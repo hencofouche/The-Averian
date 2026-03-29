@@ -1,10 +1,10 @@
-const CACHE_NAME = 'bird-manager-v5';
+const CACHE_NAME = 'bird-manager-v6';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
   '/manifest.json',
-  'https://placehold.co/192x192/0a0a0a/eab308/png?text=Bird',
-  'https://placehold.co/512x512/0a0a0a/eab308/png?text=Bird'
+  '/192.jpg',
+  '/512.jpg'
 ];
 
 self.addEventListener('install', (event) => {

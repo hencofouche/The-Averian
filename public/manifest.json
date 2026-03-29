@@ -8,21 +8,21 @@
   "theme_color": "#eab308",
   "icons": [
     {
-      "src": "https://drive.google.com/file/d/1Pv9TO2OzIKW5TuNnGqWwDmXhvs8eUsk9/view?usp=sharing",
+      "src": "/192.jpg",
       "sizes": "192x192",
-      "type": "image/png",
+      "type": "image/jpeg",
       "purpose": "any"
     },
     {
-      "src": "https://drive.google.com/file/d/1rflzlJ0nopR95HkooBoRayG71LNbic63/view?usp=sharing",
+      "src": "/512.jpg",
       "sizes": "512x512",
-      "type": "image/png",
+      "type": "image/jpeg",
       "purpose": "any"
     },
     {
-      "src": "https://drive.google.com/file/d/1Pv9TO2OzIKW5TuNnGqWwDmXhvs8eUsk9/view?usp=sharing",
+      "src": "/192.jpg",
       "sizes": "192x192",
-      "type": "image/png",
+      "type": "image/jpeg",
       "purpose": "maskable"
     }
   ]
