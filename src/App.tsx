@@ -215,7 +215,16 @@ const SearchableSelect = ({
 // --- Subscription Gate ---
 
 function SubscriptionGate({ settings, onRenew, children }: { settings: UserSettings | null, onRenew: () => void, children: React.ReactNode }) {
-  if (!settings) return <>{children}</>;
+  if (!settings) {
+    return (
+      <div className="min-h-screen bg-black-950 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="text-gold-500 animate-spin" size={40} />
+          <p className="text-black-500 font-black uppercase tracking-widest text-[10px]">Loading Account...</p>
+        </div>
+      </div>
+    );
+  }
 
   const expiryDate = settings.account_expiry_date ? new Date(settings.account_expiry_date) : null;
   const now = new Date();
@@ -337,41 +346,50 @@ export default function App() {
     }
   }, [user, userSettings]);
 
+  const [isSyncing, setIsSyncing] = useState(false);
+
   useEffect(() => {
     if (!user) return;
 
     const qBirds = query(collection(db, 'birds'), where('uid', '==', user.uid));
     const unsubBirds = onSnapshot(qBirds, (snapshot) => {
       setBirds(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Bird)));
+      setIsSyncing(snapshot.metadata.hasPendingWrites);
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'birds'));
 
     const qCages = query(collection(db, 'cages'), where('uid', '==', user.uid));
     const unsubCages = onSnapshot(qCages, (snapshot) => {
       setCages(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Cage)));
+      setIsSyncing(snapshot.metadata.hasPendingWrites);
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'cages'));
 
     const qPairs = query(collection(db, 'pairs'), where('uid', '==', user.uid));
     const unsubPairs = onSnapshot(qPairs, (snapshot) => {
       setPairs(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Pair)));
+      setIsSyncing(snapshot.metadata.hasPendingWrites);
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'pairs'));
 
     const qBreeding = query(collection(db, 'breedingRecords'), where('uid', '==', user.uid));
     const unsubBreeding = onSnapshot(qBreeding, (snapshot) => {
       setBreedingRecords(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as BreedingRecord)));
+      setIsSyncing(snapshot.metadata.hasPendingWrites);
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'breedingRecords'));
 
     const qTasks = query(collection(db, 'tasks'), where('uid', '==', user.uid));
     const unsubTasks = onSnapshot(qTasks, (snapshot) => {
       setTasks(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Task)));
+      setIsSyncing(snapshot.metadata.hasPendingWrites);
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'tasks'));
 
     const qTransactions = query(collection(db, 'transactions'), where('uid', '==', user.uid), orderBy('date', 'desc'));
     const unsubTransactions = onSnapshot(qTransactions, (snapshot) => {
       setTransactions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Transaction)));
+      setIsSyncing(snapshot.metadata.hasPendingWrites);
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'transactions'));
 
     const docRef = doc(db, 'userSettings', user.uid);
     const unsubSettings = onSnapshot(docRef, (docSnap) => {
+      setIsSyncing(docSnap.metadata.hasPendingWrites);
       if (docSnap.exists()) {
         const data = docSnap.data() as UserSettings;
         // If expiry date is missing for some reason, fix it with a trial
@@ -596,6 +614,13 @@ export default function App() {
         </nav>
 
         <div className="mt-auto pt-6 border-t border-black-800 shrink-0">
+          <div className="px-2 mb-4 flex items-center justify-between">
+            <span className="text-[9px] font-black uppercase tracking-widest text-black-600">Cloud Sync</span>
+            <div className="flex items-center gap-2">
+              <span className="text-[8px] font-black uppercase tracking-widest text-black-500">{isSyncing ? 'Syncing...' : 'Synced'}</span>
+              <div className={cn("w-1.5 h-1.5 rounded-full", isSyncing ? "bg-gold-500 animate-pulse" : "bg-emerald-500")} />
+            </div>
+          </div>
           {userSettings && (
             <div className="px-2 mb-4">
               <div className={cn(
@@ -719,7 +744,8 @@ export default function App() {
                 "grid gap-4",
                 activeTab === 'tasks' ? "max-w-3xl mx-auto grid-cols-1" : 
                 activeTab === 'financials' ? "grid-cols-1" :
-                viewMode === 'grid-large' ? "grid-cols-1 md:grid-cols-2 lg:grid-cols-3" :
+                activeTab === 'settings' || activeTab === 'subscription' ? "grid-cols-1 max-w-7xl mx-auto w-full" :
+                viewMode === 'grid-large' ? "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5" :
                 "grid-cols-1 max-w-4xl mx-auto"
               )}>
                 {activeTab === 'birds' && (
@@ -2030,7 +2056,7 @@ function SubscriptionView({ settings, onRenew }: { settings: UserSettings, onRen
   };
 
   return (
-    <div className="max-w-4xl mx-auto p-4 sm:p-6 space-y-6">
+    <div className="max-w-7xl mx-auto p-4 sm:p-6 space-y-6">
       <h2 className="text-2xl font-black uppercase tracking-widest text-gold-500 mb-6">Subscription Status</h2>
       
       <Card className="p-6 sm:p-8 bg-black-900 border-black-800 flex flex-col md:flex-row items-center justify-between gap-6">
@@ -2144,9 +2170,9 @@ function SettingsView({ settings, onUpdate }: { settings: UserSettings, onUpdate
   );
 
   return (
-    <div className="max-w-4xl mx-auto p-4 sm:p-6 h-full flex flex-col lg:flex-row gap-6 overflow-hidden">
+    <div className="max-w-7xl mx-auto p-4 sm:p-6 min-h-[600px] flex flex-col lg:flex-row gap-8">
       {/* Sidebar / Categories */}
-      <div className="w-full lg:w-72 space-y-3 flex-shrink-0">
+      <div className="w-full lg:w-80 space-y-3 flex-shrink-0">
         <SettingRow 
           icon={User} 
           title="General" 
@@ -2178,7 +2204,7 @@ function SettingsView({ settings, onUpdate }: { settings: UserSettings, onUpdate
       </div>
 
       {/* Content Area */}
-      <div className="flex-1 bg-black-900/50 border border-black-800 rounded-3xl p-6 overflow-y-auto custom-scrollbar">
+      <div className="flex-1 bg-black-900/50 border border-black-800 rounded-3xl p-6 lg:p-8 overflow-y-auto custom-scrollbar">
         <AnimatePresence mode="wait">
           {activeSection === 'general' && (
             <motion.div 
@@ -2224,7 +2250,7 @@ function SettingsView({ settings, onUpdate }: { settings: UserSettings, onUpdate
                   <Input placeholder="New species name..." value={newSpecies} onChange={e => setNewSpecies(e.target.value)} onKeyDown={e => e.key === 'Enter' && addSpecies()} />
                   <Button onClick={addSpecies} variant="secondary" className="px-4"><Plus size={18} /></Button>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
                   {settings.species?.map(s => (
                     <div key={s.id} className="p-3 bg-black-950 border border-black-800 rounded-xl flex items-center justify-between group">
                       <span className="text-sm font-bold text-white">{s.name}</span>
@@ -2272,7 +2298,7 @@ function SettingsView({ settings, onUpdate }: { settings: UserSettings, onUpdate
                     return (
                       <div key={s.id} className="space-y-2">
                         <p className="text-[10px] font-black text-black-500 uppercase tracking-widest ml-1">{s.name} Sub-species</p>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
                           {subs.map(ss => (
                             <div key={ss.id} className="p-3 bg-black-950 border border-black-800 rounded-xl flex items-center justify-between group">
                               <span className="text-sm font-bold text-white">{ss.name}</span>
@@ -2308,7 +2334,7 @@ function SettingsView({ settings, onUpdate }: { settings: UserSettings, onUpdate
                   <Input placeholder="New mutation name..." value={newMutation} onChange={e => setNewMutation(e.target.value)} onKeyDown={e => e.key === 'Enter' && addMutation()} />
                   <Button onClick={addMutation} variant="secondary" className="px-4"><Plus size={18} /></Button>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
                   {settings.mutations?.map(m => (
                     <div key={m.id} className="p-3 bg-black-950 border border-black-800 rounded-xl flex items-center justify-between group">
                       <span className="text-sm font-bold text-white">{m.name}</span>

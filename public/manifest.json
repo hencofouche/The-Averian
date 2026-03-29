@@ -1,29 +1,26 @@
 {
+  "id": "the-averian-pwa",
   "name": "The Averian",
   "short_name": "The Averian",
   "description": "Manage your bird pairings and clutches online and offline.",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#0a0a0a",
   "theme_color": "#eab308",
+  "orientation": "any",
   "icons": [
     {
       "src": "/192.png",
       "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any"
+      "type": "image/jpeg",
+      "purpose": "any maskable"
     },
     {
       "src": "/512.png",
       "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "/192.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "maskable"
+      "type": "image/jpeg",
+      "purpose": "any maskable"
     }
   ]
 }
