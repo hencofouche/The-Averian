@@ -18,6 +18,9 @@ async function startServer() {
 
   app.post("/api/create-checkout", async (req, res) => {
     try {
+      const { origin } = req.body;
+      const baseOrigin = origin || req.headers.origin || "https://the-averian-alpha.vercel.app";
+      
       const response = await fetch('https://payments.yoco.com/api/checkouts', {
         method: 'POST',
         headers: {
@@ -27,8 +30,8 @@ async function startServer() {
         body: JSON.stringify({
           amount: 45000,
           currency: 'ZAR',
-          successUrl: `${req.headers.origin}/?payment=success`,
-          cancelUrl: `${req.headers.origin}/?payment=cancel`
+          successUrl: `${baseOrigin}/?payment=success`,
+          cancelUrl: `${baseOrigin}/?payment=cancel`
         })
       });
       const data = await response.json();

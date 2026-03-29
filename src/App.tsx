@@ -223,8 +223,11 @@ function SubscriptionGate({ settings, onRenew, children }: { settings: UserSetti
 
   const handlePay = async () => {
     try {
+      // Use window.location.origin to ensure we pass the correct current domain to the server
       const response = await fetch('/api/create-checkout', {
-        method: 'POST'
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ origin: window.location.origin })
       });
       const data = await response.json();
       if (data.redirectUrl) {
@@ -261,10 +264,10 @@ function SubscriptionGate({ settings, onRenew, children }: { settings: UserSetti
 
   return (
     <div className="flex flex-col h-screen">
-      {daysLeft > 0 && daysLeft <= 30 && (
+      {daysLeft >= 0 && (
         <div className="bg-gold-500 text-black-950 px-4 py-1.5 text-center text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 flex-shrink-0">
           <AlertTriangle size={14} />
-          {daysLeft} days left in your trial/subscription
+          {daysLeft === 0 ? "Last day" : `${daysLeft} days left`} in your {daysLeft <= 30 ? 'trial' : 'subscription'}
           <button onClick={handlePay} className="ml-4 underline hover:text-white transition-colors">Renew Now</button>
         </div>
       )}
@@ -322,6 +325,7 @@ export default function App() {
     const params = new URLSearchParams(window.location.search);
     if (params.get('payment') === 'success') {
       handleRenew();
+      alert("Payment successful! Your subscription has been extended by 1 year.");
       window.history.replaceState({}, document.title, window.location.pathname);
     }
   }, [user, userSettings]);
@@ -572,6 +576,35 @@ export default function App() {
         </nav>
 
         <div className="mt-auto pt-6 border-t border-black-800 shrink-0">
+          {userSettings && (
+            <div className="px-2 mb-4">
+              <div className={cn(
+                "p-3 rounded-2xl border flex flex-col gap-1",
+                (userSettings.account_expiry_date && new Date(userSettings.account_expiry_date) < new Date())
+                  ? "bg-red-500/10 border-red-500/20"
+                  : "bg-gold-500/10 border-gold-500/20"
+              )}>
+                <div className="flex items-center justify-between">
+                  <span className="text-[9px] font-black uppercase tracking-widest text-black-500">Status</span>
+                  <div className={cn(
+                    "w-1.5 h-1.5 rounded-full animate-pulse",
+                    (userSettings.account_expiry_date && new Date(userSettings.account_expiry_date) < new Date())
+                      ? "bg-red-500"
+                      : "bg-emerald-500"
+                  )} />
+                </div>
+                <p className="text-[11px] font-black text-white uppercase tracking-tighter">
+                  {(() => {
+                    const expiry = userSettings.account_expiry_date ? new Date(userSettings.account_expiry_date) : null;
+                    if (!expiry) return 'No Subscription';
+                    if (new Date() > expiry) return 'Expired';
+                    const days = Math.ceil((expiry.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+                    return days === 0 ? 'Last Day' : `${days} Days Left`;
+                  })()}
+                </p>
+              </div>
+            </div>
+          )}
           <div className="flex items-center gap-3 px-2 mb-6">
             <div className="w-10 h-10 rounded-full bg-black-800 border border-black-700 flex items-center justify-center text-black-400 overflow-hidden shadow-inner shrink-0">
               {user.photoURL ? <img src={user.photoURL} alt="" referrerPolicy="no-referrer" /> : <User size={18} />}
@@ -1951,7 +1984,9 @@ function SubscriptionView({ settings, onRenew }: { settings: UserSettings, onRen
   const handlePay = async () => {
     try {
       const response = await fetch('/api/create-checkout', {
-        method: 'POST'
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ origin: window.location.origin })
       });
       const data = await response.json();
       if (data.redirectUrl) {
