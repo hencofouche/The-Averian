@@ -103,6 +103,7 @@ export interface Task {
   priority?: 'Low' | 'Medium' | 'High';
   category?: string;
   dueDate?: string;
+  reminderDate?: string;
   birdIds: string[];
   subTasks: SubTask[];
   uid: string;

@@ -6,7 +6,7 @@ import {
   Tag, Calendar, ChevronDown, ChevronUp, ChevronRight, X, GitBranch,
   Image as ImageIcon, Loader2, DollarSign, TrendingUp, TrendingDown,
   Activity, ArrowUpRight, ArrowDownRight, BarChart3, PieChart as PieChartIcon,
-  Menu, Egg, LayoutGrid, Grid3x3, List as ListIcon, AlertTriangle, CreditCard, CheckCircle2
+  Menu, Egg, LayoutGrid, Grid3x3, List as ListIcon, AlertTriangle, CreditCard, CheckCircle2, Bell
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -14,7 +14,7 @@ import {
   BarChart, Bar, Cell, Legend, PieChart, Pie, AreaChart, Area
 } from 'recharts';
 import { 
-  auth, db, loginWithGoogle, logout, handleFirestoreError, uploadToDrive 
+  auth, db, loginWithGoogle, logout, handleFirestoreError 
 } from './firebase';
 import { 
   onAuthStateChanged, User as FirebaseUser 
@@ -46,9 +46,9 @@ const Button = ({
 }: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'primary' | 'secondary' | 'danger' | 'ghost' }) => {
   const variants = {
     primary: 'bg-gold-500 text-black-950 hover:bg-gold-600 shadow-lg shadow-gold-500/20',
-    secondary: 'bg-black-900 text-gold-500 hover:bg-black-800 border border-gold-500/30',
+    secondary: 'bg-zinc-800 text-gold-500 hover:bg-zinc-700 border border-gold-500/30',
     danger: 'bg-red-950/30 text-red-500 hover:bg-red-900/40 border border-red-500/30',
-    ghost: 'bg-transparent text-black-400 hover:bg-black-900 hover:text-gold-500',
+    ghost: 'bg-transparent text-black-50 hover:bg-black-900 hover:text-gold-500',
   };
   return (
     <button 
@@ -62,14 +62,14 @@ const Button = ({
 
 const Input = ({ className, ...props }: React.InputHTMLAttributes<HTMLInputElement>) => (
   <input 
-    className={cn('w-full px-3 py-2 bg-black-900 border border-black-800 text-black-50 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-500/50 transition-all placeholder:text-black-600', className)} 
+    className={cn('w-full px-4 py-3 bg-black border border-black-700 text-white rounded-2xl focus:outline-none focus:ring-2 focus:ring-gold-500/20 focus:border-gold-500 transition-all placeholder:text-white/30 text-sm font-medium', className)} 
     {...props} 
   />
 );
 
 const Select = ({ className, children, ...props }: React.SelectHTMLAttributes<HTMLSelectElement>) => (
   <select 
-    className={cn('w-full px-3 py-2 bg-black-900 border border-black-800 text-black-50 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-500/50 transition-all appearance-none', className)} 
+    className={cn('w-full px-4 py-3 bg-black border border-black-700 text-white rounded-2xl focus:outline-none focus:ring-2 focus:ring-gold-500/20 focus:border-gold-500 transition-all appearance-none text-sm font-medium', className)} 
     {...props}
   >
     {children}
@@ -77,21 +77,21 @@ const Select = ({ className, children, ...props }: React.SelectHTMLAttributes<HT
 );
 
 const Card = ({ children, className, ...props }: { children: React.ReactNode, className?: string } & React.HTMLAttributes<HTMLDivElement>) => (
-  <div className={cn('bg-black-900 border border-black-800 rounded-xl overflow-hidden shadow-xl', className)} {...props}>
+  <div className={cn('bg-zinc-800 border border-black-700 rounded-2xl overflow-hidden shadow-2xl', className)} {...props}>
     {children}
   </div>
 );
 
 const Badge = ({ children, className, variant = 'neutral' }: { children: React.ReactNode, className?: string, variant?: 'neutral' | 'success' | 'warning' | 'info' | 'destructive' }) => {
   const variants = {
-    neutral: 'bg-black-800 text-black-400 border border-black-700',
-    success: 'bg-emerald-950/30 text-emerald-500 border border-emerald-500/30',
-    warning: 'bg-amber-950/30 text-amber-500 border border-amber-500/30',
-    info: 'bg-gold-950/30 text-gold-500 border border-gold-500/30',
-    destructive: 'bg-rose-950/30 text-rose-500 border border-rose-500/30',
+    neutral: 'bg-black text-white border border-black-700',
+    success: 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30',
+    warning: 'bg-amber-500/20 text-amber-400 border border-amber-500/30',
+    info: 'bg-gold-500/20 text-gold-400 border border-gold-500/30',
+    destructive: 'bg-rose-500/20 text-rose-400 border border-rose-500/30',
   };
   return (
-    <span className={cn('px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider', variants[variant], className)}>
+    <span className={cn('px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest', variants[variant], className)}>
       {children}
     </span>
   );
@@ -129,15 +129,15 @@ const SearchableSelect = ({
 
   return (
     <div className="relative space-y-1">
-      <label className="text-[10px] font-black text-black-500 uppercase tracking-widest ml-1">{label}</label>
+      <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">{label}</label>
       <div 
         className={cn(
-          "w-full px-3 py-2 bg-black-900 border border-black-800 text-black-50 rounded-lg cursor-pointer flex items-center justify-between",
+          "w-full px-4 py-3 bg-black border border-black-700 text-white rounded-2xl cursor-pointer flex items-center justify-between transition-all text-sm font-medium",
           disabled && "opacity-50 cursor-not-allowed"
         )}
         onClick={() => !disabled && setIsOpen(!isOpen)}
       >
-        <span className={cn("truncate", !value && !selectedValues.length && "text-black-600")}>
+        <span className={cn("truncate", !value && !selectedValues.length && "text-black-100")}>
           {multi 
             ? (selectedValues.length ? selectedValues.join(', ') : placeholder)
             : (options.find(o => o.id === value)?.name || placeholder)
@@ -154,7 +154,7 @@ const SearchableSelect = ({
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
-              className="absolute z-20 w-full mt-1 bg-black-900 border border-black-800 rounded-xl shadow-2xl overflow-hidden"
+              className="absolute z-20 w-full mt-1 bg-black border border-black-700 rounded-2xl shadow-2xl overflow-hidden"
             >
               <div className="p-2 border-b border-black-800">
                 <Input 
@@ -171,8 +171,8 @@ const SearchableSelect = ({
                     <div 
                       key={opt.id}
                       className={cn(
-                        "px-3 py-2 text-xs cursor-pointer hover:bg-black-800 transition-colors flex items-center justify-between",
-                        (multi ? selectedValues.includes(opt.name) : value === opt.id) && "text-gold-500 bg-black-800"
+                        "px-3 py-2 text-xs cursor-pointer hover:bg-zinc-700 transition-colors flex items-center justify-between",
+                        (multi ? selectedValues.includes(opt.name) : value === opt.id) && "text-gold-500 bg-zinc-700"
                       )}
                       onClick={() => {
                         onChange(opt.id);
@@ -184,7 +184,7 @@ const SearchableSelect = ({
                     </div>
                   ))
                 ) : (
-                  <div className="px-3 py-4 text-center text-[10px] text-black-500 uppercase tracking-widest font-bold">
+                  <div className="px-3 py-4 text-center text-[10px] text-black-100 uppercase tracking-widest font-bold">
                     No results found
                   </div>
                 )}
@@ -217,10 +217,10 @@ const SearchableSelect = ({
 function SubscriptionGate({ settings, onRenew, children }: { settings: UserSettings | null, onRenew: () => void, children: React.ReactNode }) {
   if (!settings) {
     return (
-      <div className="min-h-screen bg-black-950 flex items-center justify-center">
+      <div className="min-h-screen bg-black flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
           <Loader2 className="text-gold-500 animate-spin" size={40} />
-          <p className="text-black-500 font-black uppercase tracking-widest text-[10px]">Loading Account...</p>
+          <p className="text-black-100 font-black uppercase tracking-widest text-[10px]">Loading Account...</p>
         </div>
       </div>
     );
@@ -258,21 +258,21 @@ function SubscriptionGate({ settings, onRenew, children }: { settings: UserSetti
 
   if (isExpired) {
     return (
-      <div className="fixed inset-0 z-[100] bg-black-950 flex items-center justify-center p-4">
+      <div className="fixed inset-0 z-[100] bg-black flex items-center justify-center p-4">
         <div className="max-w-md w-full bg-black-900 border border-gold-500/30 rounded-3xl p-8 text-center space-y-6 shadow-2xl shadow-gold-500/10">
           <div className="w-20 h-20 bg-gold-500/10 rounded-full flex items-center justify-center mx-auto border border-gold-500/20">
             <CreditCard className="text-gold-500" size={40} />
           </div>
           <div className="space-y-2">
             <h2 className="text-2xl font-black uppercase tracking-widest text-white">Subscription Expired</h2>
-            <p className="text-black-400 font-bold uppercase tracking-tighter text-xs">Your trial or subscription has ended. Please renew to continue managing your aviary.</p>
+            <p className="text-black-50 font-bold uppercase tracking-tighter text-xs">Your trial or subscription has ended. Please renew to continue managing your aviary.</p>
           </div>
           <div className="py-4 border-y border-black-800 space-y-1">
             <p className="text-3xl font-black text-gold-500">R450.00</p>
-            <p className="text-[10px] font-black text-black-500 uppercase tracking-widest">Per Year</p>
+            <p className="text-[10px] font-black text-black-100 uppercase tracking-widest">Per Year</p>
           </div>
           <Button onClick={handlePay} className="w-full py-6 text-lg">Renew Now</Button>
-          <p className="text-[9px] font-bold text-black-600 uppercase tracking-widest">Secure payment powered by Yoco</p>
+          <p className="text-[9px] font-bold text-black-200 uppercase tracking-widest">Secure payment powered by Yoco</p>
         </div>
       </div>
     );
@@ -347,6 +347,50 @@ export default function App() {
   }, [user, userSettings]);
 
   const [isSyncing, setIsSyncing] = useState(false);
+
+  useEffect(() => {
+    if (!user || tasks.length === 0) return;
+
+    if ('Notification' in window && Notification.permission !== 'granted' && Notification.permission !== 'denied') {
+      Notification.requestPermission();
+    }
+
+    const interval = setInterval(() => {
+      const now = new Date();
+      tasks.forEach(task => {
+        if (task.status !== 'Completed' && task.reminderDate) {
+          const reminderTime = new Date(task.reminderDate);
+          const diff = now.getTime() - reminderTime.getTime();
+          // Notify if the reminder time has passed within the last 60 seconds
+          if (diff >= 0 && diff < 60000) {
+            const notifiedKey = `notified_${task.id}_${task.reminderDate}`;
+            if (!localStorage.getItem(notifiedKey)) {
+              localStorage.setItem(notifiedKey, 'true');
+              if ('Notification' in window && Notification.permission === 'granted') {
+                if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+                  navigator.serviceWorker.ready.then(registration => {
+                    registration.showNotification('The Averian Reminder', {
+                      body: task.title,
+                      icon: '/192.png?v=10'
+                    });
+                  });
+                } else {
+                  new Notification('The Averian Reminder', {
+                    body: task.title,
+                    icon: '/192.png?v=10'
+                  });
+                }
+              } else {
+                alert(`Reminder: ${task.title}`);
+              }
+            }
+          }
+        }
+      });
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, [user, tasks]);
 
   useEffect(() => {
     if (!user) return;
@@ -531,7 +575,7 @@ export default function App() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-black-950">
+      <div className="min-h-screen flex items-center justify-center bg-black">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gold-500"></div>
       </div>
     );
@@ -539,14 +583,14 @@ export default function App() {
 
   if (!user) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-black-950 p-4">
+      <div className="min-h-screen flex flex-col items-center justify-center bg-black p-4">
         <div className="w-full max-w-md text-center space-y-8">
           <div className="space-y-2">
             <div className="inline-flex items-center justify-center w-20 h-20 rounded-3xl bg-gold-500 text-black-950 mb-4 shadow-2xl shadow-gold-500/20">
               <BirdIcon size={40} />
             </div>
             <h1 className="text-5xl font-black tracking-tighter text-white">THE AV<span className="text-gold-500">ERIAN</span></h1>
-            <p className="text-black-400 font-medium">Professional bird breeding management</p>
+            <p className="text-black-50 font-medium">Professional bird breeding management</p>
           </div>
           <Button 
             onClick={handleLogin} 
@@ -579,15 +623,15 @@ export default function App() {
 
   return (
     <SubscriptionGate settings={userSettings} onRenew={handleRenew}>
-      <div className="min-h-screen bg-black-950 text-black-50 flex font-sans overflow-hidden">
+      <div className="min-h-screen bg-black text-white flex font-sans overflow-hidden">
       {/* Mobile Overlay */}
       {isMobileMenuOpen && (
-        <div className="fixed inset-0 bg-black-950/80 z-40 md:hidden backdrop-blur-sm" onClick={() => setIsMobileMenuOpen(false)} />
+        <div className="fixed inset-0 bg-black/80 z-40 md:hidden backdrop-blur-sm" onClick={() => setIsMobileMenuOpen(false)} />
       )}
 
       {/* Sidebar */}
       <aside className={cn(
-        "fixed inset-y-0 left-0 z-50 w-64 bg-black-950 border-r border-black-800 p-4 flex flex-col transition-transform duration-300 ease-in-out md:relative md:translate-x-0",
+        "fixed inset-y-0 left-0 z-50 w-64 bg-black border-r border-black-800 p-4 flex flex-col transition-transform duration-300 ease-in-out md:relative md:translate-x-0",
         isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
       )}>
         <div className="flex items-center justify-between px-2 mb-10">
@@ -597,7 +641,7 @@ export default function App() {
             </div>
             <span className="font-black text-2xl tracking-tighter text-white">THE AV<span className="text-gold-500">ERIAN</span></span>
           </div>
-          <button className="md:hidden text-black-400 hover:text-white" onClick={() => setIsMobileMenuOpen(false)}>
+          <button className="md:hidden text-black-50 hover:text-white" onClick={() => setIsMobileMenuOpen(false)}>
             <X size={24} />
           </button>
         </div>
@@ -607,7 +651,7 @@ export default function App() {
           <NavItem active={activeTab === 'cages'} onClick={() => handleNavigate('cages')} icon={<Home size={18} />} label="Cages" count={cages.length} />
           <NavItem active={activeTab === 'pairs'} onClick={() => handleNavigate('pairs')} icon={<Heart size={18} />} label="Pairs" count={pairs.length} />
           <NavItem active={activeTab === 'breeding'} onClick={() => handleNavigate('breeding')} icon={<Egg size={18} />} label="Breeding" count={breedingRecords.length} />
-          <NavItem active={activeTab === 'tasks'} onClick={() => handleNavigate('tasks')} icon={<CheckSquare size={18} />} label="Tasks" count={tasks.length} />
+          <NavItem active={activeTab === 'tasks'} onClick={() => handleNavigate('tasks')} icon={<CheckSquare size={18} />} label="Tasks & Reminders" count={tasks.length} />
           <NavItem active={activeTab === 'financials'} onClick={() => handleNavigate('financials')} icon={<DollarSign size={18} />} label="Financials" count={transactions.length} />
           <NavItem active={activeTab === 'subscription'} onClick={() => handleNavigate('subscription')} icon={<CreditCard size={18} />} label="Subscription" count={0} />
           <NavItem active={activeTab === 'settings'} onClick={() => handleNavigate('settings')} icon={<Tag size={18} />} label="Settings" count={0} />
@@ -615,9 +659,9 @@ export default function App() {
 
         <div className="mt-auto pt-6 border-t border-black-800 shrink-0">
           <div className="px-2 mb-4 flex items-center justify-between">
-            <span className="text-[9px] font-black uppercase tracking-widest text-black-600">Cloud Sync</span>
+            <span className="text-[9px] font-black uppercase tracking-widest text-black-200">Cloud Sync</span>
             <div className="flex items-center gap-2">
-              <span className="text-[8px] font-black uppercase tracking-widest text-black-500">{isSyncing ? 'Syncing...' : 'Synced'}</span>
+              <span className="text-[8px] font-black uppercase tracking-widest text-black-100">{isSyncing ? 'Syncing...' : 'Synced'}</span>
               <div className={cn("w-1.5 h-1.5 rounded-full", isSyncing ? "bg-gold-500 animate-pulse" : "bg-emerald-500")} />
             </div>
           </div>
@@ -630,7 +674,7 @@ export default function App() {
                   : "bg-gold-500/10 border-gold-500/20"
               )}>
                 <div className="flex items-center justify-between">
-                  <span className="text-[9px] font-black uppercase tracking-widest text-black-500">Status</span>
+                  <span className="text-[9px] font-black uppercase tracking-widest text-black-100">Status</span>
                   <div className={cn(
                     "w-1.5 h-1.5 rounded-full animate-pulse",
                     (userSettings.account_expiry_date && new Date(userSettings.account_expiry_date) < new Date())
@@ -652,15 +696,15 @@ export default function App() {
             </div>
           )}
           <div className="flex items-center gap-3 px-2 mb-6">
-            <div className="w-10 h-10 rounded-full bg-black-800 border border-black-700 flex items-center justify-center text-black-400 overflow-hidden shadow-inner shrink-0">
+            <div className="w-10 h-10 rounded-full bg-zinc-700 border border-black-700 flex items-center justify-center text-white overflow-hidden shadow-inner shrink-0">
               {user.photoURL ? <img src={user.photoURL} alt="" referrerPolicy="no-referrer" /> : <User size={18} />}
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-bold text-white truncate">{user.displayName}</p>
-              <p className="text-[10px] text-black-500 truncate uppercase tracking-widest">{user.email}</p>
+              <p className="text-[10px] text-black-100 truncate uppercase tracking-widest">{user.email}</p>
             </div>
           </div>
-          <Button variant="ghost" onClick={logout} className="w-full justify-start text-black-500 hover:text-red-500 hover:bg-red-500/10">
+          <Button variant="ghost" onClick={logout} className="w-full justify-start text-black-100 hover:text-red-500 hover:bg-red-500/10">
             <LogOut size={16} />
             Logout
           </Button>
@@ -668,17 +712,17 @@ export default function App() {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden bg-black-950">
-        <header className="shrink-0 bg-black-950/80 backdrop-blur-md border-b border-black-800 px-4 md:px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between sticky top-0 z-10 gap-4">
+      <main className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden bg-black">
+        <header className="shrink-0 bg-black/80 backdrop-blur-md border-b border-black-800 px-4 md:px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between sticky top-0 z-10 gap-4">
           <div className="flex items-center justify-between w-full sm:w-auto">
             <div className="flex items-center gap-3">
-              <button className="md:hidden p-2 -ml-2 text-black-400 hover:text-white" onClick={() => setIsMobileMenuOpen(true)}>
+              <button className="md:hidden p-2 -ml-2 text-black-50 hover:text-white" onClick={() => setIsMobileMenuOpen(true)}>
                 <Menu size={24} />
               </button>
-              <h2 className="text-xl font-black uppercase tracking-widest text-white">{activeTab}</h2>
+              <h2 className="text-xl font-black uppercase tracking-widest text-white">{activeTab === 'tasks' ? 'Tasks & Reminders' : activeTab}</h2>
             </div>
             {activeTab !== 'settings' && activeTab !== 'subscription' && (
-              <Button onClick={() => { setEditingItem(null); setIsModalOpen(true); }} className="sm:hidden h-10 px-3 text-sm font-bold">
+              <Button onClick={() => { setEditingItem(null); setIsModalOpen(true); }} className="sm:hidden py-3 px-4 text-sm font-bold">
                 <Plus size={18} />
               </Button>
             )}
@@ -687,17 +731,17 @@ export default function App() {
           <div className="flex items-center gap-2 w-full sm:w-auto mt-2 sm:mt-0">
             {activeTab !== 'settings' && activeTab !== 'subscription' && (
               <div className="relative flex-1 sm:w-64">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-black-500" size={16} />
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-black-100" size={16} />
                 <Input 
-                  placeholder={`Search ${activeTab}...`} 
-                  className="pl-10 pr-10 w-full h-10 text-sm"
+                  placeholder={`Search ${activeTab === 'tasks' ? 'tasks & reminders' : activeTab}...`} 
+                  className="pl-11 pr-10 w-full text-sm"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
                 {searchQuery && (
                   <button 
                     onClick={() => setSearchQuery('')}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-black-500 hover:text-white transition-colors"
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-black-100 hover:text-white transition-colors"
                   >
                     <X size={14} />
                   </button>
@@ -709,13 +753,13 @@ export default function App() {
               <div className="flex items-center bg-black-900 rounded-lg p-1 border border-black-800 shrink-0">
                 <button 
                   onClick={() => setViewMode('grid-large')}
-                  className={cn("p-1.5 rounded-md transition-colors", viewMode === 'grid-large' ? "bg-black-800 text-gold-500" : "text-black-500 hover:text-white")}
+                  className={cn("p-1.5 rounded-md transition-colors", viewMode === 'grid-large' ? "bg-zinc-700 text-gold-500" : "text-black-100 hover:text-white")}
                 >
                   <LayoutGrid size={16} />
                 </button>
                 <button 
                   onClick={() => setViewMode('list')}
-                  className={cn("p-1.5 rounded-md transition-colors", viewMode === 'list' ? "bg-black-800 text-gold-500" : "text-black-500 hover:text-white")}
+                  className={cn("p-1.5 rounded-md transition-colors", viewMode === 'list' ? "bg-zinc-700 text-gold-500" : "text-black-100 hover:text-white")}
                 >
                   <ListIcon size={16} />
                 </button>
@@ -723,9 +767,9 @@ export default function App() {
             )}
             
             {activeTab !== 'settings' && activeTab !== 'subscription' && (
-              <Button onClick={() => { setEditingItem(null); setIsModalOpen(true); }} className="hidden sm:flex h-10 px-4 text-sm font-bold uppercase tracking-widest">
+              <Button onClick={() => { setEditingItem(null); setIsModalOpen(true); }} className="hidden sm:flex py-3 px-5 text-sm font-bold uppercase tracking-widest">
                 <Plus size={18} />
-                <span className="ml-2">Add {activeTab === 'breeding' ? 'Record' : activeTab.slice(0, -1)}</span>
+                <span className="ml-2">Add {activeTab === 'breeding' ? 'Record' : activeTab === 'tasks' ? 'Task / Reminder' : activeTab.slice(0, -1)}</span>
               </Button>
             )}
           </div>
@@ -773,8 +817,8 @@ export default function App() {
                     ))
                   ) : (
                     <div className="col-span-full py-20 text-center bg-black-900/30 border border-dashed border-black-800 rounded-3xl">
-                      <BirdIcon size={48} className="mx-auto text-black-800 mb-4" />
-                      <p className="text-black-500 font-black uppercase tracking-widest">No birds found</p>
+                      <BirdIcon size={48} className="mx-auto text-black-300 mb-4" />
+                      <p className="text-black-100 font-black uppercase tracking-widest">No birds found</p>
                     </div>
                   )
                 )}
@@ -802,8 +846,8 @@ export default function App() {
                     ))
                   ) : (
                     <div className="col-span-full py-20 text-center bg-black-900/30 border border-dashed border-black-800 rounded-3xl">
-                      <Home size={48} className="mx-auto text-black-800 mb-4" />
-                      <p className="text-black-500 font-black uppercase tracking-widest">No cages found</p>
+                      <Home size={48} className="mx-auto text-black-300 mb-4" />
+                      <p className="text-black-100 font-black uppercase tracking-widest">No cages found</p>
                     </div>
                   )
                 )}
@@ -832,8 +876,8 @@ export default function App() {
                     ))
                   ) : (
                     <div className="col-span-full py-20 text-center bg-black-900/30 border border-dashed border-black-800 rounded-3xl">
-                      <Heart size={48} className="mx-auto text-black-800 mb-4" />
-                      <p className="text-black-500 font-black uppercase tracking-widest">No pairs found</p>
+                      <Heart size={48} className="mx-auto text-black-300 mb-4" />
+                      <p className="text-black-100 font-black uppercase tracking-widest">No pairs found</p>
                     </div>
                   )
                 )}
@@ -863,8 +907,8 @@ export default function App() {
                     ))
                   ) : (
                     <div className="col-span-full py-20 text-center bg-black-900/30 border border-dashed border-black-800 rounded-3xl">
-                      <Egg size={48} className="mx-auto text-black-800 mb-4" />
-                      <p className="text-black-500 font-black uppercase tracking-widest">No breeding records found</p>
+                      <Egg size={48} className="mx-auto text-black-300 mb-4" />
+                      <p className="text-black-100 font-black uppercase tracking-widest">No breeding records found</p>
                     </div>
                   )
                 )}
@@ -898,8 +942,8 @@ export default function App() {
                     ))
                   ) : (
                     <div className="col-span-full py-20 text-center bg-black-900/30 border border-dashed border-black-800 rounded-3xl">
-                      <CheckSquare size={48} className="mx-auto text-black-800 mb-4" />
-                      <p className="text-black-500 font-black uppercase tracking-widest">No tasks found</p>
+                      <CheckSquare size={48} className="mx-auto text-black-300 mb-4" />
+                      <p className="text-black-100 font-black uppercase tracking-widest">No tasks found</p>
                     </div>
                   )
                 )}
@@ -945,7 +989,7 @@ export default function App() {
       <Modal 
         isOpen={isModalOpen} 
         onClose={() => { setIsModalOpen(false); setEditingItem(null); }}
-        title={`${editingItem ? 'Edit' : 'Add'} ${activeTab === 'breeding' ? 'Record' : activeTab.slice(0, -1)}`}
+        title={`${editingItem ? 'Edit' : 'Add'} ${activeTab === 'breeding' ? 'Record' : activeTab === 'tasks' ? 'Task / Reminder' : activeTab.slice(0, -1)}`}
       >
         {activeTab === 'birds' && (
           <BirdForm 
@@ -983,12 +1027,12 @@ export default function App() {
 
 function NavItem({ active, onClick, icon, label, count }: { active: boolean, onClick: () => void, icon: React.ReactNode, label: string, count: number }) {
   return (
-    <button onClick={onClick} className={cn('w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold transition-all group', active ? 'bg-gold-500 text-black-950 shadow-lg shadow-gold-500/20' : 'text-black-500 hover:bg-black-900 hover:text-gold-500')}>
-      <span className={cn('transition-transform group-hover:scale-110', active ? 'text-black-950' : 'text-black-600 group-hover:text-gold-500')}>
+    <button onClick={onClick} className={cn('w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold transition-all group', active ? 'bg-gold-500 text-black-950 shadow-lg shadow-gold-500/20' : 'text-black-50 hover:bg-black-900 hover:text-gold-500')}>
+      <span className={cn('transition-transform group-hover:scale-110', active ? 'text-black-950' : 'text-black-100 group-hover:text-gold-500')}>
         {icon}
       </span>
       <span className="flex-1 text-left uppercase tracking-widest text-[11px]">{label}</span>
-      <span className={cn('text-[10px] px-2 py-0.5 rounded-lg font-black', active ? 'bg-black-950/20 text-black-950' : 'bg-black-900 text-black-600 group-hover:text-gold-500')}>{count}</span>
+      <span className={cn('text-[10px] px-2 py-0.5 rounded-lg font-black', active ? 'bg-black/20 text-black' : 'bg-zinc-800 text-white/50 group-hover:text-gold-500')}>{count}</span>
     </button>
   );
 }
@@ -1003,7 +1047,7 @@ function BirdCard({ bird, cage, birds, viewMode = 'grid-large', currency, onBird
   const mate = birds.find(b => b.id === bird.mateId);
 
   const effectiveViewMode = (viewMode === 'list' && isExpanded) ? 'grid-large' : viewMode;
-  const imageUrl = bird.imageUrl ? `https://drive.google.com/thumbnail?id=${bird.imageUrl}&sz=w800` : null;
+  const imageUrl = bird.imageUrl || null;
 
   return (
     <Card 
@@ -1014,7 +1058,7 @@ function BirdCard({ bird, cage, birds, viewMode = 'grid-large', currency, onBird
       )}
     >
       {imageUrl && effectiveViewMode !== 'list' && (
-        <div className={cn("w-full overflow-hidden bg-black-950 aspect-[4/3]")}>
+        <div className={cn("w-full overflow-hidden bg-black aspect-[4/3]")}>
           <img 
             src={imageUrl} 
             alt={bird.name} 
@@ -1036,14 +1080,14 @@ function BirdCard({ bird, cage, birds, viewMode = 'grid-large', currency, onBird
             {/* 2. Species & Sub-species */}
             <p className="text-[9px] sm:text-[10px] text-gold-500 font-black uppercase tracking-widest truncate">
               {bird.species}
-              {bird.subSpecies && <span className="text-black-500 mx-1">•</span>}
-              {bird.subSpecies && <span className="text-black-400">{bird.subSpecies}</span>}
+              {bird.subSpecies && <span className="text-white mx-1">•</span>}
+              {bird.subSpecies && <span className="text-white">{bird.subSpecies}</span>}
             </p>
           </div>
 
           {effectiveViewMode === 'list' && (
             <div className="flex items-center gap-3">
-              <ChevronRight size={20} className={cn("text-black-600 transition-transform", isExpanded && "rotate-90")} />
+              <ChevronRight size={20} className={cn("text-black-200 transition-transform", isExpanded && "rotate-90")} />
             </div>
           )}
         </div>
@@ -1051,8 +1095,8 @@ function BirdCard({ bird, cage, birds, viewMode = 'grid-large', currency, onBird
         {/* 3. Mutations / Split Mutations */}
         {(bird.mutations?.length || 0) > 0 || (bird.splitMutations?.length || 0) > 0 ? (
           <div className="flex flex-wrap gap-1">
-            {bird.mutations?.map(m => <Badge key={m} className="bg-black-800 border-black-700 text-white text-[9px] px-1.5 py-0">{m}</Badge>)}
-            {bird.splitMutations?.map(m => <Badge key={m} className="bg-black-800 border-black-700 text-gold-500 italic text-[9px] px-1.5 py-0">Split {m}</Badge>)}
+            {bird.mutations?.map(m => <Badge key={m} className="bg-zinc-700 border-black-700 text-white text-[9px] px-1.5 py-0">{m}</Badge>)}
+            {bird.splitMutations?.map(m => <Badge key={m} className="bg-zinc-700 border-black-700 text-gold-500 italic text-[9px] px-1.5 py-0">Split {m}</Badge>)}
           </div>
         ) : null}
 
@@ -1062,7 +1106,7 @@ function BirdCard({ bird, cage, birds, viewMode = 'grid-large', currency, onBird
           effectiveViewMode === 'list' ? "flex flex-wrap items-center gap-x-6 gap-y-2" : "grid grid-cols-2 gap-3"
         )}>
           <div className={cn(effectiveViewMode === 'list' ? "flex items-center gap-2" : "space-y-0.5")}>
-            <p className="text-black-500 uppercase tracking-widest font-black text-[8px]">Cage{effectiveViewMode === 'list' ? ':' : ''}</p>
+            <p className="text-white uppercase tracking-widest font-black text-[8px]">Cage{effectiveViewMode === 'list' ? ':' : ''}</p>
             {cage ? (
               <button onClick={(e) => { e.stopPropagation(); onNavigate('birds', cage.name); }} className="text-white font-bold flex items-center gap-1.5 hover:text-gold-500 transition-colors">
                 <Home size={10} className="text-gold-500" /> {cage.name}
@@ -1072,16 +1116,16 @@ function BirdCard({ bird, cage, birds, viewMode = 'grid-large', currency, onBird
             )}
           </div>
           <div className={cn(effectiveViewMode === 'list' ? "flex items-center gap-2" : "space-y-0.5")}>
-            <p className="text-black-500 uppercase tracking-widest font-black text-[8px]">Born{effectiveViewMode === 'list' ? ':' : ''}</p>
+            <p className="text-white uppercase tracking-widest font-black text-[8px]">Born{effectiveViewMode === 'list' ? ':' : ''}</p>
             <p className="text-white font-bold flex items-center gap-1.5"><Calendar size={10} className="text-gold-500" /> {bird.birthDate || 'Unknown'}</p>
           </div>
           <div className={cn(effectiveViewMode === 'list' ? "flex items-center gap-2" : "space-y-0.5")}>
-            <p className="text-black-500 uppercase tracking-widest font-black text-[8px]">Value{effectiveViewMode === 'list' ? ':' : ''}</p>
+            <p className="text-white uppercase tracking-widest font-black text-[8px]">Value{effectiveViewMode === 'list' ? ':' : ''}</p>
             <p className="text-emerald-500 font-bold flex items-center gap-1.5">{symbol}{bird.estimatedValue?.toFixed(2) || '0.00'}</p>
           </div>
           {mate && (
             <div className={cn(effectiveViewMode === 'list' ? "flex items-center gap-2" : "col-span-2 pt-1")}>
-              <p className="text-black-500 uppercase tracking-widest font-black text-[8px]">Mate{effectiveViewMode === 'list' ? ':' : ''}</p>
+              <p className="text-white uppercase tracking-widest font-black text-[8px]">Mate{effectiveViewMode === 'list' ? ':' : ''}</p>
               <button onClick={(e) => { e.stopPropagation(); onBirdRef(mate.name); }} className="text-rose-500 font-bold flex items-center gap-1.5 hover:text-rose-400 transition-colors">
                 <Heart size={10} className="fill-rose-500" /> {mate.name}
               </button>
@@ -1102,14 +1146,14 @@ function BirdCard({ bird, cage, birds, viewMode = 'grid-large', currency, onBird
         <div className="flex items-center gap-2 pt-2 border-t border-black-800/50">
           <button 
             onClick={(e) => { e.stopPropagation(); setShowTree(!showTree); }} 
-            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-black-800 hover:bg-black-700 text-black-300 hover:text-gold-500 rounded-lg transition-all border border-black-700"
+            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-zinc-700 hover:bg-zinc-600 text-white hover:text-gold-500 rounded-lg transition-all border border-black-700"
           >
             <GitBranch size={14} />
             <span className="text-[9px] font-black uppercase tracking-widest">Pedigree</span>
           </button>
           <button 
             onClick={(e) => { e.stopPropagation(); onEdit(); }} 
-            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-black-800 hover:bg-black-700 text-black-300 hover:text-gold-500 rounded-lg transition-all border border-black-700"
+            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-zinc-700 hover:bg-zinc-600 text-white hover:text-gold-500 rounded-lg transition-all border border-black-700"
           >
             <Edit2 size={14} />
             <span className="text-[9px] font-black uppercase tracking-widest">Edit</span>
@@ -1124,7 +1168,7 @@ function BirdCard({ bird, cage, birds, viewMode = 'grid-large', currency, onBird
           {viewMode === 'list' && (
             <button 
               onClick={(e) => { e.stopPropagation(); setIsExpanded(!isExpanded); }}
-              className="p-2 bg-black-800 hover:bg-black-700 text-black-300 hover:text-gold-500 rounded-lg transition-all border border-black-700"
+              className="p-2 bg-zinc-700 hover:bg-zinc-600 text-white hover:text-gold-500 rounded-lg transition-all border border-black-700"
             >
               {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
             </button>
@@ -1135,7 +1179,7 @@ function BirdCard({ bird, cage, birds, viewMode = 'grid-large', currency, onBird
           <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="pt-4 border-t border-black-800 space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
-                <p className="text-[9px] text-black-500 uppercase tracking-widest font-black">Father</p>
+                <p className="text-[9px] text-white uppercase tracking-widest font-black">Father</p>
                 <button 
                   onClick={(e) => { e.stopPropagation(); father && onBirdRef(father.name); }}
                   className="text-[11px] text-white font-bold hover:text-gold-500 transition-colors text-left flex items-center gap-2"
@@ -1145,7 +1189,7 @@ function BirdCard({ bird, cage, birds, viewMode = 'grid-large', currency, onBird
                 </button>
               </div>
               <div className="space-y-1">
-                <p className="text-[9px] text-black-500 uppercase tracking-widest font-black">Mother</p>
+                <p className="text-[9px] text-white uppercase tracking-widest font-black">Mother</p>
                 <button 
                   onClick={(e) => { e.stopPropagation(); mother && onBirdRef(mother.name); }}
                   className="text-[11px] text-white font-bold hover:text-gold-500 transition-colors text-left flex items-center gap-2"
@@ -1157,13 +1201,13 @@ function BirdCard({ bird, cage, birds, viewMode = 'grid-large', currency, onBird
             </div>
             {offspring.length > 0 && (
               <div className="space-y-2">
-                <p className="text-[9px] text-black-500 uppercase tracking-widest font-black">Offspring ({offspring.length})</p>
+                <p className="text-[9px] text-white uppercase tracking-widest font-black">Offspring ({offspring.length})</p>
                 <div className="flex flex-wrap gap-1.5">
                   {offspring.map(o => (
                     <button 
                       key={o.id} 
                       onClick={(e) => { e.stopPropagation(); onBirdRef(o.name); }}
-                      className="text-[10px] bg-black-800 px-2 py-1 rounded-lg border border-black-700 text-black-300 hover:text-gold-500 hover:border-gold-500/50 transition-all font-bold"
+                      className="text-[10px] bg-zinc-700 px-2 py-1 rounded-lg border border-black-700 text-white hover:text-gold-500 hover:border-gold-500/50 transition-all font-bold"
                     >
                       {o.name}
                     </button>
@@ -1179,13 +1223,13 @@ function BirdCard({ bird, cage, birds, viewMode = 'grid-large', currency, onBird
             {bird.statuses && bird.statuses.length > 0 && (
               <div className="flex flex-wrap gap-1">
                 {bird.statuses.map(status => (
-                  <span key={status} className="px-1.5 py-0.5 rounded-sm bg-black-800 text-gold-500 text-[9px] font-bold uppercase tracking-wider border border-black-700">
+                  <span key={status} className="px-1.5 py-0.5 rounded-sm bg-zinc-700 text-gold-500 text-[9px] font-bold uppercase tracking-wider border border-black-700">
                     {status}
                   </span>
                 ))}
               </div>
             )}
-            {bird.notes && <p className="text-[11px] text-black-400 leading-relaxed line-clamp-2 italic">"{bird.notes}"</p>}
+            {bird.notes && <p className="text-[11px] text-white leading-relaxed line-clamp-2 italic">"{bird.notes}"</p>}
           </div>
         )}
       </div>
@@ -1216,17 +1260,17 @@ function CageCard({ cage, birds, viewMode = 'grid-large', onBirdRef, onNavigate,
               <Home size={18} className="text-gold-500 shrink-0" />
               <span className="truncate">{cage.name}</span>
             </h3>
-            {cage.location && <p className="text-[9px] sm:text-[10px] text-black-500 uppercase tracking-widest font-bold truncate">{cage.location}</p>}
+            {cage.location && <p className="text-[9px] sm:text-[10px] text-white uppercase tracking-widest font-bold truncate">{cage.location}</p>}
           </div>
           
           {effectiveViewMode !== 'list' && (
             <div className={cn(
               "flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
             )}>
-              <button onClick={(e) => { e.stopPropagation(); onEdit(); }} className="p-1.5 text-black-500 hover:text-gold-500 hover:bg-black-800 rounded-lg transition-colors">
+              <button onClick={(e) => { e.stopPropagation(); onEdit(); }} className="p-1.5 text-white hover:text-gold-500 hover:bg-zinc-700 rounded-lg transition-colors">
                 <Edit2 size={16} />
               </button>
-              <button onClick={(e) => { e.stopPropagation(); onDelete(); }} className="p-1.5 text-black-500 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors">
+              <button onClick={(e) => { e.stopPropagation(); onDelete(); }} className="p-1.5 text-white hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors">
                 <Trash2 size={16} />
               </button>
             </div>
@@ -1238,24 +1282,24 @@ function CageCard({ cage, birds, viewMode = 'grid-large', onBirdRef, onNavigate,
           effectiveViewMode === 'list' ? "flex items-center gap-6 pt-2 border-t border-black-800/50" : "grid grid-cols-2 gap-3 sm:gap-4 border-t border-black-800 pt-3 sm:pt-4"
         )}>
           <div className={cn(effectiveViewMode === 'list' ? "flex items-center gap-2" : "space-y-1")}>
-            <p className="text-black-500 uppercase tracking-widest font-black text-[9px]">Birds{effectiveViewMode === 'list' ? ':' : ''}</p>
+            <p className="text-white uppercase tracking-widest font-black text-[9px]">Birds{effectiveViewMode === 'list' ? ':' : ''}</p>
             <p className="text-white font-bold">{cageBirds.length} Residents</p>
           </div>
           <div className={cn(effectiveViewMode === 'list' ? "flex items-center gap-2" : "space-y-1")}>
-            <p className="text-black-500 uppercase tracking-widest font-black text-[9px]">Type{effectiveViewMode === 'list' ? ':' : ''}</p>
+            <p className="text-white uppercase tracking-widest font-black text-[9px]">Type{effectiveViewMode === 'list' ? ':' : ''}</p>
             <p className="text-white font-bold">{cage.type || 'Standard'}</p>
           </div>
         </div>
 
         {effectiveViewMode !== 'list' && cageBirds.length > 0 && (
           <div className="space-y-2 pt-2">
-            <p className="text-[9px] text-black-500 uppercase tracking-widest font-black">Residents</p>
+            <p className="text-[9px] text-white uppercase tracking-widest font-black">Residents</p>
             <div className="flex flex-wrap gap-1.5">
               {cageBirds.map(b => (
                 <button 
                   key={b.id} 
                   onClick={(e) => { e.stopPropagation(); onBirdRef(b.name); }}
-                  className="text-[10px] bg-black-800 px-2 py-1 rounded-lg border border-black-700 text-black-300 hover:text-gold-500 hover:border-gold-500/50 transition-all font-bold"
+                  className="text-[10px] bg-zinc-700 px-2 py-1 rounded-lg border border-black-700 text-white hover:text-gold-500 hover:border-gold-500/50 transition-all font-bold"
                 >
                   {b.name}
                 </button>
@@ -1265,18 +1309,20 @@ function CageCard({ cage, birds, viewMode = 'grid-large', onBirdRef, onNavigate,
         )}
 
         <div className="flex items-center gap-2 pt-2 border-t border-black-800/50">
-          <button onClick={(e) => { e.stopPropagation(); onEdit(); }} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-black-800 hover:bg-black-700 text-black-300 hover:text-gold-500 rounded-lg transition-all border border-black-700">
+          <button onClick={(e) => { e.stopPropagation(); onEdit(); }} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-zinc-700 hover:bg-zinc-600 text-white hover:text-gold-500 rounded-lg transition-all border border-black-700"
+          >
             <Edit2 size={14} />
             <span className="text-[9px] font-black uppercase tracking-widest">Edit</span>
           </button>
-          <button onClick={(e) => { e.stopPropagation(); onDelete(); }} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-lg transition-all border border-red-500/20">
+          <button onClick={(e) => { e.stopPropagation(); onDelete(); }} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-lg transition-all border border-red-500/20"
+          >
             <Trash2 size={14} />
             <span className="text-[9px] font-black uppercase tracking-widest">Delete</span>
           </button>
           {viewMode === 'list' && (
             <button 
               onClick={(e) => { e.stopPropagation(); setIsExpanded(!isExpanded); }}
-              className="p-2 bg-black-800 hover:bg-black-700 text-black-300 hover:text-gold-500 rounded-lg transition-all border border-black-700"
+              className="p-2 bg-zinc-700 hover:bg-zinc-600 text-white hover:text-gold-500 rounded-lg transition-all border border-black-700"
             >
               {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
             </button>
@@ -1303,7 +1349,7 @@ function PairCard({ pair, male, female, onBirdRef, onNavigate, onEdit, onDelete,
         <div className={cn("flex items-start justify-between gap-2", effectiveViewMode === 'list' ? "w-full" : "relative")}>
           <div className="space-y-1 min-w-0 flex-1">
             <div className="flex items-center gap-2">
-              <Heart size={18} className={cn("shrink-0", pair.status === 'Active' ? 'text-rose-500 fill-rose-500' : 'text-black-700')} />
+              <Heart size={18} className={cn("shrink-0", pair.status === 'Active' ? 'text-rose-500 fill-rose-500' : 'text-black-200')} />
               <h3 className={cn("font-black text-white tracking-tight truncate", "text-lg")}>Breeding Pair</h3>
             </div>
             <Badge variant={pair.status === 'Active' ? 'success' : 'neutral'} className="text-[8px] sm:text-[9px] uppercase tracking-widest font-black">{pair.status}</Badge>
@@ -1311,20 +1357,20 @@ function PairCard({ pair, male, female, onBirdRef, onNavigate, onEdit, onDelete,
         </div>
 
         <div className={cn(
-          "flex items-center justify-between gap-2 sm:gap-4 p-3 sm:p-4 bg-black-950 rounded-xl border border-black-800",
+          "flex items-center justify-between gap-2 sm:gap-4 p-3 sm:p-4 bg-black rounded-xl border border-black-700",
           effectiveViewMode === 'list' ? "flex-1 py-2" : ""
         )}>
           <div className="flex items-center gap-2 min-w-0 flex-1 px-2">
-            <p className="text-[8px] sm:text-[9px] text-black-500 uppercase tracking-widest font-black shrink-0">Male:</p>
+            <p className="text-[8px] sm:text-[9px] text-white uppercase tracking-widest font-black shrink-0">Male:</p>
             {male ? (
               <button onClick={(e) => { e.stopPropagation(); onBirdRef(male.name); }} className="text-xs sm:text-sm font-black text-white hover:text-gold-500 transition-colors truncate">{male.name}</button>
             ) : (
               <p className="text-xs sm:text-sm font-black text-white">Unknown</p>
             )}
           </div>
-          <div className="h-6 sm:h-8 w-px bg-black-800 shrink-0" />
+          <div className="h-6 sm:h-8 w-px bg-zinc-700 shrink-0" />
           <div className="flex items-center gap-2 min-w-0 flex-1 px-2">
-            <p className="text-[8px] sm:text-[9px] text-black-500 uppercase tracking-widest font-black shrink-0">Female:</p>
+            <p className="text-[8px] sm:text-[9px] text-white uppercase tracking-widest font-black shrink-0">Female:</p>
             {female ? (
               <button onClick={(e) => { e.stopPropagation(); onBirdRef(female.name); }} className="text-xs sm:text-sm font-black text-white hover:text-gold-500 transition-colors truncate">{female.name}</button>
             ) : (
@@ -1333,7 +1379,7 @@ function PairCard({ pair, male, female, onBirdRef, onNavigate, onEdit, onDelete,
           </div>
         </div>
 
-        <div className="text-[9px] sm:text-[10px] text-black-500 flex justify-between uppercase tracking-widest font-bold">
+        <div className="text-[9px] sm:text-[10px] text-white flex justify-between uppercase tracking-widest font-bold">
           <span className="flex items-center gap-1.5"><Calendar size={12} className="text-gold-500" /> {pair.startDate || 'N/A'}</span>
           {pair.endDate && <span className="flex items-center gap-1.5">Ended: {pair.endDate}</span>}
         </div>
@@ -1349,7 +1395,7 @@ function PairCard({ pair, male, female, onBirdRef, onNavigate, onEdit, onDelete,
         </div>
 
         <div className="flex items-center gap-2 pt-2 border-t border-black-800/50">
-          <button onClick={(e) => { e.stopPropagation(); onEdit(); }} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-black-800 hover:bg-black-700 text-black-300 hover:text-gold-500 rounded-lg transition-all border border-black-700">
+          <button onClick={(e) => { e.stopPropagation(); onEdit(); }} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-zinc-700 hover:bg-zinc-600 text-white hover:text-gold-500 rounded-lg transition-all border border-black-700">
             <Edit2 size={14} />
             <span className="text-[9px] font-black uppercase tracking-widest">Edit</span>
           </button>
@@ -1360,7 +1406,7 @@ function PairCard({ pair, male, female, onBirdRef, onNavigate, onEdit, onDelete,
           {viewMode === 'list' && (
             <button 
               onClick={(e) => { e.stopPropagation(); setIsExpanded(!isExpanded); }}
-              className="p-2 bg-black-800 hover:bg-black-700 text-black-300 hover:text-gold-500 rounded-lg transition-all border border-black-700"
+              className="p-2 bg-zinc-700 hover:bg-zinc-600 text-white hover:text-gold-500 rounded-lg transition-all border border-black-700"
             >
               {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
             </button>
@@ -1448,38 +1494,38 @@ function FinancialsView({ transactions, filteredTransactions, birds, currency, o
     <div className="space-y-6 max-w-6xl mx-auto">
       {/* Summary Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <Card className="p-4 sm:p-5 bg-black-900 border-black-800 flex flex-col justify-between">
+        <Card className="p-4 sm:p-5 bg-zinc-800 border-black-700 flex flex-col justify-between">
           <div className="flex items-center justify-between mb-3 sm:mb-4">
-            <p className="text-[8px] sm:text-[10px] font-black text-black-500 uppercase tracking-widest">Net Profit</p>
+            <p className="text-[8px] sm:text-[10px] font-black text-white uppercase tracking-widest">Net Profit</p>
             <TrendingUp size={16} className={stats.netProfit >= 0 ? 'text-emerald-400' : 'text-rose-400'} />
           </div>
           <div>
             <p className="text-xl sm:text-2xl font-black text-white tracking-tight">{symbol}{stats.netProfit.toFixed(2)}</p>
-            <p className="text-[8px] sm:text-[9px] text-black-600 mt-1 font-bold uppercase tracking-tighter">Total income minus expenses</p>
+            <p className="text-[8px] sm:text-[9px] text-white/50 mt-1 font-bold uppercase tracking-tighter">Total income minus expenses</p>
           </div>
         </Card>
-        <Card className="p-4 sm:p-5 bg-black-900 border-black-800 flex flex-col justify-between">
+        <Card className="p-4 sm:p-5 bg-zinc-800 border-black-700 flex flex-col justify-between">
           <div className="flex items-center justify-between mb-3 sm:mb-4">
-            <p className="text-[8px] sm:text-[10px] font-black text-black-500 uppercase tracking-widest">Inventory Value</p>
+            <p className="text-[8px] sm:text-[10px] font-black text-white uppercase tracking-widest">Inventory Value</p>
             <Activity size={16} className="text-gold-500" />
           </div>
           <div>
             <p className="text-xl sm:text-2xl font-black text-white tracking-tight">{symbol}{stats.totalBirdValue.toFixed(2)}</p>
-            <p className="text-[8px] sm:text-[9px] text-black-600 mt-1 font-bold uppercase tracking-tighter">Est. value of all birds</p>
+            <p className="text-[8px] sm:text-[9px] text-white mt-1 font-bold uppercase tracking-tighter">Est. value of all birds</p>
           </div>
         </Card>
-        <Card className="p-4 sm:p-5 bg-black-900 border-black-800 flex flex-col justify-between">
+        <Card className="p-4 sm:p-5 bg-zinc-800 border-black-700 flex flex-col justify-between">
           <div className="flex items-center justify-between mb-3 sm:mb-4">
-            <p className="text-[8px] sm:text-[10px] font-black text-black-500 uppercase tracking-widest">Total Income</p>
+            <p className="text-[8px] sm:text-[10px] font-black text-white uppercase tracking-widest">Total Income</p>
             <ArrowUpRight size={16} className="text-emerald-500" />
           </div>
           <div>
             <p className="text-xl sm:text-2xl font-black text-emerald-500 tracking-tight">{symbol}{stats.totalIncome.toFixed(2)}</p>
           </div>
         </Card>
-        <Card className="p-4 sm:p-5 bg-black-900 border-black-800 flex flex-col justify-between">
+        <Card className="p-4 sm:p-5 bg-zinc-800 border-black-700 flex flex-col justify-between">
           <div className="flex items-center justify-between mb-3 sm:mb-4">
-            <p className="text-[8px] sm:text-[10px] font-black text-black-500 uppercase tracking-widest">Total Expenses</p>
+            <p className="text-[8px] sm:text-[10px] font-black text-white uppercase tracking-widest">Total Expenses</p>
             <ArrowDownRight size={16} className="text-rose-500" />
           </div>
           <div>
@@ -1490,7 +1536,7 @@ function FinancialsView({ transactions, filteredTransactions, birds, currency, o
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Charts */}
-        <Card className="p-6 bg-black-900 border-black-800 lg:col-span-2 flex flex-col">
+        <Card className="p-6 bg-zinc-800 border-black-700 lg:col-span-2 flex flex-col">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-gold-500/10 rounded-lg">
@@ -1498,14 +1544,14 @@ function FinancialsView({ transactions, filteredTransactions, birds, currency, o
               </div>
               <h3 className="font-black text-lg text-white tracking-tight uppercase">Performance</h3>
             </div>
-            <div className="flex bg-black-950 p-1 rounded-xl border border-black-800">
+            <div className="flex bg-black p-1 rounded-xl border border-black-700">
               {(['daily', 'weekly', 'monthly'] as const).map(range => (
                 <button
                   key={range}
                   onClick={() => setTimeRange(range)}
                   className={cn(
                     "px-4 py-1.5 text-[10px] font-black rounded-lg transition-all capitalize tracking-widest",
-                    timeRange === range ? "bg-gold-500 text-black-950 shadow-lg shadow-gold-500/20" : "text-black-500 hover:text-black-300"
+                    timeRange === range ? "bg-gold-500 text-black-950 shadow-lg shadow-gold-500/20" : "text-white hover:text-white"
                   )}
                 >
                   {range}
@@ -1556,9 +1602,9 @@ function FinancialsView({ transactions, filteredTransactions, birds, currency, o
               />
             ))}
             {filteredTransactions.length === 0 && (
-              <div className="text-center py-12 bg-black-900/50 border border-dashed border-black-800 rounded-2xl">
-                <DollarSign size={32} className="mx-auto text-black-700 mb-2" />
-                <p className="text-black-500 text-sm font-bold uppercase tracking-widest">No transactions found</p>
+              <div className="text-center py-12 bg-black/50 border border-dashed border-black-700 rounded-2xl">
+                <DollarSign size={32} className="mx-auto text-white mb-2" />
+                <p className="text-white text-sm font-bold uppercase tracking-widest">No transactions found</p>
               </div>
             )}
           </div>
@@ -1572,7 +1618,7 @@ function TransactionCard({ transaction, bird, currency, onBirdRef, onEdit, onDel
   const symbol = getCurrencySymbol(currency);
   return (
     <Card className={cn(
-      "p-3 sm:p-4 flex flex-col gap-3 sm:gap-4 group bg-black-900 border-black-800 hover:border-gold-500/50 transition-colors relative"
+      "p-3 sm:p-4 flex flex-col gap-3 sm:gap-4 group border-black-800 hover:border-gold-500/50 transition-colors relative"
     )}>
       <div className="flex items-center gap-3 sm:gap-4">
         <div className={cn(
@@ -1591,18 +1637,18 @@ function TransactionCard({ transaction, bird, currency, onBirdRef, onEdit, onDel
               </button>
             )}
           </div>
-          <p className="text-[10px] sm:text-[11px] text-black-500 truncate font-medium">{transaction.description || 'No description'}</p>
+          <p className="text-[10px] sm:text-[11px] text-white truncate font-medium">{transaction.description || 'No description'}</p>
         </div>
         <div className={cn("shrink-0 text-right")}>
           <p className={cn("font-black tracking-tighter", "text-base sm:text-lg", transaction.type === 'Income' ? "text-emerald-500" : "text-rose-500")}>
             {transaction.type === 'Income' ? '+' : '-'}{symbol}{transaction.amount.toFixed(2)}
           </p>
-          <p className="text-[8px] sm:text-[9px] text-black-600 font-bold uppercase tracking-widest">{transaction.date}</p>
+          <p className="text-[8px] sm:text-[9px] text-white font-bold uppercase tracking-widest">{transaction.date}</p>
         </div>
       </div>
 
       <div className="flex items-center gap-2 pt-2 border-t border-black-800/50">
-        <button onClick={onEdit} className="flex items-center gap-1.5 px-3 py-1.5 bg-black-800 hover:bg-black-700 text-black-300 hover:text-gold-500 rounded-lg transition-all border border-black-700">
+        <button onClick={onEdit} className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-700 hover:bg-zinc-600 text-white hover:text-gold-500 rounded-lg transition-all border border-black-700">
           <Edit2 size={14} />
           <span className="text-[9px] font-black uppercase tracking-widest">Edit</span>
         </button>
@@ -1634,7 +1680,7 @@ function BreedingRecordCard({ record, pair, male, female, birds, onEdit, onDelet
               <Egg size={18} className="text-gold-500 shrink-0" />
               <h3 className={cn("font-black text-white tracking-tight truncate", "text-lg")}>Breeding Record</h3>
             </div>
-            <div className="flex items-center gap-2 text-[9px] sm:text-[10px] font-medium text-black-500 uppercase tracking-widest">
+            <div className="flex items-center gap-2 text-[9px] sm:text-[10px] font-medium text-white uppercase tracking-widest">
               <Calendar size={12} className="shrink-0" />
               <span className="truncate">{record.startDate} {record.endDate ? `- ${record.endDate}` : '(Ongoing)'}</span>
             </div>
@@ -1644,10 +1690,10 @@ function BreedingRecordCard({ record, pair, male, female, birds, onEdit, onDelet
             <div className={cn(
               "flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
             )}>
-              <button onClick={(e) => { e.stopPropagation(); onEdit(); }} className="p-1.5 text-black-500 hover:text-gold-500 hover:bg-black-800 rounded-lg transition-colors">
+              <button onClick={(e) => { e.stopPropagation(); onEdit(); }} className="p-1.5 text-white hover:text-gold-500 hover:bg-zinc-700 rounded-lg transition-colors">
                 <Edit2 size={16} />
               </button>
-              <button onClick={(e) => { e.stopPropagation(); onDelete(); }} className="p-1.5 text-black-500 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors">
+              <button onClick={(e) => { e.stopPropagation(); onDelete(); }} className="p-1.5 text-white hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors">
                 <Trash2 size={16} />
               </button>
             </div>
@@ -1655,33 +1701,33 @@ function BreedingRecordCard({ record, pair, male, female, birds, onEdit, onDelet
         </div>
 
         <div className={cn(
-          "flex items-center justify-between gap-2 sm:gap-4 p-3 sm:p-4 bg-black-950 rounded-xl border border-black-800",
+          "flex items-center justify-between gap-2 sm:gap-4 p-3 sm:p-4 bg-black rounded-xl border border-black-700",
           effectiveViewMode === 'list' ? "flex-1 py-2" : ""
         )}>
           <div className="flex items-center gap-2 min-w-0 flex-1 px-2">
-            <p className="text-[8px] sm:text-[9px] text-black-500 uppercase tracking-widest font-black shrink-0">Pair:</p>
+            <p className="text-[8px] sm:text-[9px] text-white uppercase tracking-widest font-black shrink-0">Pair:</p>
             <div className="flex items-center gap-1.5 text-xs sm:text-sm font-bold text-white truncate">
               {male ? (
                 <button onClick={(e) => { e.stopPropagation(); onBirdRef(male.name); }} className="hover:text-gold-500 transition-colors">{male.name}</button>
               ) : 'Unknown'}
-              <span className="text-black-600">×</span>
+              <span className="text-white">×</span>
               {female ? (
                 <button onClick={(e) => { e.stopPropagation(); onBirdRef(female.name); }} className="hover:text-gold-500 transition-colors">{female.name}</button>
               ) : 'Unknown'}
             </div>
           </div>
-          <div className="h-6 sm:h-8 w-px bg-black-800 shrink-0" />
+          <div className="h-6 sm:h-8 w-px bg-zinc-700 shrink-0" />
           <div className="flex items-center gap-4 px-2">
             <div className="flex flex-col items-center">
-              <span className="text-[8px] text-black-500 uppercase font-black">Eggs</span>
+              <span className="text-[8px] text-white uppercase font-black">Eggs</span>
               <span className="text-xs font-black text-white">{record.eggsLaid}</span>
             </div>
             <div className="flex flex-col items-center">
-              <span className="text-[8px] text-black-500 uppercase font-black">Hatch</span>
+              <span className="text-[8px] text-white uppercase font-black">Hatch</span>
               <span className="text-xs font-black text-white">{record.eggsHatched}</span>
             </div>
             <div className="flex flex-col items-center">
-              <span className="text-[8px] text-black-500 uppercase font-black">Wean</span>
+              <span className="text-[8px] text-white uppercase font-black">Wean</span>
               <span className="text-xs font-black text-white">{record.chicksWeaned}</span>
             </div>
           </div>
@@ -1690,8 +1736,8 @@ function BreedingRecordCard({ record, pair, male, female, birds, onEdit, onDelet
         {effectiveViewMode !== 'list' && (
           <div className="space-y-4 mb-4">
             {record.offspringIds && record.offspringIds.length > 0 && (
-              <div className="p-4 bg-black-950 rounded-2xl border border-black-800">
-                <div className="text-[10px] font-black text-black-500 uppercase tracking-widest mb-2">Tagged Offspring</div>
+              <div className="p-4 bg-black rounded-2xl border border-black-700">
+                <div className="text-[10px] font-black text-white uppercase tracking-widest mb-2">Tagged Offspring</div>
                 <div className="flex flex-wrap gap-2">
                   {record.offspringIds.map(id => {
                     const offspring = birds.find(b => b.id === id);
@@ -1706,16 +1752,16 @@ function BreedingRecordCard({ record, pair, male, female, birds, onEdit, onDelet
             )}
 
             {record.notes && (
-              <div className="p-4 bg-black-950 rounded-2xl border border-black-800">
-                <div className="text-[10px] font-black text-black-500 uppercase tracking-widest mb-2">Notes</div>
-                <p className="text-sm text-black-300 leading-relaxed">{record.notes}</p>
+              <div className="p-4 bg-black rounded-2xl border border-black-700">
+                <div className="text-[10px] font-black text-white uppercase tracking-widest mb-2">Notes</div>
+                <p className="text-sm text-white leading-relaxed">{record.notes}</p>
               </div>
             )}
           </div>
         )}
 
         <div className="flex items-center gap-2 pt-2 border-t border-black-800/50">
-          <button onClick={(e) => { e.stopPropagation(); onEdit(); }} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-black-800 hover:bg-black-700 text-black-300 hover:text-gold-500 rounded-lg transition-all border border-black-700">
+          <button onClick={(e) => { e.stopPropagation(); onEdit(); }} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-zinc-700 hover:bg-zinc-600 text-white hover:text-gold-500 rounded-lg transition-all border border-black-700">
             <Edit2 size={14} />
             <span className="text-[9px] font-black uppercase tracking-widest">Edit</span>
           </button>
@@ -1726,7 +1772,7 @@ function BreedingRecordCard({ record, pair, male, female, birds, onEdit, onDelet
           {viewMode === 'list' && (
             <button 
               onClick={(e) => { e.stopPropagation(); setIsExpanded(!isExpanded); }}
-              className="p-2 bg-black-800 hover:bg-black-700 text-black-300 hover:text-gold-500 rounded-lg transition-all border border-black-700"
+              className="p-2 bg-zinc-700 hover:bg-zinc-600 text-white hover:text-gold-500 rounded-lg transition-all border border-black-700"
             >
               {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
             </button>
@@ -1751,50 +1797,54 @@ function BreedingRecordForm({ user, initialData, pairs, birds, onClose }: { user
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="space-y-1">
-        <label className="text-[10px] font-black text-black-500 uppercase tracking-widest ml-1">Pair</label>
+        <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Pair</label>
         <Select required value={formData.pairId} onChange={e => setFormData({ ...formData, pairId: e.target.value })}>
-          <option value="">Select Pair</option>
+          <option value="" className="bg-black text-white">Select Pair</option>
           {pairs.map(p => {
             const male = birds.find(b => b.id === p.maleId);
             const female = birds.find(b => b.id === p.femaleId);
-            return <option key={p.id} value={p.id}>{male?.name || 'Unknown'} × {female?.name || 'Unknown'}</option>;
+            return <option key={p.id} value={p.id} className="bg-black text-white">{male?.name || 'Unknown'} × {female?.name || 'Unknown'}</option>;
           })}
         </Select>
       </div>
       <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-1"><label className="text-[10px] font-black text-black-500 uppercase tracking-widest ml-1">Start Date</label><Input type="date" required value={formData.startDate} onChange={e => setFormData({ ...formData, startDate: e.target.value })} /></div>
-        <div className="space-y-1"><label className="text-[10px] font-black text-black-500 uppercase tracking-widest ml-1">End Date</label><Input type="date" value={formData.endDate} onChange={e => setFormData({ ...formData, endDate: e.target.value })} /></div>
+        <div className="space-y-1"><label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Start Date</label><Input type="date" required value={formData.startDate} onChange={e => setFormData({ ...formData, startDate: e.target.value })} /></div>
+        <div className="space-y-1"><label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">End Date</label><Input type="date" value={formData.endDate} onChange={e => setFormData({ ...formData, endDate: e.target.value })} /></div>
       </div>
       <div className="grid grid-cols-3 gap-4">
-        <div className="space-y-1"><label className="text-[10px] font-black text-black-500 uppercase tracking-widest ml-1">Eggs Laid</label><Input type="number" min="0" required value={formData.eggsLaid} onChange={e => setFormData({ ...formData, eggsLaid: parseInt(e.target.value) || 0 })} /></div>
-        <div className="space-y-1"><label className="text-[10px] font-black text-black-500 uppercase tracking-widest ml-1">Hatched</label><Input type="number" min="0" required value={formData.eggsHatched} onChange={e => setFormData({ ...formData, eggsHatched: parseInt(e.target.value) || 0 })} /></div>
-        <div className="space-y-1"><label className="text-[10px] font-black text-black-500 uppercase tracking-widest ml-1">Weaned</label><Input type="number" min="0" required value={formData.chicksWeaned} onChange={e => setFormData({ ...formData, chicksWeaned: parseInt(e.target.value) || 0 })} /></div>
+        <div className="space-y-1"><label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Eggs Laid</label><Input type="number" min="0" required value={formData.eggsLaid} onChange={e => setFormData({ ...formData, eggsLaid: parseInt(e.target.value) || 0 })} /></div>
+        <div className="space-y-1"><label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Hatched</label><Input type="number" min="0" required value={formData.eggsHatched} onChange={e => setFormData({ ...formData, eggsHatched: parseInt(e.target.value) || 0 })} /></div>
+        <div className="space-y-1"><label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Weaned</label><Input type="number" min="0" required value={formData.chicksWeaned} onChange={e => setFormData({ ...formData, chicksWeaned: parseInt(e.target.value) || 0 })} /></div>
       </div>
       <div className="space-y-1">
-        <label className="text-[10px] font-black text-black-500 uppercase tracking-widest ml-1">Tag Offspring</label>
-        <div className="max-h-32 overflow-y-auto border border-black-800 rounded-xl p-2 space-y-1 bg-black-950/50 custom-scrollbar">
-          {birds.map(b => (
-            <label key={b.id} className="flex items-center gap-2 text-[11px] font-bold text-black-400 hover:text-gold-500 cursor-pointer transition-colors">
-              <input 
-                type="checkbox" 
-                className="rounded border-black-800 bg-black-900 text-gold-500 focus:ring-gold-500/20"
-                checked={formData.offspringIds?.includes(b.id)} 
-                onChange={e => {
-                  const ids = new Set(formData.offspringIds || []);
-                  if (e.target.checked) ids.add(b.id);
-                  else ids.delete(b.id);
-                  setFormData({ ...formData, offspringIds: Array.from(ids) });
-                }}
-              />
-              {b.name}
-            </label>
-          ))}
+        <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Tag Offspring</label>
+        <div className="max-h-32 overflow-y-auto border border-black-700 rounded-2xl p-3 space-y-2 bg-black custom-scrollbar">
+          {birds.length === 0 ? (
+            <span className="text-xs text-white italic px-2">No birds available</span>
+          ) : (
+            birds.map(b => (
+              <label key={b.id} className="flex items-center gap-3 text-[11px] font-bold text-white hover:text-gold-500 cursor-pointer transition-colors p-1">
+                <input 
+                  type="checkbox" 
+                  className="rounded border-black-800 bg-black-900 text-gold-500 focus:ring-gold-500/20 w-4 h-4"
+                  checked={formData.offspringIds?.includes(b.id)} 
+                  onChange={e => {
+                    const ids = new Set(formData.offspringIds || []);
+                    if (e.target.checked) ids.add(b.id);
+                    else ids.delete(b.id);
+                    setFormData({ ...formData, offspringIds: Array.from(ids) });
+                  }}
+                />
+                {b.name}
+              </label>
+            ))
+          )}
         </div>
       </div>
       <div className="space-y-1">
-        <label className="text-[10px] font-black text-black-500 uppercase tracking-widest ml-1">Notes</label>
+        <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Notes</label>
         <textarea 
-          className="w-full px-4 py-3 bg-black-950 border border-black-800 rounded-2xl focus:outline-none focus:ring-2 focus:ring-gold-500/20 focus:border-gold-500 text-white transition-all min-h-[80px] text-sm font-medium placeholder:text-black-700" 
+          className="w-full px-4 py-3 bg-black border border-black-700 rounded-2xl focus:outline-none focus:ring-2 focus:ring-gold-500/20 focus:border-gold-500 text-white transition-all min-h-[80px] text-sm font-medium placeholder:text-white/30" 
           placeholder="Breeding notes..."
           value={formData.notes} 
           onChange={e => setFormData({ ...formData, notes: e.target.value })} 
@@ -1830,38 +1880,38 @@ function TransactionForm({ user, initialData, birds, currency, onClose }: { user
     <form onSubmit={handleSubmit} className="space-y-6">
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
-          <label className="text-[10px] font-black text-black-500 uppercase tracking-widest ml-1">Type</label>
+          <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Type</label>
           <Select value={formData.type} onChange={e => setFormData({ ...formData, type: e.target.value as any })}>
-            <option value="Income">Income</option>
-            <option value="Expense">Expense</option>
+            <option value="Income" className="bg-black text-white">Income</option>
+            <option value="Expense" className="bg-black text-white">Expense</option>
           </Select>
         </div>
         <div className="space-y-2">
-          <label className="text-[10px] font-black text-black-500 uppercase tracking-widest ml-1">Amount ({symbol})</label>
+          <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Amount ({symbol})</label>
           <Input type="number" step="0.01" required value={formData.amount} onChange={e => setFormData({ ...formData, amount: parseFloat(e.target.value) || 0 })} />
         </div>
       </div>
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
-          <label className="text-[10px] font-black text-black-500 uppercase tracking-widest ml-1">Category</label>
+          <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Category</label>
           <Input required placeholder="e.g. Seed, Sale, Vet" value={formData.category} onChange={e => setFormData({ ...formData, category: e.target.value })} />
         </div>
         <div className="space-y-2">
-          <label className="text-[10px] font-black text-black-500 uppercase tracking-widest ml-1">Date</label>
+          <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Date</label>
           <Input type="date" required value={formData.date} onChange={e => setFormData({ ...formData, date: e.target.value })} />
         </div>
       </div>
       <div className="space-y-2">
-        <label className="text-[10px] font-black text-black-500 uppercase tracking-widest ml-1">Related Bird (Optional)</label>
+        <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Related Bird (Optional)</label>
         <Select value={formData.birdId} onChange={e => setFormData({ ...formData, birdId: e.target.value })}>
-          <option value="">None</option>
-          {birds.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+          <option value="" className="bg-black text-white">None</option>
+          {birds.map(b => <option key={b.id} value={b.id} className="bg-black text-white">{b.name}</option>)}
         </Select>
       </div>
       <div className="space-y-2">
-        <label className="text-[10px] font-black text-black-500 uppercase tracking-widest ml-1">Description</label>
+        <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Description</label>
         <textarea 
-          className="w-full px-4 py-3 bg-black-950 border border-black-800 rounded-2xl focus:outline-none focus:ring-2 focus:ring-gold-500/20 focus:border-gold-500 text-white transition-all min-h-[100px] text-sm font-medium placeholder:text-black-700" 
+          className="w-full px-4 py-3 bg-black border border-black-700 rounded-2xl focus:outline-none focus:ring-2 focus:ring-gold-500/20 focus:border-gold-500 text-white transition-all min-h-[100px] text-sm font-medium placeholder:text-white/30" 
           placeholder="Enter transaction details..."
           value={formData.description} 
           onChange={e => setFormData({ ...formData, description: e.target.value })} 
@@ -1881,7 +1931,7 @@ function TaskCard({ task, birds, onBirdRef, onToggle, onEdit, onDelete, viewMode
     <Card 
       onClick={() => viewMode === 'list' && setExpanded(!expanded)}
       className={cn(
-        'transition-all group bg-black-900 border-black-800 hover:border-gold-500/30 relative overflow-hidden', 
+        'transition-all group border-black-800 hover:border-gold-500/30 relative overflow-hidden', 
         task.status === 'Completed' && 'opacity-60',
         effectiveViewMode === 'list' ? "flex flex-row items-center p-4 gap-4 cursor-pointer hover:bg-black-900/50" : "cursor-default"
       )}
@@ -1904,14 +1954,20 @@ function TaskCard({ task, birds, onBirdRef, onToggle, onEdit, onDelete, viewMode
             <div className="min-w-0 flex-1">
               <h3 className={cn('font-black tracking-tight transition-all truncate', 
                 "text-base sm:text-lg",
-                task.status === 'Completed' ? 'text-black-600 line-through' : 'text-white'
+                task.status === 'Completed' ? 'text-black-100 line-through' : 'text-white'
               )}>
                 {task.title}
               </h3>
               {task.dueDate && (
-                <div className="flex items-center gap-1.5 text-[9px] sm:text-[10px] font-bold text-black-500 uppercase tracking-widest truncate">
+                <div className="flex items-center gap-1.5 text-[9px] sm:text-[10px] font-bold text-white uppercase tracking-widest truncate">
                   <Calendar size={12} className="text-gold-500 shrink-0" />
                   {task.dueDate}
+                </div>
+              )}
+              {task.reminderDate && (
+                <div className="flex items-center gap-1.5 text-[9px] sm:text-[10px] font-bold text-white uppercase tracking-widest truncate mt-0.5">
+                  <Bell size={12} className="text-blue-500 shrink-0" />
+                  {new Date(task.reminderDate).toLocaleString()}
                 </div>
               )}
             </div>
@@ -1928,7 +1984,7 @@ function TaskCard({ task, birds, onBirdRef, onToggle, onEdit, onDelete, viewMode
 
         {effectiveViewMode === 'list' && (
           <div className="flex items-center gap-2 pt-2 border-t border-black-800/50">
-            <button onClick={(e) => { e.stopPropagation(); onEdit(); }} className="flex items-center gap-1.5 px-3 py-1.5 bg-black-800 hover:bg-black-700 text-black-300 hover:text-gold-500 rounded-lg transition-all border border-black-700">
+            <button onClick={(e) => { e.stopPropagation(); onEdit(); }} className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-700 hover:bg-zinc-600 text-white hover:text-gold-500 rounded-lg transition-all border border-black-700">
               <Edit2 size={14} />
               <span className="text-[9px] font-black uppercase tracking-widest">Edit</span>
             </button>
@@ -1944,23 +2000,23 @@ function TaskCard({ task, birds, onBirdRef, onToggle, onEdit, onDelete, viewMode
             <Badge variant={task.priority === 'High' ? 'destructive' : task.priority === 'Medium' ? 'warning' : 'neutral'} className="text-[8px] uppercase tracking-widest font-black">
               {task.priority}
             </Badge>
-            <span className="text-[10px] text-black-500 font-bold uppercase tracking-widest">{task.category}</span>
+            <span className="text-[10px] text-white font-bold uppercase tracking-widest">{task.category}</span>
           </div>
         )}
 
-        {effectiveViewMode !== 'list' && task.description && <p className="text-xs sm:text-sm text-black-400 font-medium leading-relaxed line-clamp-2 sm:line-clamp-none mt-2">{task.description}</p>}
+        {effectiveViewMode !== 'list' && task.description && <p className="text-xs sm:text-sm text-white font-medium leading-relaxed line-clamp-2 sm:line-clamp-none mt-2">{task.description}</p>}
 
         {effectiveViewMode !== 'list' && task.subTasks.length > 0 && (
           <div className="pt-3 sm:pt-4 border-t border-black-800">
             <button 
               onClick={() => setExpanded(!expanded)} 
-              className="text-[9px] sm:text-[10px] font-black text-black-500 uppercase tracking-widest flex items-center gap-2 hover:text-gold-500 transition-colors"
+              className="text-[9px] sm:text-[10px] font-black text-white uppercase tracking-widest flex items-center gap-2 hover:text-gold-500 transition-colors"
             >
               {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
               Subtasks ({completedSubtasks}/{task.subTasks.length})
             </button>
             
-            <div className="w-full h-1 bg-black-950 rounded-full overflow-hidden mt-3">
+            <div className="w-full h-1 bg-black rounded-full overflow-hidden mt-3">
               <motion.div 
                 initial={{ width: 0 }}
                 animate={{ width: `${(completedSubtasks / task.subTasks.length) * 100}%` }}
@@ -1977,9 +2033,9 @@ function TaskCard({ task, birds, onBirdRef, onToggle, onEdit, onDelete, viewMode
                   className="overflow-hidden space-y-2 mt-4 pl-3 border-l-2 border-black-800"
                 >
                   {task.subTasks.map((sub, idx) => (
-                    <div key={idx} className="flex items-center gap-3 p-2 bg-black-950/50 rounded-xl border border-black-800/50">
-                      <div className={cn('w-2 h-2 rounded-full shrink-0', sub.completed ? 'bg-gold-500 shadow-sm shadow-gold-500/50' : 'bg-black-800')} />
-                      <span className={cn('text-xs font-bold flex-1', sub.completed ? 'text-black-600 line-through' : 'text-black-300')}>
+                    <div key={idx} className="flex items-center gap-3 p-3 bg-black rounded-2xl border border-black-700">
+                      <div className={cn('w-2 h-2 rounded-full shrink-0', sub.completed ? 'bg-gold-500 shadow-sm shadow-gold-500/50' : 'bg-zinc-700')} />
+                      <span className={cn('text-xs font-bold flex-1', sub.completed ? 'text-black-200 line-through' : 'text-black-50')}>
                         {sub.title}
                       </span>
                       <div className="flex gap-1.5">
@@ -1989,7 +2045,7 @@ function TaskCard({ task, birds, onBirdRef, onToggle, onEdit, onDelete, viewMode
                             <button 
                               key={id} 
                               onClick={() => bird && onBirdRef(bird.name)}
-                              className="text-[8px] font-black uppercase tracking-tighter text-black-500 hover:text-gold-500"
+                              className="text-[8px] font-black uppercase tracking-tighter text-black-100 hover:text-gold-500"
                             >
                               @{bird?.name}
                             </button>
@@ -2006,7 +2062,7 @@ function TaskCard({ task, birds, onBirdRef, onToggle, onEdit, onDelete, viewMode
 
         {effectiveViewMode !== 'list' && (
           <div className="flex items-center gap-2 pt-2 border-t border-black-800/50">
-            <button onClick={(e) => { e.stopPropagation(); onEdit(); }} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-black-800 hover:bg-black-700 text-black-300 hover:text-gold-500 rounded-lg transition-all border border-black-700">
+            <button onClick={(e) => { e.stopPropagation(); onEdit(); }} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-zinc-700 hover:bg-zinc-600 text-white hover:text-gold-500 rounded-lg transition-all border border-black-700">
               <Edit2 size={14} />
               <span className="text-[9px] font-black uppercase tracking-widest">Edit</span>
             </button>
@@ -2068,11 +2124,11 @@ function SubscriptionView({ settings, onRenew }: { settings: UserSettings, onRen
             <h3 className="text-xl font-black text-white uppercase tracking-widest">
               {isExpired ? 'Expired' : daysLeft <= 30 ? 'Trial Active' : 'Active Subscription'}
             </h3>
-            <p className="text-black-400 font-medium mt-1">
+            <p className="text-black-50 font-medium mt-1">
               {statusText}
             </p>
             {expiryDate && (
-              <p className="text-[10px] text-black-500 font-bold uppercase tracking-widest mt-2">
+              <p className="text-[10px] text-black-100 font-bold uppercase tracking-widest mt-2">
                 Valid until: {format(expiryDate, 'PPP')}
               </p>
             )}
@@ -2083,7 +2139,7 @@ function SubscriptionView({ settings, onRenew }: { settings: UserSettings, onRen
           <Button onClick={handlePay} className="w-full md:w-48 py-4 text-sm">
             {isExpired ? 'Renew Now (R450)' : 'Extend 1 Year (R450)'}
           </Button>
-          <p className="text-[8px] text-center text-black-600 font-bold uppercase tracking-widest">Powered by Yoco</p>
+          <p className="text-[8px] text-center text-black-200 font-bold uppercase tracking-widest">Powered by Yoco</p>
         </div>
       </Card>
     </div>
@@ -2158,14 +2214,14 @@ function SettingsView({ settings, onUpdate }: { settings: UserSettings, onUpdate
           : "bg-black-900 border-black-800 hover:border-black-700"
       )}
     >
-      <div className={cn("p-3 rounded-xl", active ? "bg-gold-500 text-black-950" : "bg-black-800 text-gold-500")}>
+      <div className={cn("p-3 rounded-xl", active ? "bg-gold-500 text-black" : "bg-zinc-800 text-gold-500")}>
         <Icon size={20} />
       </div>
       <div className="flex-1">
         <h4 className={cn("font-black uppercase tracking-widest text-sm", active ? "text-gold-500" : "text-white")}>{title}</h4>
-        <p className="text-[10px] font-bold text-black-500 uppercase tracking-tighter mt-0.5">{description}</p>
+        <p className="text-[10px] font-bold text-white/50 uppercase tracking-tighter mt-0.5">{description}</p>
       </div>
-      <ChevronRight size={20} className={cn("transition-transform", active ? "rotate-90 text-gold-500" : "text-black-700")} />
+      <ChevronRight size={20} className={cn("transition-transform", active ? "rotate-90 text-gold-500" : "text-black-200")} />
     </button>
   );
 
@@ -2218,7 +2274,7 @@ function SettingsView({ settings, onUpdate }: { settings: UserSettings, onUpdate
                 <h3 className="text-lg font-black uppercase tracking-widest text-gold-500">General Settings</h3>
                 
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-black-500 uppercase tracking-widest ml-1">Currency</label>
+                  <label className="text-[10px] font-black text-black-100 uppercase tracking-widest ml-1">Currency</label>
                   <Select 
                     value={settings.currency || 'ZAR'} 
                     onChange={e => onUpdate({ ...settings, currency: e.target.value })}
@@ -2252,11 +2308,11 @@ function SettingsView({ settings, onUpdate }: { settings: UserSettings, onUpdate
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
                   {settings.species?.map(s => (
-                    <div key={s.id} className="p-3 bg-black-950 border border-black-800 rounded-xl flex items-center justify-between group">
+                    <div key={s.id} className="p-3 bg-black border border-black-700 rounded-xl flex items-center justify-between group">
                       <span className="text-sm font-bold text-white">{s.name}</span>
                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
-                        <button onClick={() => setEditingItem({ type: 'species', id: s.id, name: s.name })} className="text-black-600 hover:text-gold-500 p-1"><Edit2 size={14} /></button>
-                        <button onClick={() => removeSpecies(s.id)} className="text-black-600 hover:text-red-500 p-1"><Trash2 size={14} /></button>
+                        <button onClick={() => setEditingItem({ type: 'species', id: s.id, name: s.name })} className="text-black-200 hover:text-gold-500 p-1"><Edit2 size={14} /></button>
+                        <button onClick={() => removeSpecies(s.id)} className="text-black-200 hover:text-red-500 p-1"><Trash2 size={14} /></button>
                       </div>
                     </div>
                   ))}
@@ -2277,14 +2333,14 @@ function SettingsView({ settings, onUpdate }: { settings: UserSettings, onUpdate
                 <h3 className="text-lg font-black uppercase tracking-widest text-gold-500">Manage Sub-Species</h3>
                 <div className="grid grid-cols-1 gap-3">
                   <div className="space-y-1">
-                    <label className="text-[10px] font-black text-black-500 uppercase tracking-widest ml-1">Parent Species</label>
+                    <label className="text-[10px] font-black text-black-100 uppercase tracking-widest ml-1">Parent Species</label>
                     <Select value={selectedSpeciesId} onChange={e => setSelectedSpeciesId(e.target.value)}>
                       <option value="">Select Parent Species</option>
                       {settings.species?.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                     </Select>
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[10px] font-black text-black-500 uppercase tracking-widest ml-1">Sub-Species Name</label>
+                    <label className="text-[10px] font-black text-black-100 uppercase tracking-widest ml-1">Sub-Species Name</label>
                     <div className="flex gap-2">
                       <Input placeholder="New sub-species name..." value={newSubSpecies} onChange={e => setNewSubSpecies(e.target.value)} onKeyDown={e => e.key === 'Enter' && addSubSpecies()} />
                       <Button onClick={addSubSpecies} variant="secondary" className="px-4" disabled={!selectedSpeciesId}><Plus size={18} /></Button>
@@ -2297,14 +2353,14 @@ function SettingsView({ settings, onUpdate }: { settings: UserSettings, onUpdate
                     if (subs.length === 0) return null;
                     return (
                       <div key={s.id} className="space-y-2">
-                        <p className="text-[10px] font-black text-black-500 uppercase tracking-widest ml-1">{s.name} Sub-species</p>
+                        <p className="text-[10px] font-black text-black-100 uppercase tracking-widest ml-1">{s.name} Sub-species</p>
                         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
                           {subs.map(ss => (
-                            <div key={ss.id} className="p-3 bg-black-950 border border-black-800 rounded-xl flex items-center justify-between group">
+                            <div key={ss.id} className="p-3 bg-black border border-black-700 rounded-xl flex items-center justify-between group">
                               <span className="text-sm font-bold text-white">{ss.name}</span>
                               <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
-                                <button onClick={() => setEditingItem({ type: 'subspecies', id: ss.id, name: ss.name })} className="text-black-600 hover:text-gold-500 p-1"><Edit2 size={14} /></button>
-                                <button onClick={() => removeSubSpecies(ss.id)} className="text-black-600 hover:text-red-500 p-1"><Trash2 size={14} /></button>
+                                <button onClick={() => setEditingItem({ type: 'subspecies', id: ss.id, name: ss.name })} className="text-black-200 hover:text-gold-500 p-1"><Edit2 size={14} /></button>
+                                <button onClick={() => removeSubSpecies(ss.id)} className="text-black-200 hover:text-red-500 p-1"><Trash2 size={14} /></button>
                               </div>
                             </div>
                           ))}
@@ -2336,11 +2392,11 @@ function SettingsView({ settings, onUpdate }: { settings: UserSettings, onUpdate
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
                   {settings.mutations?.map(m => (
-                    <div key={m.id} className="p-3 bg-black-950 border border-black-800 rounded-xl flex items-center justify-between group">
+                    <div key={m.id} className="p-3 bg-black border border-black-700 rounded-xl flex items-center justify-between group">
                       <span className="text-sm font-bold text-white">{m.name}</span>
                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
-                        <button onClick={() => setEditingItem({ type: 'mutation', id: m.id, name: m.name })} className="text-black-600 hover:text-gold-500 p-1"><Edit2 size={14} /></button>
-                        <button onClick={() => removeMutation(m.id)} className="text-black-600 hover:text-red-500 p-1"><Trash2 size={14} /></button>
+                        <button onClick={() => setEditingItem({ type: 'mutation', id: m.id, name: m.name })} className="text-black-200 hover:text-gold-500 p-1"><Edit2 size={14} /></button>
+                        <button onClick={() => removeMutation(m.id)} className="text-black-200 hover:text-red-500 p-1"><Trash2 size={14} /></button>
                       </div>
                     </div>
                   ))}
@@ -2354,7 +2410,7 @@ function SettingsView({ settings, onUpdate }: { settings: UserSettings, onUpdate
       {/* Edit Modal */}
       <AnimatePresence>
         {editingItem && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black-950/80 backdrop-blur-sm">
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
             <motion.div 
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
@@ -2385,13 +2441,13 @@ function SettingsView({ settings, onUpdate }: { settings: UserSettings, onUpdate
 function Modal({ isOpen, onClose, title, children }: { isOpen: boolean, onClose: () => void, title: string, children: React.ReactNode }) {
   if (!isOpen) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black-950/80 backdrop-blur-md">
-      <motion.div initial={{ scale: 0.95, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} className="bg-black-900 border border-black-800 rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
-        <div className="p-6 border-b border-black-800 flex items-center justify-between bg-black-900/50">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-xl">
+      <motion.div initial={{ scale: 0.95, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} className="bg-zinc-800 border border-black-700 rounded-[2rem] shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
+        <div className="p-6 border-b border-black-700 flex items-center justify-between bg-zinc-800">
           <h3 className="text-xl font-black text-white uppercase tracking-widest">{title}</h3>
-          <button onClick={onClose} className="p-2 hover:bg-black-800 rounded-xl text-black-500 hover:text-gold-500 transition-all"><X size={20} /></button>
+          <button onClick={onClose} className="p-2 hover:bg-black/20 rounded-xl text-white/50 hover:text-gold-500 transition-all"><X size={20} /></button>
         </div>
-        <div className="p-6 overflow-y-auto custom-scrollbar">{children}</div>
+        <div className="p-6 overflow-y-auto custom-scrollbar bg-zinc-800 text-white">{children}</div>
       </motion.div>
     </div>
   );
@@ -2400,11 +2456,11 @@ function Modal({ isOpen, onClose, title, children }: { isOpen: boolean, onClose:
 function ConfirmModal({ isOpen, onClose, onConfirm, title, message }: { isOpen: boolean, onClose: () => void, onConfirm: () => void, title: string, message: string }) {
   if (!isOpen) return null;
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/90 backdrop-blur-xl">
       <motion.div 
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="w-full max-w-md bg-black-900 border border-black-800 rounded-[2rem] overflow-hidden shadow-2xl"
+        className="w-full max-w-md bg-zinc-800 border border-black-700 rounded-[2.5rem] overflow-hidden shadow-2xl"
       >
         <div className="p-8 space-y-6">
           <div className="flex items-center gap-4 text-red-500">
@@ -2413,7 +2469,7 @@ function ConfirmModal({ isOpen, onClose, onConfirm, title, message }: { isOpen: 
             </div>
             <h3 className="text-xl font-black uppercase tracking-widest">{title}</h3>
           </div>
-          <p className="text-black-400 text-sm font-medium leading-relaxed">{message}</p>
+          <p className="text-white/70 text-sm font-medium leading-relaxed">{message}</p>
           <div className="flex gap-3 pt-2">
             <Button variant="secondary" onClick={onClose} className="flex-1 py-4">Cancel</Button>
             <Button variant="danger" onClick={onConfirm} className="flex-1 py-4">Delete</Button>
@@ -2466,11 +2522,59 @@ function BirdForm({ user, initialData, cages, birds, userSettings, onAddSpecies,
     setIsUploading(true);
     setUploadError(null);
     try {
-      const fileId = await uploadToDrive(file);
-      setFormData(prev => ({ ...prev, imageUrl: fileId }));
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setFormData(prev => ({ ...prev, imageUrl: reader.result as string }));
+        setIsUploading(false);
+      };
+      reader.onerror = () => {
+        setUploadError('Failed to read file');
+        setIsUploading(false);
+      };
+      
+      // Compress image before saving to avoid Firestore 1MB limit
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX_WIDTH = 800;
+        const MAX_HEIGHT = 800;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_WIDTH) {
+            height *= MAX_WIDTH / width;
+            width = MAX_WIDTH;
+          }
+        } else {
+          if (height > MAX_HEIGHT) {
+            width *= MAX_HEIGHT / height;
+            height = MAX_HEIGHT;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx?.drawImage(img, 0, 0, width, height);
+        
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+        setFormData(prev => ({ ...prev, imageUrl: dataUrl }));
+        setIsUploading(false);
+      };
+      img.onerror = () => {
+        setUploadError('Failed to process image');
+        setIsUploading(false);
+      };
+      
+      reader.readAsDataURL(file);
+      
+      // We'll use the reader result to load the image for compression
+      reader.onload = (e) => {
+        img.src = e.target?.result as string;
+      };
     } catch (err) {
       setUploadError(err instanceof Error ? err.message : 'Upload failed');
-    } finally {
       setIsUploading(false);
     }
   };
@@ -2523,7 +2627,7 @@ function BirdForm({ user, initialData, cages, birds, userSettings, onAddSpecies,
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-1"><label className="text-[10px] font-black text-black-500 uppercase tracking-widest ml-1">Name/ID</label><Input required value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} /></div>
+        <div className="space-y-1"><label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Name/ID</label><Input required value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} /></div>
         <SearchableSelect 
           label="Species"
           options={speciesOptions}
@@ -2550,7 +2654,7 @@ function BirdForm({ user, initialData, cages, birds, userSettings, onAddSpecies,
           placeholder={formData.species ? "Select Sub-Species" : "Select Species First"}
           disabled={!formData.species}
         />
-        <div className="space-y-1"><label className="text-[10px] font-black text-black-500 uppercase tracking-widest ml-1">Sex</label><Select value={formData.sex} onChange={e => setFormData({ ...formData, sex: e.target.value as any })}><option value="Unknown">Unknown</option><option value="Male">Male</option><option value="Female">Female</option></Select></div>
+        <div className="space-y-1"><label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Sex</label><Select value={formData.sex} onChange={e => setFormData({ ...formData, sex: e.target.value as any })}><option value="Unknown" className="bg-black text-white">Unknown</option><option value="Male" className="bg-black text-white">Male</option><option value="Female" className="bg-black text-white">Female</option></Select></div>
       </div>
       
       <div className="grid grid-cols-2 gap-4">
@@ -2589,7 +2693,7 @@ function BirdForm({ user, initialData, cages, birds, userSettings, onAddSpecies,
       </div>
       
       <div className="space-y-1">
-        <label className="text-[10px] font-black text-black-500 uppercase tracking-widest ml-1">Image (Google Drive)</label>
+        <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Image</label>
         <div className="flex items-center gap-3">
           <div className="flex-1">
             <input 
@@ -2603,18 +2707,18 @@ function BirdForm({ user, initialData, cages, birds, userSettings, onAddSpecies,
             <label 
               htmlFor="bird-image-upload"
               className={cn(
-                "flex items-center justify-center gap-2 px-4 py-2 border border-black-800 rounded-xl cursor-pointer hover:bg-black-800 transition-all text-xs font-black uppercase tracking-widest text-black-400 hover:text-gold-500",
+                "flex items-center justify-center gap-2 px-4 py-3 bg-black border border-black-700 rounded-2xl cursor-pointer hover:bg-zinc-700 transition-all text-xs font-black uppercase tracking-widest text-white hover:text-gold-500",
                 isUploading && "opacity-50 cursor-not-allowed"
               )}
             >
               {isUploading ? <Loader2 size={16} className="animate-spin" /> : <ImageIcon size={16} />}
-              {formData.imageUrl ? 'Change Image' : 'Upload to Drive'}
+              {formData.imageUrl ? 'Change Image' : 'Upload Image'}
             </label>
           </div>
           {formData.imageUrl && (
-            <div className="w-10 h-10 rounded-xl bg-black-950 overflow-hidden border border-black-800">
+            <div className="w-12 h-12 rounded-2xl bg-black overflow-hidden border border-black-700">
               <img 
-                src={`https://drive.google.com/thumbnail?id=${formData.imageUrl}&sz=w100`} 
+                src={formData.imageUrl} 
                 alt="Preview" 
                 className="w-full h-full object-cover"
                 referrerPolicy="no-referrer"
@@ -2624,66 +2728,70 @@ function BirdForm({ user, initialData, cages, birds, userSettings, onAddSpecies,
         </div>
         {uploadError && <p className="text-[10px] text-red-500 mt-1 font-bold">{uploadError}</p>}
       </div>
-
+ 
       <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-1"><label className="text-[10px] font-black text-black-500 uppercase tracking-widest ml-1">Cage</label><Select value={formData.cageId} onChange={e => setFormData({ ...formData, cageId: e.target.value })}><option value="">Unassigned</option>{cages.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</Select></div>
-        <div className="space-y-1"><label className="text-[10px] font-black text-black-500 uppercase tracking-widest ml-1">Birth Date</label><Input type="date" value={formData.birthDate} onChange={e => setFormData({ ...formData, birthDate: e.target.value })} /></div>
+        <div className="space-y-1"><label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Cage</label><Select value={formData.cageId} onChange={e => setFormData({ ...formData, cageId: e.target.value })}><option value="" className="bg-black text-white">Unassigned</option>{cages.map(c => <option key={c.id} value={c.id} className="bg-black text-white">{c.name}</option>)}</Select></div>
+        <div className="space-y-1"><label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Birth Date</label><Input type="date" value={formData.birthDate} onChange={e => setFormData({ ...formData, birthDate: e.target.value })} /></div>
       </div>
-
+ 
       <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-1"><label className="text-[10px] font-black text-black-500 uppercase tracking-widest ml-1">Father</label><Select value={formData.fatherId} onChange={e => setFormData({ ...formData, fatherId: e.target.value })}><option value="">Unknown</option>{birds.filter(b => b.sex === 'Male' && b.id !== initialData?.id).map(b => <option key={b.id} value={b.id}>{b.name}</option>)}</Select></div>
-        <div className="space-y-1"><label className="text-[10px] font-black text-black-500 uppercase tracking-widest ml-1">Mother</label><Select value={formData.motherId} onChange={e => setFormData({ ...formData, motherId: e.target.value })}><option value="">Unknown</option>{birds.filter(b => b.sex === 'Female' && b.id !== initialData?.id).map(b => <option key={b.id} value={b.id}>{b.name}</option>)}</Select></div>
+        <div className="space-y-1"><label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Father</label><Select value={formData.fatherId} onChange={e => setFormData({ ...formData, fatherId: e.target.value })}><option value="" className="bg-black text-white">Unknown</option>{birds.filter(b => b.sex === 'Male' && b.id !== initialData?.id).map(b => <option key={b.id} value={b.id} className="bg-black text-white">{b.name}</option>)}</Select></div>
+        <div className="space-y-1"><label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Mother</label><Select value={formData.motherId} onChange={e => setFormData({ ...formData, motherId: e.target.value })}><option value="" className="bg-black text-white">Unknown</option>{birds.filter(b => b.sex === 'Female' && b.id !== initialData?.id).map(b => <option key={b.id} value={b.id} className="bg-black text-white">{b.name}</option>)}</Select></div>
       </div>
-
+ 
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1">
-          <label className="text-[10px] font-black text-black-500 uppercase tracking-widest ml-1">Mate</label>
+          <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Mate</label>
           <Select value={formData.mateId} onChange={e => setFormData({ ...formData, mateId: e.target.value })}>
-            <option value="">None</option>
-            {birds.filter(b => b.id !== initialData?.id && (formData.sex === 'Unknown' || b.sex !== formData.sex)).map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+            <option value="" className="bg-black text-white">None</option>
+            {birds.filter(b => b.id !== initialData?.id && (formData.sex === 'Unknown' || b.sex !== formData.sex)).map(b => <option key={b.id} value={b.id} className="bg-black text-white">{b.name}</option>)}
           </Select>
         </div>
         <div className="space-y-1">
-          <label className="text-[10px] font-black text-black-500 uppercase tracking-widest ml-1">Offspring</label>
-          <div className="max-h-32 overflow-y-auto border border-black-800 rounded-xl p-2 space-y-1 bg-black-950/50 custom-scrollbar">
-            {birds.filter(b => b.id !== initialData?.id).map(b => (
-              <label key={b.id} className="flex items-center gap-2 text-[11px] font-bold text-black-400 hover:text-gold-500 cursor-pointer transition-colors">
-                <input 
-                  type="checkbox" 
-                  className="rounded border-black-800 bg-black-900 text-gold-500 focus:ring-gold-500/20"
-                  checked={formData.offspringIds?.includes(b.id)} 
-                  onChange={e => {
-                    const ids = new Set(formData.offspringIds || []);
-                    if (e.target.checked) ids.add(b.id);
-                    else ids.delete(b.id);
-                    setFormData({ ...formData, offspringIds: Array.from(ids) });
-                  }}
-                />
-                {b.name}
-              </label>
-            ))}
+          <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Offspring</label>
+          <div className="max-h-32 overflow-y-auto border border-black-700 rounded-2xl p-3 space-y-2 bg-black custom-scrollbar">
+            {birds.filter(b => b.id !== initialData?.id).length === 0 ? (
+              <span className="text-xs text-black-200 italic px-2">No birds available</span>
+            ) : (
+              birds.filter(b => b.id !== initialData?.id).map(b => (
+                <label key={b.id} className="flex items-center gap-3 text-[11px] font-bold text-black-50 hover:text-gold-500 cursor-pointer transition-colors p-1">
+                  <input 
+                    type="checkbox" 
+                    className="rounded border-black-800 bg-black-900 text-gold-500 focus:ring-gold-500/20 w-4 h-4"
+                    checked={formData.offspringIds?.includes(b.id)} 
+                    onChange={e => {
+                      const ids = new Set(formData.offspringIds || []);
+                      if (e.target.checked) ids.add(b.id);
+                      else ids.delete(b.id);
+                      setFormData({ ...formData, offspringIds: Array.from(ids) });
+                    }}
+                  />
+                  {b.name}
+                </label>
+              ))
+            )}
           </div>
         </div>
       </div>
 
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1">
-          <label className="text-[10px] font-black text-black-500 uppercase tracking-widest ml-1">Purchase Date</label>
+          <label className="text-[10px] font-black text-black-100 uppercase tracking-widest ml-1">Purchase Date</label>
           <Input type="date" value={formData.purchaseDate} onChange={e => setFormData({ ...formData, purchaseDate: e.target.value })} />
         </div>
         <div className="space-y-1">
-          <label className="text-[10px] font-black text-black-500 uppercase tracking-widest ml-1">Purchase Price ({symbol})</label>
+          <label className="text-[10px] font-black text-black-100 uppercase tracking-widest ml-1">Purchase Price ({symbol})</label>
           <Input type="number" min="0" step="0.01" value={formData.purchasePrice} onChange={e => setFormData({ ...formData, purchasePrice: parseFloat(e.target.value) || 0 })} />
         </div>
       </div>
 
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1">
-          <label className="text-[10px] font-black text-black-500 uppercase tracking-widest ml-1">Est. Value ({symbol})</label>
+          <label className="text-[10px] font-black text-black-100 uppercase tracking-widest ml-1">Est. Value ({symbol})</label>
           <Input type="number" min="0" step="0.01" value={formData.estimatedValue} onChange={e => setFormData({ ...formData, estimatedValue: parseFloat(e.target.value) || 0 })} />
         </div>
         <div className="space-y-2">
-          <label className="text-[10px] font-black text-black-500 uppercase tracking-widest ml-1">Custom Statuses</label>
+          <label className="text-[10px] font-black text-black-100 uppercase tracking-widest ml-1">Custom Statuses</label>
           <div className="flex gap-2">
             <Input 
               placeholder="Add status (e.g., Sold, Sick)..." 
@@ -2702,7 +2810,7 @@ function BirdForm({ user, initialData, cages, birds, userSettings, onAddSpecies,
           </div>
           <div className="flex flex-wrap gap-1">
             {formData.statuses?.map((s, i) => (
-              <Badge key={i} className="flex items-center gap-1 bg-black-800 border-black-700 text-gold-500">
+              <Badge key={i} className="flex items-center gap-1 bg-zinc-700 border-black-700 text-gold-500">
                 {s}
                 <button type="button" onClick={() => setFormData({ ...formData, statuses: formData.statuses?.filter((_, idx) => idx !== i) })} className="hover:text-white"><X size={10} /></button>
               </Badge>
@@ -2712,9 +2820,9 @@ function BirdForm({ user, initialData, cages, birds, userSettings, onAddSpecies,
       </div>
 
       <div className="space-y-1">
-        <label className="text-[10px] font-black text-black-500 uppercase tracking-widest ml-1">Notes</label>
+        <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Notes</label>
         <textarea 
-          className="w-full px-4 py-3 bg-black-950 border border-black-800 rounded-2xl focus:outline-none focus:ring-2 focus:ring-gold-500/20 focus:border-gold-500 text-white transition-all min-h-[100px] text-sm font-medium placeholder:text-black-700" 
+          className="w-full px-4 py-3 bg-black border border-black-700 rounded-2xl focus:outline-none focus:ring-2 focus:ring-gold-500/20 focus:border-gold-500 text-white transition-all min-h-[100px] text-sm font-medium placeholder:text-white/30" 
           placeholder="Additional notes..."
           value={formData.notes} 
           onChange={e => setFormData({ ...formData, notes: e.target.value })} 
@@ -2738,10 +2846,10 @@ function CageForm({ user, initialData, onClose }: { user: FirebaseUser, initialD
   };
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="space-y-1"><label className="text-[10px] font-black text-black-500 uppercase tracking-widest ml-1">Cage Name/Number</label><Input required value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} /></div>
+      <div className="space-y-1"><label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Cage Name/Number</label><Input required value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} /></div>
       <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-1"><label className="text-[10px] font-black text-black-500 uppercase tracking-widest ml-1">Location</label><Input value={formData.location} onChange={e => setFormData({ ...formData, location: e.target.value })} /></div>
-        <div className="space-y-1"><label className="text-[10px] font-black text-black-500 uppercase tracking-widest ml-1">Type</label><Select value={formData.type} onChange={e => setFormData({ ...formData, type: e.target.value })}><option value="Standard">Standard</option><option value="Breeding">Breeding</option><option value="Flight">Flight</option><option value="Hospital">Hospital</option></Select></div>
+        <div className="space-y-1"><label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Location</label><Input value={formData.location} onChange={e => setFormData({ ...formData, location: e.target.value })} /></div>
+        <div className="space-y-1"><label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Type</label><Select value={formData.type} onChange={e => setFormData({ ...formData, type: e.target.value })}><option value="Standard" className="bg-black text-white">Standard</option><option value="Breeding" className="bg-black text-white">Breeding</option><option value="Flight" className="bg-black text-white">Flight</option><option value="Hospital" className="bg-black text-white">Hospital</option></Select></div>
       </div>
       <Button type="submit" className="w-full py-4 text-sm uppercase tracking-widest font-black">{initialData ? 'Update' : 'Add'} Cage</Button>
     </form>
@@ -2762,13 +2870,13 @@ function PairForm({ user, initialData, birds, onClose }: { user: FirebaseUser, i
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-1"><label className="text-[10px] font-black text-black-500 uppercase tracking-widest ml-1">Male</label><Select required value={formData.maleId} onChange={e => setFormData({ ...formData, maleId: e.target.value })}><option value="">Select Male</option>{birds.filter(b => b.sex === 'Male').map(b => <option key={b.id} value={b.id}>{b.name}</option>)}</Select></div>
-        <div className="space-y-1"><label className="text-[10px] font-black text-black-500 uppercase tracking-widest ml-1">Female</label><Select required value={formData.femaleId} onChange={e => setFormData({ ...formData, femaleId: e.target.value })}><option value="">Select Female</option>{birds.filter(b => b.sex === 'Female').map(b => <option key={b.id} value={b.id}>{b.name}</option>)}</Select></div>
+        <div className="space-y-1"><label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Male</label><Select required value={formData.maleId} onChange={e => setFormData({ ...formData, maleId: e.target.value })}><option value="" className="bg-black text-white">Select Male</option>{birds.filter(b => b.sex === 'Male').map(b => <option key={b.id} value={b.id} className="bg-black text-white">{b.name}</option>)}</Select></div>
+        <div className="space-y-1"><label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Female</label><Select required value={formData.femaleId} onChange={e => setFormData({ ...formData, femaleId: e.target.value })}><option value="" className="bg-black text-white">Select Female</option>{birds.filter(b => b.sex === 'Female').map(b => <option key={b.id} value={b.id} className="bg-black text-white">{b.name}</option>)}</Select></div>
       </div>
-      <div className="space-y-1"><label className="text-[10px] font-black text-black-500 uppercase tracking-widest ml-1">Status</label><Select value={formData.status} onChange={e => setFormData({ ...formData, status: e.target.value as any })}><option value="Active">Active</option><option value="Inactive">Inactive</option></Select></div>
+      <div className="space-y-1"><label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Status</label><Select value={formData.status} onChange={e => setFormData({ ...formData, status: e.target.value as any })}><option value="Active" className="bg-black text-white">Active</option><option value="Inactive" className="bg-black text-white">Inactive</option></Select></div>
       <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-1"><label className="text-[10px] font-black text-black-500 uppercase tracking-widest ml-1">Start Date</label><Input type="date" value={formData.startDate} onChange={e => setFormData({ ...formData, startDate: e.target.value })} /></div>
-        <div className="space-y-1"><label className="text-[10px] font-black text-black-500 uppercase tracking-widest ml-1">End Date</label><Input type="date" value={formData.endDate} onChange={e => setFormData({ ...formData, endDate: e.target.value })} /></div>
+        <div className="space-y-1"><label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Start Date</label><Input type="date" value={formData.startDate} onChange={e => setFormData({ ...formData, startDate: e.target.value })} /></div>
+        <div className="space-y-1"><label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">End Date</label><Input type="date" value={formData.endDate} onChange={e => setFormData({ ...formData, endDate: e.target.value })} /></div>
       </div>
       <Button type="submit" className="w-full py-4 text-sm uppercase tracking-widest font-black">{initialData ? 'Update' : 'Add'} Pair</Button>
     </form>
@@ -2776,7 +2884,7 @@ function PairForm({ user, initialData, birds, onClose }: { user: FirebaseUser, i
 }
 
 function TaskForm({ user, initialData, birds, onClose }: { user: FirebaseUser, initialData?: Task, birds: Bird[], onClose: () => void }) {
-  const [formData, setFormData] = useState<Partial<Task>>(initialData || { title: '', description: '', status: 'Pending', priority: 'Medium', category: 'General', dueDate: '', birdIds: [], subTasks: [] });
+  const [formData, setFormData] = useState<Partial<Task>>(initialData || { title: '', description: '', status: 'Pending', priority: 'Medium', category: 'General', dueDate: '', reminderDate: '', birdIds: [], subTasks: [] });
   const [newSubTask, setNewSubTask] = useState('');
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -2798,56 +2906,65 @@ function TaskForm({ user, initialData, birds, onClose }: { user: FirebaseUser, i
   };
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="space-y-1"><label className="text-[10px] font-black text-black-500 uppercase tracking-widest ml-1">Title</label><Input required value={formData.title} onChange={e => setFormData({ ...formData, title: e.target.value })} /></div>
+      <div className="space-y-1"><label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Title</label><Input required value={formData.title} onChange={e => setFormData({ ...formData, title: e.target.value })} /></div>
       <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-1"><label className="text-[10px] font-black text-black-500 uppercase tracking-widest ml-1">Category</label><Input required value={formData.category} onChange={e => setFormData({ ...formData, category: e.target.value })} /></div>
-        <div className="space-y-1"><label className="text-[10px] font-black text-black-500 uppercase tracking-widest ml-1">Priority</label><Select value={formData.priority} onChange={e => setFormData({ ...formData, priority: e.target.value as any })}><option value="Low">Low</option><option value="Medium">Medium</option><option value="High">High</option></Select></div>
+        <div className="space-y-1"><label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Category</label><Input required value={formData.category} onChange={e => setFormData({ ...formData, category: e.target.value })} /></div>
+        <div className="space-y-1"><label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Priority</label><Select value={formData.priority} onChange={e => setFormData({ ...formData, priority: e.target.value as any })}><option value="Low" className="bg-black text-white">Low</option><option value="Medium" className="bg-black text-white">Medium</option><option value="High" className="bg-black text-white">High</option></Select></div>
       </div>
       <div className="space-y-1">
-        <label className="text-[10px] font-black text-black-500 uppercase tracking-widest ml-1">Description</label>
+        <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Description</label>
         <textarea 
-          className="w-full px-4 py-3 bg-black-950 border border-black-800 rounded-2xl focus:outline-none focus:ring-2 focus:ring-gold-500/20 focus:border-gold-500 text-white transition-all min-h-[80px] text-sm font-medium placeholder:text-black-700" 
+          className="w-full px-4 py-3 bg-black border border-black-700 rounded-2xl focus:outline-none focus:ring-2 focus:ring-gold-500/20 focus:border-gold-500 text-white transition-all min-h-[80px] text-sm font-medium placeholder:text-white/30" 
           placeholder="Task description..."
           value={formData.description} 
           onChange={e => setFormData({ ...formData, description: e.target.value })} 
         />
       </div>
       <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-1"><label className="text-[10px] font-black text-black-500 uppercase tracking-widest ml-1">Status</label><Select value={formData.status} onChange={e => setFormData({ ...formData, status: e.target.value as any })}><option value="Pending">Pending</option><option value="Completed">Completed</option></Select></div>
-        <div className="space-y-1"><label className="text-[10px] font-black text-black-500 uppercase tracking-widest ml-1">Due Date</label><Input type="date" value={formData.dueDate} onChange={e => setFormData({ ...formData, dueDate: e.target.value })} /></div>
+        <div className="space-y-1"><label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Status</label><Select value={formData.status} onChange={e => setFormData({ ...formData, status: e.target.value as any })}><option value="Pending" className="bg-black text-white">Pending</option><option value="Completed" className="bg-black text-white">Completed</option></Select></div>
+        <div className="space-y-1"><label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Due Date</label><Input type="date" value={formData.dueDate} onChange={e => setFormData({ ...formData, dueDate: e.target.value })} /></div>
+      </div>
+      <div className="space-y-1">
+        <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Reminder (Push Notification)</label>
+        <Input type="datetime-local" value={formData.reminderDate || ''} onChange={e => setFormData({ ...formData, reminderDate: e.target.value })} />
+        <p className="text-[10px] text-white ml-1">You will receive a notification when the app is open or running in the background.</p>
       </div>
       <div className="space-y-2">
-        <label className="text-[10px] font-black text-black-500 uppercase tracking-widest ml-1">Tag Birds</label>
-        <div className="flex flex-wrap gap-2 p-2 border border-black-800 rounded-xl bg-black-950/50">
-          {birds.map(b => (
-            <button 
-              key={b.id} 
-              type="button" 
-              onClick={() => toggleBirdTag(b.id)} 
-              className={cn(
-                'px-2 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all', 
-                formData.birdIds?.includes(b.id) 
-                  ? 'bg-gold-500 text-black-950 shadow-lg shadow-gold-500/20' 
-                  : 'bg-black-900 text-black-500 border border-black-800 hover:border-gold-500/50'
-              )}
-            >
-              {b.name}
-            </button>
-          ))}
+        <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Tag Birds</label>
+        <div className="flex flex-wrap gap-2 p-3 border border-black-700 rounded-2xl bg-black min-h-[50px] items-center">
+          {birds.length === 0 ? (
+            <span className="text-xs text-white italic px-2">No birds available to tag</span>
+          ) : (
+            birds.map(b => (
+              <button 
+                key={b.id} 
+                type="button" 
+                onClick={() => toggleBirdTag(b.id)} 
+                className={cn(
+                  'px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all', 
+                  formData.birdIds?.includes(b.id) 
+                    ? 'bg-gold-500 text-black-950 shadow-lg shadow-gold-500/20' 
+                    : 'bg-zinc-700 text-white border border-black-700 hover:border-gold-500/50'
+                )}
+              >
+                {b.name}
+              </button>
+            ))
+          )}
         </div>
       </div>
       <div className="space-y-2">
-        <label className="text-[10px] font-black text-black-500 uppercase tracking-widest ml-1">Subtasks</label>
+        <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Subtasks</label>
         <div className="flex gap-2">
           <Input placeholder="Add subtask..." value={newSubTask} onChange={e => setNewSubTask(e.target.value)} onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addSubTask())} />
           <Button type="button" onClick={addSubTask} variant="secondary" className="px-3"><Plus size={16} /></Button>
         </div>
         <div className="space-y-2">
           {formData.subTasks?.map((sub, idx) => (
-            <div key={idx} className="flex items-center justify-between p-3 bg-black-950/50 rounded-xl border border-black-800">
-              <span className="text-xs font-bold text-black-300">{sub.title}</span>
-              <button type="button" onClick={() => setFormData({ ...formData, subTasks: formData.subTasks?.filter((_, i) => i !== idx) })} className="text-black-600 hover:text-red-500 transition-colors">
-                <Trash2 size={14} />
+            <div key={idx} className="flex items-center justify-between p-3 bg-black rounded-2xl border border-black-700">
+              <span className="text-xs font-bold text-white">{sub.title}</span>
+              <button type="button" onClick={() => setFormData({ ...formData, subTasks: formData.subTasks?.filter((_, i) => i !== idx) })} className="text-white hover:text-red-500 transition-colors">
+                <Trash2 size={16} />
               </button>
             </div>
           ))}

@@ -1,10 +1,10 @@
-const CACHE_NAME = 'bird-manager-v10';
+const CACHE_NAME = 'bird-manager-v11';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
   '/manifest.json',
-  '/192.png',
-  '/512.png'
+  '/192.png?v=11',
+  '/512.png?v=11'
 ];
 
 self.addEventListener('install', (event) => {
