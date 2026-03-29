@@ -218,8 +218,15 @@ function SubscriptionGate({ settings, onRenew, children }: { settings: UserSetti
   if (!settings) return <>{children}</>;
 
   const expiryDate = settings.account_expiry_date ? new Date(settings.account_expiry_date) : null;
-  const isExpired = expiryDate ? new Date() > expiryDate : false;
-  const daysLeft = expiryDate ? Math.ceil((expiryDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) : 0;
+  const now = new Date();
+  
+  const isValidDate = expiryDate && !isNaN(expiryDate.getTime());
+  // If we have settings but no valid date, it's a data error. 
+  // We'll treat it as expired to be safe and encourage renewal/fix.
+  const isExpired = !isValidDate || now > expiryDate;
+  
+  const diffTime = isValidDate ? expiryDate.getTime() - now.getTime() : 0;
+  const daysLeft = Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
 
   const handlePay = async () => {
     try {
@@ -264,7 +271,7 @@ function SubscriptionGate({ settings, onRenew, children }: { settings: UserSetti
 
   return (
     <div className="flex flex-col h-screen">
-      {daysLeft >= 0 && (
+      {(daysLeft <= 30) && (
         <div className="bg-gold-500 text-black-950 px-4 py-1.5 text-center text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 flex-shrink-0">
           <AlertTriangle size={14} />
           {daysLeft === 0 ? "Last day" : `${daysLeft} days left`} in your {daysLeft <= 30 ? 'trial' : 'subscription'}
@@ -366,8 +373,20 @@ export default function App() {
     const docRef = doc(db, 'userSettings', user.uid);
     const unsubSettings = onSnapshot(docRef, (docSnap) => {
       if (docSnap.exists()) {
-        setUserSettings({ id: docSnap.id, ...docSnap.data() } as UserSettings);
+        const data = docSnap.data() as UserSettings;
+        // If expiry date is missing for some reason, fix it with a trial
+        if (!data.account_expiry_date) {
+          const trialExpiry = new Date();
+          trialExpiry.setDate(trialExpiry.getDate() + 30);
+          const updated = { ...data, account_expiry_date: trialExpiry.toISOString() };
+          updateDoc(docRef, { account_expiry_date: updated.account_expiry_date });
+          setUserSettings({ id: docSnap.id, ...updated });
+        } else {
+          setUserSettings({ id: docSnap.id, ...data });
+        }
       } else {
+        const trialExpiry = new Date();
+        trialExpiry.setDate(trialExpiry.getDate() + 30);
         const initialSettings: UserSettings = {
           id: user.uid,
           species: [],
@@ -375,9 +394,10 @@ export default function App() {
           mutations: [],
           uid: user.uid,
           currency: 'ZAR',
-          account_expiry_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+          account_expiry_date: trialExpiry.toISOString()
         };
         setDoc(docRef, initialSettings);
+        setUserSettings(initialSettings);
       }
     });
 
@@ -596,9 +616,10 @@ export default function App() {
                 <p className="text-[11px] font-black text-white uppercase tracking-tighter">
                   {(() => {
                     const expiry = userSettings.account_expiry_date ? new Date(userSettings.account_expiry_date) : null;
-                    if (!expiry) return 'No Subscription';
+                    if (!expiry || isNaN(expiry.getTime())) return 'No Subscription';
                     if (new Date() > expiry) return 'Expired';
-                    const days = Math.ceil((expiry.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+                    const diff = expiry.getTime() - new Date().getTime();
+                    const days = Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
                     return days === 0 ? 'Last Day' : `${days} Days Left`;
                   })()}
                 </p>
@@ -1978,8 +1999,17 @@ function TaskCard({ task, birds, onBirdRef, onToggle, onEdit, onDelete, viewMode
 
 function SubscriptionView({ settings, onRenew }: { settings: UserSettings, onRenew: () => void }) {
   const expiryDate = settings.account_expiry_date ? new Date(settings.account_expiry_date) : null;
-  const isExpired = expiryDate ? new Date() > expiryDate : false;
-  const daysLeft = expiryDate ? Math.ceil((expiryDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) : 0;
+  const now = new Date();
+  const isValidDate = expiryDate && !isNaN(expiryDate.getTime());
+  const isExpired = !isValidDate || now > expiryDate;
+  const diffTime = isValidDate ? expiryDate.getTime() - now.getTime() : 0;
+  const daysLeft = Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
+
+  const statusText = isExpired 
+    ? 'Your access has expired. Renew to regain full access.' 
+    : daysLeft === 0 
+      ? 'Today is your last day of access. Renew now to avoid interruption.'
+      : `You have ${daysLeft} days remaining.`;
 
   const handlePay = async () => {
     try {
@@ -2013,9 +2043,7 @@ function SubscriptionView({ settings, onRenew }: { settings: UserSettings, onRen
               {isExpired ? 'Expired' : daysLeft <= 30 ? 'Trial Active' : 'Active Subscription'}
             </h3>
             <p className="text-black-400 font-medium mt-1">
-              {isExpired 
-                ? 'Your access has expired. Renew to regain full access.' 
-                : `You have ${daysLeft} days remaining.`}
+              {statusText}
             </p>
             {expiryDate && (
               <p className="text-[10px] text-black-500 font-bold uppercase tracking-widest mt-2">
