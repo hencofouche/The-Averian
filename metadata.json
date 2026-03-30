@@ -1,5 +1,5 @@
 {
   "name": "The Averian",
-  "description": "A professional bird breeding tracker with Google Drive integration for bird images.",
+  "description": "A professional bird breeding tracker with offline support and cloud sync.",
   "requestFramePermissions": []
 }

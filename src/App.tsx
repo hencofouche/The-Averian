@@ -7,7 +7,7 @@ import {
   Tag, Calendar, ChevronDown, ChevronUp, ChevronRight, X, GitBranch,
   Image as ImageIcon, Loader2, DollarSign, TrendingUp, TrendingDown,
   Activity, ArrowUpRight, ArrowDownRight, BarChart3, PieChart as PieChartIcon,
-  Menu, Egg, LayoutGrid, Grid3x3, List as ListIcon, AlertTriangle, CreditCard, CheckCircle2, Bell
+  Menu, Egg, LayoutGrid, Grid3x3, List as ListIcon, AlertTriangle, CreditCard, CheckCircle2, Bell, Cloud
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -15,14 +15,14 @@ import {
   BarChart, Bar, Cell, Legend, PieChart, Pie, AreaChart, Area
 } from 'recharts';
 import { 
-  auth, db, storage, loginWithGoogle, logout, handleFirestoreError 
+  auth, db, storage, loginWithGoogle, logout, handleFirestoreError, testConnection
 } from './firebase';
 import { 
   onAuthStateChanged, User as FirebaseUser 
 } from 'firebase/auth';
 import { 
   collection, onSnapshot, query, where, addDoc, 
-  updateDoc, deleteDoc, doc, getDocs, orderBy, setDoc
+  updateDoc, deleteDoc, doc, getDocs, orderBy, setDoc, getDocFromServer
 } from 'firebase/firestore';
 import { 
   ref, uploadBytes, getDownloadURL 
@@ -417,9 +417,18 @@ export default function App() {
     if (!user || !userSettings) return;
     const params = new URLSearchParams(window.location.search);
     if (params.get('payment') === 'success') {
-      handleRenew();
-      toast.success("Payment successful! Your subscription has been extended by 1 year.");
-      window.history.replaceState({}, document.title, window.location.pathname);
+      // Use a flag to avoid multiple calls if the component re-renders
+      const hasRenewed = sessionStorage.getItem('has_renewed_session');
+      if (!hasRenewed) {
+        handleRenew().then(() => {
+          sessionStorage.setItem('has_renewed_session', 'true');
+          toast.success("Payment successful! Your subscription has been extended by 1 year.");
+          window.history.replaceState({}, document.title, window.location.pathname);
+        }).catch(e => {
+          console.error("Renewal failed:", e);
+          toast.error("Failed to activate subscription. Please contact support.");
+        });
+      }
     }
   }, [user, userSettings]);
 
@@ -509,10 +518,26 @@ export default function App() {
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'transactions'));
 
     const docRef = doc(db, 'userSettings', user.uid);
-    const unsubSettings = onSnapshot(docRef, (docSnap) => {
+    const unsubSettings = onSnapshot(docRef, (docSnap: any) => {
       setIsSyncing(docSnap.metadata.hasPendingWrites);
+      
+      // If the snapshot is from cache and empty, don't overwrite server data with a trial yet.
+      // Wait for the server response.
+      if (docSnap.metadata.fromCache && !docSnap.exists()) {
+        console.log("UserSettings not in cache, waiting for server...");
+        return;
+      }
+
       if (docSnap.exists()) {
         const data = docSnap.data() as UserSettings;
+        
+        // If we have pending writes, it means we just updated something locally.
+        // We should trust our local state for now to avoid flickering or overwriting with stale data.
+        if (docSnap.metadata.hasPendingWrites) {
+          setUserSettings({ id: docSnap.id, ...data });
+          return;
+        }
+
         // If expiry date is missing for some reason, fix it with a trial
         if (!data.account_expiry_date) {
           const trialExpiry = new Date();
@@ -524,6 +549,10 @@ export default function App() {
           setUserSettings({ id: docSnap.id, ...data });
         }
       } else {
+        // Only create initial settings if we are sure it doesn't exist on server
+        // and we are not just waiting for the server response.
+        if (docSnap.metadata.fromCache) return;
+
         const trialExpiry = new Date();
         trialExpiry.setDate(trialExpiry.getDate() + 30);
         const initialSettings: UserSettings = {
@@ -538,7 +567,7 @@ export default function App() {
         setDoc(docRef, initialSettings);
         setUserSettings(initialSettings);
       }
-    });
+    }, (err) => handleFirestoreError(err, OperationType.GET, 'userSettings'));
 
     return () => {
       unsubBirds();
@@ -602,7 +631,10 @@ export default function App() {
   const handleUpdateSettings = async (newSettings: UserSettings) => {
     if (!user) return;
     try {
-      await setDoc(doc(db, 'userSettings', user.uid), newSettings);
+      // Use setDoc with merge: true to avoid overwriting fields we don't intend to change
+      // and to ensure the document is created if it doesn't exist.
+      const { id, ...data } = newSettings;
+      await setDoc(doc(db, 'userSettings', user.uid), data, { merge: true });
     } catch (e) {
       handleFirestoreError(e, OperationType.WRITE, 'userSettings');
     }
@@ -637,15 +669,20 @@ export default function App() {
 
   const handleRenew = async () => {
     if (!user || !userSettings) return;
-    const currentExpiry = userSettings.account_expiry_date ? new Date(userSettings.account_expiry_date) : new Date();
-    const baseDate = currentExpiry > new Date() ? currentExpiry : new Date();
-    baseDate.setFullYear(baseDate.getFullYear() + 1);
     
     try {
+      // Fetch latest from server to avoid race conditions
+      const docSnap = await getDocFromServer(doc(db, 'userSettings', user.uid));
+      const currentData = docSnap.exists() ? docSnap.data() as UserSettings : userSettings;
+      
+      const currentExpiry = currentData.account_expiry_date ? new Date(currentData.account_expiry_date) : new Date();
+      const baseDate = currentExpiry > new Date() ? currentExpiry : new Date();
+      baseDate.setFullYear(baseDate.getFullYear() + 1);
+      
       await updateDoc(doc(db, 'userSettings', user.uid), {
         account_expiry_date: baseDate.toISOString()
       });
-      toast.success("Subscription renewed successfully!");
+      toast.success("Subscription activated for 1 year!");
     } catch (e) {
       handleFirestoreError(e, OperationType.UPDATE, 'userSettings');
     }
@@ -1050,6 +1087,8 @@ export default function App() {
                     settings={userSettings} 
                     onUpdate={handleUpdateSettings} 
                     allData={{ birds, cages, pairs, breedingRecords, tasks, transactions, userSettings }}
+                    user={user}
+                    isSyncing={isSyncing}
                   />
                 )}
 
@@ -2228,7 +2267,7 @@ function SubscriptionView({ settings, onRenew }: { settings: UserSettings, onRen
 
 // --- Settings View ---
 
-function SettingsView({ settings, onUpdate, allData }: { settings: UserSettings, onUpdate: (s: UserSettings) => void, allData: any }) {
+function SettingsView({ settings, onUpdate, allData, user, isSyncing }: { settings: UserSettings, onUpdate: (s: UserSettings) => void, allData: any, user: FirebaseUser | null, isSyncing: boolean }) {
   const [activeSection, setActiveSection] = useState<'general' | 'species' | 'subspecies' | 'mutations' | 'data' | null>('general');
   const [newSpecies, setNewSpecies] = useState('');
   const [newMutation, setNewMutation] = useState('');
@@ -2525,17 +2564,40 @@ function SettingsView({ settings, onUpdate, allData }: { settings: UserSettings,
                   <Button onClick={downloadBackup} className="w-full py-4">Download Backup Now</Button>
                 </div>
 
-                <div className="p-6 bg-black border border-black-700 rounded-3xl space-y-4 opacity-50">
+                <div className="bg-black-900 border border-black-800 rounded-3xl p-6 space-y-6">
                   <div className="flex items-center gap-4">
                     <div className="p-3 bg-gold-500/10 rounded-2xl text-gold-500">
-                      <Home size={24} />
+                      <Cloud size={24} />
                     </div>
-                    <div>
-                      <h4 className="text-sm font-black uppercase tracking-widest text-white">Google Drive Sync</h4>
-                      <p className="text-[10px] font-bold text-white/50 uppercase tracking-tighter mt-0.5">Automatic image backup (Coming Soon)</p>
+                    <div className="flex-1">
+                      <h4 className="text-sm font-black uppercase tracking-widest text-white">Cloud Sync</h4>
+                      <p className="text-[10px] font-bold text-white/50 uppercase tracking-tighter mt-0.5">
+                        {isSyncing ? 'Syncing changes...' : 'All data backed up online'}
+                      </p>
+                    </div>
+                    <Button 
+                      variant="ghost" 
+                      onClick={() => window.location.reload()}
+                      className="text-[10px] font-black uppercase tracking-widest text-gold-500"
+                    >
+                      Refresh
+                    </Button>
+                  </div>
+                  
+                  <div className="pt-4 border-t border-black-800 space-y-2">
+                    <div className="flex justify-between items-center text-[10px] font-bold uppercase tracking-widest">
+                      <span className="text-white/50">User ID</span>
+                      <span className="text-white font-mono">{user?.uid.slice(0, 8)}...</span>
+                    </div>
+                    <div className="flex justify-between items-center text-[10px] font-bold uppercase tracking-widest">
+                      <span className="text-white/50">Birds</span>
+                      <span className="text-white">{allData.birds.length}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-[10px] font-bold uppercase tracking-widest">
+                      <span className="text-white/50">Cages</span>
+                      <span className="text-white">{allData.cages.length}</span>
                     </div>
                   </div>
-                  <Button disabled className="w-full py-4">Connect Google Drive</Button>
                 </div>
               </div>
             </motion.div>
