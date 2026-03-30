@@ -18,7 +18,28 @@
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js', { scope: '/' });
+          navigator.serviceWorker.register('/sw.js', { scope: '/' }).then(registration => {
+            // Check for updates periodically
+            setInterval(() => {
+              registration.update();
+            }, 60 * 60 * 1000); // Check every hour
+          });
+        });
+
+        // Reload the page when a new service worker takes over
+        let refreshing = false;
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          if (!refreshing) {
+            refreshing = true;
+            window.location.reload();
+          }
+        });
+
+        // Check for updates when the user returns to the app
+        window.addEventListener('focus', () => {
+          navigator.serviceWorker.ready.then(registration => {
+            registration.update();
+          });
         });
       }
     </script>
