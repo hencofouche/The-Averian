@@ -36,6 +36,7 @@ service cloud.firestore {
     // Fields:
     //   - name: string (required)
     //   - location: string (optional)
+    //   - imageUrl: string (optional)
     //   - uid: string (required, immutable)
     //
     // Collection: pairs
@@ -145,7 +146,7 @@ service cloud.firestore {
              (!('mutations' in data) || data.mutations is list) &&
              (!('splitMutations' in data) || data.splitMutations is list) &&
              (!('statuses' in data) || data.statuses is list) &&
-             (!('imageUrl' in data) || data.imageUrl is string) &&
+             (!('imageUrl' in data) || (data.imageUrl is string && data.imageUrl.size() < 2000)) &&
              (!('notes' in data) || data.notes is string && data.notes.size() < 2000) &&
              (!('purchaseDate' in data) || isValidDateString(data.purchaseDate)) &&
              (!('purchasePrice' in data) || data.purchasePrice is number) &&
@@ -165,7 +166,8 @@ service cloud.firestore {
     function isValidCage(data) {
       return hasRequiredFields(['name', 'uid']) &&
              data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
-             (!('location' in data) || data.location is string && data.location.size() < 200);
+             (!('location' in data) || data.location is string && data.location.size() < 200) &&
+             (!('imageUrl' in data) || (data.imageUrl is string && data.imageUrl.size() < 2000));
     }
 
     function isValidPair(data) {

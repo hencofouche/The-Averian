@@ -63,6 +63,7 @@ export interface Cage {
   name: string;
   location?: string;
   type?: string;
+  imageUrl?: string;
   uid: string;
 }
 

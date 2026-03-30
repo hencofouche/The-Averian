@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { format } from 'date-fns';
+import { Toaster, toast } from 'sonner';
 import { 
   Plus, Search, Bird as BirdIcon, Home, Heart, CheckSquare, 
   Info, Trash2, Edit2, LogOut, User, 
@@ -14,7 +15,7 @@ import {
   BarChart, Bar, Cell, Legend, PieChart, Pie, AreaChart, Area
 } from 'recharts';
 import { 
-  auth, db, loginWithGoogle, logout, handleFirestoreError 
+  auth, db, storage, loginWithGoogle, logout, handleFirestoreError 
 } from './firebase';
 import { 
   onAuthStateChanged, User as FirebaseUser 
@@ -23,6 +24,9 @@ import {
   collection, onSnapshot, query, where, addDoc, 
   updateDoc, deleteDoc, doc, getDocs, orderBy, setDoc
 } from 'firebase/firestore';
+import { 
+  ref, uploadBytes, getDownloadURL 
+} from 'firebase/storage';
 import { 
   Bird, Cage, Pair, Task, Transaction, OperationType, BreedingRecord, UserSettings, Species, SubSpecies, Mutation
 } from './types';
@@ -37,6 +41,79 @@ const getCurrencySymbol = (currency?: string) => {
     case 'GBP': return '£';
     case 'USD': default: return '$';
   }
+};
+
+const compressAndUploadImage = async (file: File, path: string): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = (event) => {
+      const img = new Image();
+      img.src = event.target?.result as string;
+      img.onload = async () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+        const MAX_WIDTH = 1200;
+        const MAX_HEIGHT = 1200;
+
+        if (width > height) {
+          if (width > MAX_WIDTH) {
+            height *= MAX_WIDTH / width;
+            width = MAX_WIDTH;
+          }
+        } else {
+          if (height > MAX_HEIGHT) {
+            width *= MAX_HEIGHT / height;
+            height = MAX_HEIGHT;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx?.drawImage(img, 0, 0, width, height);
+
+        // Convert to blob with quality adjustment to meet 1.5MB limit
+        let quality = 0.8;
+        let blob: Blob | null = null;
+        let mimeType = 'image/webp';
+        
+        const getBlob = (q: number, type: string): Promise<Blob | null> => 
+          new Promise(res => canvas.toBlob(b => res(b), type, q));
+
+        blob = await getBlob(quality, mimeType);
+        
+        // Fallback to jpeg if webp fails or is not supported
+        if (!blob) {
+          mimeType = 'image/jpeg';
+          blob = await getBlob(quality, mimeType);
+        }
+        
+        // If still too large, reduce quality (though 1.5MB is quite generous for 1200px)
+        while (blob && blob.size > 1.5 * 1024 * 1024 && quality > 0.1) {
+          quality -= 0.1;
+          blob = await getBlob(quality, mimeType);
+        }
+
+        if (!blob) {
+          reject(new Error('Failed to compress image'));
+          return;
+        }
+
+        try {
+          const storageRef = ref(storage, `${path}/${Date.now()}_${file.name}`);
+          const snapshot = await uploadBytes(storageRef, blob);
+          const downloadURL = await getDownloadURL(snapshot.ref);
+          resolve(downloadURL);
+        } catch (error) {
+          reject(error);
+        }
+      };
+      img.onerror = () => reject(new Error('Failed to load image'));
+    };
+    reader.onerror = () => reject(new Error('Failed to read file'));
+  });
 };
 
 // --- UI Components ---
@@ -249,10 +326,10 @@ function SubscriptionGate({ settings, onRenew, children }: { settings: UserSetti
       if (data.redirectUrl) {
         window.location.href = data.redirectUrl;
       } else {
-        alert("Payment failed: " + (data.error || "Unknown error"));
+        toast.error("Payment failed: " + (data.error || "Unknown error"));
       }
     } catch (error: any) {
-      alert("Payment failed: " + error.message);
+      toast.error("Payment failed: " + error.message);
     }
   };
 
@@ -323,7 +400,7 @@ export default function App() {
       await deleteConfirmation.onConfirm();
       setDeleteConfirmation(null);
     } catch (e: any) {
-      alert("Failed to delete: " + e.message);
+      toast.error("Failed to delete: " + e.message);
       setDeleteConfirmation(null);
     }
   };
@@ -341,7 +418,7 @@ export default function App() {
     const params = new URLSearchParams(window.location.search);
     if (params.get('payment') === 'success') {
       handleRenew();
-      alert("Payment successful! Your subscription has been extended by 1 year.");
+      toast.success("Payment successful! Your subscription has been extended by 1 year.");
       window.history.replaceState({}, document.title, window.location.pathname);
     }
   }, [user, userSettings]);
@@ -381,7 +458,7 @@ export default function App() {
                   });
                 }
               } else {
-                alert(`Reminder: ${task.title}`);
+                toast.info(`Reminder: ${task.title}`);
               }
             }
           }
@@ -568,6 +645,7 @@ export default function App() {
       await updateDoc(doc(db, 'userSettings', user.uid), {
         account_expiry_date: baseDate.toISOString()
       });
+      toast.success("Subscription renewed successfully!");
     } catch (e) {
       handleFirestoreError(e, OperationType.UPDATE, 'userSettings');
     }
@@ -971,6 +1049,7 @@ export default function App() {
                   <SettingsView 
                     settings={userSettings} 
                     onUpdate={handleUpdateSettings} 
+                    allData={{ birds, cages, pairs, breedingRecords, tasks, transactions, userSettings }}
                   />
                 )}
 
@@ -1018,6 +1097,7 @@ export default function App() {
         title={deleteConfirmation?.title || 'Confirm Delete'}
         message={deleteConfirmation?.message || 'Are you sure you want to delete this item? This action cannot be undone.'}
       />
+      <Toaster theme="dark" position="top-center" richColors />
       </div>
     </SubscriptionGate>
   );
@@ -1966,7 +2046,7 @@ function TaskCard({ task, birds, onBirdRef, onToggle, onEdit, onDelete, viewMode
               )}
               {task.reminderDate && (
                 <div className="flex items-center gap-1.5 text-[9px] sm:text-[10px] font-bold text-white uppercase tracking-widest truncate mt-0.5">
-                  <Bell size={12} className="text-blue-500 shrink-0" />
+                  <Bell size={12} className="text-gold-500 shrink-0" />
                   {new Date(task.reminderDate).toLocaleString()}
                 </div>
               )}
@@ -2104,10 +2184,10 @@ function SubscriptionView({ settings, onRenew }: { settings: UserSettings, onRen
       if (data.redirectUrl) {
         window.location.href = data.redirectUrl;
       } else {
-        alert("Payment failed: " + (data.error || "Unknown error"));
+        toast.error("Payment failed: " + (data.error || "Unknown error"));
       }
     } catch (error: any) {
-      alert("Payment failed: " + error.message);
+      toast.error("Payment failed: " + error.message);
     }
   };
 
@@ -2148,13 +2228,24 @@ function SubscriptionView({ settings, onRenew }: { settings: UserSettings, onRen
 
 // --- Settings View ---
 
-function SettingsView({ settings, onUpdate }: { settings: UserSettings, onUpdate: (s: UserSettings) => void }) {
-  const [activeSection, setActiveSection] = useState<'general' | 'species' | 'subspecies' | 'mutations' | null>('general');
+function SettingsView({ settings, onUpdate, allData }: { settings: UserSettings, onUpdate: (s: UserSettings) => void, allData: any }) {
+  const [activeSection, setActiveSection] = useState<'general' | 'species' | 'subspecies' | 'mutations' | 'data' | null>('general');
   const [newSpecies, setNewSpecies] = useState('');
   const [newMutation, setNewMutation] = useState('');
   const [newSubSpecies, setNewSubSpecies] = useState('');
   const [selectedSpeciesId, setSelectedSpeciesId] = useState('');
   const [editingItem, setEditingItem] = useState<{ type: 'species' | 'subspecies' | 'mutation', id: string, name: string } | null>(null);
+
+  const downloadBackup = () => {
+    const data = JSON.stringify(allData, null, 2);
+    const blob = new Blob([data], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `aviary_backup_${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   const addSpecies = () => {
     if (!newSpecies.trim()) return;
@@ -2256,6 +2347,13 @@ function SettingsView({ settings, onUpdate }: { settings: UserSettings, onUpdate
           description="Manage Mutations" 
           active={activeSection === 'mutations'} 
           onClick={() => setActiveSection('mutations')} 
+        />
+        <SettingRow 
+          icon={Activity} 
+          title="Data Management" 
+          description="Backup & Export" 
+          active={activeSection === 'data'} 
+          onClick={() => setActiveSection('data')} 
         />
       </div>
 
@@ -2404,6 +2502,44 @@ function SettingsView({ settings, onUpdate }: { settings: UserSettings, onUpdate
               </div>
             </motion.div>
           )}
+          {activeSection === 'data' && (
+            <motion.div 
+              key="data"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              className="space-y-6"
+            >
+              <div className="space-y-4">
+                <h3 className="text-lg font-black uppercase tracking-widest text-gold-500">Data Management</h3>
+                <div className="p-6 bg-black border border-black-700 rounded-3xl space-y-4">
+                  <div className="flex items-center gap-4">
+                    <div className="p-3 bg-gold-500/10 rounded-2xl text-gold-500">
+                      <ImageIcon size={24} />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-black uppercase tracking-widest text-white">Manual Backup</h4>
+                      <p className="text-[10px] font-bold text-white/50 uppercase tracking-tighter mt-0.5">Download all your records as a JSON file</p>
+                    </div>
+                  </div>
+                  <Button onClick={downloadBackup} className="w-full py-4">Download Backup Now</Button>
+                </div>
+
+                <div className="p-6 bg-black border border-black-700 rounded-3xl space-y-4 opacity-50">
+                  <div className="flex items-center gap-4">
+                    <div className="p-3 bg-gold-500/10 rounded-2xl text-gold-500">
+                      <Home size={24} />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-black uppercase tracking-widest text-white">Google Drive Sync</h4>
+                      <p className="text-[10px] font-bold text-white/50 uppercase tracking-tighter mt-0.5">Automatic image backup (Coming Soon)</p>
+                    </div>
+                  </div>
+                  <Button disabled className="w-full py-4">Connect Google Drive</Button>
+                </div>
+              </div>
+            </motion.div>
+          )}
         </AnimatePresence>
       </div>
 
@@ -2522,57 +2658,9 @@ function BirdForm({ user, initialData, cages, birds, userSettings, onAddSpecies,
     setIsUploading(true);
     setUploadError(null);
     try {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setFormData(prev => ({ ...prev, imageUrl: reader.result as string }));
-        setIsUploading(false);
-      };
-      reader.onerror = () => {
-        setUploadError('Failed to read file');
-        setIsUploading(false);
-      };
-      
-      // Compress image before saving to avoid Firestore 1MB limit
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        const MAX_WIDTH = 800;
-        const MAX_HEIGHT = 800;
-        let width = img.width;
-        let height = img.height;
-
-        if (width > height) {
-          if (width > MAX_WIDTH) {
-            height *= MAX_WIDTH / width;
-            width = MAX_WIDTH;
-          }
-        } else {
-          if (height > MAX_HEIGHT) {
-            width *= MAX_HEIGHT / height;
-            height = MAX_HEIGHT;
-          }
-        }
-
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        ctx?.drawImage(img, 0, 0, width, height);
-        
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
-        setFormData(prev => ({ ...prev, imageUrl: dataUrl }));
-        setIsUploading(false);
-      };
-      img.onerror = () => {
-        setUploadError('Failed to process image');
-        setIsUploading(false);
-      };
-      
-      reader.readAsDataURL(file);
-      
-      // We'll use the reader result to load the image for compression
-      reader.onload = (e) => {
-        img.src = e.target?.result as string;
-      };
+      const downloadURL = await compressAndUploadImage(file, `birds/${user.uid}`);
+      setFormData(prev => ({ ...prev, imageUrl: downloadURL }));
+      setIsUploading(false);
     } catch (err) {
       setUploadError(err instanceof Error ? err.message : 'Upload failed');
       setIsUploading(false);
@@ -2601,7 +2689,8 @@ function BirdForm({ user, initialData, cages, birds, userSettings, onAddSpecies,
         await updateDoc(doc(db, 'birds', mateId), { mateId: birdId });
 
         // Create or update Pair document
-        const existingPair = (await getDocs(query(collection(db, 'pairs'), where('uid', '==', user.uid)))).docs
+        const pairsSnap = await getDocs(query(collection(db, 'pairs'), where('uid', '==', user.uid)));
+        const existingPair = pairsSnap.docs
           .map(d => ({ id: d.id, ...d.data() } as Pair))
           .find(p => (p.maleId === birdId && p.femaleId === mateId) || (p.maleId === mateId && p.femaleId === birdId));
 
@@ -2834,9 +2923,28 @@ function BirdForm({ user, initialData, cages, birds, userSettings, onAddSpecies,
 }
 
 function CageForm({ user, initialData, onClose }: { user: FirebaseUser, initialData?: Cage, onClose: () => void }) {
-  const [formData, setFormData] = useState<Partial<Cage>>(initialData || { name: '', location: '', type: 'Standard' });
+  const [formData, setFormData] = useState<Partial<Cage>>(initialData || { name: '', location: '', type: 'Standard', imageUrl: '' });
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsUploading(true);
+    setUploadError(null);
+    try {
+      const downloadURL = await compressAndUploadImage(file, `cages/${user.uid}`);
+      setFormData(prev => ({ ...prev, imageUrl: downloadURL }));
+      setIsUploading(false);
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : 'Upload failed');
+      setIsUploading(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isUploading) return;
     try {
       const data = { ...formData, uid: user.uid };
       if (initialData?.id) { await updateDoc(doc(db, 'cages', initialData.id), data); } 
@@ -2846,12 +2954,34 @@ function CageForm({ user, initialData, onClose }: { user: FirebaseUser, initialD
   };
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="flex justify-center">
+        <div className="relative group">
+          <div className="w-24 h-24 rounded-3xl bg-black border border-black-700 flex items-center justify-center overflow-hidden">
+            {formData.imageUrl ? (
+              <img src={formData.imageUrl} alt="Cage" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+            ) : (
+              <ImageIcon className="text-black-700" size={32} />
+            )}
+            {isUploading && (
+              <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                <Loader2 className="text-gold-500 animate-spin" size={24} />
+              </div>
+            )}
+          </div>
+          <label className="absolute -bottom-2 -right-2 p-2 bg-gold-500 text-black-950 rounded-xl cursor-pointer shadow-lg hover:bg-gold-600 transition-colors">
+            <Plus size={16} />
+            <input type="file" className="hidden" accept="image/*" onChange={handleFileChange} />
+          </label>
+        </div>
+      </div>
+      {uploadError && <p className="text-rose-500 text-[10px] text-center font-bold uppercase tracking-widest">{uploadError}</p>}
+
       <div className="space-y-1"><label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Cage Name/Number</label><Input required value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} /></div>
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1"><label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Location</label><Input value={formData.location} onChange={e => setFormData({ ...formData, location: e.target.value })} /></div>
         <div className="space-y-1"><label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Type</label><Select value={formData.type} onChange={e => setFormData({ ...formData, type: e.target.value })}><option value="Standard" className="bg-black text-white">Standard</option><option value="Breeding" className="bg-black text-white">Breeding</option><option value="Flight" className="bg-black text-white">Flight</option><option value="Hospital" className="bg-black text-white">Hospital</option></Select></div>
       </div>
-      <Button type="submit" className="w-full py-4 text-sm uppercase tracking-widest font-black">{initialData ? 'Update' : 'Add'} Cage</Button>
+      <Button type="submit" className="w-full py-4 text-sm uppercase tracking-widest font-black" disabled={isUploading}>{initialData ? 'Update' : 'Add'} Cage</Button>
     </form>
   );
 }
