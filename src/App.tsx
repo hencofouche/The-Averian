@@ -1139,6 +1139,7 @@ export default function App() {
             initialData={editingItem} 
             cages={cages} 
             birds={birds} 
+            pairs={pairs}
             userSettings={userSettings}
             onAddSpecies={handleAddSpecies}
             onAddSubSpecies={handleAddSubSpecies}
@@ -1928,14 +1929,18 @@ function BreedingRecordCard({ record, pair, male, female, birds, onEdit, onDelet
 
 function BreedingRecordForm({ user, initialData, pairs, birds, onClose }: { user: FirebaseUser, initialData?: BreedingRecord, pairs: Pair[], birds: Bird[], onClose: () => void }) {
   const [formData, setFormData] = useState<Partial<BreedingRecord>>(initialData || { pairId: '', startDate: '', endDate: '', eggsLaid: 0, eggsHatched: 0, chicksWeaned: 0, offspringIds: [], notes: '' });
+  const [isSaving, setIsSaving] = useState(false);
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSaving) return;
+    setIsSaving(true);
     try {
       const data = { ...formData, uid: user.uid };
       if (initialData?.id) { await updateDoc(doc(db, 'breedingRecords', initialData.id), data); } 
       else { await addDoc(collection(db, 'breedingRecords'), data); }
       onClose();
     } catch (err) { handleFirestoreError(err, initialData ? OperationType.UPDATE : OperationType.CREATE, 'breedingRecords'); }
+    finally { setIsSaving(false); }
   };
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
@@ -1993,7 +1998,10 @@ function BreedingRecordForm({ user, initialData, pairs, birds, onClose }: { user
           onChange={e => setFormData({ ...formData, notes: e.target.value })} 
         />
       </div>
-      <Button type="submit" className="w-full py-4 text-sm uppercase tracking-widest font-black">{initialData ? 'Update' : 'Add'} Record</Button>
+      <Button type="submit" className="w-full py-4 text-sm uppercase tracking-widest font-black" disabled={isSaving}>
+        {isSaving ? <Loader2 className="animate-spin mr-2" size={16} /> : null}
+        {initialData ? 'Update' : 'Add'} Record
+      </Button>
     </form>
   );
 }
@@ -2008,17 +2016,20 @@ function TransactionForm({ user, initialData, birds, currency, onClose }: { user
     birdId: '',
     description: ''
   });
+  const [isSaving, setIsSaving] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSaving) return;
+    setIsSaving(true);
     try {
       const data = { ...formData, uid: user.uid };
       if (initialData?.id) { await updateDoc(doc(db, 'transactions', initialData.id), data); } 
       else { await addDoc(collection(db, 'transactions'), data); }
       onClose();
     } catch (err) { handleFirestoreError(err, initialData ? OperationType.UPDATE : OperationType.CREATE, 'transactions'); }
+    finally { setIsSaving(false); }
   };
-
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       <div className="grid grid-cols-2 gap-4">
@@ -2060,7 +2071,10 @@ function TransactionForm({ user, initialData, birds, currency, onClose }: { user
           onChange={e => setFormData({ ...formData, description: e.target.value })} 
         />
       </div>
-      <Button type="submit" className="w-full py-4 text-sm uppercase tracking-widest font-black">{initialData ? 'Update' : 'Add'} Transaction</Button>
+      <Button type="submit" className="w-full py-4 text-sm uppercase tracking-widest font-black" disabled={isSaving}>
+        {isSaving ? <Loader2 className="animate-spin mr-2" size={16} /> : null}
+        {initialData ? 'Update' : 'Add'} Transaction
+      </Button>
     </form>
   );
 }
@@ -2713,7 +2727,7 @@ function ConfirmModal({ isOpen, onClose, onConfirm, title, message }: { isOpen: 
 
 // --- Forms ---
 
-function BirdForm({ user, initialData, cages, birds, userSettings, onAddSpecies, onAddSubSpecies, onAddMutation, onClose }: { user: FirebaseUser, initialData?: Bird, cages: Cage[], birds: Bird[], userSettings: UserSettings | null, onAddSpecies: (n: string) => void, onAddSubSpecies: (n: string, sid: string) => void, onAddMutation: (n: string) => void, onClose: () => void }) {
+function BirdForm({ user, initialData, cages, birds, pairs, userSettings, onAddSpecies, onAddSubSpecies, onAddMutation, onClose }: { user: FirebaseUser, initialData?: Bird | null, cages: Cage[], birds: Bird[], pairs: Pair[], userSettings: UserSettings | null, onAddSpecies: (n: string) => void, onAddSubSpecies: (n: string, sid: string) => void, onAddMutation: (n: string) => void, onClose: () => void }) {
   const symbol = getCurrencySymbol(userSettings?.currency);
   const [formData, setFormData] = useState<Partial<Bird>>(initialData || { 
     name: '', 
@@ -2736,6 +2750,7 @@ function BirdForm({ user, initialData, cages, birds, userSettings, onAddSpecies,
     imageUrl: '' 
   });
   const [isUploading, setIsUploading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [newStatus, setNewStatus] = useState('');
 
@@ -2764,7 +2779,8 @@ function BirdForm({ user, initialData, cages, birds, userSettings, onAddSpecies,
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isUploading) return;
+    if (isUploading || isSaving) return;
+    setIsSaving(true);
     try {
       const data = { ...formData, uid: user.uid };
       let birdId = initialData?.id;
@@ -2784,10 +2800,7 @@ function BirdForm({ user, initialData, cages, birds, userSettings, onAddSpecies,
         await updateDoc(doc(db, 'birds', mateId), { mateId: birdId });
 
         // Create or update Pair document
-        const pairsSnap = await getDocs(query(collection(db, 'pairs'), where('uid', '==', user.uid)));
-        const existingPair = pairsSnap.docs
-          .map(d => ({ id: d.id, ...d.data() } as Pair))
-          .find(p => (p.maleId === birdId && p.femaleId === mateId) || (p.maleId === mateId && p.femaleId === birdId));
+        const existingPair = pairs.find(p => (p.maleId === birdId && p.femaleId === mateId) || (p.maleId === mateId && p.femaleId === birdId));
 
         const pairData = {
           maleId: formData.sex === 'Male' ? birdId : mateId,
@@ -2798,14 +2811,18 @@ function BirdForm({ user, initialData, cages, birds, userSettings, onAddSpecies,
         };
 
         if (existingPair) {
-          await updateDoc(doc(db, 'pairs', existingPair.id), pairData);
+          await updateDoc(doc(db, 'pairs', existingPair.id), pairData as any);
         } else {
           await addDoc(collection(db, 'pairs'), pairData);
         }
       }
 
       onClose();
-    } catch (err) { handleFirestoreError(err, initialData ? OperationType.UPDATE : OperationType.CREATE, 'birds'); }
+    } catch (err) { 
+      handleFirestoreError(err, initialData ? OperationType.UPDATE : OperationType.CREATE, 'birds'); 
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -3012,7 +3029,10 @@ function BirdForm({ user, initialData, cages, birds, userSettings, onAddSpecies,
           onChange={e => setFormData({ ...formData, notes: e.target.value })} 
         />
       </div>
-      <Button type="submit" className="w-full py-4 text-sm uppercase tracking-widest font-black" disabled={isUploading}>{initialData ? 'Update' : 'Add'} Bird</Button>
+      <Button type="submit" className="w-full py-4 text-sm uppercase tracking-widest font-black" disabled={isUploading || isSaving}>
+        {isSaving ? <Loader2 className="animate-spin mr-2" size={16} /> : null}
+        {initialData ? 'Update' : 'Add'} Bird
+      </Button>
     </form>
   );
 }
@@ -3020,6 +3040,7 @@ function BirdForm({ user, initialData, cages, birds, userSettings, onAddSpecies,
 function CageForm({ user, initialData, onClose }: { user: FirebaseUser, initialData?: Cage, onClose: () => void }) {
   const [formData, setFormData] = useState<Partial<Cage>>(initialData || { name: '', location: '', type: 'Standard', imageUrl: '' });
   const [isUploading, setIsUploading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -3039,13 +3060,15 @@ function CageForm({ user, initialData, onClose }: { user: FirebaseUser, initialD
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isUploading) return;
+    if (isUploading || isSaving) return;
+    setIsSaving(true);
     try {
       const data = { ...formData, uid: user.uid };
       if (initialData?.id) { await updateDoc(doc(db, 'cages', initialData.id), data); } 
       else { await addDoc(collection(db, 'cages'), data); }
       onClose();
     } catch (err) { handleFirestoreError(err, initialData ? OperationType.UPDATE : OperationType.CREATE, 'cages'); }
+    finally { setIsSaving(false); }
   };
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
@@ -3076,21 +3099,28 @@ function CageForm({ user, initialData, onClose }: { user: FirebaseUser, initialD
         <div className="space-y-1"><label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Location</label><Input value={formData.location} onChange={e => setFormData({ ...formData, location: e.target.value })} /></div>
         <div className="space-y-1"><label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Type</label><Select value={formData.type} onChange={e => setFormData({ ...formData, type: e.target.value })}><option value="Standard" className="bg-black text-white">Standard</option><option value="Breeding" className="bg-black text-white">Breeding</option><option value="Flight" className="bg-black text-white">Flight</option><option value="Hospital" className="bg-black text-white">Hospital</option></Select></div>
       </div>
-      <Button type="submit" className="w-full py-4 text-sm uppercase tracking-widest font-black" disabled={isUploading}>{initialData ? 'Update' : 'Add'} Cage</Button>
+      <Button type="submit" className="w-full py-4 text-sm uppercase tracking-widest font-black" disabled={isUploading || isSaving}>
+        {isSaving ? <Loader2 className="animate-spin mr-2" size={16} /> : null}
+        {initialData ? 'Update' : 'Add'} Cage
+      </Button>
     </form>
   );
 }
 
 function PairForm({ user, initialData, birds, onClose }: { user: FirebaseUser, initialData?: Pair, birds: Bird[], onClose: () => void }) {
   const [formData, setFormData] = useState<Partial<Pair>>(initialData || { maleId: '', femaleId: '', status: 'Active', startDate: '', endDate: '' });
+  const [isSaving, setIsSaving] = useState(false);
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSaving) return;
+    setIsSaving(true);
     try {
       const data = { ...formData, uid: user.uid };
       if (initialData?.id) { await updateDoc(doc(db, 'pairs', initialData.id), data); } 
       else { await addDoc(collection(db, 'pairs'), data); }
       onClose();
     } catch (err) { handleFirestoreError(err, initialData ? OperationType.UPDATE : OperationType.CREATE, 'pairs'); }
+    finally { setIsSaving(false); }
   };
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
@@ -3103,7 +3133,10 @@ function PairForm({ user, initialData, birds, onClose }: { user: FirebaseUser, i
         <div className="space-y-1"><label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Start Date</label><Input type="date" value={formData.startDate} onChange={e => setFormData({ ...formData, startDate: e.target.value })} /></div>
         <div className="space-y-1"><label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">End Date</label><Input type="date" value={formData.endDate} onChange={e => setFormData({ ...formData, endDate: e.target.value })} /></div>
       </div>
-      <Button type="submit" className="w-full py-4 text-sm uppercase tracking-widest font-black">{initialData ? 'Update' : 'Add'} Pair</Button>
+      <Button type="submit" className="w-full py-4 text-sm uppercase tracking-widest font-black" disabled={isSaving}>
+        {isSaving ? <Loader2 className="animate-spin mr-2" size={16} /> : null}
+        {initialData ? 'Update' : 'Add'} Pair
+      </Button>
     </form>
   );
 }
@@ -3111,14 +3144,18 @@ function PairForm({ user, initialData, birds, onClose }: { user: FirebaseUser, i
 function TaskForm({ user, initialData, birds, onClose }: { user: FirebaseUser, initialData?: Task, birds: Bird[], onClose: () => void }) {
   const [formData, setFormData] = useState<Partial<Task>>(initialData || { title: '', description: '', status: 'Pending', priority: 'Medium', category: 'General', dueDate: '', reminderDate: '', birdIds: [], subTasks: [] });
   const [newSubTask, setNewSubTask] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSaving) return;
+    setIsSaving(true);
     try {
       const data = { ...formData, uid: user.uid };
       if (initialData?.id) { await updateDoc(doc(db, 'tasks', initialData.id), data); } 
       else { await addDoc(collection(db, 'tasks'), data); }
       onClose();
     } catch (err) { handleFirestoreError(err, initialData ? OperationType.UPDATE : OperationType.CREATE, 'tasks'); }
+    finally { setIsSaving(false); }
   };
   const addSubTask = () => {
     if (!newSubTask.trim()) return;
@@ -3195,7 +3232,10 @@ function TaskForm({ user, initialData, birds, onClose }: { user: FirebaseUser, i
           ))}
         </div>
       </div>
-      <Button type="submit" className="w-full py-4 text-sm uppercase tracking-widest font-black">{initialData ? 'Update' : 'Add'} Task</Button>
+      <Button type="submit" className="w-full py-4 text-sm uppercase tracking-widest font-black" disabled={isSaving}>
+        {isSaving ? <Loader2 className="animate-spin mr-2" size={16} /> : null}
+        {initialData ? 'Update' : 'Add'} Task
+      </Button>
     </form>
   );
 }
