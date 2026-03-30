@@ -19,7 +19,7 @@ async function startServer() {
   app.post("/api/create-checkout", async (req, res) => {
     try {
       const { origin } = req.body;
-      const baseOrigin = origin || req.headers.origin || "https://the-averian-alpha.vercel.app";
+      const baseOrigin = origin || req.headers.origin || (req.headers.host ? `https://${req.headers.host}` : "");
       
       const response = await fetch('https://payments.yoco.com/api/checkouts', {
         method: 'POST',
