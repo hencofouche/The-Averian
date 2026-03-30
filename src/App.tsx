@@ -15,7 +15,7 @@ import {
   BarChart, Bar, Cell, Legend, PieChart, Pie, AreaChart, Area
 } from 'recharts';
 import { 
-  auth, db, storage, loginWithGoogle, logout, handleFirestoreError, testConnection
+  auth, db, loginWithGoogle, logout, handleFirestoreError, testConnection
 } from './firebase';
 import { 
   onAuthStateChanged, User as FirebaseUser 
@@ -24,9 +24,6 @@ import {
   collection, onSnapshot, query, where, addDoc, 
   updateDoc, deleteDoc, doc, getDocs, orderBy, setDoc, getDocFromServer
 } from 'firebase/firestore';
-import { 
-  ref, uploadBytes, getDownloadURL 
-} from 'firebase/storage';
 import { 
   Bird, Cage, Pair, Task, Transaction, OperationType, BreedingRecord, UserSettings, Species, SubSpecies, Mutation
 } from './types';
@@ -90,8 +87,8 @@ const compressAndUploadImage = async (file: File, path: string): Promise<string>
           blob = await getBlob(quality, mimeType);
         }
         
-        // If still too large, reduce quality (though 1.5MB is quite generous for 1200px)
-        while (blob && blob.size > 1.5 * 1024 * 1024 && quality > 0.1) {
+        // If still too large, reduce quality (though 1MB is the Firestore limit, base64 adds overhead)
+        while (blob && blob.size > 0.7 * 1024 * 1024 && quality > 0.1) {
           quality -= 0.1;
           blob = await getBlob(quality, mimeType);
         }
@@ -101,14 +98,14 @@ const compressAndUploadImage = async (file: File, path: string): Promise<string>
           return;
         }
 
-        try {
-          const storageRef = ref(storage, `${path}/${Date.now()}_${file.name}`);
-          const snapshot = await uploadBytes(storageRef, blob);
-          const downloadURL = await getDownloadURL(snapshot.ref);
-          resolve(downloadURL);
-        } catch (error) {
-          reject(error);
-        }
+        // Convert blob to base64 string for Firestore storage (bypasses Storage CORS and works offline)
+        const reader2 = new FileReader();
+        reader2.readAsDataURL(blob);
+        reader2.onloadend = () => {
+          const base64data = reader2.result as string;
+          resolve(base64data);
+        };
+        reader2.onerror = () => reject(new Error('Failed to convert image to base64'));
       };
       img.onerror = () => reject(new Error('Failed to load image'));
     };

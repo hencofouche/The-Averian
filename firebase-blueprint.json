@@ -18,7 +18,7 @@
         "mutations": { "type": "array", "items": { "type": "string" }, "description": "List of mutations." },
         "splitMutations": { "type": "array", "items": { "type": "string" }, "description": "List of split mutations." },
         "statuses": { "type": "array", "items": { "type": "string" }, "description": "List of custom statuses." },
-        "imageUrl": { "type": "string", "description": "URL of the bird's image in Firebase Storage." },
+        "imageUrl": { "type": "string", "description": "Data URL or external URL of the bird's image." },
         "notes": { "type": "string", "description": "General notes about the bird." },
         "purchaseDate": { "type": "string", "format": "date" },
         "purchasePrice": { "type": "number" },
