@@ -417,20 +417,21 @@ export default function App() {
     if (!user || !userSettings) return;
     const params = new URLSearchParams(window.location.search);
     if (params.get('payment') === 'success') {
-      // Use a flag to avoid multiple calls if the component re-renders
-      const hasRenewed = sessionStorage.getItem('has_renewed_session');
+      // 1. Remove the parameter from the URL immediately to prevent re-triggers
+      const newUrl = window.location.pathname;
+      window.history.replaceState({}, document.title, newUrl);
+
+      // 2. Use a session storage flag to ensure it only happens once per session/load
+      const hasRenewed = sessionStorage.getItem('has_renewed_payment');
       if (!hasRenewed) {
-        handleRenew().then(() => {
-          sessionStorage.setItem('has_renewed_session', 'true');
-          toast.success("Payment successful! Your subscription has been extended by 1 year.");
-          window.history.replaceState({}, document.title, window.location.pathname);
-        }).catch(e => {
+        sessionStorage.setItem('has_renewed_payment', 'true');
+        handleRenew().catch(e => {
           console.error("Renewal failed:", e);
           toast.error("Failed to activate subscription. Please contact support.");
         });
       }
     }
-  }, [user, userSettings]);
+  }, [user, !!userSettings]); // Only trigger when user/settings become available, not on every update
 
   const [isSyncing, setIsSyncing] = useState(false);
 
@@ -546,7 +547,22 @@ export default function App() {
           updateDoc(docRef, { account_expiry_date: updated.account_expiry_date });
           setUserSettings({ id: docSnap.id, ...updated });
         } else {
-          setUserSettings({ id: docSnap.id, ...data });
+          // Cap the expiry at 365 days from now if it's excessively high (due to the loop error)
+          const expiry = new Date(data.account_expiry_date);
+          const now = new Date();
+          const maxExpiry = new Date();
+          maxExpiry.setFullYear(maxExpiry.getFullYear() + 1);
+          maxExpiry.setDate(maxExpiry.getDate() + 30); // 30 day buffer
+
+          if (expiry > maxExpiry) {
+            console.log("Subscription expiry excessively high, capping at 1 year.");
+            const cappedExpiry = new Date();
+            cappedExpiry.setFullYear(cappedExpiry.getFullYear() + 1);
+            updateDoc(docRef, { account_expiry_date: cappedExpiry.toISOString() });
+            setUserSettings({ id: docSnap.id, ...data, account_expiry_date: cappedExpiry.toISOString() });
+          } else {
+            setUserSettings({ id: docSnap.id, ...data });
+          }
         }
       } else {
         // Only create initial settings if we are sure it doesn't exist on server
@@ -676,7 +692,18 @@ export default function App() {
       const currentData = docSnap.exists() ? docSnap.data() as UserSettings : userSettings;
       
       const currentExpiry = currentData.account_expiry_date ? new Date(currentData.account_expiry_date) : new Date();
-      const baseDate = currentExpiry > new Date() ? currentExpiry : new Date();
+      const now = new Date();
+      
+      // Prevent topping up if they already have more than 45 days left
+      const diffTime = currentExpiry.getTime() - now.getTime();
+      const daysLeft = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      
+      if (daysLeft > 45) {
+        console.log("Subscription already active for more than 45 days, skipping auto-renewal.");
+        return;
+      }
+
+      const baseDate = currentExpiry > now ? currentExpiry : now;
       baseDate.setFullYear(baseDate.getFullYear() + 1);
       
       await updateDoc(doc(db, 'userSettings', user.uid), {
@@ -2255,9 +2282,18 @@ function SubscriptionView({ settings, onRenew }: { settings: UserSettings, onRen
         </div>
         
         <div className="w-full md:w-auto flex flex-col gap-2">
-          <Button onClick={handlePay} className="w-full md:w-48 py-4 text-sm">
+          <Button 
+            onClick={handlePay} 
+            disabled={!isExpired && daysLeft > 30}
+            className="w-full md:w-48 py-4 text-sm"
+          >
             {isExpired ? 'Renew Now (R450)' : 'Extend 1 Year (R450)'}
           </Button>
+          {!isExpired && daysLeft > 30 && (
+            <p className="text-[8px] text-center text-gold-500/50 font-bold uppercase tracking-widest">
+              Available when &lt; 30 days left
+            </p>
+          )}
           <p className="text-[8px] text-center text-black-200 font-bold uppercase tracking-widest">Powered by Yoco</p>
         </div>
       </Card>
