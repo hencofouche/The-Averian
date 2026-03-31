@@ -455,13 +455,13 @@ export default function App() {
                   navigator.serviceWorker.ready.then(registration => {
                     registration.showNotification('The Averian Reminder', {
                       body: task.title,
-                      icon: '/192.png?v=10'
+                      icon: '/pwa-192.png'
                     });
                   });
                 } else {
                   new Notification('The Averian Reminder', {
                     body: task.title,
-                    icon: '/192.png?v=10'
+                    icon: '/pwa-192.png'
                   });
                 }
               } else {
@@ -475,6 +475,44 @@ export default function App() {
 
     return () => clearInterval(interval);
   }, [user, tasks]);
+
+  useEffect(() => {
+    if (!user || !('serviceWorker' in navigator)) return;
+
+    const subscribeToPush = async () => {
+      try {
+        const registration = await navigator.serviceWorker.ready;
+        
+        // Get existing subscription
+        let subscription = await registration.pushManager.getSubscription();
+        
+        if (!subscription) {
+          // Subscribe
+          const publicKey = import.meta.env.VITE_VAPID_PUBLIC_KEY || 'BJqzp7rkr1obW1Tr2C7_Jm-7H_pS1ybLDsgJBeQewq46Ws2HpXF1jF_g1h9sthZw7KmmtnjziqdIXfiyB7wGLno';
+          subscription = await registration.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: publicKey
+          });
+        }
+
+        // Send to server
+        await fetch('/api/save-subscription', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            subscription,
+            userId: user.uid
+          })
+        });
+      } catch (error) {
+        console.error('Failed to subscribe to push notifications:', error);
+      }
+    };
+
+    if (Notification.permission === 'granted') {
+      subscribeToPush();
+    }
+  }, [user]);
 
   useEffect(() => {
     if (!user) return;
