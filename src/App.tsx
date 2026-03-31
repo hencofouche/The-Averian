@@ -7,7 +7,7 @@ import {
   Tag, Calendar, ChevronDown, ChevronUp, ChevronRight, X, GitBranch,
   Image as ImageIcon, Loader2, DollarSign, TrendingUp, TrendingDown,
   Activity, ArrowUpRight, ArrowDownRight, BarChart3, PieChart as PieChartIcon,
-  Menu, Egg, LayoutGrid, Grid3x3, List as ListIcon, AlertTriangle, CreditCard, CheckCircle2, Bell, Cloud
+  Menu, Egg, LayoutGrid, Grid3x3, List as ListIcon, AlertTriangle, CreditCard, CheckCircle2, Bell, Cloud, Maximize2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -391,15 +391,15 @@ export default function App() {
   const [editingItem, setEditingItem] = useState<any>(null);
   const [deleteConfirmation, setDeleteConfirmation] = useState<{ title: string, message: string, onConfirm: () => Promise<void> | void } | null>(null);
 
-  const handleConfirmDelete = async () => {
+  const handleConfirmDelete = () => {
     if (!deleteConfirmation) return;
-    try {
-      await deleteConfirmation.onConfirm();
-      setDeleteConfirmation(null);
-    } catch (e: any) {
-      toast.error("Failed to delete: " + e.message);
-      setDeleteConfirmation(null);
+    const result = deleteConfirmation.onConfirm();
+    if (result instanceof Promise) {
+      result.catch((e: any) => {
+        toast.error("Failed to delete: " + e.message);
+      });
     }
+    setDeleteConfirmation(null);
   };
 
   useEffect(() => {
@@ -599,9 +599,11 @@ export default function App() {
       case 'birds':
         return birds.filter(b => {
           const cage = cages.find(c => c.id === b.cageId);
+          const inPair = pairs.find(p => p.id === query && (p.maleId === b.id || p.femaleId === b.id));
           return b.name.toLowerCase().includes(query) || 
                  b.species.toLowerCase().includes(query) ||
-                 (cage && cage.name.toLowerCase().includes(query));
+                 (cage && cage.name.toLowerCase().includes(query)) ||
+                 !!inPair;
         });
       case 'cages':
         return cages.filter(c => c.name.toLowerCase().includes(query));
@@ -609,10 +611,13 @@ export default function App() {
         return pairs.filter(p => {
           const male = birds.find(b => b.id === p.maleId);
           const female = birds.find(b => b.id === p.femaleId);
+          if (!male && !female) return false;
+          if (!query) return true;
           return (male?.name.toLowerCase().includes(query) || female?.name.toLowerCase().includes(query));
         });
       case 'breeding':
         return breedingRecords.filter(br => {
+          if (!query) return true;
           const pair = pairs.find(p => p.id === br.pairId);
           const male = birds.find(b => b.id === pair?.maleId);
           const female = birds.find(b => b.id === pair?.femaleId);
@@ -788,7 +793,7 @@ export default function App() {
         <nav className="flex-1 space-y-2 overflow-y-auto custom-scrollbar">
           <NavItem active={activeTab === 'birds'} onClick={() => handleNavigate('birds')} icon={<BirdIcon size={18} />} label="Birds" count={birds.length} />
           <NavItem active={activeTab === 'cages'} onClick={() => handleNavigate('cages')} icon={<Home size={18} />} label="Cages" count={cages.length} />
-          <NavItem active={activeTab === 'pairs'} onClick={() => handleNavigate('pairs')} icon={<Heart size={18} />} label="Pairs" count={pairs.length} />
+          <NavItem active={activeTab === 'pairs'} onClick={() => handleNavigate('pairs')} icon={<Heart size={18} />} label="Pairs" count={pairs.filter(p => birds.some(b => b.id === p.maleId) || birds.some(b => b.id === p.femaleId)).length} />
           <NavItem active={activeTab === 'breeding'} onClick={() => handleNavigate('breeding')} icon={<Egg size={18} />} label="Breeding" count={breedingRecords.length} />
           <NavItem active={activeTab === 'tasks'} onClick={() => handleNavigate('tasks')} icon={<CheckSquare size={18} />} label="Tasks & Reminders" count={tasks.length} />
           <NavItem active={activeTab === 'financials'} onClick={() => handleNavigate('financials')} icon={<DollarSign size={18} />} label="Financials" count={transactions.length} />
@@ -1184,6 +1189,7 @@ function NavItem({ active, onClick, icon, label, count }: { active: boolean, onC
 function BirdCard({ bird, cage, birds, viewMode = 'grid-large', currency, onBirdRef, onNavigate, onEdit, onDelete }: { bird: Bird, cage?: Cage, birds: Bird[], viewMode?: 'grid-large' | 'list', currency?: string, onBirdRef: (name: string) => void, onNavigate: (tab: string, query?: string) => void, onEdit: () => void, onDelete: () => void }) {
   const [showTree, setShowTree] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
+  const [fullscreenImage, setFullscreenImage] = useState(false);
   const symbol = getCurrencySymbol(currency);
   const offspring = birds.filter(b => b.motherId === bird.id || b.fatherId === bird.id || bird.offspringIds?.includes(b.id));
   const mother = birds.find(b => b.id === bird.motherId);
@@ -1202,7 +1208,10 @@ function BirdCard({ bird, cage, birds, viewMode = 'grid-large', currency, onBird
       )}
     >
       {imageUrl && effectiveViewMode !== 'list' && (
-        <div className={cn("w-full overflow-hidden bg-black aspect-[4/3]")}>
+        <div 
+          className={cn("w-full overflow-hidden bg-black aspect-[4/3] cursor-pointer relative")}
+          onClick={(e) => { e.stopPropagation(); setFullscreenImage(true); }}
+        >
           <img 
             src={imageUrl} 
             alt={bird.name} 
@@ -1210,6 +1219,9 @@ function BirdCard({ bird, cage, birds, viewMode = 'grid-large', currency, onBird
             referrerPolicy="no-referrer"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black-950 via-transparent to-transparent opacity-60" />
+          <div className="absolute top-3 right-3 p-2 bg-black/50 backdrop-blur-sm rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
+            <Maximize2 size={16} className="text-white" />
+          </div>
         </div>
       )}
       <div className={cn("space-y-3 relative w-full", effectiveViewMode === 'list' ? "flex-1 flex flex-col" : "p-4 sm:p-5")}>
@@ -1377,6 +1389,35 @@ function BirdCard({ bird, cage, birds, viewMode = 'grid-large', currency, onBird
           </div>
         )}
       </div>
+
+      <AnimatePresence>
+        {fullscreenImage && imageUrl && (
+          <div 
+            className="fixed inset-0 z-[200] flex items-center justify-center bg-black/95 backdrop-blur-md p-4 sm:p-8 cursor-zoom-out"
+            onClick={(e) => { e.stopPropagation(); setFullscreenImage(false); }}
+          >
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              className="relative max-w-5xl w-full max-h-full flex items-center justify-center"
+            >
+              <img 
+                src={imageUrl} 
+                alt={bird.name} 
+                className="max-w-full max-h-[90vh] object-contain rounded-2xl shadow-2xl"
+                referrerPolicy="no-referrer"
+              />
+              <button 
+                onClick={(e) => { e.stopPropagation(); setFullscreenImage(false); }}
+                className="absolute top-4 right-4 p-3 bg-black/50 hover:bg-black/80 text-white rounded-full backdrop-blur-md transition-all"
+              >
+                <X size={24} />
+              </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </Card>
   );
 }
@@ -1436,32 +1477,34 @@ function CageCard({ cage, birds, viewMode = 'grid-large', onBirdRef, onNavigate,
         </div>
 
         {effectiveViewMode !== 'list' && cageBirds.length > 0 && (
-          <div className="space-y-2 pt-2">
-            <p className="text-[9px] text-white uppercase tracking-widest font-black">Residents</p>
-            <div className="flex flex-wrap gap-1.5">
+          <div 
+            className="space-y-2 pt-2 cursor-pointer group/residents"
+            onClick={(e) => { e.stopPropagation(); onNavigate('birds', cage.name); }}
+          >
+            <p className="text-[9px] text-white uppercase tracking-widest font-black group-hover/residents:text-gold-500 transition-colors">Residents</p>
+            <div className="flex flex-wrap gap-1.5 pointer-events-none">
               {cageBirds.map(b => (
-                <button 
+                <div 
                   key={b.id} 
-                  onClick={(e) => { e.stopPropagation(); onBirdRef(b.name); }}
-                  className="text-[10px] bg-zinc-700 px-2 py-1 rounded-lg border border-black-700 text-white hover:text-gold-500 hover:border-gold-500/50 transition-all font-bold"
+                  className="text-[10px] bg-zinc-700 px-2 py-1 rounded-lg border border-black-700 text-white font-bold"
                 >
                   {b.name}
-                </button>
+                </div>
               ))}
             </div>
           </div>
         )}
 
-        <div className="flex items-center gap-2 pt-2 border-t border-black-800/50">
-          <button onClick={(e) => { e.stopPropagation(); onEdit(); }} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-zinc-700 hover:bg-zinc-600 text-white hover:text-gold-500 rounded-lg transition-all border border-black-700"
+        <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-black-800/50">
+          <button onClick={(e) => { e.stopPropagation(); onEdit(); }} className="flex-1 min-w-[60px] flex items-center justify-center gap-1.5 px-3 py-2 bg-zinc-700 hover:bg-zinc-600 text-white hover:text-gold-500 rounded-lg transition-all border border-black-700"
           >
             <Edit2 size={14} />
-            <span className="text-[9px] font-black uppercase tracking-widest">Edit</span>
+            <span className="text-[9px] font-black uppercase tracking-widest hidden sm:inline">Edit</span>
           </button>
-          <button onClick={(e) => { e.stopPropagation(); onDelete(); }} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-lg transition-all border border-red-500/20"
+          <button onClick={(e) => { e.stopPropagation(); onDelete(); }} className="flex-1 min-w-[60px] flex items-center justify-center gap-1.5 px-3 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-lg transition-all border border-red-500/20"
           >
             <Trash2 size={14} />
-            <span className="text-[9px] font-black uppercase tracking-widest">Delete</span>
+            <span className="text-[9px] font-black uppercase tracking-widest hidden sm:inline">Delete</span>
           </button>
           {viewMode === 'list' && (
             <button 
@@ -1492,33 +1535,71 @@ function PairCard({ pair, male, female, onBirdRef, onNavigate, onEdit, onDelete,
       <div className={cn("space-y-4 relative w-full", effectiveViewMode === 'list' ? "flex-1 flex flex-col space-y-3" : "p-4 sm:p-5")}>
         <div className={cn("flex items-start justify-between gap-2", effectiveViewMode === 'list' ? "w-full" : "relative")}>
           <div className="space-y-1 min-w-0 flex-1">
-            <div className="flex items-center gap-2">
-              <Heart size={18} className={cn("shrink-0", pair.status === 'Active' ? 'text-rose-500 fill-rose-500' : 'text-black-200')} />
-              <h3 className={cn("font-black text-white tracking-tight truncate", "text-lg")}>Breeding Pair</h3>
+            <div 
+              className="flex items-center gap-2 cursor-pointer hover:text-gold-500 transition-colors group/title"
+              onClick={(e) => { e.stopPropagation(); onNavigate('birds', pair.id); }}
+            >
+              <Heart size={18} className={cn("shrink-0", pair.status === 'Active' ? 'text-rose-500 fill-rose-500' : 'text-black-200', "group-hover/title:text-gold-500 transition-colors")} />
+              <h3 className={cn("font-black text-white tracking-tight truncate group-hover/title:text-gold-500 transition-colors", "text-lg")}>Breeding Pair</h3>
             </div>
             <Badge variant={pair.status === 'Active' ? 'success' : 'neutral'} className="text-[8px] sm:text-[9px] uppercase tracking-widest font-black">{pair.status}</Badge>
           </div>
         </div>
 
         <div className={cn(
-          "flex items-center justify-between gap-2 sm:gap-4 p-3 sm:p-4 bg-black rounded-xl border border-black-700",
+          "flex items-center justify-center gap-2 sm:gap-4 p-2 sm:p-4 bg-black rounded-xl border border-black-700",
           effectiveViewMode === 'list' ? "flex-1 py-2" : ""
         )}>
-          <div className="flex items-center gap-2 min-w-0 flex-1 px-2">
-            <p className="text-[8px] sm:text-[9px] text-white uppercase tracking-widest font-black shrink-0">Male:</p>
+          {/* Male Card */}
+          <div 
+            onClick={(e) => { e.stopPropagation(); onNavigate('birds', pair.id); }}
+            className={cn(
+              "flex-1 flex flex-col items-center justify-center p-2 rounded-lg border border-black-800 bg-zinc-900/50 hover:bg-zinc-800 hover:border-gold-500/50 transition-all cursor-pointer text-center min-w-0",
+              !male && "opacity-50 cursor-default hover:border-black-800 hover:bg-zinc-900/50"
+            )}
+          >
+            <p className="text-[8px] sm:text-[9px] text-gold-500 uppercase tracking-widest font-black mb-1">Male</p>
             {male ? (
-              <button onClick={(e) => { e.stopPropagation(); onBirdRef(male.name); }} className="text-xs sm:text-sm font-black text-white hover:text-gold-500 transition-colors truncate">{male.name}</button>
+              <>
+                {effectiveViewMode !== 'list' && male.imageUrl && (
+                  <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full overflow-hidden mb-1 sm:mb-2 border border-black-700 shrink-0">
+                    <img src={male.imageUrl} alt={male.name} className="w-full h-full object-cover" />
+                  </div>
+                )}
+                <p className="text-[10px] sm:text-xs font-black text-white truncate w-full px-1">{male.name}</p>
+                <p className="text-[8px] sm:text-[9px] text-zinc-400 truncate w-full px-1">{male.species}</p>
+              </>
             ) : (
-              <p className="text-xs sm:text-sm font-black text-white">Unknown</p>
+              <p className="text-[10px] sm:text-xs font-black text-white py-2">Unknown</p>
             )}
           </div>
-          <div className="h-6 sm:h-8 w-px bg-zinc-700 shrink-0" />
-          <div className="flex items-center gap-2 min-w-0 flex-1 px-2">
-            <p className="text-[8px] sm:text-[9px] text-white uppercase tracking-widest font-black shrink-0">Female:</p>
+
+          {/* X in the middle */}
+          <div className="flex items-center justify-center shrink-0">
+            <X size={14} className="text-zinc-500" />
+          </div>
+
+          {/* Female Card */}
+          <div 
+            onClick={(e) => { e.stopPropagation(); onNavigate('birds', pair.id); }}
+            className={cn(
+              "flex-1 flex flex-col items-center justify-center p-2 rounded-lg border border-black-800 bg-zinc-900/50 hover:bg-zinc-800 hover:border-gold-500/50 transition-all cursor-pointer text-center min-w-0",
+              !female && "opacity-50 cursor-default hover:border-black-800 hover:bg-zinc-900/50"
+            )}
+          >
+            <p className="text-[8px] sm:text-[9px] text-rose-500 uppercase tracking-widest font-black mb-1">Female</p>
             {female ? (
-              <button onClick={(e) => { e.stopPropagation(); onBirdRef(female.name); }} className="text-xs sm:text-sm font-black text-white hover:text-gold-500 transition-colors truncate">{female.name}</button>
+              <>
+                {effectiveViewMode !== 'list' && female.imageUrl && (
+                  <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full overflow-hidden mb-1 sm:mb-2 border border-black-700 shrink-0">
+                    <img src={female.imageUrl} alt={female.name} className="w-full h-full object-cover" />
+                  </div>
+                )}
+                <p className="text-[10px] sm:text-xs font-black text-white truncate w-full px-1">{female.name}</p>
+                <p className="text-[8px] sm:text-[9px] text-zinc-400 truncate w-full px-1">{female.species}</p>
+              </>
             ) : (
-              <p className="text-xs sm:text-sm font-black text-white">Unknown</p>
+              <p className="text-[10px] sm:text-xs font-black text-white py-2">Unknown</p>
             )}
           </div>
         </div>
@@ -1538,14 +1619,14 @@ function PairCard({ pair, male, female, onBirdRef, onNavigate, onEdit, onDelete,
           </button>
         </div>
 
-        <div className="flex items-center gap-2 pt-2 border-t border-black-800/50">
-          <button onClick={(e) => { e.stopPropagation(); onEdit(); }} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-zinc-700 hover:bg-zinc-600 text-white hover:text-gold-500 rounded-lg transition-all border border-black-700">
+        <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-black-800/50">
+          <button onClick={(e) => { e.stopPropagation(); onEdit(); }} className="flex-1 min-w-[60px] flex items-center justify-center gap-1.5 px-3 py-2 bg-zinc-700 hover:bg-zinc-600 text-white hover:text-gold-500 rounded-lg transition-all border border-black-700">
             <Edit2 size={14} />
-            <span className="text-[9px] font-black uppercase tracking-widest">Edit</span>
+            <span className="text-[9px] font-black uppercase tracking-widest hidden sm:inline">Edit</span>
           </button>
-          <button onClick={(e) => { e.stopPropagation(); onDelete(); }} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-lg transition-all border border-red-500/20">
+          <button onClick={(e) => { e.stopPropagation(); onDelete(); }} className="flex-1 min-w-[60px] flex items-center justify-center gap-1.5 px-3 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-lg transition-all border border-red-500/20">
             <Trash2 size={14} />
-            <span className="text-[9px] font-black uppercase tracking-widest">Delete</span>
+            <span className="text-[9px] font-black uppercase tracking-widest hidden sm:inline">Delete</span>
           </button>
           {viewMode === 'list' && (
             <button 
@@ -1791,14 +1872,14 @@ function TransactionCard({ transaction, bird, currency, onBirdRef, onEdit, onDel
         </div>
       </div>
 
-      <div className="flex items-center gap-2 pt-2 border-t border-black-800/50">
-        <button onClick={onEdit} className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-700 hover:bg-zinc-600 text-white hover:text-gold-500 rounded-lg transition-all border border-black-700">
+      <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-black-800/50">
+        <button onClick={onEdit} className="flex-1 min-w-[60px] flex items-center justify-center gap-1.5 px-3 py-1.5 bg-zinc-700 hover:bg-zinc-600 text-white hover:text-gold-500 rounded-lg transition-all border border-black-700">
           <Edit2 size={14} />
-          <span className="text-[9px] font-black uppercase tracking-widest">Edit</span>
+          <span className="text-[9px] font-black uppercase tracking-widest hidden sm:inline">Edit</span>
         </button>
-        <button onClick={onDelete} className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-lg transition-all border border-red-500/20">
+        <button onClick={onDelete} className="flex-1 min-w-[60px] flex items-center justify-center gap-1.5 px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-lg transition-all border border-red-500/20">
           <Trash2 size={14} />
-          <span className="text-[9px] font-black uppercase tracking-widest">Delete</span>
+          <span className="text-[9px] font-black uppercase tracking-widest hidden sm:inline">Delete</span>
         </button>
       </div>
     </Card>
@@ -1904,14 +1985,14 @@ function BreedingRecordCard({ record, pair, male, female, birds, onEdit, onDelet
           </div>
         )}
 
-        <div className="flex items-center gap-2 pt-2 border-t border-black-800/50">
-          <button onClick={(e) => { e.stopPropagation(); onEdit(); }} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-zinc-700 hover:bg-zinc-600 text-white hover:text-gold-500 rounded-lg transition-all border border-black-700">
+        <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-black-800/50">
+          <button onClick={(e) => { e.stopPropagation(); onEdit(); }} className="flex-1 min-w-[60px] flex items-center justify-center gap-1.5 px-3 py-2 bg-zinc-700 hover:bg-zinc-600 text-white hover:text-gold-500 rounded-lg transition-all border border-black-700">
             <Edit2 size={14} />
-            <span className="text-[9px] font-black uppercase tracking-widest">Edit</span>
+            <span className="text-[9px] font-black uppercase tracking-widest hidden sm:inline">Edit</span>
           </button>
-          <button onClick={(e) => { e.stopPropagation(); onDelete(); }} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-lg transition-all border border-red-500/20">
+          <button onClick={(e) => { e.stopPropagation(); onDelete(); }} className="flex-1 min-w-[60px] flex items-center justify-center gap-1.5 px-3 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-lg transition-all border border-red-500/20">
             <Trash2 size={14} />
-            <span className="text-[9px] font-black uppercase tracking-widest">Delete</span>
+            <span className="text-[9px] font-black uppercase tracking-widest hidden sm:inline">Delete</span>
           </button>
           {viewMode === 'list' && (
             <button 
@@ -1930,30 +2011,45 @@ function BreedingRecordCard({ record, pair, male, female, birds, onEdit, onDelet
 function BreedingRecordForm({ user, initialData, pairs, birds, onClose }: { user: FirebaseUser, initialData?: BreedingRecord, pairs: Pair[], birds: Bird[], onClose: () => void }) {
   const [formData, setFormData] = useState<Partial<BreedingRecord>>(initialData || { pairId: '', startDate: '', endDate: '', eggsLaid: 0, eggsHatched: 0, chicksWeaned: 0, offspringIds: [], notes: '' });
   const [isSaving, setIsSaving] = useState(false);
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!formData.pairId) {
+      toast.error('Please select a pair.');
+      return;
+    }
     if (isSaving) return;
     setIsSaving(true);
-    try {
-      const data = { ...formData, uid: user.uid };
-      if (initialData?.id) { await updateDoc(doc(db, 'breedingRecords', initialData.id), data); } 
-      else { await addDoc(collection(db, 'breedingRecords'), data); }
-      onClose();
-    } catch (err) { handleFirestoreError(err, initialData ? OperationType.UPDATE : OperationType.CREATE, 'breedingRecords'); }
-    finally { setIsSaving(false); }
+    
+    const savePromise = async () => {
+      try {
+        const data = { ...formData, uid: user.uid };
+        if (initialData?.id) { await updateDoc(doc(db, 'breedingRecords', initialData.id), data); } 
+        else { 
+          const docRef = doc(collection(db, 'breedingRecords'));
+          await setDoc(docRef, data); 
+        }
+      } catch (err) { handleFirestoreError(err, initialData ? OperationType.UPDATE : OperationType.CREATE, 'breedingRecords'); }
+    };
+
+    savePromise();
+    onClose();
   };
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="space-y-1">
-        <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Pair</label>
-        <Select required value={formData.pairId} onChange={e => setFormData({ ...formData, pairId: e.target.value })}>
-          <option value="" className="bg-black text-white">Select Pair</option>
-          {pairs.map(p => {
-            const male = birds.find(b => b.id === p.maleId);
-            const female = birds.find(b => b.id === p.femaleId);
-            return <option key={p.id} value={p.id} className="bg-black text-white">{male?.name || 'Unknown'} × {female?.name || 'Unknown'}</option>;
-          })}
-        </Select>
+        <SearchableSelect 
+          label="Pair"
+          value={formData.pairId || ''}
+          onChange={(val) => setFormData({ ...formData, pairId: val })}
+          options={[
+            { id: '', name: 'Select Pair' },
+            ...pairs.map(p => {
+              const male = birds.find(b => b.id === p.maleId);
+              const female = birds.find(b => b.id === p.femaleId);
+              return { id: p.id, name: `${male?.name || 'Unknown'} × ${female?.name || 'Unknown'}` };
+            })
+          ]}
+        />
       </div>
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1"><label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Start Date</label><Input type="date" required value={formData.startDate} onChange={e => setFormData({ ...formData, startDate: e.target.value })} /></div>
@@ -1965,29 +2061,20 @@ function BreedingRecordForm({ user, initialData, pairs, birds, onClose }: { user
         <div className="space-y-1"><label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Weaned</label><Input type="number" min="0" required value={formData.chicksWeaned} onChange={e => setFormData({ ...formData, chicksWeaned: parseInt(e.target.value) || 0 })} /></div>
       </div>
       <div className="space-y-1">
-        <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Tag Offspring</label>
-        <div className="max-h-32 overflow-y-auto border border-black-700 rounded-2xl p-3 space-y-2 bg-black custom-scrollbar">
-          {birds.length === 0 ? (
-            <span className="text-xs text-white italic px-2">No birds available</span>
-          ) : (
-            birds.map(b => (
-              <label key={b.id} className="flex items-center gap-3 text-[11px] font-bold text-white hover:text-gold-500 cursor-pointer transition-colors p-1">
-                <input 
-                  type="checkbox" 
-                  className="rounded border-black-800 bg-black-900 text-gold-500 focus:ring-gold-500/20 w-4 h-4"
-                  checked={formData.offspringIds?.includes(b.id)} 
-                  onChange={e => {
-                    const ids = new Set(formData.offspringIds || []);
-                    if (e.target.checked) ids.add(b.id);
-                    else ids.delete(b.id);
-                    setFormData({ ...formData, offspringIds: Array.from(ids) });
-                  }}
-                />
-                {b.name}
-              </label>
-            ))
-          )}
-        </div>
+        <SearchableSelect 
+          label="Tag Offspring"
+          options={birds.map(b => ({ id: b.id, name: b.name }))}
+          multi
+          selectedValues={formData.offspringIds?.map(id => birds.find(b => b.id === id)?.name || id) || []}
+          onChange={(id) => {
+            const current = formData.offspringIds || [];
+            setFormData({ 
+              ...formData, 
+              offspringIds: current.includes(id) ? current.filter(m => m !== id) : [...current, id] 
+            });
+          }}
+          placeholder="Select Offspring"
+        />
       </div>
       <div className="space-y-1">
         <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Notes</label>
@@ -2018,17 +2105,24 @@ function TransactionForm({ user, initialData, birds, currency, onClose }: { user
   });
   const [isSaving, setIsSaving] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (isSaving) return;
     setIsSaving(true);
-    try {
-      const data = { ...formData, uid: user.uid };
-      if (initialData?.id) { await updateDoc(doc(db, 'transactions', initialData.id), data); } 
-      else { await addDoc(collection(db, 'transactions'), data); }
-      onClose();
-    } catch (err) { handleFirestoreError(err, initialData ? OperationType.UPDATE : OperationType.CREATE, 'transactions'); }
-    finally { setIsSaving(false); }
+    
+    const savePromise = async () => {
+      try {
+        const data = { ...formData, uid: user.uid };
+        if (initialData?.id) { await updateDoc(doc(db, 'transactions', initialData.id), data); } 
+        else { 
+          const docRef = doc(collection(db, 'transactions'));
+          await setDoc(docRef, data); 
+        }
+      } catch (err) { handleFirestoreError(err, initialData ? OperationType.UPDATE : OperationType.CREATE, 'transactions'); }
+    };
+
+    savePromise();
+    onClose();
   };
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
@@ -2056,11 +2150,15 @@ function TransactionForm({ user, initialData, birds, currency, onClose }: { user
         </div>
       </div>
       <div className="space-y-2">
-        <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Related Bird (Optional)</label>
-        <Select value={formData.birdId} onChange={e => setFormData({ ...formData, birdId: e.target.value })}>
-          <option value="" className="bg-black text-white">None</option>
-          {birds.map(b => <option key={b.id} value={b.id} className="bg-black text-white">{b.name}</option>)}
-        </Select>
+        <SearchableSelect 
+          label="Related Bird (Optional)"
+          value={formData.birdId || ''}
+          onChange={(val) => setFormData({ ...formData, birdId: val })}
+          options={[
+            { id: '', name: 'None' },
+            ...birds.map(b => ({ id: b.id, name: b.name }))
+          ]}
+        />
       </div>
       <div className="space-y-2">
         <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Description</label>
@@ -2218,14 +2316,14 @@ function TaskCard({ task, birds, onBirdRef, onToggle, onEdit, onDelete, viewMode
         )}
 
         {effectiveViewMode !== 'list' && (
-          <div className="flex items-center gap-2 pt-2 border-t border-black-800/50">
-            <button onClick={(e) => { e.stopPropagation(); onEdit(); }} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-zinc-700 hover:bg-zinc-600 text-white hover:text-gold-500 rounded-lg transition-all border border-black-700">
+          <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-black-800/50">
+            <button onClick={(e) => { e.stopPropagation(); onEdit(); }} className="flex-1 min-w-[60px] flex items-center justify-center gap-1.5 px-3 py-2 bg-zinc-700 hover:bg-zinc-600 text-white hover:text-gold-500 rounded-lg transition-all border border-black-700">
               <Edit2 size={14} />
-              <span className="text-[9px] font-black uppercase tracking-widest">Edit</span>
+              <span className="text-[9px] font-black uppercase tracking-widest hidden sm:inline">Edit</span>
             </button>
-            <button onClick={(e) => { e.stopPropagation(); onDelete(); }} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-lg transition-all border border-red-500/20">
+            <button onClick={(e) => { e.stopPropagation(); onDelete(); }} className="flex-1 min-w-[60px] flex items-center justify-center gap-1.5 px-3 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-lg transition-all border border-red-500/20">
               <Trash2 size={14} />
-              <span className="text-[9px] font-black uppercase tracking-widest">Delete</span>
+              <span className="text-[9px] font-black uppercase tracking-widest hidden sm:inline">Delete</span>
             </button>
           </div>
         )}
@@ -2777,52 +2875,55 @@ function BirdForm({ user, initialData, cages, birds, pairs, userSettings, onAddS
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (isUploading || isSaving) return;
     setIsSaving(true);
-    try {
-      const data = { ...formData, uid: user.uid };
-      let birdId = initialData?.id;
-      
-      if (birdId) { 
-        await updateDoc(doc(db, 'birds', birdId), data); 
-      } else { 
-        const docRef = await addDoc(collection(db, 'birds'), data);
-        birdId = docRef.id;
-      }
-
-      // Auto-pairing logic
-      if (formData.mateId && birdId) {
-        const mateId = formData.mateId;
+    
+    const savePromise = async () => {
+      try {
+        const data = { ...formData, uid: user.uid };
+        let birdId = initialData?.id;
         
-        // Update mate's record to point back to this bird
-        await updateDoc(doc(db, 'birds', mateId), { mateId: birdId });
-
-        // Create or update Pair document
-        const existingPair = pairs.find(p => (p.maleId === birdId && p.femaleId === mateId) || (p.maleId === mateId && p.femaleId === birdId));
-
-        const pairData = {
-          maleId: formData.sex === 'Male' ? birdId : mateId,
-          femaleId: formData.sex === 'Female' ? birdId : mateId,
-          status: 'Active',
-          startDate: format(new Date(), 'yyyy-MM-dd'),
-          uid: user.uid
-        };
-
-        if (existingPair) {
-          await updateDoc(doc(db, 'pairs', existingPair.id), pairData as any);
-        } else {
-          await addDoc(collection(db, 'pairs'), pairData);
+        if (birdId) { 
+          await updateDoc(doc(db, 'birds', birdId), data); 
+        } else { 
+          const docRef = doc(collection(db, 'birds'));
+          birdId = docRef.id;
+          await setDoc(docRef, data);
         }
-      }
 
-      onClose();
-    } catch (err) { 
-      handleFirestoreError(err, initialData ? OperationType.UPDATE : OperationType.CREATE, 'birds'); 
-    } finally {
-      setIsSaving(false);
-    }
+        // Auto-pairing logic
+        if (formData.mateId && birdId) {
+          const mateId = formData.mateId;
+          
+          // Update mate's record to point back to this bird
+          await updateDoc(doc(db, 'birds', mateId), { mateId: birdId });
+
+          // Create or update Pair document
+          const existingPair = pairs.find(p => (p.maleId === birdId && p.femaleId === mateId) || (p.maleId === mateId && p.femaleId === birdId));
+
+          const pairData = {
+            maleId: formData.sex === 'Male' ? birdId : mateId,
+            femaleId: formData.sex === 'Female' ? birdId : mateId,
+            status: 'Active',
+            startDate: format(new Date(), 'yyyy-MM-dd'),
+            uid: user.uid
+          };
+
+          if (existingPair) {
+            await updateDoc(doc(db, 'pairs', existingPair.id), pairData as any);
+          } else {
+            await addDoc(collection(db, 'pairs'), pairData);
+          }
+        }
+      } catch (err) { 
+        handleFirestoreError(err, initialData ? OperationType.UPDATE : OperationType.CREATE, 'birds'); 
+      }
+    };
+
+    savePromise();
+    onClose();
   };
 
   return (
@@ -2931,48 +3032,59 @@ function BirdForm({ user, initialData, cages, birds, pairs, userSettings, onAddS
       </div>
  
       <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-1"><label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Cage</label><Select value={formData.cageId} onChange={e => setFormData({ ...formData, cageId: e.target.value })}><option value="" className="bg-black text-white">Unassigned</option>{cages.map(c => <option key={c.id} value={c.id} className="bg-black text-white">{c.name}</option>)}</Select></div>
+        <div className="space-y-1">
+          <SearchableSelect 
+            label="Cage"
+            value={formData.cageId || ''}
+            onChange={(val) => setFormData({ ...formData, cageId: val })}
+            options={[
+              { id: '', name: 'Unassigned' },
+              ...cages.map(c => ({ id: c.id, name: c.name }))
+            ]}
+          />
+        </div>
         <div className="space-y-1"><label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Birth Date</label><Input type="date" value={formData.birthDate} onChange={e => setFormData({ ...formData, birthDate: e.target.value })} /></div>
       </div>
  
       <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-1"><label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Father</label><Select value={formData.fatherId} onChange={e => setFormData({ ...formData, fatherId: e.target.value })}><option value="" className="bg-black text-white">Unknown</option>{birds.filter(b => b.sex === 'Male' && b.id !== initialData?.id).map(b => <option key={b.id} value={b.id} className="bg-black text-white">{b.name}</option>)}</Select></div>
-        <div className="space-y-1"><label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Mother</label><Select value={formData.motherId} onChange={e => setFormData({ ...formData, motherId: e.target.value })}><option value="" className="bg-black text-white">Unknown</option>{birds.filter(b => b.sex === 'Female' && b.id !== initialData?.id).map(b => <option key={b.id} value={b.id} className="bg-black text-white">{b.name}</option>)}</Select></div>
+        <SearchableSelect 
+          label="Father"
+          options={[{ id: '', name: 'Unknown' }, ...birds.filter(b => b.sex === 'Male' && b.id !== initialData?.id).map(b => ({ id: b.id, name: b.name }))]}
+          value={formData.fatherId}
+          onChange={(id) => setFormData({ ...formData, fatherId: id })}
+          placeholder="Unknown"
+        />
+        <SearchableSelect 
+          label="Mother"
+          options={[{ id: '', name: 'Unknown' }, ...birds.filter(b => b.sex === 'Female' && b.id !== initialData?.id).map(b => ({ id: b.id, name: b.name }))]}
+          value={formData.motherId}
+          onChange={(id) => setFormData({ ...formData, motherId: id })}
+          placeholder="Unknown"
+        />
       </div>
  
       <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-1">
-          <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Mate</label>
-          <Select value={formData.mateId} onChange={e => setFormData({ ...formData, mateId: e.target.value })}>
-            <option value="" className="bg-black text-white">None</option>
-            {birds.filter(b => b.id !== initialData?.id && (formData.sex === 'Unknown' || b.sex !== formData.sex)).map(b => <option key={b.id} value={b.id} className="bg-black text-white">{b.name}</option>)}
-          </Select>
-        </div>
-        <div className="space-y-1">
-          <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Offspring</label>
-          <div className="max-h-32 overflow-y-auto border border-black-700 rounded-2xl p-3 space-y-2 bg-black custom-scrollbar">
-            {birds.filter(b => b.id !== initialData?.id).length === 0 ? (
-              <span className="text-xs text-black-200 italic px-2">No birds available</span>
-            ) : (
-              birds.filter(b => b.id !== initialData?.id).map(b => (
-                <label key={b.id} className="flex items-center gap-3 text-[11px] font-bold text-black-50 hover:text-gold-500 cursor-pointer transition-colors p-1">
-                  <input 
-                    type="checkbox" 
-                    className="rounded border-black-800 bg-black-900 text-gold-500 focus:ring-gold-500/20 w-4 h-4"
-                    checked={formData.offspringIds?.includes(b.id)} 
-                    onChange={e => {
-                      const ids = new Set(formData.offspringIds || []);
-                      if (e.target.checked) ids.add(b.id);
-                      else ids.delete(b.id);
-                      setFormData({ ...formData, offspringIds: Array.from(ids) });
-                    }}
-                  />
-                  {b.name}
-                </label>
-              ))
-            )}
-          </div>
-        </div>
+        <SearchableSelect 
+          label="Mate"
+          options={[{ id: '', name: 'None' }, ...birds.filter(b => b.id !== initialData?.id && (formData.sex === 'Unknown' || b.sex !== formData.sex)).map(b => ({ id: b.id, name: b.name }))]}
+          value={formData.mateId}
+          onChange={(id) => setFormData({ ...formData, mateId: id })}
+          placeholder="None"
+        />
+        <SearchableSelect 
+          label="Offspring"
+          options={birds.filter(b => b.id !== initialData?.id).map(b => ({ id: b.id, name: b.name }))}
+          multi
+          selectedValues={formData.offspringIds?.map(id => birds.find(b => b.id === id)?.name || id) || []}
+          onChange={(id) => {
+            const current = formData.offspringIds || [];
+            setFormData({ 
+              ...formData, 
+              offspringIds: current.includes(id) ? current.filter(m => m !== id) : [...current, id] 
+            });
+          }}
+          placeholder="Select Offspring"
+        />
       </div>
 
       <div className="grid grid-cols-2 gap-4">
@@ -3058,17 +3170,24 @@ function CageForm({ user, initialData, onClose }: { user: FirebaseUser, initialD
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (isUploading || isSaving) return;
     setIsSaving(true);
-    try {
-      const data = { ...formData, uid: user.uid };
-      if (initialData?.id) { await updateDoc(doc(db, 'cages', initialData.id), data); } 
-      else { await addDoc(collection(db, 'cages'), data); }
-      onClose();
-    } catch (err) { handleFirestoreError(err, initialData ? OperationType.UPDATE : OperationType.CREATE, 'cages'); }
-    finally { setIsSaving(false); }
+    
+    const savePromise = async () => {
+      try {
+        const data = { ...formData, uid: user.uid };
+        if (initialData?.id) { await updateDoc(doc(db, 'cages', initialData.id), data); } 
+        else { 
+          const docRef = doc(collection(db, 'cages'));
+          await setDoc(docRef, data); 
+        }
+      } catch (err) { handleFirestoreError(err, initialData ? OperationType.UPDATE : OperationType.CREATE, 'cages'); }
+    };
+
+    savePromise();
+    onClose();
   };
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
@@ -3110,23 +3229,50 @@ function CageForm({ user, initialData, onClose }: { user: FirebaseUser, initialD
 function PairForm({ user, initialData, birds, onClose }: { user: FirebaseUser, initialData?: Pair, birds: Bird[], onClose: () => void }) {
   const [formData, setFormData] = useState<Partial<Pair>>(initialData || { maleId: '', femaleId: '', status: 'Active', startDate: '', endDate: '' });
   const [isSaving, setIsSaving] = useState(false);
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!formData.maleId || !formData.femaleId) {
+      toast.error('Please select both a male and a female bird.');
+      return;
+    }
     if (isSaving) return;
     setIsSaving(true);
-    try {
-      const data = { ...formData, uid: user.uid };
-      if (initialData?.id) { await updateDoc(doc(db, 'pairs', initialData.id), data); } 
-      else { await addDoc(collection(db, 'pairs'), data); }
-      onClose();
-    } catch (err) { handleFirestoreError(err, initialData ? OperationType.UPDATE : OperationType.CREATE, 'pairs'); }
-    finally { setIsSaving(false); }
+    
+    const savePromise = async () => {
+      try {
+        const data = { ...formData, uid: user.uid };
+        if (initialData?.id) { await updateDoc(doc(db, 'pairs', initialData.id), data); } 
+        else { 
+          const docRef = doc(collection(db, 'pairs'));
+          await setDoc(docRef, data); 
+        }
+      } catch (err) { handleFirestoreError(err, initialData ? OperationType.UPDATE : OperationType.CREATE, 'pairs'); }
+    };
+
+    savePromise();
+    onClose();
   };
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-1"><label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Male</label><Select required value={formData.maleId} onChange={e => setFormData({ ...formData, maleId: e.target.value })}><option value="" className="bg-black text-white">Select Male</option>{birds.filter(b => b.sex === 'Male').map(b => <option key={b.id} value={b.id} className="bg-black text-white">{b.name}</option>)}</Select></div>
-        <div className="space-y-1"><label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Female</label><Select required value={formData.femaleId} onChange={e => setFormData({ ...formData, femaleId: e.target.value })}><option value="" className="bg-black text-white">Select Female</option>{birds.filter(b => b.sex === 'Female').map(b => <option key={b.id} value={b.id} className="bg-black text-white">{b.name}</option>)}</Select></div>
+        <SearchableSelect 
+          label="Male"
+          value={formData.maleId || ''}
+          onChange={(val) => setFormData({ ...formData, maleId: val })}
+          options={[
+            { id: '', name: 'Select Male' },
+            ...birds.filter(b => b.sex === 'Male').map(b => ({ id: b.id, name: b.name }))
+          ]}
+        />
+        <SearchableSelect 
+          label="Female"
+          value={formData.femaleId || ''}
+          onChange={(val) => setFormData({ ...formData, femaleId: val })}
+          options={[
+            { id: '', name: 'Select Female' },
+            ...birds.filter(b => b.sex === 'Female').map(b => ({ id: b.id, name: b.name }))
+          ]}
+        />
       </div>
       <div className="space-y-1"><label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Status</label><Select value={formData.status} onChange={e => setFormData({ ...formData, status: e.target.value as any })}><option value="Active" className="bg-black text-white">Active</option><option value="Inactive" className="bg-black text-white">Inactive</option></Select></div>
       <div className="grid grid-cols-2 gap-4">
@@ -3145,17 +3291,24 @@ function TaskForm({ user, initialData, birds, onClose }: { user: FirebaseUser, i
   const [formData, setFormData] = useState<Partial<Task>>(initialData || { title: '', description: '', status: 'Pending', priority: 'Medium', category: 'General', dueDate: '', reminderDate: '', birdIds: [], subTasks: [] });
   const [newSubTask, setNewSubTask] = useState('');
   const [isSaving, setIsSaving] = useState(false);
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (isSaving) return;
     setIsSaving(true);
-    try {
-      const data = { ...formData, uid: user.uid };
-      if (initialData?.id) { await updateDoc(doc(db, 'tasks', initialData.id), data); } 
-      else { await addDoc(collection(db, 'tasks'), data); }
-      onClose();
-    } catch (err) { handleFirestoreError(err, initialData ? OperationType.UPDATE : OperationType.CREATE, 'tasks'); }
-    finally { setIsSaving(false); }
+    
+    const savePromise = async () => {
+      try {
+        const data = { ...formData, uid: user.uid };
+        if (initialData?.id) { await updateDoc(doc(db, 'tasks', initialData.id), data); } 
+        else { 
+          const docRef = doc(collection(db, 'tasks'));
+          await setDoc(docRef, data); 
+        }
+      } catch (err) { handleFirestoreError(err, initialData ? OperationType.UPDATE : OperationType.CREATE, 'tasks'); }
+    };
+
+    savePromise();
+    onClose();
   };
   const addSubTask = () => {
     if (!newSubTask.trim()) return;

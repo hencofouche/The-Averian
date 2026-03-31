@@ -149,7 +149,7 @@ service cloud.firestore {
              (!('mutations' in data) || data.mutations is list) &&
              (!('splitMutations' in data) || data.splitMutations is list) &&
              (!('statuses' in data) || data.statuses is list) &&
-             (!('imageUrl' in data) || (data.imageUrl is string && data.imageUrl.size() < 1000000)) &&
+             (!('imageUrl' in data) || (data.imageUrl is string && data.imageUrl.size() < 1500000)) &&
              (!('notes' in data) || data.notes is string && data.notes.size() < 2000) &&
              (!('purchaseDate' in data) || isValidDateString(data.purchaseDate)) &&
              (!('purchasePrice' in data) || data.purchasePrice is number) &&
@@ -170,7 +170,7 @@ service cloud.firestore {
       return hasRequiredFields(['name', 'uid']) &&
              data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
              (!('location' in data) || data.location is string && data.location.size() < 200) &&
-             (!('imageUrl' in data) || (data.imageUrl is string && data.imageUrl.size() < 1000000));
+             (!('imageUrl' in data) || (data.imageUrl is string && data.imageUrl.size() < 1500000));
     }
 
     function isValidPair(data) {
