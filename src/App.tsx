@@ -599,7 +599,7 @@ export default function App() {
       case 'birds':
         return birds.filter(b => {
           const cage = cages.find(c => c.id === b.cageId);
-          const inPair = pairs.find(p => p.id === query && (p.maleId === b.id || p.femaleId === b.id));
+          const inPair = pairs.find(p => p.id.toLowerCase() === query && (p.maleId === b.id || p.femaleId === b.id));
           return b.name.toLowerCase().includes(query) || 
                  b.species.toLowerCase().includes(query) ||
                  (cage && cage.name.toLowerCase().includes(query)) ||
@@ -1478,15 +1478,15 @@ function CageCard({ cage, birds, viewMode = 'grid-large', onBirdRef, onNavigate,
 
         {effectiveViewMode !== 'list' && cageBirds.length > 0 && (
           <div 
-            className="space-y-2 pt-2 cursor-pointer group/residents"
+            className="mt-4 p-4 bg-zinc-900/50 rounded-xl border border-black-700 cursor-pointer hover:border-gold-500/50 transition-all group/residents"
             onClick={(e) => { e.stopPropagation(); onNavigate('birds', cage.name); }}
           >
-            <p className="text-[9px] text-white uppercase tracking-widest font-black group-hover/residents:text-gold-500 transition-colors">Residents</p>
+            <p className="text-[9px] text-white uppercase tracking-widest font-black mb-3 group-hover/residents:text-gold-500 transition-colors">Residents ({cageBirds.length})</p>
             <div className="flex flex-wrap gap-1.5 pointer-events-none">
               {cageBirds.map(b => (
                 <div 
                   key={b.id} 
-                  className="text-[10px] bg-zinc-700 px-2 py-1 rounded-lg border border-black-700 text-white font-bold"
+                  className="text-[10px] bg-zinc-800 px-2 py-1 rounded-lg border border-black-700 text-white font-bold"
                 >
                   {b.name}
                 </div>
@@ -1495,7 +1495,7 @@ function CageCard({ cage, birds, viewMode = 'grid-large', onBirdRef, onNavigate,
           </div>
         )}
 
-        <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-black-800/50">
+        <div className="flex flex-wrap items-center gap-2 pt-4 border-t border-black-800/50 mt-4">
           <button onClick={(e) => { e.stopPropagation(); onEdit(); }} className="flex-1 min-w-[60px] flex items-center justify-center gap-1.5 px-3 py-2 bg-zinc-700 hover:bg-zinc-600 text-white hover:text-gold-500 rounded-lg transition-all border border-black-700"
           >
             <Edit2 size={14} />
@@ -1546,61 +1546,56 @@ function PairCard({ pair, male, female, onBirdRef, onNavigate, onEdit, onDelete,
           </div>
         </div>
 
-        <div className={cn(
-          "flex items-center justify-center gap-2 sm:gap-4 p-2 sm:p-4 bg-black rounded-xl border border-black-700",
-          effectiveViewMode === 'list' ? "flex-1 py-2" : ""
-        )}>
-          {/* Male Card */}
-          <div 
-            onClick={(e) => { e.stopPropagation(); onNavigate('birds', pair.id); }}
-            className={cn(
-              "flex-1 flex flex-col items-center justify-center p-2 rounded-lg border border-black-800 bg-zinc-900/50 hover:bg-zinc-800 hover:border-gold-500/50 transition-all cursor-pointer text-center min-w-0",
-              !male && "opacity-50 cursor-default hover:border-black-800 hover:bg-zinc-900/50"
-            )}
-          >
-            <p className="text-[8px] sm:text-[9px] text-gold-500 uppercase tracking-widest font-black mb-1">Male</p>
-            {male ? (
-              <>
-                {effectiveViewMode !== 'list' && male.imageUrl && (
-                  <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full overflow-hidden mb-1 sm:mb-2 border border-black-700 shrink-0">
-                    <img src={male.imageUrl} alt={male.name} className="w-full h-full object-cover" />
-                  </div>
-                )}
-                <p className="text-[10px] sm:text-xs font-black text-white truncate w-full px-1">{male.name}</p>
-                <p className="text-[8px] sm:text-[9px] text-zinc-400 truncate w-full px-1">{male.species}</p>
-              </>
-            ) : (
-              <p className="text-[10px] sm:text-xs font-black text-white py-2">Unknown</p>
-            )}
-          </div>
+        <div 
+          onClick={(e) => { e.stopPropagation(); onNavigate('birds', pair.id); }}
+          className={cn(
+            "p-4 bg-zinc-900/50 rounded-xl border border-black-700 cursor-pointer hover:border-gold-500/50 transition-all group/members",
+            effectiveViewMode === 'list' ? "flex-1 py-2" : ""
+          )}
+        >
+          <p className="text-[9px] text-white uppercase tracking-widest font-black mb-3 group-hover/members:text-gold-500 transition-colors">Pair Members</p>
+          <div className="flex items-center justify-center gap-2 sm:gap-4 pointer-events-none">
+            {/* Male Card */}
+            <div className={cn(
+              "flex-1 flex flex-col items-center justify-center p-2 rounded-lg border border-black-800 bg-black/40 text-center min-w-0",
+              !male && "opacity-50"
+            )}>
+              <p className="text-[8px] sm:text-[9px] text-gold-500 uppercase tracking-widest font-black mb-1">Male</p>
+              {male ? (
+                <>
+                  {effectiveViewMode !== 'list' && male.imageUrl && (
+                    <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full overflow-hidden mb-1 sm:mb-2 border border-black-700 shrink-0">
+                      <img src={male.imageUrl} alt={male.name} className="w-full h-full object-cover" />
+                    </div>
+                  )}
+                  <p className="text-[10px] sm:text-xs font-black text-white truncate w-full px-1">{male.name}</p>
+                </>
+              ) : (
+                <p className="text-[10px] sm:text-xs font-black text-white py-2">Unknown</p>
+              )}
+            </div>
 
-          {/* X in the middle */}
-          <div className="flex items-center justify-center shrink-0">
-            <X size={14} className="text-zinc-500" />
-          </div>
+            <X size={14} className="text-zinc-500 shrink-0" />
 
-          {/* Female Card */}
-          <div 
-            onClick={(e) => { e.stopPropagation(); onNavigate('birds', pair.id); }}
-            className={cn(
-              "flex-1 flex flex-col items-center justify-center p-2 rounded-lg border border-black-800 bg-zinc-900/50 hover:bg-zinc-800 hover:border-gold-500/50 transition-all cursor-pointer text-center min-w-0",
-              !female && "opacity-50 cursor-default hover:border-black-800 hover:bg-zinc-900/50"
-            )}
-          >
-            <p className="text-[8px] sm:text-[9px] text-rose-500 uppercase tracking-widest font-black mb-1">Female</p>
-            {female ? (
-              <>
-                {effectiveViewMode !== 'list' && female.imageUrl && (
-                  <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full overflow-hidden mb-1 sm:mb-2 border border-black-700 shrink-0">
-                    <img src={female.imageUrl} alt={female.name} className="w-full h-full object-cover" />
-                  </div>
-                )}
-                <p className="text-[10px] sm:text-xs font-black text-white truncate w-full px-1">{female.name}</p>
-                <p className="text-[8px] sm:text-[9px] text-zinc-400 truncate w-full px-1">{female.species}</p>
-              </>
-            ) : (
-              <p className="text-[10px] sm:text-xs font-black text-white py-2">Unknown</p>
-            )}
+            {/* Female Card */}
+            <div className={cn(
+              "flex-1 flex flex-col items-center justify-center p-2 rounded-lg border border-black-800 bg-black/40 text-center min-w-0",
+              !female && "opacity-50"
+            )}>
+              <p className="text-[8px] sm:text-[9px] text-rose-500 uppercase tracking-widest font-black mb-1">Female</p>
+              {female ? (
+                <>
+                  {effectiveViewMode !== 'list' && female.imageUrl && (
+                    <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full overflow-hidden mb-1 sm:mb-2 border border-black-700 shrink-0">
+                      <img src={female.imageUrl} alt={female.name} className="w-full h-full object-cover" />
+                    </div>
+                  )}
+                  <p className="text-[10px] sm:text-xs font-black text-white truncate w-full px-1">{female.name}</p>
+                </>
+              ) : (
+                <p className="text-[10px] sm:text-xs font-black text-white py-2">Unknown</p>
+              )}
+            </div>
           </div>
         </div>
 
