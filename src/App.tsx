@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { format } from 'date-fns';
 import { Toaster, toast } from 'sonner';
 import { 
@@ -3396,14 +3397,12 @@ function PrintListModal({ birds, cages, onClose }: { birds: Bird[], cages: Cage[
 
   const handlePrint = () => {
     setIsPrinting(true);
-    // Use a longer delay to ensure the print area is fully rendered and visible
+    // Use a longer delay to ensure the print area is fully rendered and visible in the portal
     setTimeout(() => {
       window.print();
-      setTimeout(() => {
-        setIsPrinting(false);
-        onClose();
-      }, 500);
-    }, 500);
+      setIsPrinting(false);
+      onClose();
+    }, 800);
   };
 
   const toggleAll = () => {
@@ -3426,40 +3425,25 @@ function PrintListModal({ birds, cages, onClose }: { birds: Bird[], cages: Cage[
             size: A4 portrait;
             margin: 10mm;
           }
-          body {
-            background: white !important;
-            color: black !important;
-            margin: 0;
-            padding: 0;
-          }
-          .no-print {
+          body > #root {
             display: none !important;
           }
-          #root > *:not(#print-area) {
-            display: none !important;
-          }
-          #print-area {
+          body > #print-area-portal {
             display: block !important;
-            position: absolute !important;
-            top: 0 !important;
-            left: 0 !important;
+            visibility: visible !important;
+            position: static !important;
             width: 100% !important;
             height: auto !important;
-            padding: 0 !important;
-            margin: 0 !important;
             background: white !important;
             color: black !important;
-            visibility: visible !important;
           }
-          #print-area * {
+          #print-area-portal * {
             visibility: visible !important;
             color: black !important;
             border-color: #000 !important;
           }
-          .print-lined {
-            background-image: linear-gradient(#eee 1px, transparent 1px);
-            background-size: 100% 2rem;
-            line-height: 2rem;
+          .no-print {
+            display: none !important;
           }
           table {
             width: 100% !important;
@@ -3486,20 +3470,16 @@ function PrintListModal({ birds, cages, onClose }: { birds: Bird[], cages: Cage[
           <div className="flex items-center gap-2">
             <Button 
               onClick={() => setPrintEmpty(!printEmpty)} 
-              variant={printEmpty ? 'primary' : 'secondary'} 
-              className="py-2 px-4 text-xs whitespace-nowrap"
+              variant="secondary" 
+              className="py-2 px-4 text-[10px] whitespace-nowrap"
             >
-              {printEmpty ? 'Print Empty List' : 'Print Selection'}
+              Mode: {printEmpty ? 'Empty List' : 'Selection'}
             </Button>
             {!printEmpty && (
-              <Button onClick={toggleAll} variant="secondary" className="py-2 px-4 text-xs whitespace-nowrap">
+              <Button onClick={toggleAll} variant="secondary" className="py-2 px-4 text-[10px] whitespace-nowrap">
                 {selectedBirds.length === filteredBirds.length ? 'Deselect All' : 'Select All'}
               </Button>
             )}
-            <Button onClick={handlePrint} disabled={!printEmpty && selectedBirds.length === 0} className="px-6">
-              <Printer size={18} className="mr-2" />
-              Print Selected
-            </Button>
           </div>
         </div>
 
@@ -3548,70 +3528,73 @@ function PrintListModal({ birds, cages, onClose }: { birds: Bird[], cages: Cage[
           </div>
         )}
 
-        <Button onClick={handlePrint} disabled={!printEmpty && selectedBirds.length === 0} className="w-full py-4">
+        <Button onClick={handlePrint} disabled={!printEmpty && selectedBirds.length === 0} className="w-full py-4 mt-4">
           <Printer size={18} className="mr-2" />
-          {printEmpty ? 'Print Empty List' : `Print Selected (${selectedBirds.length})`}
+          Confirm & Print
         </Button>
       </div>
 
-      {/* Hidden Print Area */}
-      <div id="print-area" className={cn("fixed inset-0 z-[9999] bg-white text-black p-10 overflow-y-auto", isPrinting ? "block" : "hidden")}>
-        <div className="flex justify-between items-end border-b-4 border-black pb-6 mb-8">
-          <div>
-            <h1 className="text-4xl font-black uppercase tracking-tighter mb-2">Aviary Records</h1>
-            <p className="text-sm font-black text-gray-600 uppercase tracking-[0.3em]">Official Breeding Log</p>
+      {/* Hidden Print Area rendered via Portal */}
+      {isPrinting && createPortal(
+        <div id="print-area-portal" className="fixed inset-0 z-[9999] bg-white text-black p-10 overflow-y-auto">
+          <div className="flex justify-between items-end border-b-4 border-black pb-6 mb-8">
+            <div>
+              <h1 className="text-4xl font-black uppercase tracking-tighter mb-2">Aviary Records</h1>
+              <p className="text-sm font-black text-gray-600 uppercase tracking-[0.3em]">Official Breeding Log</p>
+            </div>
+            <div className="text-right">
+              <p className="text-sm font-bold text-gray-800 uppercase tracking-widest mb-1">Date: {new Date().toLocaleDateString()}</p>
+              <p className="text-xs font-black uppercase tracking-widest text-gray-500">Total Birds: {printEmpty ? '___' : selectedBirds.length}</p>
+            </div>
           </div>
-          <div className="text-right">
-            <p className="text-sm font-bold text-gray-800 uppercase tracking-widest mb-1">Date: {new Date().toLocaleDateString()}</p>
-            <p className="text-xs font-black uppercase tracking-widest text-gray-500">Total Birds: {printEmpty ? '___' : selectedBirds.length}</p>
-          </div>
-        </div>
 
-        <div className="min-h-[900px]">
-          <table className="w-full border-2 border-black">
-            <thead>
-              <tr className="bg-gray-100 border-b-2 border-black">
-                <th className="py-3 px-2 text-[10px] font-black uppercase tracking-widest text-left border-r border-black">Cage</th>
-                <th className="py-3 px-2 text-[10px] font-black uppercase tracking-widest text-left border-r border-black">Bird ID / Ring</th>
-                <th className="py-3 px-2 text-[10px] font-black uppercase tracking-widest text-left border-r border-black">Sex</th>
-                <th className="py-3 px-2 text-[10px] font-black uppercase tracking-widest text-left border-r border-black">Species / Mutation</th>
-                <th className="py-3 px-2 text-[10px] font-black uppercase tracking-widest text-left">Notes</th>
-              </tr>
-            </thead>
-            <tbody>
-              {printEmpty ? (
-                Array.from({ length: 30 }).map((_, i) => (
-                  <tr key={i} className="border-b border-gray-300 h-12">
-                    <td className="py-2 px-2 border-r border-gray-300"></td>
-                    <td className="py-2 px-2 border-r border-gray-300"></td>
-                    <td className="py-2 px-2 border-r border-gray-300"></td>
-                    <td className="py-2 px-2 border-r border-gray-300"></td>
-                    <td className="py-2 px-2"></td>
-                  </tr>
-                ))
-              ) : (
-                sortedBirds.filter(b => selectedBirds.includes(b.id)).map(bird => {
-                  const cage = cages.find(c => c.id === bird.cageId);
-                  return (
-                    <tr key={bird.id} className="border-b border-gray-300 h-12">
-                      <td className="py-2 px-2 border-r border-gray-300 text-xs font-black uppercase">{cage?.name || '-'}</td>
-                      <td className="py-2 px-2 border-r border-gray-300 text-xs font-bold">{bird.name}</td>
-                      <td className="py-2 px-2 border-r border-gray-300 text-xs font-black uppercase">{bird.sex}</td>
-                      <td className="py-2 px-2 border-r border-gray-300 text-xs">{bird.species} {bird.mutations?.join(', ')}</td>
-                      <td className="py-2 px-2 text-xs"></td>
+          <div className="min-h-[900px]">
+            <table className="w-full border-2 border-black">
+              <thead>
+                <tr className="bg-gray-100 border-b-2 border-black">
+                  <th className="py-3 px-2 text-[10px] font-black uppercase tracking-widest text-left border-r border-black">Cage</th>
+                  <th className="py-3 px-2 text-[10px] font-black uppercase tracking-widest text-left border-r border-black">Bird ID / Ring</th>
+                  <th className="py-3 px-2 text-[10px] font-black uppercase tracking-widest text-left border-r border-black">Sex</th>
+                  <th className="py-3 px-2 text-[10px] font-black uppercase tracking-widest text-left border-r border-black">Species / Mutation</th>
+                  <th className="py-3 px-2 text-[10px] font-black uppercase tracking-widest text-left">Notes</th>
+                </tr>
+              </thead>
+              <tbody>
+                {printEmpty ? (
+                  Array.from({ length: 30 }).map((_, i) => (
+                    <tr key={i} className="border-b border-gray-300 h-12">
+                      <td className="py-2 px-2 border-r border-gray-300"></td>
+                      <td className="py-2 px-2 border-r border-gray-300"></td>
+                      <td className="py-2 px-2 border-r border-gray-300"></td>
+                      <td className="py-2 px-2 border-r border-gray-300"></td>
+                      <td className="py-2 px-2"></td>
                     </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-        
-        <div className="mt-12 pt-6 border-t-2 border-black text-[10px] text-gray-500 flex justify-between uppercase tracking-[0.2em] font-black">
-          <span>Generated by Aviary Manager Pro</span>
-          <span>Page 1 of 1</span>
-        </div>
-      </div>
+                  ))
+                ) : (
+                  sortedBirds.filter(b => selectedBirds.includes(b.id)).map(bird => {
+                    const cage = cages.find(c => c.id === bird.cageId);
+                    return (
+                      <tr key={bird.id} className="border-b border-gray-300 h-12">
+                        <td className="py-2 px-2 border-r border-gray-300 text-xs font-black uppercase">{cage?.name || '-'}</td>
+                        <td className="py-2 px-2 border-r border-gray-300 text-xs font-bold">{bird.name}</td>
+                        <td className="py-2 px-2 border-r border-gray-300 text-xs font-black uppercase">{bird.sex}</td>
+                        <td className="py-2 px-2 border-r border-gray-300 text-xs">{bird.species} {bird.mutations?.join(', ')}</td>
+                        <td className="py-2 px-2 text-xs"></td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+          
+          <div className="mt-12 pt-6 border-t-2 border-black text-[10px] text-gray-500 flex justify-between uppercase tracking-[0.2em] font-black">
+            <span>Generated by Aviary Manager Pro</span>
+            <span>Page 1 of 1</span>
+          </div>
+        </div>,
+        document.body
+      )}
     </>
   );
 }
