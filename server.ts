@@ -13,7 +13,7 @@ const firebaseConfig = JSON.parse(fs.readFileSync('./firebase-applet-config.json
 admin.initializeApp({
   projectId: firebaseConfig.projectId
 });
-const db = admin.firestore();
+const db = admin.firestore(firebaseConfig.firestoreDatabaseId);
 
 // Configure web-push
 webpush.setVapidDetails(

@@ -7,7 +7,7 @@ import {
   Tag, Calendar, ChevronDown, ChevronUp, ChevronRight, X, GitBranch,
   Image as ImageIcon, Loader2, DollarSign, TrendingUp, TrendingDown,
   Activity, ArrowUpRight, ArrowDownRight, BarChart3, PieChart as PieChartIcon,
-  Menu, Egg, LayoutGrid, Grid3x3, List as ListIcon, AlertTriangle, CreditCard, CheckCircle2, Bell, Cloud, Maximize2
+  Menu, Egg, LayoutGrid, Grid3x3, List as ListIcon, AlertTriangle, CreditCard, CheckCircle2, Bell, Cloud, Maximize2, Share2, Send
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -1237,6 +1237,42 @@ function BirdCard({ bird, cage, birds, viewMode = 'grid-large', currency, onBird
   const effectiveViewMode = (viewMode === 'list' && isExpanded) ? 'grid-large' : viewMode;
   const imageUrl = bird.imageUrl || null;
 
+  const handleShare = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const text = `Check out my bird!\nName: ${bird.name}\nSpecies: ${bird.species}${bird.subSpecies ? ` - ${bird.subSpecies}` : ''}\nSex: ${bird.sex}\nMutations: ${bird.mutations?.join(', ') || 'None'}`;
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: `Bird: ${bird.name}`,
+          text: text,
+        });
+      } catch (err) {
+        console.error('Share failed:', err);
+      }
+    } else {
+      navigator.clipboard.writeText(text);
+      toast.success('Bird info copied to clipboard');
+    }
+  };
+
+  const handleTransfer = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const text = `Transfer Bird Info:\nName: ${bird.name}\nSpecies: ${bird.species}${bird.subSpecies ? ` - ${bird.subSpecies}` : ''}\nSex: ${bird.sex}\nBorn: ${bird.birthDate || 'Unknown'}\nMutations: ${bird.mutations?.join(', ') || 'None'}\nSplit Mutations: ${bird.splitMutations?.join(', ') || 'None'}\nFather: ${father?.name || 'Unknown'}\nMother: ${mother?.name || 'Unknown'}`;
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: `Transfer Bird: ${bird.name}`,
+          text: text,
+        });
+      } catch (err) {
+        console.error('Share failed:', err);
+      }
+    } else {
+      navigator.clipboard.writeText(text);
+      toast.success('Transfer info copied to clipboard');
+    }
+  };
+
   return (
     <Card 
       onClick={() => viewMode === 'list' && setIsExpanded(!isExpanded)}
@@ -1335,6 +1371,24 @@ function BirdCard({ bird, cage, birds, viewMode = 'grid-large', currency, onBird
           <Egg size={12} className="text-gold-500" />
           Breeding History
         </button>
+
+        {/* 5.5 Share & Transfer Buttons */}
+        <div className="flex items-center gap-2 pt-2 border-t border-black-800/50">
+          <button 
+            onClick={handleShare}
+            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-zinc-700 hover:bg-zinc-600 text-white hover:text-gold-500 rounded-lg transition-all border border-black-700"
+          >
+            <Share2 size={14} />
+            <span className="text-[9px] font-black uppercase tracking-widest">Share</span>
+          </button>
+          <button 
+            onClick={handleTransfer}
+            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-zinc-700 hover:bg-zinc-600 text-white hover:text-gold-500 rounded-lg transition-all border border-black-700"
+          >
+            <Send size={14} />
+            <span className="text-[9px] font-black uppercase tracking-widest">Transfer</span>
+          </button>
+        </div>
 
         {/* 6. Action Buttons - Always Last, Under everything, Next to each other */}
         <div className="flex items-center gap-2 pt-2 border-t border-black-800/50">
