@@ -25,7 +25,7 @@ import {
   updateDoc, deleteDoc, doc, getDocs, orderBy, setDoc, getDocFromServer
 } from 'firebase/firestore';
 import { 
-  Bird, Cage, Pair, Task, Transaction, OperationType, BreedingRecord, UserSettings, Species, SubSpecies, Mutation
+  Bird, Cage, Pair, Task, Transaction, OperationType, BreedingRecord, UserSettings, Species, SubSpecies, Mutation, SharedItem
 } from './types';
 import { cn } from './lib/utils';
 import { startOfDay, startOfWeek, startOfMonth, subDays, subWeeks, subMonths, isWithinInterval, parseISO } from 'date-fns';
@@ -391,6 +391,9 @@ export default function App() {
   const [editingItem, setEditingItem] = useState<any>(null);
   const [deleteConfirmation, setDeleteConfirmation] = useState<{ title: string, message: string, onConfirm: () => Promise<void> | void } | null>(null);
 
+  const [sharedItemView, setSharedItemView] = useState<SharedItem | null>(null);
+  const [isSharedItemLoading, setIsSharedItemLoading] = useState(false);
+
   const handleConfirmDelete = () => {
     if (!deleteConfirmation) return;
     const result = deleteConfirmation.onConfirm();
@@ -408,6 +411,33 @@ export default function App() {
       setLoading(false);
     });
     return unsubscribe;
+  }, []);
+
+  useEffect(() => {
+    const fetchSharedItem = async () => {
+      const params = new URLSearchParams(window.location.search);
+      const shareId = params.get('shareId');
+      const transferId = params.get('transferId');
+      const id = shareId || transferId;
+      
+      if (id) {
+        setIsSharedItemLoading(true);
+        try {
+          const docSnap = await getDocFromServer(doc(db, 'shared_items', id));
+          if (docSnap.exists()) {
+            setSharedItemView({ id: docSnap.id, ...docSnap.data() } as SharedItem);
+          } else {
+            toast.error('Shared item not found or has expired.');
+          }
+        } catch (e) {
+          console.error("Error fetching shared item:", e);
+          toast.error('Failed to load shared item.');
+        } finally {
+          setIsSharedItemLoading(false);
+        }
+      }
+    };
+    fetchSharedItem();
   }, []);
 
   useEffect(() => {
@@ -802,6 +832,160 @@ export default function App() {
   const handleBirdRef = (birdName: string) => {
     handleNavigate('birds', birdName);
   };
+
+  if (sharedItemView) {
+    const data = JSON.parse(sharedItemView.data);
+    const isTransfer = sharedItemView.action === 'transfer';
+
+    const handleImport = () => {
+      // Open modal to edit and save the transferred item
+      setEditingItem({ ...data, id: undefined }); // Remove original ID
+      setIsModalOpen(true);
+      
+      // Determine the correct tab based on the type
+      let targetTab = 'birds';
+      if (sharedItemView.type === 'pair') targetTab = 'breeding';
+      if (sharedItemView.type === 'cage') targetTab = 'cages';
+      
+      setActiveTab(targetTab as any);
+      setSharedItemView(null); // Close the shared view
+      
+      // Clean up URL
+      const newUrl = window.location.pathname;
+      window.history.replaceState({}, document.title, newUrl);
+    };
+
+    const handleCloseSharedView = () => {
+      setSharedItemView(null);
+      const newUrl = window.location.pathname;
+      window.history.replaceState({}, document.title, newUrl);
+    };
+
+    return (
+      <div className="min-h-screen bg-black flex flex-col items-center justify-center p-4">
+        <div className="w-full max-w-md space-y-6">
+          <div className="flex items-center justify-between">
+            <h1 className="text-2xl font-black uppercase tracking-widest text-white">
+              {isTransfer ? `${sharedItemView.type} Transfer` : `Shared ${sharedItemView.type}`}
+            </h1>
+            <button onClick={handleCloseSharedView} className="p-2 text-black-200 hover:text-white transition-colors">
+              <X size={24} />
+            </button>
+          </div>
+          
+          <Card className="p-6 space-y-6">
+            {sharedItemView.type === 'bird' && (
+              <>
+                {data.imageUrl && (
+                  <div className="w-full aspect-square rounded-xl overflow-hidden bg-black-900 border border-black-800">
+                    <img src={data.imageUrl} alt={data.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                  </div>
+                )}
+                
+                <div className="space-y-4">
+                  <div>
+                    <h2 className="text-3xl font-black text-white flex items-center gap-3">
+                      {data.name}
+                      <Badge variant={data.sex === 'Male' ? 'info' : data.sex === 'Female' ? 'warning' : 'neutral'}>{data.sex}</Badge>
+                    </h2>
+                    <p className="text-gold-500 font-bold uppercase tracking-widest text-xs mt-1">
+                      {data.species} {data.subSpecies ? `• ${data.subSpecies}` : ''}
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4 text-sm border-t border-black-800 pt-4">
+                    {data.birthDate && (
+                      <div className="space-y-1">
+                        <p className="text-black-200 uppercase tracking-widest text-[10px] font-black">Born</p>
+                        <p className="text-white font-medium">{data.birthDate}</p>
+                      </div>
+                    )}
+                    {data.fatherName && (
+                      <div className="space-y-1">
+                        <p className="text-black-200 uppercase tracking-widest text-[10px] font-black">Father</p>
+                        <p className="text-white font-medium">{data.fatherName}</p>
+                      </div>
+                    )}
+                    {data.motherName && (
+                      <div className="space-y-1">
+                        <p className="text-black-200 uppercase tracking-widest text-[10px] font-black">Mother</p>
+                        <p className="text-white font-medium">{data.motherName}</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {(data.mutations?.length > 0 || data.splitMutations?.length > 0) && (
+                    <div className="space-y-2 border-t border-black-800 pt-4">
+                      <p className="text-black-200 uppercase tracking-widest text-[10px] font-black">Mutations</p>
+                      <div className="flex flex-wrap gap-2">
+                        {data.mutations?.map((m: string) => <Badge key={m} className="bg-zinc-700">{m}</Badge>)}
+                        {data.splitMutations?.map((m: string) => <Badge key={m} className="bg-zinc-700 text-gold-500 italic">Split {m}</Badge>)}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+
+            {sharedItemView.type === 'pair' && (
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <Heart size={24} className="text-rose-500 fill-rose-500" />
+                  <h2 className="text-2xl font-black text-white">Breeding Pair</h2>
+                </div>
+                <div className="grid grid-cols-2 gap-4 border-t border-black-800 pt-4">
+                  <div className="space-y-1">
+                    <p className="text-gold-500 uppercase tracking-widest text-[10px] font-black">Male</p>
+                    <p className="text-white font-bold">{data.maleName || 'Unknown'}</p>
+                    {data.maleSpecies && <p className="text-black-200 text-xs">{data.maleSpecies}</p>}
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-rose-500 uppercase tracking-widest text-[10px] font-black">Female</p>
+                    <p className="text-white font-bold">{data.femaleName || 'Unknown'}</p>
+                    {data.femaleSpecies && <p className="text-black-200 text-xs">{data.femaleSpecies}</p>}
+                  </div>
+                </div>
+                <div className="border-t border-black-800 pt-4">
+                  <p className="text-black-200 uppercase tracking-widest text-[10px] font-black">Started</p>
+                  <p className="text-white font-medium">{data.startDate || 'Unknown'}</p>
+                </div>
+              </div>
+            )}
+
+            {sharedItemView.type === 'cage' && (
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <Home size={24} className="text-gold-500" />
+                  <h2 className="text-2xl font-black text-white">{data.name}</h2>
+                </div>
+                {data.location && (
+                  <p className="text-black-200 uppercase tracking-widest text-xs font-bold">{data.location}</p>
+                )}
+                {data.birds && data.birds.length > 0 && (
+                  <div className="border-t border-black-800 pt-4 space-y-2">
+                    <p className="text-black-200 uppercase tracking-widest text-[10px] font-black">Residents ({data.birds.length})</p>
+                    <div className="flex flex-wrap gap-2">
+                      {data.birds.map((b: any, i: number) => (
+                        <Badge key={i} variant={b.sex === 'Male' ? 'info' : b.sex === 'Female' ? 'warning' : 'neutral'}>
+                          {b.name}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </Card>
+
+          {isTransfer && (
+            <Button onClick={handleImport} className="w-full py-4 text-lg">
+              Import to My Aviary
+            </Button>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <SubscriptionGate settings={userSettings} onRenew={handleRenew}>
@@ -1239,37 +1423,89 @@ function BirdCard({ bird, cage, birds, viewMode = 'grid-large', currency, onBird
 
   const handleShare = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    const text = `Check out my bird!\nName: ${bird.name}\nSpecies: ${bird.species}${bird.subSpecies ? ` - ${bird.subSpecies}` : ''}\nSex: ${bird.sex}\nMutations: ${bird.mutations?.join(', ') || 'None'}`;
-    if (navigator.share) {
-      try {
+    try {
+      const shareData = {
+        name: bird.name,
+        species: bird.species,
+        subSpecies: bird.subSpecies,
+        sex: bird.sex,
+        birthDate: bird.birthDate,
+        mutations: bird.mutations,
+        splitMutations: bird.splitMutations,
+        imageUrl: bird.imageUrl,
+        motherName: mother?.name,
+        fatherName: father?.name,
+      };
+      
+      const docRef = await addDoc(collection(db, 'shared_items'), {
+        type: 'bird',
+        action: 'share',
+        data: JSON.stringify(shareData),
+        createdAt: new Date().toISOString(),
+        createdBy: auth.currentUser?.uid || ''
+      });
+      
+      const url = `${window.location.origin}?shareId=${docRef.id}`;
+      
+      if (navigator.share) {
         await navigator.share({
           title: `Bird: ${bird.name}`,
-          text: text,
+          text: `Check out my bird ${bird.name}!`,
+          url: url
         });
-      } catch (err) {
-        console.error('Share failed:', err);
+      } else {
+        navigator.clipboard.writeText(url);
+        toast.success('Share link copied to clipboard');
       }
-    } else {
-      navigator.clipboard.writeText(text);
-      toast.success('Bird info copied to clipboard');
+    } catch (err) {
+      console.error('Share failed:', err);
+      toast.error('Failed to generate share link');
     }
   };
 
   const handleTransfer = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    const text = `Transfer Bird Info:\nName: ${bird.name}\nSpecies: ${bird.species}${bird.subSpecies ? ` - ${bird.subSpecies}` : ''}\nSex: ${bird.sex}\nBorn: ${bird.birthDate || 'Unknown'}\nMutations: ${bird.mutations?.join(', ') || 'None'}\nSplit Mutations: ${bird.splitMutations?.join(', ') || 'None'}\nFather: ${father?.name || 'Unknown'}\nMother: ${mother?.name || 'Unknown'}`;
-    if (navigator.share) {
-      try {
+    try {
+      // For transfer, we include almost everything except uid, cageId (since it won't match the new user's cages), and maybe price/value
+      const transferData = {
+        ...bird,
+        uid: undefined,
+        cageId: undefined,
+        motherId: undefined, // IDs won't match, we should probably pass names
+        fatherId: undefined,
+        mateId: undefined,
+        motherName: mother?.name,
+        fatherName: father?.name,
+        mateName: mate?.name,
+        purchasePrice: undefined,
+        estimatedValue: undefined,
+        notes: undefined,
+        statuses: undefined
+      };
+      
+      const docRef = await addDoc(collection(db, 'shared_items'), {
+        type: 'bird',
+        action: 'transfer',
+        data: JSON.stringify(transferData),
+        createdAt: new Date().toISOString(),
+        createdBy: auth.currentUser?.uid || ''
+      });
+      
+      const url = `${window.location.origin}?transferId=${docRef.id}`;
+      
+      if (navigator.share) {
         await navigator.share({
           title: `Transfer Bird: ${bird.name}`,
-          text: text,
+          text: `Here is the transfer info for ${bird.name}`,
+          url: url
         });
-      } catch (err) {
-        console.error('Share failed:', err);
+      } else {
+        navigator.clipboard.writeText(url);
+        toast.success('Transfer link copied to clipboard');
       }
-    } else {
-      navigator.clipboard.writeText(text);
-      toast.success('Transfer info copied to clipboard');
+    } catch (err) {
+      console.error('Transfer failed:', err);
+      toast.error('Failed to generate transfer link');
     }
   };
 
@@ -1519,6 +1755,92 @@ function CageCard({ cage, birds, viewMode = 'grid-large', onBirdRef, onNavigate,
   const effectiveViewMode = (viewMode === 'list' && isExpanded) ? 'grid-large' : viewMode;
   const cageBirds = birds.filter(b => b.cageId === cage.id);
 
+  const handleShare = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      const shareData = {
+        id: cage.id,
+        name: cage.name,
+        location: cage.location,
+        birds: cageBirds.map(b => ({
+          name: b.name,
+          species: b.species,
+          sex: b.sex
+        }))
+      };
+      
+      const docRef = await addDoc(collection(db, 'shared_items'), {
+        type: 'cage',
+        action: 'share',
+        data: JSON.stringify(shareData),
+        createdAt: new Date().toISOString(),
+        createdBy: auth.currentUser?.uid || ''
+      });
+      
+      const url = `${window.location.origin}?shareId=${docRef.id}`;
+      
+      if (navigator.share) {
+        await navigator.share({
+          title: `Cage: ${cage.name}`,
+          text: `Check out my cage and its birds!`,
+          url: url
+        });
+      } else {
+        navigator.clipboard.writeText(url);
+        toast.success('Share link copied to clipboard');
+      }
+    } catch (err) {
+      console.error('Share failed:', err);
+      toast.error('Failed to generate share link');
+    }
+  };
+
+  const handleTransfer = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      const transferData = {
+        ...cage,
+        uid: undefined,
+        birds: cageBirds.map(b => ({
+          ...b,
+          uid: undefined,
+          cageId: undefined,
+          motherId: undefined,
+          fatherId: undefined,
+          mateId: undefined,
+          purchasePrice: undefined,
+          estimatedValue: undefined,
+          notes: undefined,
+          statuses: undefined
+        }))
+      };
+      
+      const docRef = await addDoc(collection(db, 'shared_items'), {
+        type: 'cage',
+        action: 'transfer',
+        data: JSON.stringify(transferData),
+        createdAt: new Date().toISOString(),
+        createdBy: auth.currentUser?.uid || ''
+      });
+      
+      const url = `${window.location.origin}?transferId=${docRef.id}`;
+      
+      if (navigator.share) {
+        await navigator.share({
+          title: `Transfer Cage: ${cage.name}`,
+          text: `Here is the transfer info for the cage and its birds`,
+          url: url
+        });
+      } else {
+        navigator.clipboard.writeText(url);
+        toast.success('Transfer link copied to clipboard');
+      }
+    } catch (err) {
+      console.error('Transfer failed:', err);
+      toast.error('Failed to generate transfer link');
+    }
+  };
+
   return (
     <Card 
       onClick={() => viewMode === 'list' && setIsExpanded(!isExpanded)}
@@ -1587,7 +1909,25 @@ function CageCard({ cage, birds, viewMode = 'grid-large', onBirdRef, onNavigate,
           </div>
         )}
 
-        <div className="flex flex-wrap items-center gap-2 pt-4 border-t border-black-800/50 mt-4">
+        {/* Share & Transfer Buttons */}
+        <div className="flex items-center gap-2 pt-2 border-t border-black-800/50 mt-4">
+          <button 
+            onClick={handleShare}
+            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-zinc-700 hover:bg-zinc-600 text-white hover:text-gold-500 rounded-lg transition-all border border-black-700"
+          >
+            <Share2 size={14} />
+            <span className="text-[9px] font-black uppercase tracking-widest">Share</span>
+          </button>
+          <button 
+            onClick={handleTransfer}
+            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-zinc-700 hover:bg-zinc-600 text-white hover:text-gold-500 rounded-lg transition-all border border-black-700"
+          >
+            <Send size={14} />
+            <span className="text-[9px] font-black uppercase tracking-widest">Transfer</span>
+          </button>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-black-800/50">
           <button onClick={(e) => { e.stopPropagation(); onEdit(); }} className="flex-1 min-w-[60px] flex items-center justify-center gap-1.5 px-3 py-2 bg-zinc-700 hover:bg-zinc-600 text-white hover:text-gold-500 rounded-lg transition-all border border-black-700"
           >
             <Edit2 size={14} />
@@ -1615,6 +1955,83 @@ function CageCard({ cage, birds, viewMode = 'grid-large', onBirdRef, onNavigate,
 function PairCard({ pair, male, female, onBirdRef, onNavigate, onEdit, onDelete, viewMode = 'grid-large' }: { pair: Pair, male?: Bird, female?: Bird, onBirdRef: (name: string) => void, onNavigate: (tab: string, query?: string) => void, onEdit: () => void, onDelete: () => void, viewMode?: 'grid-large' | 'list' }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const effectiveViewMode = (viewMode === 'list' && isExpanded) ? 'grid-large' : viewMode;
+
+  const handleShare = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      const shareData = {
+        id: pair.id,
+        status: pair.status,
+        startDate: pair.startDate,
+        maleName: male?.name,
+        maleSpecies: male?.species,
+        femaleName: female?.name,
+        femaleSpecies: female?.species,
+      };
+      
+      const docRef = await addDoc(collection(db, 'shared_items'), {
+        type: 'pair',
+        action: 'share',
+        data: JSON.stringify(shareData),
+        createdAt: new Date().toISOString(),
+        createdBy: auth.currentUser?.uid || ''
+      });
+      
+      const url = `${window.location.origin}?shareId=${docRef.id}`;
+      
+      if (navigator.share) {
+        await navigator.share({
+          title: `Pair: ${male?.name || 'Unknown'} & ${female?.name || 'Unknown'}`,
+          text: `Check out my breeding pair!`,
+          url: url
+        });
+      } else {
+        navigator.clipboard.writeText(url);
+        toast.success('Share link copied to clipboard');
+      }
+    } catch (err) {
+      console.error('Share failed:', err);
+      toast.error('Failed to generate share link');
+    }
+  };
+
+  const handleTransfer = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      const transferData = {
+        ...pair,
+        uid: undefined,
+        maleId: undefined,
+        femaleId: undefined,
+        maleName: male?.name,
+        femaleName: female?.name,
+      };
+      
+      const docRef = await addDoc(collection(db, 'shared_items'), {
+        type: 'pair',
+        action: 'transfer',
+        data: JSON.stringify(transferData),
+        createdAt: new Date().toISOString(),
+        createdBy: auth.currentUser?.uid || ''
+      });
+      
+      const url = `${window.location.origin}?transferId=${docRef.id}`;
+      
+      if (navigator.share) {
+        await navigator.share({
+          title: `Transfer Pair: ${male?.name || 'Unknown'} & ${female?.name || 'Unknown'}`,
+          text: `Here is the transfer info for the pair`,
+          url: url
+        });
+      } else {
+        navigator.clipboard.writeText(url);
+        toast.success('Transfer link copied to clipboard');
+      }
+    } catch (err) {
+      console.error('Transfer failed:', err);
+      toast.error('Failed to generate transfer link');
+    }
+  };
 
   return (
     <Card 
@@ -1703,6 +2120,24 @@ function PairCard({ pair, male, female, onBirdRef, onNavigate, onEdit, onDelete,
           >
             <Egg size={12} className="text-gold-500" />
             View Breeding Records
+          </button>
+        </div>
+
+        {/* Share & Transfer Buttons */}
+        <div className="flex items-center gap-2 pt-2 border-t border-black-800/50">
+          <button 
+            onClick={handleShare}
+            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-zinc-700 hover:bg-zinc-600 text-white hover:text-gold-500 rounded-lg transition-all border border-black-700"
+          >
+            <Share2 size={14} />
+            <span className="text-[9px] font-black uppercase tracking-widest">Share</span>
+          </button>
+          <button 
+            onClick={handleTransfer}
+            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-zinc-700 hover:bg-zinc-600 text-white hover:text-gold-500 rounded-lg transition-all border border-black-700"
+          >
+            <Send size={14} />
+            <span className="text-[9px] font-black uppercase tracking-widest">Transfer</span>
           </button>
         </div>
 

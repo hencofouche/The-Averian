@@ -24,6 +24,15 @@ export interface UserSettings {
   account_expiry_date?: string; // ISO date string
 }
 
+export interface SharedItem {
+  id: string;
+  type: 'bird' | 'pair' | 'cage';
+  action: 'share' | 'transfer';
+  data: string; // JSON stringified data
+  createdAt: string;
+  createdBy: string;
+}
+
 export interface Bird {
   id: string;
   name: string;

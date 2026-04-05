@@ -140,6 +140,19 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["endpoint", "keys", "userId"]
+    },
+    "SharedItem": {
+      "title": "Shared Item",
+      "description": "A shared or transferred item (bird, pair, cage).",
+      "type": "object",
+      "properties": {
+        "type": { "type": "string", "enum": ["bird", "pair", "cage"] },
+        "action": { "type": "string", "enum": ["share", "transfer"] },
+        "data": { "type": "string", "description": "JSON stringified data of the item." },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "createdBy": { "type": "string" }
+      },
+      "required": ["type", "action", "data", "createdAt", "createdBy"]
     }
   },
   "firestore": {
@@ -150,6 +163,7 @@
     "/tasks/{taskId}": { "schema": "Task", "description": "Collection of tasks and notes." },
     "/transactions/{transactionId}": { "schema": "Transaction", "description": "Collection of financial transactions." },
     "/userSettings/{userId}": { "schema": "UserSettings", "description": "User's settings and custom data." },
-    "/push_subscriptions/{subId}": { "schema": "PushSubscription", "description": "Collection of push notification subscriptions." }
+    "/push_subscriptions/{subId}": { "schema": "PushSubscription", "description": "Collection of push notification subscriptions." },
+    "/shared_items/{itemId}": { "schema": "SharedItem", "description": "Collection of shared items." }
   }
 }
