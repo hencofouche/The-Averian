@@ -7,7 +7,7 @@ import {
   Tag, Calendar, ChevronDown, ChevronUp, ChevronRight, X, GitBranch,
   Image as ImageIcon, Loader2, DollarSign, TrendingUp, TrendingDown,
   Activity, ArrowUpRight, ArrowDownRight, BarChart3, PieChart as PieChartIcon,
-  Menu, Egg, LayoutGrid, Grid3x3, List as ListIcon, AlertTriangle, CreditCard, CheckCircle2, Bell, Cloud, Maximize2, Share2, Send
+  Menu, Egg, LayoutGrid, Grid3x3, List as ListIcon, AlertTriangle, CreditCard, CheckCircle2, Bell, Cloud, Maximize2, Share2, Send, Printer
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -374,9 +374,11 @@ export default function App() {
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'birds' | 'cages' | 'pairs' | 'breeding' | 'tasks' | 'financials' | 'settings' | 'subscription'>('birds');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [viewMode, setViewMode] = useState<'grid-large' | 'list'>('grid-large');
+  const [viewingImage, setViewingImage] = useState<string | null>(null);
   
   const [birds, setBirds] = useState<Bird[]>([]);
   const [cages, setCages] = useState<Cage[]>([]);
@@ -672,9 +674,11 @@ export default function App() {
                  b.species.toLowerCase().includes(query) ||
                  (cage && cage.name.toLowerCase().includes(query)) ||
                  !!inPair;
-        });
+        }).sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
       case 'cages':
-        return cages.filter(c => c.name.toLowerCase().includes(query));
+        return cages
+          .filter(c => c.name.toLowerCase().includes(query))
+          .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
       case 'pairs':
         return pairs.filter(p => {
           const male = birds.find(b => b.id === p.maleId);
@@ -837,20 +841,89 @@ export default function App() {
     const data = JSON.parse(sharedItemView.data);
     const isTransfer = sharedItemView.action === 'transfer';
 
-    const handleImport = () => {
-      // Open modal to edit and save the transferred item
-      setEditingItem({ ...data, id: undefined }); // Remove original ID
-      setIsModalOpen(true);
+    const handleImport = async () => {
+      if (sharedItemView.type === 'bird') {
+        setEditingItem({ ...data, id: undefined });
+        setIsModalOpen(true);
+        setActiveTab('birds');
+      } else if (sharedItemView.type === 'pair') {
+        try {
+          let newMaleId = '';
+          if (data.maleName) {
+            const existingMale = birds.find(b => b.name === data.maleName && b.sex === 'Male');
+            if (existingMale) {
+              newMaleId = existingMale.id;
+            } else {
+              const maleRef = await addDoc(collection(db, 'birds'), {
+                name: data.maleName,
+                species: data.maleSpecies || '',
+                sex: 'Male',
+                uid: user?.uid,
+                createdAt: new Date().toISOString()
+              });
+              newMaleId = maleRef.id;
+            }
+          }
+          
+          let newFemaleId = '';
+          if (data.femaleName) {
+            const existingFemale = birds.find(b => b.name === data.femaleName && b.sex === 'Female');
+            if (existingFemale) {
+              newFemaleId = existingFemale.id;
+            } else {
+              const femaleRef = await addDoc(collection(db, 'birds'), {
+                name: data.femaleName,
+                species: data.femaleSpecies || '',
+                sex: 'Female',
+                uid: user?.uid,
+                createdAt: new Date().toISOString()
+              });
+              newFemaleId = femaleRef.id;
+            }
+          }
+          
+          await addDoc(collection(db, 'pairs'), {
+            maleId: newMaleId,
+            femaleId: newFemaleId,
+            status: data.status || 'Active',
+            startDate: data.startDate || new Date().toISOString().split('T')[0],
+            uid: user?.uid
+          });
+          toast.success('Pair and birds imported successfully!');
+          setActiveTab('pairs');
+        } catch (e) {
+          console.error("Error importing pair:", e);
+          toast.error('Failed to import pair');
+        }
+      } else if (sharedItemView.type === 'cage') {
+        try {
+          const cageRef = await addDoc(collection(db, 'cages'), {
+            name: data.name,
+            location: data.location || '',
+            type: data.type || 'Standard',
+            uid: user?.uid,
+            createdAt: new Date().toISOString()
+          });
+          
+          if (data.birds && data.birds.length > 0) {
+            for (const b of data.birds) {
+              await addDoc(collection(db, 'birds'), {
+                ...b,
+                cageId: cageRef.id,
+                uid: user?.uid,
+                createdAt: new Date().toISOString()
+              });
+            }
+          }
+          toast.success('Cage and birds imported successfully!');
+          setActiveTab('cages');
+        } catch (e) {
+          console.error("Error importing cage:", e);
+          toast.error('Failed to import cage');
+        }
+      }
       
-      // Determine the correct tab based on the type
-      let targetTab = 'birds';
-      if (sharedItemView.type === 'pair') targetTab = 'breeding';
-      if (sharedItemView.type === 'cage') targetTab = 'cages';
-      
-      setActiveTab(targetTab as any);
-      setSharedItemView(null); // Close the shared view
-      
-      // Clean up URL
+      setSharedItemView(null);
       const newUrl = window.location.pathname;
       window.history.replaceState({}, document.title, newUrl);
     };
@@ -877,7 +950,10 @@ export default function App() {
             {sharedItemView.type === 'bird' && (
               <>
                 {data.imageUrl && (
-                  <div className="w-full aspect-square rounded-xl overflow-hidden bg-black-900 border border-black-800">
+                  <div 
+                    className="w-full aspect-square rounded-xl overflow-hidden bg-black-900 border border-black-800 cursor-pointer"
+                    onClick={() => setViewingImage(data.imageUrl)}
+                  >
                     <img src={data.imageUrl} alt={data.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                   </div>
                 )}
@@ -1019,6 +1095,7 @@ export default function App() {
           <NavItem active={activeTab === 'breeding'} onClick={() => handleNavigate('breeding')} icon={<Egg size={18} />} label="Breeding" count={breedingRecords.length} />
           <NavItem active={activeTab === 'tasks'} onClick={() => handleNavigate('tasks')} icon={<CheckSquare size={18} />} label="Tasks & Reminders" count={tasks.length} />
           <NavItem active={activeTab === 'financials'} onClick={() => handleNavigate('financials')} icon={<DollarSign size={18} />} label="Financials" count={transactions.length} />
+          <NavItem active={false} onClick={() => setIsPrintModalOpen(true)} icon={<Printer size={18} />} label="Print List" count={0} />
           <NavItem active={activeTab === 'subscription'} onClick={() => handleNavigate('subscription')} icon={<CreditCard size={18} />} label="Subscription" count={0} />
           <NavItem active={activeTab === 'settings'} onClick={() => handleNavigate('settings')} icon={<Tag size={18} />} label="Settings" count={0} />
         </nav>
@@ -1381,6 +1458,14 @@ export default function App() {
         {activeTab === 'financials' && <TransactionForm user={user} initialData={editingItem} birds={birds} currency={userSettings?.currency} onClose={() => setIsModalOpen(false)} />}
       </Modal>
 
+      <Modal
+        isOpen={isPrintModalOpen}
+        onClose={() => setIsPrintModalOpen(false)}
+        title="Print List"
+      >
+        <PrintListModal birds={birds} cages={cages} onClose={() => setIsPrintModalOpen(false)} />
+      </Modal>
+
       <ConfirmModal 
         isOpen={!!deleteConfirmation}
         onClose={() => setDeleteConfirmation(null)}
@@ -1388,6 +1473,29 @@ export default function App() {
         title={deleteConfirmation?.title || 'Confirm Delete'}
         message={deleteConfirmation?.message || 'Are you sure you want to delete this item? This action cannot be undone.'}
       />
+
+      <AnimatePresence>
+        {viewingImage && (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/90 backdrop-blur-sm" onClick={() => setViewingImage(null)}>
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="relative max-w-4xl max-h-[90vh] w-full"
+              onClick={e => e.stopPropagation()}
+            >
+              <button 
+                onClick={() => setViewingImage(null)}
+                className="absolute -top-12 right-0 p-2 text-white/50 hover:text-white bg-black/50 rounded-full transition-colors"
+              >
+                <X size={24} />
+              </button>
+              <img src={viewingImage} alt="Enlarged view" className="w-full h-full object-contain rounded-xl" referrerPolicy="no-referrer" />
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       <Toaster theme="dark" position="top-center" richColors />
       </div>
     </SubscriptionGate>
@@ -2005,6 +2113,8 @@ function PairCard({ pair, male, female, onBirdRef, onNavigate, onEdit, onDelete,
         femaleId: undefined,
         maleName: male?.name,
         femaleName: female?.name,
+        maleSpecies: male?.species,
+        femaleSpecies: female?.species,
       };
       
       const docRef = await addDoc(collection(db, 'shared_items'), {
@@ -3300,6 +3410,95 @@ function SettingsView({ settings, onUpdate, allData, user, isSyncing }: { settin
         )}
       </AnimatePresence>
     </div>
+  );
+}
+
+function PrintListModal({ birds, cages, onClose }: { birds: Bird[], cages: Cage[], onClose: () => void }) {
+  const [selectedBirds, setSelectedBirds] = useState<string[]>([]);
+  const [isPrinting, setIsPrinting] = useState(false);
+
+  const handlePrint = () => {
+    setIsPrinting(true);
+    setTimeout(() => {
+      window.print();
+      setIsPrinting(false);
+      onClose();
+    }, 100);
+  };
+
+  const toggleAll = () => {
+    if (selectedBirds.length === birds.length) {
+      setSelectedBirds([]);
+    } else {
+      setSelectedBirds(birds.map(b => b.id));
+    }
+  };
+
+  const toggleBird = (id: string) => {
+    setSelectedBirds(prev => prev.includes(id) ? prev.filter(bId => bId !== id) : [...prev, id]);
+  };
+
+  return (
+    <>
+      <div className="space-y-4">
+        <div className="flex justify-between items-center">
+          <h3 className="text-lg font-black text-white uppercase tracking-widest">Select Birds to Print</h3>
+          <Button onClick={toggleAll} variant="secondary" className="py-1 px-3 text-xs">
+            {selectedBirds.length === birds.length ? 'Deselect All' : 'Select All'}
+          </Button>
+        </div>
+        <div className="max-h-[60vh] overflow-y-auto space-y-2 custom-scrollbar pr-2">
+          {birds.map(bird => {
+            const cage = cages.find(c => c.id === bird.cageId);
+            return (
+              <div key={bird.id} className="flex items-center gap-3 p-3 bg-zinc-900/50 rounded-xl border border-black-800 cursor-pointer hover:border-gold-500/50 transition-colors" onClick={() => toggleBird(bird.id)}>
+                <div className={cn("w-5 h-5 rounded border flex items-center justify-center transition-colors", selectedBirds.includes(bird.id) ? "bg-gold-500 border-gold-500 text-black" : "border-black-600")}>
+                  {selectedBirds.includes(bird.id) && <CheckSquare size={14} />}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold text-white truncate">{bird.name}</p>
+                  <p className="text-[10px] text-black-200 uppercase tracking-widest truncate">{cage?.name || 'No Cage'} • {bird.sex}</p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <Button onClick={handlePrint} disabled={selectedBirds.length === 0} className="w-full">
+          Print Selected ({selectedBirds.length})
+        </Button>
+      </div>
+
+      {isPrinting && (
+        <div className="fixed inset-0 bg-white z-[9999] p-8 print-only">
+          <h1 className="text-2xl font-bold mb-6 text-black">Bird List</h1>
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="border-b-2 border-black">
+                <th className="p-2 font-bold text-black">Cage Number</th>
+                <th className="p-2 font-bold text-black">Sex</th>
+                <th className="p-2 font-bold text-black">Ring Number</th>
+                <th className="p-2 font-bold text-black">Mutation</th>
+                <th className="p-2 font-bold text-black w-1/3">Notes</th>
+              </tr>
+            </thead>
+            <tbody>
+              {birds.filter(b => selectedBirds.includes(b.id)).map(bird => {
+                const cage = cages.find(c => c.id === bird.cageId);
+                return (
+                  <tr key={bird.id} className="border-b border-gray-300">
+                    <td className="p-2 text-black">{cage?.name || ''}</td>
+                    <td className="p-2 text-black">{bird.sex}</td>
+                    <td className="p-2 text-black">{bird.name}</td>
+                    <td className="p-2 text-black">{bird.mutations?.join(', ') || ''}</td>
+                    <td className="p-2 text-black border-l border-gray-300"></td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </>
   );
 }
 

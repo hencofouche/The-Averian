@@ -41,3 +41,20 @@ input:-webkit-autofill:active  {
     -webkit-box-shadow: 0 0 0 30px black inset !important;
     -webkit-text-fill-color: white !important;
 }
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .print-only, .print-only * {
+    visibility: visible;
+  }
+  .print-only {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    background: white;
+    color: black;
+  }
+}
