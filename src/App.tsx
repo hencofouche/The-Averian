@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
+import html2canvas from 'html2canvas';
 import { format } from 'date-fns';
 import { Toaster, toast } from 'sonner';
 import { 
@@ -1000,7 +1001,32 @@ export default function App() {
                         <p className="text-white font-medium">{data.motherName}</p>
                       </div>
                     )}
+                    {data.purchasePrice && (
+                      <div className="space-y-1">
+                        <p className="text-black-200 uppercase tracking-widest text-[10px] font-black">Purchase Price</p>
+                        <p className="text-white font-medium">{data.purchasePrice}</p>
+                      </div>
+                    )}
+                    {data.estimatedValue && (
+                      <div className="space-y-1">
+                        <p className="text-black-200 uppercase tracking-widest text-[10px] font-black">Est. Value</p>
+                        <p className="text-white font-medium">{data.estimatedValue}</p>
+                      </div>
+                    )}
+                    {data.offspringCount !== undefined && (
+                      <div className="space-y-1">
+                        <p className="text-black-200 uppercase tracking-widest text-[10px] font-black">Offspring</p>
+                        <p className="text-white font-medium">{data.offspringCount}</p>
+                      </div>
+                    )}
                   </div>
+
+                  {data.notes && (
+                    <div className="space-y-2 border-t border-black-800 pt-4">
+                      <p className="text-black-200 uppercase tracking-widest text-[10px] font-black">Notes</p>
+                      <p className="text-white text-xs leading-relaxed">{data.notes}</p>
+                    </div>
+                  )}
 
                   {(data.mutations?.length > 0 || data.splitMutations?.length > 0) && (
                     <div className="space-y-2 border-t border-black-800 pt-4">
@@ -1530,9 +1556,11 @@ function NavItem({ active, onClick, icon, label, count }: { active: boolean, onC
   );
 }
 
-function ShareBirdModal({ bird, mother, father, mate, onClose }: { bird: Bird, mother?: Bird, father?: Bird, mate?: Bird, onClose: () => void }) {
+function ShareBirdModal({ bird, mother, father, mate, birds, onClose }: { bird: Bird, mother?: Bird, father?: Bird, mate?: Bird, birds: Bird[], onClose: () => void }) {
   const [selectedFields, setSelectedFields] = useState<string[]>(['name', 'sex', 'species', 'mutations', 'image']);
   const [isTransferMode, setIsTransferMode] = useState(false);
+  const [isGeneratingImage, setIsGeneratingImage] = useState(false);
+  const shareCardRef = React.useRef<HTMLDivElement>(null);
 
   const fields = [
     { id: 'name', label: 'Name / Ring Number' },
@@ -1541,9 +1569,52 @@ function ShareBirdModal({ bird, mother, father, mate, onClose }: { bird: Bird, m
     { id: 'mutations', label: 'Mutations' },
     { id: 'birthDate', label: 'Birth Date' },
     { id: 'parents', label: 'Parents (Names)' },
+    { id: 'offspring', label: 'Offspring (Count)' },
+    { id: 'purchasePrice', label: 'Purchase Price' },
+    { id: 'estimatedValue', label: 'Estimated Value' },
     { id: 'image', label: 'Bird Image' },
     { id: 'notes', label: 'Notes' },
   ];
+
+  const handleShareAsImage = async () => {
+    if (!shareCardRef.current) return;
+    setIsGeneratingImage(true);
+    try {
+      const canvas = await html2canvas(shareCardRef.current, {
+        backgroundColor: '#000000',
+        scale: 2,
+        useCORS: true,
+        logging: false,
+      });
+      
+      const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/png'));
+      if (!blob) throw new Error('Failed to generate image');
+
+      const file = new File([blob], `bird-${bird.name.replace(/\s+/g, '-')}.png`, { type: 'image/png' });
+
+      if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          files: [file],
+          title: `Bird: ${bird.name}`,
+          text: `Check out my bird ${bird.name}!`,
+        });
+      } else {
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `bird-${bird.name.replace(/\s+/g, '-')}.png`;
+        link.click();
+        URL.revokeObjectURL(url);
+        toast.success('Image downloaded! You can now share it manually.');
+      }
+      onClose();
+    } catch (err) {
+      console.error('Failed to share as image:', err);
+      toast.error('Failed to generate shareable image');
+    } finally {
+      setIsGeneratingImage(false);
+    }
+  };
 
   const handleShare = async () => {
     let shareText = `🐦 Bird Details: ${bird.name}\n\n`;
@@ -1562,44 +1633,63 @@ function ShareBirdModal({ bird, mother, father, mate, onClose }: { bird: Bird, m
       if (father) shareText += `Father: ${father.name}\n`;
       if (mother) shareText += `Mother: ${mother.name}\n`;
     }
+    if (selectedFields.includes('offspring')) {
+      const offspringCount = birds.filter(b => b.motherId === bird.id || b.fatherId === bird.id).length;
+      shareText += `Offspring: ${offspringCount}\n`;
+    }
+    if (selectedFields.includes('purchasePrice') && bird.purchasePrice) {
+      shareText += `Purchase Price: ${bird.purchasePrice}\n`;
+    }
+    if (selectedFields.includes('estimatedValue') && bird.estimatedValue) {
+      shareText += `Estimated Value: ${bird.estimatedValue}\n`;
+    }
     if (selectedFields.includes('notes') && bird.notes) {
       shareText += `Notes: ${bird.notes}\n`;
     }
-    if (selectedFields.includes('image') && bird.imageUrl) {
+    
+    // Only include image if it's a real URL, not base64 (too long for text)
+    if (selectedFields.includes('image') && bird.imageUrl && bird.imageUrl.startsWith('http')) {
       shareText += `\nImage: ${bird.imageUrl}\n`;
     }
 
-    if (isTransferMode) {
+    const shareData: any = {
+      ...bird,
+      uid: undefined,
+      cageId: undefined,
+      motherId: undefined,
+      fatherId: undefined,
+      mateId: undefined,
+      motherName: mother?.name,
+      fatherName: father?.name,
+      mateName: mate?.name,
+      offspringCount: selectedFields.includes('offspring') ? birds.filter(b => b.motherId === bird.id || b.fatherId === bird.id).length : undefined
+    };
+
+    // Remove fields not selected for sharing (except for transfer mode which needs more)
+    if (!isTransferMode) {
+      if (!selectedFields.includes('purchasePrice')) shareData.purchasePrice = undefined;
+      if (!selectedFields.includes('estimatedValue')) shareData.estimatedValue = undefined;
+      if (!selectedFields.includes('notes')) shareData.notes = undefined;
+      if (!selectedFields.includes('image')) shareData.imageUrl = undefined;
+    } else {
       shareText += `\n--- Transfer Data ---\n`;
-      const transferData = {
-        ...bird,
-        uid: undefined,
-        cageId: undefined,
-        motherId: undefined,
-        fatherId: undefined,
-        mateId: undefined,
-        motherName: mother?.name,
-        fatherName: father?.name,
-        mateName: mate?.name,
-        purchasePrice: undefined,
-        estimatedValue: undefined,
-        notes: undefined,
-        statuses: undefined
-      };
-      
-      try {
-        const docRef = await addDoc(collection(db, 'shared_items'), {
-          type: 'bird',
-          action: 'transfer',
-          data: JSON.stringify(transferData),
-          createdAt: new Date().toISOString(),
-          createdBy: auth.currentUser?.uid || ''
-        });
-        const transferUrl = `${window.location.origin}?transferId=${docRef.id}`;
-        shareText += `\nImport Link: ${transferUrl}\n`;
-      } catch (err) {
-        console.error('Failed to create transfer link:', err);
-      }
+      // In transfer mode, we might want to keep some private notes or prices hidden unless explicitly selected
+      if (!selectedFields.includes('purchasePrice')) shareData.purchasePrice = undefined;
+      if (!selectedFields.includes('estimatedValue')) shareData.estimatedValue = undefined;
+    }
+    
+    try {
+      const docRef = await addDoc(collection(db, 'shared_items'), {
+        type: 'bird',
+        action: isTransferMode ? 'transfer' : 'share',
+        data: JSON.stringify(shareData),
+        createdAt: new Date().toISOString(),
+        createdBy: auth.currentUser?.uid || ''
+      });
+      const shareUrl = `${window.location.origin}?shareId=${docRef.id}`;
+      shareText += `\nFull Details: ${shareUrl}\n`;
+    } catch (err) {
+      console.error('Failed to create share link:', err);
     }
 
     if (navigator.share) {
@@ -1621,6 +1711,80 @@ function ShareBirdModal({ bird, mother, father, mate, onClose }: { bird: Bird, m
 
   return (
     <div className="space-y-6">
+      {/* Hidden Card for Image Generation */}
+      <div className="fixed -left-[9999px] top-0">
+        <div 
+          ref={shareCardRef}
+          className="w-[400px] bg-black p-8 border-4 border-gold-500 rounded-[2.5rem] space-y-6"
+        >
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-gold-500 rounded-2xl text-black">
+              <BirdIcon size={32} />
+            </div>
+            <div>
+              <h2 className="text-2xl font-black text-white uppercase tracking-tighter">The Averian</h2>
+              <p className="text-[10px] font-black text-gold-500 uppercase tracking-[0.3em]">Official Bird Record</p>
+            </div>
+          </div>
+
+          {bird.imageUrl && selectedFields.includes('image') && (
+            <div className="w-full aspect-square rounded-3xl overflow-hidden border-2 border-black-800">
+              <img src={bird.imageUrl} alt="" className="w-full h-full object-cover" crossOrigin="anonymous" />
+            </div>
+          )}
+
+          <div className="space-y-4">
+            <div>
+              <h3 className="text-3xl font-black text-white flex items-center gap-3">
+                {bird.name}
+                <span className={cn(
+                  "text-xs px-3 py-1 rounded-full uppercase tracking-widest",
+                  bird.sex === 'Male' ? "bg-blue-500/20 text-blue-400" : bird.sex === 'Female' ? "bg-rose-500/20 text-rose-400" : "bg-zinc-800 text-zinc-400"
+                )}>
+                  {bird.sex}
+                </span>
+              </h3>
+              <p className="text-gold-500 font-bold uppercase tracking-widest text-sm mt-1">
+                {bird.species} {bird.subSpecies ? `• ${bird.subSpecies}` : ''}
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-y-4 gap-x-6 pt-4 border-t border-black-800">
+              {selectedFields.includes('birthDate') && bird.birthDate && (
+                <div>
+                  <p className="text-black-200 uppercase tracking-widest text-[8px] font-black">Born</p>
+                  <p className="text-white text-sm font-bold">{bird.birthDate}</p>
+                </div>
+              )}
+              {selectedFields.includes('parents') && (father || mother) && (
+                <div>
+                  <p className="text-black-200 uppercase tracking-widest text-[8px] font-black">Lineage</p>
+                  <p className="text-white text-xs font-bold truncate">F: {father?.name || '?'}</p>
+                  <p className="text-white text-xs font-bold truncate">M: {mother?.name || '?'}</p>
+                </div>
+              )}
+              {selectedFields.includes('mutations') && bird.mutations?.length && (
+                <div className="col-span-2">
+                  <p className="text-black-200 uppercase tracking-widest text-[8px] font-black">Mutations</p>
+                  <p className="text-white text-xs font-bold">{bird.mutations.join(', ')}</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="pt-6 border-t border-black-800 flex justify-between items-end">
+            <div className="text-[8px] text-black-400 uppercase tracking-widest font-black">
+              Verified Aviary Record<br />
+              {new Date().toLocaleDateString()}
+            </div>
+            <div className="w-12 h-12 bg-white p-1 rounded-lg">
+              {/* Mock QR Code placeholder */}
+              <div className="w-full h-full bg-black rounded-sm" />
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-black text-white uppercase tracking-widest">Select Data to Share</h3>
@@ -1654,10 +1818,20 @@ function ShareBirdModal({ bird, mother, father, mate, onClose }: { bird: Bird, m
         </div>
       </div>
 
-      <Button onClick={handleShare} className="w-full py-4">
-        <Send size={18} className="mr-2" />
-        {isTransferMode ? 'Share & Transfer' : 'Share Bird Info'}
-      </Button>
+      <div className="grid grid-cols-2 gap-3">
+        <Button onClick={handleShare} className="py-4">
+          <Send size={18} className="mr-2" />
+          {isTransferMode ? 'Transfer' : 'Share Text'}
+        </Button>
+        <Button onClick={handleShareAsImage} variant="secondary" className="py-4" disabled={isGeneratingImage}>
+          {isGeneratingImage ? (
+            <div className="w-5 h-5 border-2 border-gold-500 border-t-transparent rounded-full animate-spin mr-2" />
+          ) : (
+            <ImageIcon size={18} className="mr-2" />
+          )}
+          Share Image
+        </Button>
+      </div>
     </div>
   );
 }
@@ -1681,60 +1855,15 @@ function BirdCard({ bird, cage, birds, viewMode = 'grid-large', currency, onBird
     setIsShareModalOpen(true);
   };
 
-  const handleTransfer = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    try {
-      // For transfer, we include almost everything except uid, cageId (since it won't match the new user's cages), and maybe price/value
-      const transferData = {
-        ...bird,
-        uid: undefined,
-        cageId: undefined,
-        motherId: undefined, // IDs won't match, we should probably pass names
-        fatherId: undefined,
-        mateId: undefined,
-        motherName: mother?.name,
-        fatherName: father?.name,
-        mateName: mate?.name,
-        purchasePrice: undefined,
-        estimatedValue: undefined,
-        notes: undefined,
-        statuses: undefined
-      };
-      
-      const docRef = await addDoc(collection(db, 'shared_items'), {
-        type: 'bird',
-        action: 'transfer',
-        data: JSON.stringify(transferData),
-        createdAt: new Date().toISOString(),
-        createdBy: auth.currentUser?.uid || ''
-      });
-      
-      const url = `${window.location.origin}?transferId=${docRef.id}`;
-      
-      if (navigator.share) {
-        await navigator.share({
-          title: `Transfer Bird: ${bird.name}`,
-          text: `Here is the transfer info for ${bird.name}`,
-          url: url
-        });
-      } else {
-        navigator.clipboard.writeText(url);
-        toast.success('Transfer link copied to clipboard');
-      }
-    } catch (err) {
-      console.error('Transfer failed:', err);
-      toast.error('Failed to generate transfer link');
-    }
-  };
-
   return (
-    <Card 
-      onClick={() => viewMode === 'list' && setIsExpanded(!isExpanded)}
-      className={cn(
-        "group relative transition-all duration-300 overflow-hidden", 
-        effectiveViewMode === 'list' ? "flex flex-row items-center p-4 gap-4 cursor-pointer hover:bg-black-900/50" : "cursor-default"
-      )}
-    >
+    <>
+      <Card 
+        onClick={() => viewMode === 'list' && setIsExpanded(!isExpanded)}
+        className={cn(
+          "group relative transition-all duration-300 overflow-hidden", 
+          effectiveViewMode === 'list' ? "flex flex-row items-center p-4 gap-4 cursor-pointer hover:bg-black-900/50" : "cursor-default"
+        )}
+      >
       {imageUrl && effectiveViewMode !== 'list' && (
         <div 
           className={cn("w-full overflow-hidden bg-black aspect-[4/3] cursor-pointer relative")}
@@ -1838,7 +1967,7 @@ function BirdCard({ bird, cage, birds, viewMode = 'grid-large', currency, onBird
         </div>
 
         <Modal isOpen={isShareModalOpen} onClose={() => setIsShareModalOpen(false)} title="Share Bird">
-          <ShareBirdModal bird={bird} mother={mother} father={father} mate={mate} onClose={() => setIsShareModalOpen(false)} />
+          <ShareBirdModal bird={bird} mother={mother} father={father} mate={mate} birds={birds} onClose={() => setIsShareModalOpen(false)} />
         </Modal>
 
         {/* 6. Action Buttons - Always Last, Under everything, Next to each other */}
@@ -1962,6 +2091,7 @@ function BirdCard({ bird, cage, birds, viewMode = 'grid-large', currency, onBird
         )}
       </AnimatePresence>
     </Card>
+    </>
   );
 }
 
@@ -3448,11 +3578,21 @@ function PrintListModal({ birds, cages, onClose }: { birds: Bird[], cages: Cage[
           table {
             width: 100% !important;
             border-collapse: collapse !important;
+            table-layout: fixed !important;
           }
           th, td {
             border: 1px solid #000 !important;
-            padding: 8px !important;
+            padding: 4px 8px !important;
+            white-space: nowrap !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+            font-size: 9px !important;
           }
+          th:nth-child(1), td:nth-child(1) { width: 15%; }
+          th:nth-child(2), td:nth-child(2) { width: 25%; }
+          th:nth-child(3), td:nth-child(3) { width: 10%; }
+          th:nth-child(4), td:nth-child(4) { width: 25%; }
+          th:nth-child(5), td:nth-child(5) { width: 25%; }
         }
       `}</style>
       <div className="space-y-4">
