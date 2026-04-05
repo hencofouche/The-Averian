@@ -674,7 +674,18 @@ export default function App() {
                  b.species.toLowerCase().includes(query) ||
                  (cage && cage.name.toLowerCase().includes(query)) ||
                  !!inPair;
-        }).sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
+        }).sort((a, b) => {
+          const cageA = cages.find(c => c.id === a.cageId)?.name || 'ZZZ';
+          const cageB = cages.find(c => c.id === b.cageId)?.name || 'ZZZ';
+          
+          if (cageA !== cageB) return cageA.localeCompare(cageB);
+          
+          const sexOrder: Record<string, number> = { 'Male': 0, 'Female': 1, 'Unknown': 2 };
+          const sexDiff = (sexOrder[a.sex] ?? 2) - (sexOrder[b.sex] ?? 2);
+          if (sexDiff !== 0) return sexDiff;
+          
+          return a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' });
+        });
       case 'cages':
         return cages
           .filter(c => c.name.toLowerCase().includes(query))
@@ -1516,10 +1527,143 @@ function NavItem({ active, onClick, icon, label, count }: { active: boolean, onC
   );
 }
 
+function ShareBirdModal({ bird, mother, father, mate, onClose }: { bird: Bird, mother?: Bird, father?: Bird, mate?: Bird, onClose: () => void }) {
+  const [selectedFields, setSelectedFields] = useState<string[]>(['name', 'sex', 'species', 'mutations', 'image']);
+  const [isTransferMode, setIsTransferMode] = useState(false);
+
+  const fields = [
+    { id: 'name', label: 'Name / Ring Number' },
+    { id: 'sex', label: 'Sex' },
+    { id: 'species', label: 'Species & Sub-species' },
+    { id: 'mutations', label: 'Mutations' },
+    { id: 'birthDate', label: 'Birth Date' },
+    { id: 'parents', label: 'Parents (Names)' },
+    { id: 'image', label: 'Bird Image' },
+    { id: 'notes', label: 'Notes' },
+  ];
+
+  const handleShare = async () => {
+    let shareText = `🐦 Bird Details: ${bird.name}\n\n`;
+    
+    if (selectedFields.includes('sex')) shareText += `Sex: ${bird.sex}\n`;
+    if (selectedFields.includes('species')) {
+      shareText += `Species: ${bird.species}${bird.subSpecies ? ` (${bird.subSpecies})` : ''}\n`;
+    }
+    if (selectedFields.includes('mutations') && bird.mutations?.length) {
+      shareText += `Mutations: ${bird.mutations.join(', ')}\n`;
+    }
+    if (selectedFields.includes('birthDate') && bird.birthDate) {
+      shareText += `Born: ${bird.birthDate}\n`;
+    }
+    if (selectedFields.includes('parents')) {
+      if (father) shareText += `Father: ${father.name}\n`;
+      if (mother) shareText += `Mother: ${mother.name}\n`;
+    }
+    if (selectedFields.includes('notes') && bird.notes) {
+      shareText += `Notes: ${bird.notes}\n`;
+    }
+    if (selectedFields.includes('image') && bird.imageUrl) {
+      shareText += `\nImage: ${bird.imageUrl}\n`;
+    }
+
+    if (isTransferMode) {
+      shareText += `\n--- Transfer Data ---\n`;
+      const transferData = {
+        ...bird,
+        uid: undefined,
+        cageId: undefined,
+        motherId: undefined,
+        fatherId: undefined,
+        mateId: undefined,
+        motherName: mother?.name,
+        fatherName: father?.name,
+        mateName: mate?.name,
+        purchasePrice: undefined,
+        estimatedValue: undefined,
+        notes: undefined,
+        statuses: undefined
+      };
+      
+      try {
+        const docRef = await addDoc(collection(db, 'shared_items'), {
+          type: 'bird',
+          action: 'transfer',
+          data: JSON.stringify(transferData),
+          createdAt: new Date().toISOString(),
+          createdBy: auth.currentUser?.uid || ''
+        });
+        const transferUrl = `${window.location.origin}?transferId=${docRef.id}`;
+        shareText += `\nImport Link: ${transferUrl}\n`;
+      } catch (err) {
+        console.error('Failed to create transfer link:', err);
+      }
+    }
+
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: `Bird: ${bird.name}`,
+          text: shareText
+        });
+        onClose();
+      } catch (err) {
+        console.error('Share failed:', err);
+      }
+    } else {
+      navigator.clipboard.writeText(shareText);
+      toast.success('Bird info copied to clipboard');
+      onClose();
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-black text-white uppercase tracking-widest">Select Data to Share</h3>
+          <button 
+            onClick={() => setIsTransferMode(!isTransferMode)}
+            className={cn(
+              "text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full border transition-all",
+              isTransferMode ? "bg-gold-500 border-gold-500 text-black" : "border-black-700 text-white/50"
+            )}
+          >
+            {isTransferMode ? 'Transfer Mode ON' : 'Transfer Mode OFF'}
+          </button>
+        </div>
+        
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          {fields.map(field => (
+            <div 
+              key={field.id}
+              onClick={() => setSelectedFields(prev => prev.includes(field.id) ? prev.filter(f => f !== field.id) : [...prev, field.id])}
+              className={cn(
+                "flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all",
+                selectedFields.includes(field.id) ? "bg-gold-500/10 border-gold-500/50" : "bg-zinc-900/50 border-black-800 hover:border-black-600"
+              )}
+            >
+              <div className={cn("w-4 h-4 rounded border flex items-center justify-center transition-colors", selectedFields.includes(field.id) ? "bg-gold-500 border-gold-500 text-black" : "border-black-600")}>
+                {selectedFields.includes(field.id) && <CheckSquare size={12} />}
+              </div>
+              <span className="text-xs font-bold text-white">{field.label}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <Button onClick={handleShare} className="w-full py-4">
+        <Send size={18} className="mr-2" />
+        {isTransferMode ? 'Share & Transfer' : 'Share Bird Info'}
+      </Button>
+    </div>
+  );
+}
+
 function BirdCard({ bird, cage, birds, viewMode = 'grid-large', currency, onBirdRef, onNavigate, onEdit, onDelete }: { bird: Bird, cage?: Cage, birds: Bird[], viewMode?: 'grid-large' | 'list', currency?: string, onBirdRef: (name: string) => void, onNavigate: (tab: string, query?: string) => void, onEdit: () => void, onDelete: () => void }) {
   const [showTree, setShowTree] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [fullscreenImage, setFullscreenImage] = useState(false);
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const symbol = getCurrencySymbol(currency);
   const offspring = birds.filter(b => b.motherId === bird.id || b.fatherId === bird.id || bird.offspringIds?.includes(b.id));
   const mother = birds.find(b => b.id === bird.motherId);
@@ -1529,46 +1673,9 @@ function BirdCard({ bird, cage, birds, viewMode = 'grid-large', currency, onBird
   const effectiveViewMode = (viewMode === 'list' && isExpanded) ? 'grid-large' : viewMode;
   const imageUrl = bird.imageUrl || null;
 
-  const handleShare = async (e: React.MouseEvent) => {
+  const handleShare = (e: React.MouseEvent) => {
     e.stopPropagation();
-    try {
-      const shareData = {
-        name: bird.name,
-        species: bird.species,
-        subSpecies: bird.subSpecies,
-        sex: bird.sex,
-        birthDate: bird.birthDate,
-        mutations: bird.mutations,
-        splitMutations: bird.splitMutations,
-        imageUrl: bird.imageUrl,
-        motherName: mother?.name,
-        fatherName: father?.name,
-      };
-      
-      const docRef = await addDoc(collection(db, 'shared_items'), {
-        type: 'bird',
-        action: 'share',
-        data: JSON.stringify(shareData),
-        createdAt: new Date().toISOString(),
-        createdBy: auth.currentUser?.uid || ''
-      });
-      
-      const url = `${window.location.origin}?shareId=${docRef.id}`;
-      
-      if (navigator.share) {
-        await navigator.share({
-          title: `Bird: ${bird.name}`,
-          text: `Check out my bird ${bird.name}!`,
-          url: url
-        });
-      } else {
-        navigator.clipboard.writeText(url);
-        toast.success('Share link copied to clipboard');
-      }
-    } catch (err) {
-      console.error('Share failed:', err);
-      toast.error('Failed to generate share link');
-    }
+    setIsShareModalOpen(true);
   };
 
   const handleTransfer = async (e: React.MouseEvent) => {
@@ -1716,51 +1823,48 @@ function BirdCard({ bird, cage, birds, viewMode = 'grid-large', currency, onBird
           Breeding History
         </button>
 
-        {/* 5.5 Share & Transfer Buttons */}
-        <div className="flex items-center gap-2 pt-2 border-t border-black-800/50">
+        {/* 5.5 Share Button */}
+        <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-black-800/50">
           <button 
             onClick={handleShare}
-            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-zinc-700 hover:bg-zinc-600 text-white hover:text-gold-500 rounded-lg transition-all border border-black-700"
+            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-zinc-700 hover:bg-zinc-600 text-white hover:text-gold-500 rounded-lg transition-all border border-black-700 min-w-[80px]"
           >
             <Share2 size={14} />
-            <span className="text-[9px] font-black uppercase tracking-widest">Share</span>
-          </button>
-          <button 
-            onClick={handleTransfer}
-            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-zinc-700 hover:bg-zinc-600 text-white hover:text-gold-500 rounded-lg transition-all border border-black-700"
-          >
-            <Send size={14} />
-            <span className="text-[9px] font-black uppercase tracking-widest">Transfer</span>
+            <span className="text-[9px] font-black uppercase tracking-widest">Share / Transfer</span>
           </button>
         </div>
 
+        <Modal isOpen={isShareModalOpen} onClose={() => setIsShareModalOpen(false)} title="Share Bird">
+          <ShareBirdModal bird={bird} mother={mother} father={father} mate={mate} onClose={() => setIsShareModalOpen(false)} />
+        </Modal>
+
         {/* 6. Action Buttons - Always Last, Under everything, Next to each other */}
-        <div className="flex items-center gap-2 pt-2 border-t border-black-800/50">
+        <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-black-800/50">
           <button 
             onClick={(e) => { e.stopPropagation(); setShowTree(!showTree); }} 
-            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-zinc-700 hover:bg-zinc-600 text-white hover:text-gold-500 rounded-lg transition-all border border-black-700"
+            className="flex-1 flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-2 bg-zinc-700 hover:bg-zinc-600 text-white hover:text-gold-500 rounded-lg transition-all border border-black-700 min-w-[50px]"
           >
-            <GitBranch size={14} />
-            <span className="text-[9px] font-black uppercase tracking-widest">Pedigree</span>
+            <GitBranch size={14} className="shrink-0" />
+            <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-widest hidden sm:inline">Pedigree</span>
           </button>
           <button 
             onClick={(e) => { e.stopPropagation(); onEdit(); }} 
-            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-zinc-700 hover:bg-zinc-600 text-white hover:text-gold-500 rounded-lg transition-all border border-black-700"
+            className="flex-1 flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-2 bg-zinc-700 hover:bg-zinc-600 text-white hover:text-gold-500 rounded-lg transition-all border border-black-700 min-w-[50px]"
           >
-            <Edit2 size={14} />
-            <span className="text-[9px] font-black uppercase tracking-widest">Edit</span>
+            <Edit2 size={14} className="shrink-0" />
+            <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-widest hidden sm:inline">Edit</span>
           </button>
           <button 
             onClick={(e) => { e.stopPropagation(); onDelete(); }} 
-            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-lg transition-all border border-red-500/20"
+            className="flex-1 flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-lg transition-all border border-red-500/20 min-w-[50px]"
           >
-            <Trash2 size={14} />
-            <span className="text-[9px] font-black uppercase tracking-widest">Delete</span>
+            <Trash2 size={14} className="shrink-0" />
+            <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-widest hidden sm:inline">Delete</span>
           </button>
           {viewMode === 'list' && (
             <button 
               onClick={(e) => { e.stopPropagation(); setIsExpanded(!isExpanded); }}
-              className="p-2 bg-zinc-700 hover:bg-zinc-600 text-white hover:text-gold-500 rounded-lg transition-all border border-black-700"
+              className="p-2 bg-zinc-700 hover:bg-zinc-600 text-white hover:text-gold-500 rounded-lg transition-all border border-black-700 shrink-0"
             >
               {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
             </button>
@@ -1863,92 +1967,6 @@ function CageCard({ cage, birds, viewMode = 'grid-large', onBirdRef, onNavigate,
   const effectiveViewMode = (viewMode === 'list' && isExpanded) ? 'grid-large' : viewMode;
   const cageBirds = birds.filter(b => b.cageId === cage.id);
 
-  const handleShare = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    try {
-      const shareData = {
-        id: cage.id,
-        name: cage.name,
-        location: cage.location,
-        birds: cageBirds.map(b => ({
-          name: b.name,
-          species: b.species,
-          sex: b.sex
-        }))
-      };
-      
-      const docRef = await addDoc(collection(db, 'shared_items'), {
-        type: 'cage',
-        action: 'share',
-        data: JSON.stringify(shareData),
-        createdAt: new Date().toISOString(),
-        createdBy: auth.currentUser?.uid || ''
-      });
-      
-      const url = `${window.location.origin}?shareId=${docRef.id}`;
-      
-      if (navigator.share) {
-        await navigator.share({
-          title: `Cage: ${cage.name}`,
-          text: `Check out my cage and its birds!`,
-          url: url
-        });
-      } else {
-        navigator.clipboard.writeText(url);
-        toast.success('Share link copied to clipboard');
-      }
-    } catch (err) {
-      console.error('Share failed:', err);
-      toast.error('Failed to generate share link');
-    }
-  };
-
-  const handleTransfer = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    try {
-      const transferData = {
-        ...cage,
-        uid: undefined,
-        birds: cageBirds.map(b => ({
-          ...b,
-          uid: undefined,
-          cageId: undefined,
-          motherId: undefined,
-          fatherId: undefined,
-          mateId: undefined,
-          purchasePrice: undefined,
-          estimatedValue: undefined,
-          notes: undefined,
-          statuses: undefined
-        }))
-      };
-      
-      const docRef = await addDoc(collection(db, 'shared_items'), {
-        type: 'cage',
-        action: 'transfer',
-        data: JSON.stringify(transferData),
-        createdAt: new Date().toISOString(),
-        createdBy: auth.currentUser?.uid || ''
-      });
-      
-      const url = `${window.location.origin}?transferId=${docRef.id}`;
-      
-      if (navigator.share) {
-        await navigator.share({
-          title: `Transfer Cage: ${cage.name}`,
-          text: `Here is the transfer info for the cage and its birds`,
-          url: url
-        });
-      } else {
-        navigator.clipboard.writeText(url);
-        toast.success('Transfer link copied to clipboard');
-      }
-    } catch (err) {
-      console.error('Transfer failed:', err);
-      toast.error('Failed to generate transfer link');
-    }
-  };
-
   return (
     <Card 
       onClick={() => viewMode === 'list' && setIsExpanded(!isExpanded)}
@@ -1998,6 +2016,7 @@ function CageCard({ cage, birds, viewMode = 'grid-large', onBirdRef, onNavigate,
           </div>
         </div>
 
+        {/* Residents List */}
         {effectiveViewMode !== 'list' && cageBirds.length > 0 && (
           <div 
             className="mt-4 p-4 bg-zinc-900/50 rounded-xl border border-black-700 cursor-pointer hover:border-gold-500/50 transition-all group/residents"
@@ -2017,39 +2036,21 @@ function CageCard({ cage, birds, viewMode = 'grid-large', onBirdRef, onNavigate,
           </div>
         )}
 
-        {/* Share & Transfer Buttons */}
-        <div className="flex items-center gap-2 pt-2 border-t border-black-800/50 mt-4">
-          <button 
-            onClick={handleShare}
-            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-zinc-700 hover:bg-zinc-600 text-white hover:text-gold-500 rounded-lg transition-all border border-black-700"
-          >
-            <Share2 size={14} />
-            <span className="text-[9px] font-black uppercase tracking-widest">Share</span>
-          </button>
-          <button 
-            onClick={handleTransfer}
-            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-zinc-700 hover:bg-zinc-600 text-white hover:text-gold-500 rounded-lg transition-all border border-black-700"
-          >
-            <Send size={14} />
-            <span className="text-[9px] font-black uppercase tracking-widest">Transfer</span>
-          </button>
-        </div>
-
         <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-black-800/50">
-          <button onClick={(e) => { e.stopPropagation(); onEdit(); }} className="flex-1 min-w-[60px] flex items-center justify-center gap-1.5 px-3 py-2 bg-zinc-700 hover:bg-zinc-600 text-white hover:text-gold-500 rounded-lg transition-all border border-black-700"
+          <button onClick={(e) => { e.stopPropagation(); onEdit(); }} className="flex-1 flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-2 bg-zinc-700 hover:bg-zinc-600 text-white hover:text-gold-500 rounded-lg transition-all border border-black-700 min-w-[70px]"
           >
-            <Edit2 size={14} />
-            <span className="text-[9px] font-black uppercase tracking-widest hidden sm:inline">Edit</span>
+            <Edit2 size={14} className="shrink-0" />
+            <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-widest truncate">Edit</span>
           </button>
-          <button onClick={(e) => { e.stopPropagation(); onDelete(); }} className="flex-1 min-w-[60px] flex items-center justify-center gap-1.5 px-3 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-lg transition-all border border-red-500/20"
+          <button onClick={(e) => { e.stopPropagation(); onDelete(); }} className="flex-1 flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-lg transition-all border border-red-500/20 min-w-[70px]"
           >
-            <Trash2 size={14} />
-            <span className="text-[9px] font-black uppercase tracking-widest hidden sm:inline">Delete</span>
+            <Trash2 size={14} className="shrink-0" />
+            <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-widest truncate">Delete</span>
           </button>
           {viewMode === 'list' && (
             <button 
               onClick={(e) => { e.stopPropagation(); setIsExpanded(!isExpanded); }}
-              className="p-2 bg-zinc-700 hover:bg-zinc-600 text-white hover:text-gold-500 rounded-lg transition-all border border-black-700"
+              className="p-2 bg-zinc-700 hover:bg-zinc-600 text-white hover:text-gold-500 rounded-lg transition-all border border-black-700 shrink-0"
             >
               {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
             </button>
@@ -2063,85 +2064,6 @@ function CageCard({ cage, birds, viewMode = 'grid-large', onBirdRef, onNavigate,
 function PairCard({ pair, male, female, onBirdRef, onNavigate, onEdit, onDelete, viewMode = 'grid-large' }: { pair: Pair, male?: Bird, female?: Bird, onBirdRef: (name: string) => void, onNavigate: (tab: string, query?: string) => void, onEdit: () => void, onDelete: () => void, viewMode?: 'grid-large' | 'list' }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const effectiveViewMode = (viewMode === 'list' && isExpanded) ? 'grid-large' : viewMode;
-
-  const handleShare = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    try {
-      const shareData = {
-        id: pair.id,
-        status: pair.status,
-        startDate: pair.startDate,
-        maleName: male?.name,
-        maleSpecies: male?.species,
-        femaleName: female?.name,
-        femaleSpecies: female?.species,
-      };
-      
-      const docRef = await addDoc(collection(db, 'shared_items'), {
-        type: 'pair',
-        action: 'share',
-        data: JSON.stringify(shareData),
-        createdAt: new Date().toISOString(),
-        createdBy: auth.currentUser?.uid || ''
-      });
-      
-      const url = `${window.location.origin}?shareId=${docRef.id}`;
-      
-      if (navigator.share) {
-        await navigator.share({
-          title: `Pair: ${male?.name || 'Unknown'} & ${female?.name || 'Unknown'}`,
-          text: `Check out my breeding pair!`,
-          url: url
-        });
-      } else {
-        navigator.clipboard.writeText(url);
-        toast.success('Share link copied to clipboard');
-      }
-    } catch (err) {
-      console.error('Share failed:', err);
-      toast.error('Failed to generate share link');
-    }
-  };
-
-  const handleTransfer = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    try {
-      const transferData = {
-        ...pair,
-        uid: undefined,
-        maleId: undefined,
-        femaleId: undefined,
-        maleName: male?.name,
-        femaleName: female?.name,
-        maleSpecies: male?.species,
-        femaleSpecies: female?.species,
-      };
-      
-      const docRef = await addDoc(collection(db, 'shared_items'), {
-        type: 'pair',
-        action: 'transfer',
-        data: JSON.stringify(transferData),
-        createdAt: new Date().toISOString(),
-        createdBy: auth.currentUser?.uid || ''
-      });
-      
-      const url = `${window.location.origin}?transferId=${docRef.id}`;
-      
-      if (navigator.share) {
-        await navigator.share({
-          title: `Transfer Pair: ${male?.name || 'Unknown'} & ${female?.name || 'Unknown'}`,
-          text: `Here is the transfer info for the pair`,
-          url: url
-        });
-      } else {
-        navigator.clipboard.writeText(url);
-        toast.success('Transfer link copied to clipboard');
-      }
-    } catch (err) {
-      console.error('Transfer failed:', err);
-      toast.error('Failed to generate transfer link');
-    }
-  };
 
   return (
     <Card 
@@ -2168,52 +2090,76 @@ function PairCard({ pair, male, female, onBirdRef, onNavigate, onEdit, onDelete,
         <div 
           onClick={(e) => { e.stopPropagation(); onNavigate('birds', pair.id); }}
           className={cn(
-            "p-4 bg-zinc-900/50 rounded-xl border border-black-700 cursor-pointer hover:border-gold-500/50 transition-all group/members",
+            "p-3 sm:p-4 bg-zinc-900/50 rounded-xl border border-black-700 cursor-pointer hover:border-gold-500/50 transition-all group/members space-y-3",
             effectiveViewMode === 'list' ? "flex-1 py-2" : ""
           )}
         >
-          <p className="text-[9px] text-white uppercase tracking-widest font-black mb-3 group-hover/members:text-gold-500 transition-colors">Pair Members</p>
-          <div className="flex items-center justify-center gap-2 sm:gap-4 pointer-events-none">
+          <p className="text-[9px] text-white uppercase tracking-widest font-black group-hover/members:text-gold-500 transition-colors">Pair Members</p>
+          <div className="flex flex-col gap-2 pointer-events-none">
             {/* Male Card */}
             <div className={cn(
-              "flex-1 flex flex-col items-center justify-center p-2 rounded-lg border border-black-800 bg-black/40 text-center min-w-0",
+              "flex items-center gap-3 p-2 rounded-lg border border-black-800 bg-black/40 w-full",
               !male && "opacity-50"
             )}>
-              <p className="text-[8px] sm:text-[9px] text-gold-500 uppercase tracking-widest font-black mb-1">Male</p>
-              {male ? (
-                <>
-                  {effectiveViewMode !== 'list' && male.imageUrl && (
-                    <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full overflow-hidden mb-1 sm:mb-2 border border-black-700 shrink-0">
-                      <img src={male.imageUrl} alt={male.name} className="w-full h-full object-cover" />
-                    </div>
-                  )}
-                  <p className="text-[10px] sm:text-xs font-black text-white truncate w-full px-1">{male.name}</p>
-                </>
+              {male && male.imageUrl ? (
+                <div className="w-10 h-10 rounded-full overflow-hidden border border-black-700 shrink-0">
+                  <img src={male.imageUrl} alt={male.name} className="w-full h-full object-cover" />
+                </div>
               ) : (
-                <p className="text-[10px] sm:text-xs font-black text-white py-2">Unknown</p>
+                <div className="w-10 h-10 rounded-full bg-black-800 border border-black-700 flex items-center justify-center shrink-0">
+                  <span className="text-[8px] text-gold-500 font-black">MALE</span>
+                </div>
               )}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between gap-2 mb-1">
+                  <p className="text-xs font-black text-white truncate">{male ? male.name : 'Unknown'}</p>
+                  <span className="text-[8px] text-gold-500 uppercase tracking-widest font-black shrink-0 px-1.5 py-0.5 bg-gold-500/10 rounded">Male</span>
+                </div>
+                {male && (
+                  <div className="text-[9px] text-white/70 space-y-0.5">
+                    <p className="truncate"><span className="text-white/40">Type:</span> {male.species}</p>
+                    {male.mutations && male.mutations.length > 0 && (
+                      <p className="truncate"><span className="text-white/40">Mut:</span> {male.mutations.join(', ')}</p>
+                    )}
+                    {male.cageId && (
+                      <p className="truncate"><span className="text-white/40">Cage:</span> {male.cageId}</p>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
-
-            <X size={14} className="text-zinc-500 shrink-0" />
 
             {/* Female Card */}
             <div className={cn(
-              "flex-1 flex flex-col items-center justify-center p-2 rounded-lg border border-black-800 bg-black/40 text-center min-w-0",
+              "flex items-center gap-3 p-2 rounded-lg border border-black-800 bg-black/40 w-full",
               !female && "opacity-50"
             )}>
-              <p className="text-[8px] sm:text-[9px] text-rose-500 uppercase tracking-widest font-black mb-1">Female</p>
-              {female ? (
-                <>
-                  {effectiveViewMode !== 'list' && female.imageUrl && (
-                    <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full overflow-hidden mb-1 sm:mb-2 border border-black-700 shrink-0">
-                      <img src={female.imageUrl} alt={female.name} className="w-full h-full object-cover" />
-                    </div>
-                  )}
-                  <p className="text-[10px] sm:text-xs font-black text-white truncate w-full px-1">{female.name}</p>
-                </>
+              {female && female.imageUrl ? (
+                <div className="w-10 h-10 rounded-full overflow-hidden border border-black-700 shrink-0">
+                  <img src={female.imageUrl} alt={female.name} className="w-full h-full object-cover" />
+                </div>
               ) : (
-                <p className="text-[10px] sm:text-xs font-black text-white py-2">Unknown</p>
+                <div className="w-10 h-10 rounded-full bg-black-800 border border-black-700 flex items-center justify-center shrink-0">
+                  <span className="text-[8px] text-rose-500 font-black">FEMALE</span>
+                </div>
               )}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between gap-2 mb-1">
+                  <p className="text-xs font-black text-white truncate">{female ? female.name : 'Unknown'}</p>
+                  <span className="text-[8px] text-rose-500 uppercase tracking-widest font-black shrink-0 px-1.5 py-0.5 bg-rose-500/10 rounded">Female</span>
+                </div>
+                {female && (
+                  <div className="text-[9px] text-white/70 space-y-0.5">
+                    <p className="truncate"><span className="text-white/40">Type:</span> {female.species}</p>
+                    {female.mutations && female.mutations.length > 0 && (
+                      <p className="truncate"><span className="text-white/40">Mut:</span> {female.mutations.join(', ')}</p>
+                    )}
+                    {female.cageId && (
+                      <p className="truncate"><span className="text-white/40">Cage:</span> {female.cageId}</p>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -2233,37 +2179,19 @@ function PairCard({ pair, male, female, onBirdRef, onNavigate, onEdit, onDelete,
           </button>
         </div>
 
-        {/* Share & Transfer Buttons */}
-        <div className="flex items-center gap-2 pt-2 border-t border-black-800/50">
-          <button 
-            onClick={handleShare}
-            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-zinc-700 hover:bg-zinc-600 text-white hover:text-gold-500 rounded-lg transition-all border border-black-700"
-          >
-            <Share2 size={14} />
-            <span className="text-[9px] font-black uppercase tracking-widest">Share</span>
-          </button>
-          <button 
-            onClick={handleTransfer}
-            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-zinc-700 hover:bg-zinc-600 text-white hover:text-gold-500 rounded-lg transition-all border border-black-700"
-          >
-            <Send size={14} />
-            <span className="text-[9px] font-black uppercase tracking-widest">Transfer</span>
-          </button>
-        </div>
-
         <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-black-800/50">
-          <button onClick={(e) => { e.stopPropagation(); onEdit(); }} className="flex-1 min-w-[60px] flex items-center justify-center gap-1.5 px-3 py-2 bg-zinc-700 hover:bg-zinc-600 text-white hover:text-gold-500 rounded-lg transition-all border border-black-700">
-            <Edit2 size={14} />
-            <span className="text-[9px] font-black uppercase tracking-widest hidden sm:inline">Edit</span>
+          <button onClick={(e) => { e.stopPropagation(); onEdit(); }} className="flex-1 flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-2 bg-zinc-700 hover:bg-zinc-600 text-white hover:text-gold-500 rounded-lg transition-all border border-black-700 min-w-[70px]">
+            <Edit2 size={14} className="shrink-0" />
+            <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-widest truncate">Edit</span>
           </button>
-          <button onClick={(e) => { e.stopPropagation(); onDelete(); }} className="flex-1 min-w-[60px] flex items-center justify-center gap-1.5 px-3 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-lg transition-all border border-red-500/20">
-            <Trash2 size={14} />
-            <span className="text-[9px] font-black uppercase tracking-widest hidden sm:inline">Delete</span>
+          <button onClick={(e) => { e.stopPropagation(); onDelete(); }} className="flex-1 flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-lg transition-all border border-red-500/20 min-w-[70px]">
+            <Trash2 size={14} className="shrink-0" />
+            <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-widest truncate">Delete</span>
           </button>
           {viewMode === 'list' && (
             <button 
               onClick={(e) => { e.stopPropagation(); setIsExpanded(!isExpanded); }}
-              className="p-2 bg-zinc-700 hover:bg-zinc-600 text-white hover:text-gold-500 rounded-lg transition-all border border-black-700"
+              className="p-2 bg-zinc-700 hover:bg-zinc-600 text-white hover:text-gold-500 rounded-lg transition-all border border-black-700 shrink-0"
             >
               {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
             </button>
@@ -2505,11 +2433,11 @@ function TransactionCard({ transaction, bird, currency, onBirdRef, onEdit, onDel
       </div>
 
       <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-black-800/50">
-        <button onClick={onEdit} className="flex-1 min-w-[60px] flex items-center justify-center gap-1.5 px-3 py-1.5 bg-zinc-700 hover:bg-zinc-600 text-white hover:text-gold-500 rounded-lg transition-all border border-black-700">
+        <button onClick={onEdit} className="flex-1 flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 bg-zinc-700 hover:bg-zinc-600 text-white hover:text-gold-500 rounded-lg transition-all border border-black-700 min-w-0">
           <Edit2 size={14} />
           <span className="text-[9px] font-black uppercase tracking-widest hidden sm:inline">Edit</span>
         </button>
-        <button onClick={onDelete} className="flex-1 min-w-[60px] flex items-center justify-center gap-1.5 px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-lg transition-all border border-red-500/20">
+        <button onClick={onDelete} className="flex-1 flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-lg transition-all border border-red-500/20 min-w-0">
           <Trash2 size={14} />
           <span className="text-[9px] font-black uppercase tracking-widest hidden sm:inline">Delete</span>
         </button>
@@ -2618,18 +2546,18 @@ function BreedingRecordCard({ record, pair, male, female, birds, onEdit, onDelet
         )}
 
         <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-black-800/50">
-          <button onClick={(e) => { e.stopPropagation(); onEdit(); }} className="flex-1 min-w-[60px] flex items-center justify-center gap-1.5 px-3 py-2 bg-zinc-700 hover:bg-zinc-600 text-white hover:text-gold-500 rounded-lg transition-all border border-black-700">
-            <Edit2 size={14} />
-            <span className="text-[9px] font-black uppercase tracking-widest hidden sm:inline">Edit</span>
+          <button onClick={(e) => { e.stopPropagation(); onEdit(); }} className="flex-1 flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-2 bg-zinc-700 hover:bg-zinc-600 text-white hover:text-gold-500 rounded-lg transition-all border border-black-700 min-w-0">
+            <Edit2 size={14} className="shrink-0" />
+            <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-widest truncate hidden sm:inline">Edit</span>
           </button>
-          <button onClick={(e) => { e.stopPropagation(); onDelete(); }} className="flex-1 min-w-[60px] flex items-center justify-center gap-1.5 px-3 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-lg transition-all border border-red-500/20">
-            <Trash2 size={14} />
-            <span className="text-[9px] font-black uppercase tracking-widest hidden sm:inline">Delete</span>
+          <button onClick={(e) => { e.stopPropagation(); onDelete(); }} className="flex-1 flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-lg transition-all border border-red-500/20 min-w-0">
+            <Trash2 size={14} className="shrink-0" />
+            <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-widest truncate hidden sm:inline">Delete</span>
           </button>
           {viewMode === 'list' && (
             <button 
               onClick={(e) => { e.stopPropagation(); setIsExpanded(!isExpanded); }}
-              className="p-2 bg-zinc-700 hover:bg-zinc-600 text-white hover:text-gold-500 rounded-lg transition-all border border-black-700"
+              className="p-2 bg-zinc-700 hover:bg-zinc-600 text-white hover:text-gold-500 rounded-lg transition-all border border-black-700 shrink-0"
             >
               {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
             </button>
@@ -2949,11 +2877,11 @@ function TaskCard({ task, birds, onBirdRef, onToggle, onEdit, onDelete, viewMode
 
         {effectiveViewMode !== 'list' && (
           <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-black-800/50">
-            <button onClick={(e) => { e.stopPropagation(); onEdit(); }} className="flex-1 min-w-[60px] flex items-center justify-center gap-1.5 px-3 py-2 bg-zinc-700 hover:bg-zinc-600 text-white hover:text-gold-500 rounded-lg transition-all border border-black-700">
+            <button onClick={(e) => { e.stopPropagation(); onEdit(); }} className="flex-1 flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-2 bg-zinc-700 hover:bg-zinc-600 text-white hover:text-gold-500 rounded-lg transition-all border border-black-700 min-w-0">
               <Edit2 size={14} />
               <span className="text-[9px] font-black uppercase tracking-widest hidden sm:inline">Edit</span>
             </button>
-            <button onClick={(e) => { e.stopPropagation(); onDelete(); }} className="flex-1 min-w-[60px] flex items-center justify-center gap-1.5 px-3 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-lg transition-all border border-red-500/20">
+            <button onClick={(e) => { e.stopPropagation(); onDelete(); }} className="flex-1 flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-lg transition-all border border-red-500/20 min-w-0">
               <Trash2 size={14} />
               <span className="text-[9px] font-black uppercase tracking-widest hidden sm:inline">Delete</span>
             </button>
@@ -3416,6 +3344,31 @@ function SettingsView({ settings, onUpdate, allData, user, isSyncing }: { settin
 function PrintListModal({ birds, cages, onClose }: { birds: Bird[], cages: Cage[], onClose: () => void }) {
   const [selectedBirds, setSelectedBirds] = useState<string[]>([]);
   const [isPrinting, setIsPrinting] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [printEmpty, setPrintEmpty] = useState(false);
+
+  const sortedBirds = useMemo(() => {
+    return [...birds].sort((a, b) => {
+      const cageA = cages.find(c => c.id === a.cageId)?.name || 'ZZZ'; // Unassigned at the end
+      const cageB = cages.find(c => c.id === b.cageId)?.name || 'ZZZ';
+      
+      if (cageA !== cageB) return cageA.localeCompare(cageB);
+      
+      const sexOrder: Record<string, number> = { 'Male': 0, 'Female': 1, 'Unknown': 2 };
+      return (sexOrder[a.sex] ?? 2) - (sexOrder[b.sex] ?? 2);
+    });
+  }, [birds, cages]);
+
+  const filteredBirds = sortedBirds.filter(bird => {
+    const cageName = cages.find(c => c.id === bird.cageId)?.name || 'No Cage';
+    const searchLower = searchQuery.toLowerCase();
+    return (
+      bird.name.toLowerCase().includes(searchLower) ||
+      cageName.toLowerCase().includes(searchLower) ||
+      bird.species.toLowerCase().includes(searchLower) ||
+      (bird.mutations || []).some(m => m.toLowerCase().includes(searchLower))
+    );
+  });
 
   const handlePrint = () => {
     setIsPrinting(true);
@@ -3423,14 +3376,14 @@ function PrintListModal({ birds, cages, onClose }: { birds: Bird[], cages: Cage[
       window.print();
       setIsPrinting(false);
       onClose();
-    }, 100);
+    }, 500);
   };
 
   const toggleAll = () => {
-    if (selectedBirds.length === birds.length) {
+    if (selectedBirds.length === filteredBirds.length) {
       setSelectedBirds([]);
     } else {
-      setSelectedBirds(birds.map(b => b.id));
+      setSelectedBirds(filteredBirds.map(b => b.id));
     }
   };
 
@@ -3441,61 +3394,143 @@ function PrintListModal({ birds, cages, onClose }: { birds: Bird[], cages: Cage[
   return (
     <>
       <div className="space-y-4">
-        <div className="flex justify-between items-center">
-          <h3 className="text-lg font-black text-white uppercase tracking-widest">Select Birds to Print</h3>
-          <Button onClick={toggleAll} variant="secondary" className="py-1 px-3 text-xs">
-            {selectedBirds.length === birds.length ? 'Deselect All' : 'Select All'}
-          </Button>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-black-400" size={16} />
+            <input
+              type="text"
+              placeholder="Search birds or cages..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 bg-black-900/50 border border-black-700 rounded-xl text-sm focus:outline-none focus:border-gold-500 transition-colors"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <Button 
+              onClick={() => setPrintEmpty(!printEmpty)} 
+              variant={printEmpty ? 'primary' : 'secondary'} 
+              className="py-2 px-4 text-xs whitespace-nowrap"
+            >
+              {printEmpty ? 'Print Empty List' : 'Print Selection'}
+            </Button>
+            {!printEmpty && (
+              <Button onClick={toggleAll} variant="secondary" className="py-2 px-4 text-xs whitespace-nowrap">
+                {selectedBirds.length === filteredBirds.length ? 'Deselect All' : 'Select All'}
+              </Button>
+            )}
+          </div>
         </div>
-        <div className="max-h-[60vh] overflow-y-auto space-y-2 custom-scrollbar pr-2">
-          {birds.map(bird => {
-            const cage = cages.find(c => c.id === bird.cageId);
-            return (
-              <div key={bird.id} className="flex items-center gap-3 p-3 bg-zinc-900/50 rounded-xl border border-black-800 cursor-pointer hover:border-gold-500/50 transition-colors" onClick={() => toggleBird(bird.id)}>
-                <div className={cn("w-5 h-5 rounded border flex items-center justify-center transition-colors", selectedBirds.includes(bird.id) ? "bg-gold-500 border-gold-500 text-black" : "border-black-600")}>
-                  {selectedBirds.includes(bird.id) && <CheckSquare size={14} />}
+
+        {!printEmpty && (
+          <div className="max-h-[50vh] overflow-y-auto space-y-2 custom-scrollbar pr-2">
+            {filteredBirds.map(bird => {
+              const cage = cages.find(c => c.id === bird.cageId);
+              const isSelected = selectedBirds.includes(bird.id);
+              return (
+                <div 
+                  key={bird.id} 
+                  className={cn(
+                    "flex items-center gap-3 p-3 rounded-xl border transition-all cursor-pointer",
+                    isSelected ? "bg-gold-500/10 border-gold-500/50" : "bg-zinc-900/50 border-black-800 hover:border-black-600"
+                  )} 
+                  onClick={() => toggleBird(bird.id)}
+                >
+                  <div className={cn("w-5 h-5 rounded border flex items-center justify-center transition-colors", isSelected ? "bg-gold-500 border-gold-500 text-black" : "border-black-600")}>
+                    {isSelected && <CheckSquare size={14} />}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-sm font-bold text-white truncate">{bird.name}</p>
+                      <Badge variant={bird.sex === 'Male' ? 'info' : bird.sex === 'Female' ? 'warning' : 'neutral'} className="text-[8px] px-1 py-0">{bird.sex}</Badge>
+                    </div>
+                    <p className="text-[10px] text-black-200 uppercase tracking-widest truncate">
+                      {cage?.name || 'No Cage'} • {bird.species}
+                    </p>
+                  </div>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-bold text-white truncate">{bird.name}</p>
-                  <p className="text-[10px] text-black-200 uppercase tracking-widest truncate">{cage?.name || 'No Cage'} • {bird.sex}</p>
-                </div>
+              );
+            })}
+            {filteredBirds.length === 0 && (
+              <div className="text-center py-8 text-black-400">
+                <p className="text-sm">No birds found matching your search.</p>
               </div>
-            );
-          })}
-        </div>
-        <Button onClick={handlePrint} disabled={selectedBirds.length === 0} className="w-full">
-          Print Selected ({selectedBirds.length})
+            )}
+          </div>
+        )}
+
+        {printEmpty && (
+          <div className="p-4 bg-zinc-900/50 border border-black-800 rounded-xl text-center space-y-2">
+            <Printer size={32} className="mx-auto text-gold-500/50" />
+            <p className="text-sm text-white font-medium">Empty List Mode</p>
+            <p className="text-xs text-black-400">This will print a blank table for manual entry.</p>
+          </div>
+        )}
+
+        <Button onClick={handlePrint} disabled={!printEmpty && selectedBirds.length === 0} className="w-full py-4">
+          <Printer size={18} className="mr-2" />
+          {printEmpty ? 'Print Empty List' : `Print Selected (${selectedBirds.length})`}
         </Button>
       </div>
 
       {isPrinting && (
-        <div className="fixed inset-0 bg-white z-[9999] p-8 print-only">
-          <h1 className="text-2xl font-bold mb-6 text-black">Bird List</h1>
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="border-b-2 border-black">
-                <th className="p-2 font-bold text-black">Cage Number</th>
-                <th className="p-2 font-bold text-black">Sex</th>
-                <th className="p-2 font-bold text-black">Ring Number</th>
-                <th className="p-2 font-bold text-black">Mutation</th>
-                <th className="p-2 font-bold text-black w-1/3">Notes</th>
-              </tr>
-            </thead>
-            <tbody>
-              {birds.filter(b => selectedBirds.includes(b.id)).map(bird => {
-                const cage = cages.find(c => c.id === bird.cageId);
-                return (
-                  <tr key={bird.id} className="border-b border-gray-300">
-                    <td className="p-2 text-black">{cage?.name || ''}</td>
-                    <td className="p-2 text-black">{bird.sex}</td>
-                    <td className="p-2 text-black">{bird.name}</td>
-                    <td className="p-2 text-black">{bird.mutations?.join(', ') || ''}</td>
-                    <td className="p-2 text-black border-l border-gray-300"></td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+        <div className="fixed inset-0 bg-white z-[9999] p-8 print-only overflow-auto">
+          <div className="max-w-4xl mx-auto">
+            <div className="flex justify-between items-end border-b-4 border-black pb-4 mb-8">
+              <div>
+                <h1 className="text-4xl font-black uppercase tracking-tighter text-black">Bird Inventory</h1>
+                <p className="text-sm font-bold text-gray-600 uppercase tracking-widest">Generated on {new Date().toLocaleDateString()}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-xs font-black uppercase text-gray-400">Aviary Management System</p>
+              </div>
+            </div>
+
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-gray-100">
+                  <th className="p-3 border-2 border-black font-black uppercase text-xs text-black">Cage</th>
+                  <th className="p-3 border-2 border-black font-black uppercase text-xs text-black">Sex</th>
+                  <th className="p-3 border-2 border-black font-black uppercase text-xs text-black">Ring / Name</th>
+                  <th className="p-3 border-2 border-black font-black uppercase text-xs text-black">Species / Mutation</th>
+                  <th className="p-3 border-2 border-black font-black uppercase text-xs text-black w-1/3">Notes</th>
+                </tr>
+              </thead>
+              <tbody>
+                {printEmpty ? (
+                  Array.from({ length: 20 }).map((_, i) => (
+                    <tr key={i} className="h-12">
+                      <td className="p-3 border-2 border-black"></td>
+                      <td className="p-3 border-2 border-black"></td>
+                      <td className="p-3 border-2 border-black"></td>
+                      <td className="p-3 border-2 border-black"></td>
+                      <td className="p-3 border-2 border-black"></td>
+                    </tr>
+                  ))
+                ) : (
+                  sortedBirds.filter(b => selectedBirds.includes(b.id)).map(bird => {
+                    const cage = cages.find(c => c.id === bird.cageId);
+                    return (
+                      <tr key={bird.id} className="break-inside-avoid">
+                        <td className="p-3 border-2 border-black text-sm font-bold text-black">{cage?.name || '-'}</td>
+                        <td className="p-3 border-2 border-black text-sm text-black">{bird.sex}</td>
+                        <td className="p-3 border-2 border-black text-sm font-bold text-black">{bird.name}</td>
+                        <td className="p-3 border-2 border-black text-sm text-black">
+                          <div className="font-bold">{bird.species}</div>
+                          <div className="text-xs opacity-70">{bird.mutations?.join(', ')}</div>
+                        </td>
+                        <td className="p-3 border-2 border-black"></td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+            
+            <div className="mt-8 pt-4 border-t border-gray-200 text-[10px] text-gray-400 uppercase tracking-widest flex justify-between">
+              <span>Total Birds: {printEmpty ? '-' : selectedBirds.length}</span>
+              <span>Page 1 of 1</span>
+            </div>
+          </div>
         </div>
       )}
     </>
@@ -3770,14 +3805,20 @@ function BirdForm({ user, initialData, cages, birds, pairs, userSettings, onAddS
       <div className="grid grid-cols-2 gap-4">
         <SearchableSelect 
           label="Father"
-          options={[{ id: '', name: 'Unknown' }, ...birds.filter(b => b.sex === 'Male' && b.id !== initialData?.id).map(b => ({ id: b.id, name: b.name }))]}
+          options={[{ id: '', name: 'Unknown' }, ...birds.filter(b => b.sex === 'Male' && b.id !== initialData?.id).map(b => {
+            const cage = cages.find(c => c.id === b.cageId);
+            return { id: b.id, name: cage ? `${b.name} (${cage.name})` : b.name };
+          })]}
           value={formData.fatherId}
           onChange={(id) => setFormData({ ...formData, fatherId: id })}
           placeholder="Unknown"
         />
         <SearchableSelect 
           label="Mother"
-          options={[{ id: '', name: 'Unknown' }, ...birds.filter(b => b.sex === 'Female' && b.id !== initialData?.id).map(b => ({ id: b.id, name: b.name }))]}
+          options={[{ id: '', name: 'Unknown' }, ...birds.filter(b => b.sex === 'Female' && b.id !== initialData?.id).map(b => {
+            const cage = cages.find(c => c.id === b.cageId);
+            return { id: b.id, name: cage ? `${b.name} (${cage.name})` : b.name };
+          })]}
           value={formData.motherId}
           onChange={(id) => setFormData({ ...formData, motherId: id })}
           placeholder="Unknown"
@@ -3787,16 +3828,27 @@ function BirdForm({ user, initialData, cages, birds, pairs, userSettings, onAddS
       <div className="grid grid-cols-2 gap-4">
         <SearchableSelect 
           label="Mate"
-          options={[{ id: '', name: 'None' }, ...birds.filter(b => b.id !== initialData?.id && (formData.sex === 'Unknown' || b.sex !== formData.sex)).map(b => ({ id: b.id, name: b.name }))]}
+          options={[{ id: '', name: 'None' }, ...birds.filter(b => b.id !== initialData?.id && (formData.sex === 'Unknown' || b.sex !== formData.sex)).map(b => {
+            const cage = cages.find(c => c.id === b.cageId);
+            return { id: b.id, name: cage ? `${b.name} (${cage.name})` : b.name };
+          })]}
           value={formData.mateId}
           onChange={(id) => setFormData({ ...formData, mateId: id })}
           placeholder="None"
         />
         <SearchableSelect 
           label="Offspring"
-          options={birds.filter(b => b.id !== initialData?.id).map(b => ({ id: b.id, name: b.name }))}
+          options={birds.filter(b => b.id !== initialData?.id).map(b => {
+            const cage = cages.find(c => c.id === b.cageId);
+            return { id: b.id, name: cage ? `${b.name} (${cage.name})` : b.name };
+          })}
           multi
-          selectedValues={formData.offspringIds?.map(id => birds.find(b => b.id === id)?.name || id) || []}
+          selectedValues={formData.offspringIds?.map(id => {
+            const b = birds.find(b => b.id === id);
+            if (!b) return id;
+            const cage = cages.find(c => c.id === b.cageId);
+            return cage ? `${b.name} (${cage.name})` : b.name;
+          }) || []}
           onChange={(id) => {
             const current = formData.offspringIds || [];
             setFormData({ 
