@@ -126,7 +126,7 @@ const Button = ({
   };
   return (
     <button 
-      className={cn('px-4 py-2 rounded-lg font-medium transition-all flex items-center justify-center gap-2 disabled:opacity-50 active:scale-95', variants[variant], className)} 
+      className={cn('px-4 py-2 rounded-lg font-bold transition-all flex items-center justify-center gap-2 disabled:opacity-50 active:scale-95 text-[clamp(10px,1.2vw,14px)] uppercase tracking-widest', variants[variant], className)} 
       {...props}
     >
       {children}
@@ -1314,6 +1314,7 @@ export default function App() {
                         pair={pair} 
                         male={birds.find(b => b.id === pair.maleId)}
                         female={birds.find(b => b.id === pair.femaleId)}
+                        cages={cages}
                         viewMode={viewMode}
                         onBirdRef={handleBirdRef}
                         onNavigate={handleNavigate}
@@ -1843,24 +1844,24 @@ function BirdCard({ bird, cage, birds, viewMode = 'grid-large', currency, onBird
         <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-black-800/50">
           <button 
             onClick={(e) => { e.stopPropagation(); setShowTree(!showTree); }} 
-            className="flex-1 flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-2 bg-zinc-700 hover:bg-zinc-600 text-white hover:text-gold-500 rounded-lg transition-all border border-black-700 min-w-[40px]"
+            className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 bg-gold-500/10 hover:bg-gold-500/20 text-gold-500 rounded-xl transition-all border border-gold-500/20 group/btn min-w-[80px]"
           >
-            <GitBranch size={14} className="shrink-0" />
-            <span className="text-[7px] sm:text-[9px] font-black uppercase tracking-widest hidden sm:inline">Pedigree</span>
+            <GitBranch size={16} className="group-hover/btn:scale-110 transition-transform" />
+            <span className="text-[10px] font-black uppercase tracking-widest whitespace-nowrap">Pedigree</span>
           </button>
           <button 
             onClick={(e) => { e.stopPropagation(); onEdit(); }} 
-            className="flex-1 flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-2 bg-zinc-700 hover:bg-zinc-600 text-white hover:text-gold-500 rounded-lg transition-all border border-black-700 min-w-[40px]"
+            className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-white rounded-xl transition-all border border-black-700 group/btn min-w-[80px]"
           >
-            <Edit2 size={14} className="shrink-0" />
-            <span className="text-[7px] sm:text-[9px] font-black uppercase tracking-widest hidden sm:inline">Edit</span>
+            <Edit2 size={16} className="group-hover/btn:scale-110 transition-transform" />
+            <span className="text-[10px] font-black uppercase tracking-widest whitespace-nowrap">Edit</span>
           </button>
           <button 
             onClick={(e) => { e.stopPropagation(); onDelete(); }} 
-            className="flex-1 flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-lg transition-all border border-red-500/20 min-w-[40px]"
+            className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-xl transition-all border border-red-500/20 group/btn min-w-[80px]"
           >
-            <Trash2 size={14} className="shrink-0" />
-            <span className="text-[7px] sm:text-[9px] font-black uppercase tracking-widest hidden sm:inline">Delete</span>
+            <Trash2 size={16} className="group-hover/btn:scale-110 transition-transform" />
+            <span className="text-[10px] font-black uppercase tracking-widest whitespace-nowrap">Delete</span>
           </button>
           {viewMode === 'list' && (
             <button 
@@ -2062,122 +2063,130 @@ function CageCard({ cage, birds, viewMode = 'grid-large', onBirdRef, onNavigate,
   );
 }
 
-function PairCard({ pair, male, female, onBirdRef, onNavigate, onEdit, onDelete, viewMode = 'grid-large' }: { pair: Pair, male?: Bird, female?: Bird, onBirdRef: (name: string) => void, onNavigate: (tab: string, query?: string) => void, onEdit: () => void, onDelete: () => void, viewMode?: 'grid-large' | 'list' }) {
+function PairCard({ pair, male, female, cages, onBirdRef, onNavigate, onEdit, onDelete, viewMode = 'grid-large' }: { pair: Pair, male?: Bird, female?: Bird, cages: Cage[], onBirdRef: (name: string) => void, onNavigate: (tab: string, query?: string) => void, onEdit: () => void, onDelete: () => void, viewMode?: 'grid-large' | 'list' }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const effectiveViewMode = (viewMode === 'list' && isExpanded) ? 'grid-large' : viewMode;
+  const cage = cages.find(c => c.id === (male?.cageId || female?.cageId));
+
+  const BirdInfo = ({ bird, sex }: { bird?: Bird, sex: 'Male' | 'Female' }) => (
+    <div className={cn(
+      "flex-1 min-w-0 p-4 rounded-3xl border transition-all relative overflow-hidden",
+      sex === 'Male' ? "bg-info-500/5 border-info-500/20" : "bg-rose-500/5 border-rose-500/20",
+      !bird && "opacity-50 grayscale"
+    )}>
+      {/* Background Sex Icon */}
+      <div className="absolute -right-2 -bottom-2 opacity-10 pointer-events-none">
+        {sex === 'Male' ? <Activity size={60} /> : <Heart size={60} />}
+      </div>
+
+      <div className="relative z-10 space-y-3">
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center justify-between gap-2">
+            <h4 className="text-base sm:text-lg font-black text-white truncate uppercase tracking-tight leading-none">
+              {bird ? bird.name : 'Unknown'}
+            </h4>
+            <Badge 
+              variant={sex === 'Male' ? 'info' : 'warning'} 
+              className="text-[10px] uppercase tracking-widest font-black px-2.5 py-1 shadow-lg"
+            >
+              {sex}
+            </Badge>
+          </div>
+          <p className="text-[11px] font-black text-gold-500 uppercase tracking-[0.2em]">
+            {bird?.species || 'Ringneck'}
+          </p>
+        </div>
+        
+        {bird && bird.mutations && bird.mutations.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {bird.mutations.map((m, i) => (
+              <span key={i} className="text-[9px] px-2 py-1 bg-black/60 border border-white/10 rounded-lg text-white font-black uppercase tracking-tighter shadow-sm">
+                {m}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
 
   return (
     <Card 
       onClick={() => viewMode === 'list' && setIsExpanded(!isExpanded)}
       className={cn(
-        "group transition-all duration-300 overflow-hidden", 
+        "group transition-all duration-300 overflow-hidden border-black-800 hover:border-gold-500/40 shadow-xl", 
         effectiveViewMode === 'list' ? "flex flex-row items-center p-4 gap-4 cursor-pointer hover:bg-black-900/50" : "cursor-default"
       )}
     >
-      <div className={cn("space-y-4 relative w-full", effectiveViewMode === 'list' ? "flex-1 flex flex-col space-y-3" : "p-4 sm:p-5")}>
+      <div className={cn("space-y-4 relative w-full", effectiveViewMode === 'list' ? "flex-1 flex flex-col space-y-3" : "p-4 sm:p-6")}>
         {/* Cage Info at Top */}
-        <div className="flex items-center justify-between border-b border-black-800 pb-2">
-          <div className="flex items-center gap-2">
-            <Home size={14} className="text-gold-500" />
-            <span className="text-[10px] font-black uppercase tracking-widest text-white">
-              Cage: {male?.cageId || female?.cageId || 'Unassigned'}
-            </span>
-          </div>
-          <Badge variant={pair.status === 'Active' ? 'success' : 'neutral'} className="text-[8px] uppercase tracking-widest font-black">{pair.status}</Badge>
-        </div>
-
-        <div className={cn("flex items-start justify-between gap-2", effectiveViewMode === 'list' ? "w-full" : "relative")}>
-          <div className="space-y-1 min-w-0 flex-1">
-            <div 
-              className="flex items-center gap-2 cursor-pointer hover:text-gold-500 transition-colors group/title"
-              onClick={(e) => { e.stopPropagation(); onNavigate('birds', pair.id); }}
-            >
-              <Heart size={18} className={cn("shrink-0", pair.status === 'Active' ? 'text-rose-500 fill-rose-500' : 'text-black-200', "group-hover/title:text-gold-500 transition-colors")} />
-              <h3 className={cn("font-black text-white tracking-tight truncate group-hover/title:text-gold-500 transition-colors", "text-lg")}>Breeding Pair</h3>
+        <div className="flex items-center justify-between bg-black-900/80 -mx-4 sm:-mx-6 -mt-4 sm:-mt-6 px-4 sm:px-6 py-4 border-b border-black-800">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-gold-500/10 rounded-xl border border-gold-500/20">
+              <Home size={16} className="text-gold-500" />
+            </div>
+            <div className="flex flex-col">
+              <span className="text-[9px] font-black text-gold-500 uppercase tracking-widest leading-none mb-1">Location / Cage</span>
+              <span className="text-xs sm:text-sm font-black uppercase tracking-widest text-white">
+                {cage?.name || 'Unassigned'}
+              </span>
             </div>
           </div>
+          <Badge variant={pair.status === 'Active' ? 'success' : 'neutral'} className="text-[10px] uppercase tracking-widest font-black px-4 py-1 rounded-full shadow-lg border border-white/5">{pair.status}</Badge>
         </div>
 
         <div 
           onClick={(e) => { e.stopPropagation(); onNavigate('birds', pair.id); }}
           className={cn(
-            "p-3 sm:p-4 bg-zinc-900/50 rounded-xl border border-black-700 cursor-pointer hover:border-gold-500/50 transition-all group/members",
-            effectiveViewMode === 'list' ? "flex-1 py-2" : ""
+            "cursor-pointer group/members py-2",
+            effectiveViewMode === 'list' ? "flex-1" : ""
           )}
         >
-          <div className="flex gap-4 pointer-events-none">
-            {/* Male Info */}
-            <div className={cn(
-              "flex-1 min-w-0 p-2 rounded-lg border border-black-800 bg-black/40",
-              !male && "opacity-50"
-            )}>
-              <div className="flex items-center justify-between gap-2 mb-1">
-                <p className="text-xs font-black text-white truncate">{male ? male.name : 'Unknown'}</p>
-                <span className="text-[8px] text-gold-500 uppercase tracking-widest font-black shrink-0 px-1.5 py-0.5 bg-gold-500/10 rounded">Male</span>
+          <div className="flex flex-col sm:flex-row gap-4 items-stretch">
+            <BirdInfo bird={male} sex="Male" />
+            <div className="hidden sm:flex items-center justify-center -mx-2 relative z-20">
+              <div className="p-2 bg-zinc-900 rounded-full border-4 border-zinc-800 shadow-xl">
+                <Heart size={24} className={cn(pair.status === 'Active' ? 'text-rose-500 fill-rose-500 animate-pulse' : 'text-black-700')} />
               </div>
-              {male && (
-                <div className="text-[9px] text-white/70 space-y-0.5">
-                  <p className="truncate"><span className="text-white/40">Type:</span> {male.species}</p>
-                  {male.mutations && male.mutations.length > 0 && (
-                    <p className="truncate"><span className="text-white/40">Mut:</span> {male.mutations.join(', ')}</p>
-                  )}
-                </div>
-              )}
             </div>
-
-            {/* Female Info */}
-            <div className={cn(
-              "flex-1 min-w-0 p-2 rounded-lg border border-black-800 bg-black/40",
-              !female && "opacity-50"
-            )}>
-              <div className="flex items-center justify-between gap-2 mb-1">
-                <p className="text-xs font-black text-white truncate">{female ? female.name : 'Unknown'}</p>
-                <span className="text-[8px] text-rose-500 uppercase tracking-widest font-black shrink-0 px-1.5 py-0.5 bg-rose-500/10 rounded">Female</span>
-              </div>
-              {female && (
-                <div className="text-[9px] text-white/70 space-y-0.5">
-                  <p className="truncate"><span className="text-white/40">Type:</span> {female.species}</p>
-                  {female.mutations && female.mutations.length > 0 && (
-                    <p className="truncate"><span className="text-white/40">Mut:</span> {female.mutations.join(', ')}</p>
-                  )}
-                </div>
-              )}
-            </div>
+            <BirdInfo bird={female} sex="Female" />
           </div>
         </div>
 
-        <div className="text-[9px] sm:text-[10px] text-white flex justify-between uppercase tracking-widest font-bold">
-          <span className="flex items-center gap-1.5"><Calendar size={12} className="text-gold-500" /> {pair.startDate || 'N/A'}</span>
-          {pair.endDate && <span className="flex items-center gap-1.5">Ended: {pair.endDate}</span>}
+        <div className="flex items-center justify-between text-[10px] text-white/40 uppercase tracking-widest font-black pt-2 border-t border-black-800/30">
+          <div className="flex items-center gap-2">
+            <Calendar size={14} className="text-gold-500" />
+            <span>Pairing Date: {pair.startDate || 'N/A'}</span>
+          </div>
+          {pair.endDate && (
+            <div className="flex items-center gap-2">
+              <span className="text-rose-500">Ended: {pair.endDate}</span>
+            </div>
+          )}
         </div>
 
-        <div className="pt-2 border-t border-black-800">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
           <button 
             onClick={(e) => { e.stopPropagation(); onNavigate('breeding', male?.name || female?.name || ''); }}
-            className="w-full p-2 bg-gold-500/10 border border-gold-500/20 rounded-lg text-[9px] sm:text-[10px] text-gold-500 font-black uppercase tracking-widest hover:bg-gold-500/20 transition-colors flex items-center justify-center gap-2"
+            className="flex items-center justify-center gap-2 px-4 py-3 bg-gold-500/10 hover:bg-gold-500/20 text-gold-500 rounded-2xl transition-all border border-gold-500/20 group/btn"
           >
-            <Egg size={12} className="text-gold-500" />
-            View Breeding Records
+            <Egg size={16} className="group-hover/btn:scale-110 transition-transform" />
+            <span className="text-xs font-black uppercase tracking-widest whitespace-nowrap">Breeding</span>
           </button>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-black-800/50">
-          <button onClick={(e) => { e.stopPropagation(); onEdit(); }} className="flex-1 flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-2 bg-zinc-700 hover:bg-zinc-600 text-white hover:text-gold-500 rounded-lg transition-all border border-black-700 min-w-[70px]">
-            <Edit2 size={14} className="shrink-0" />
-            <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-widest truncate">Edit</span>
+          <button 
+            onClick={(e) => { e.stopPropagation(); onEdit(); }} 
+            className="flex items-center justify-center gap-2 px-4 py-3 bg-zinc-800 hover:bg-zinc-700 text-white rounded-2xl transition-all border border-black-700 group/btn"
+          >
+            <Edit2 size={16} className="group-hover/btn:scale-110 transition-transform" />
+            <span className="text-xs font-black uppercase tracking-widest whitespace-nowrap">Edit</span>
           </button>
-          <button onClick={(e) => { e.stopPropagation(); onDelete(); }} className="flex-1 flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-lg transition-all border border-red-500/20 min-w-[70px]">
-            <Trash2 size={14} className="shrink-0" />
-            <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-widest truncate">Delete</span>
+          <button 
+            onClick={(e) => { e.stopPropagation(); onDelete(); }} 
+            className="flex items-center justify-center gap-2 px-4 py-3 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-2xl transition-all border border-red-500/20 group/btn"
+          >
+            <Trash2 size={16} className="group-hover/btn:scale-110 transition-transform" />
+            <span className="text-xs font-black uppercase tracking-widest whitespace-nowrap">Delete</span>
           </button>
-          {viewMode === 'list' && (
-            <button 
-              onClick={(e) => { e.stopPropagation(); setIsExpanded(!isExpanded); }}
-              className="p-2 bg-zinc-700 hover:bg-zinc-600 text-white hover:text-gold-500 rounded-lg transition-all border border-black-700 shrink-0"
-            >
-              {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-            </button>
-          )}
         </div>
       </div>
     </Card>
@@ -3155,9 +3164,21 @@ function SettingsView({ settings, onUpdate, allData, user, isSyncing, setDeleteC
                   {settings.species?.map(s => (
                     <div key={s.id} className="p-3 bg-black border border-black-700 rounded-xl flex items-center justify-between group">
                       <span className="text-sm font-bold text-white">{s.name}</span>
-                      <div className="flex items-center gap-1">
-                        <button onClick={() => setEditingItem({ type: 'species', id: s.id, name: s.name })} className="text-black-200 hover:text-gold-500 p-1.5 bg-zinc-800 rounded-lg transition-all"><Edit2 size={14} /></button>
-                        <button onClick={() => removeSpecies(s.id, s.name)} className="text-black-200 hover:text-red-500 p-1.5 bg-zinc-800 rounded-lg transition-all"><Trash2 size={14} /></button>
+                      <div className="flex items-center gap-2">
+                        <button 
+                          onClick={() => setEditingItem({ type: 'species', id: s.id, name: s.name })} 
+                          className="text-gold-500 hover:text-white p-2 bg-zinc-800 hover:bg-gold-500 rounded-xl transition-all border border-gold-500/20"
+                          title="Edit"
+                        >
+                          <Edit2 size={16} />
+                        </button>
+                        <button 
+                          onClick={() => removeSpecies(s.id, s.name)} 
+                          className="text-red-500 hover:text-white p-2 bg-red-500/10 hover:bg-red-500 rounded-xl transition-all border border-red-500/20"
+                          title="Delete"
+                        >
+                          <Trash2 size={16} />
+                        </button>
                       </div>
                     </div>
                   ))}
@@ -3375,10 +3396,13 @@ function PrintListModal({ birds, cages, onClose }: { birds: Bird[], cages: Cage[
 
   const handlePrint = () => {
     setIsPrinting(true);
+    // Use a longer delay to ensure the print area is fully rendered and visible
     setTimeout(() => {
       window.print();
-      setIsPrinting(false);
-      onClose();
+      setTimeout(() => {
+        setIsPrinting(false);
+        onClose();
+      }, 500);
     }, 500);
   };
 
@@ -3402,27 +3426,48 @@ function PrintListModal({ birds, cages, onClose }: { birds: Bird[], cages: Cage[
             size: A4 portrait;
             margin: 10mm;
           }
-          body * {
-            visibility: hidden;
-          }
-          #print-area, #print-area * {
-            visibility: visible;
-          }
-          #print-area {
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 100%;
+          body {
             background: white !important;
             color: black !important;
+            margin: 0;
+            padding: 0;
+          }
+          .no-print {
+            display: none !important;
+          }
+          #root > *:not(#print-area) {
+            display: none !important;
+          }
+          #print-area {
+            display: block !important;
+            position: absolute !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 100% !important;
+            height: auto !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            background: white !important;
+            color: black !important;
+            visibility: visible !important;
+          }
+          #print-area * {
+            visibility: visible !important;
+            color: black !important;
+            border-color: #000 !important;
           }
           .print-lined {
             background-image: linear-gradient(#eee 1px, transparent 1px);
             background-size: 100% 2rem;
             line-height: 2rem;
           }
-          .no-print {
-            display: none !important;
+          table {
+            width: 100% !important;
+            border-collapse: collapse !important;
+          }
+          th, td {
+            border: 1px solid #000 !important;
+            padding: 8px !important;
           }
         }
       `}</style>
@@ -3510,49 +3555,50 @@ function PrintListModal({ birds, cages, onClose }: { birds: Bird[], cages: Cage[
       </div>
 
       {/* Hidden Print Area */}
-      <div id="print-area" className="hidden print:block p-8 bg-white text-black">
-        <div className="flex justify-between items-end border-b-2 border-black pb-4 mb-6">
+      <div id="print-area" className={cn("fixed inset-0 z-[9999] bg-white text-black p-10 overflow-y-auto", isPrinting ? "block" : "hidden")}>
+        <div className="flex justify-between items-end border-b-4 border-black pb-6 mb-8">
           <div>
-            <h1 className="text-3xl font-black uppercase tracking-tighter">Bird Aviary Records</h1>
-            <p className="text-sm font-bold text-gray-600 uppercase tracking-widest">Date: {new Date().toLocaleDateString()}</p>
+            <h1 className="text-4xl font-black uppercase tracking-tighter mb-2">Aviary Records</h1>
+            <p className="text-sm font-black text-gray-600 uppercase tracking-[0.3em]">Official Breeding Log</p>
           </div>
           <div className="text-right">
-            <p className="text-xs font-black uppercase tracking-widest">Total Birds: {printEmpty ? '___' : selectedBirds.length}</p>
+            <p className="text-sm font-bold text-gray-800 uppercase tracking-widest mb-1">Date: {new Date().toLocaleDateString()}</p>
+            <p className="text-xs font-black uppercase tracking-widest text-gray-500">Total Birds: {printEmpty ? '___' : selectedBirds.length}</p>
           </div>
         </div>
 
-        <div className="print-lined min-h-[800px]">
-          <table className="w-full border-collapse">
+        <div className="min-h-[900px]">
+          <table className="w-full border-2 border-black">
             <thead>
-              <tr className="border-b-2 border-black text-left">
-                <th className="py-2 px-1 text-xs font-black uppercase tracking-widest">Cage</th>
-                <th className="py-2 px-1 text-xs font-black uppercase tracking-widest">Bird ID / Ring</th>
-                <th className="py-2 px-1 text-xs font-black uppercase tracking-widest">Sex</th>
-                <th className="py-2 px-1 text-xs font-black uppercase tracking-widest">Species / Mutation</th>
-                <th className="py-2 px-1 text-xs font-black uppercase tracking-widest">Notes</th>
+              <tr className="bg-gray-100 border-b-2 border-black">
+                <th className="py-3 px-2 text-[10px] font-black uppercase tracking-widest text-left border-r border-black">Cage</th>
+                <th className="py-3 px-2 text-[10px] font-black uppercase tracking-widest text-left border-r border-black">Bird ID / Ring</th>
+                <th className="py-3 px-2 text-[10px] font-black uppercase tracking-widest text-left border-r border-black">Sex</th>
+                <th className="py-3 px-2 text-[10px] font-black uppercase tracking-widest text-left border-r border-black">Species / Mutation</th>
+                <th className="py-3 px-2 text-[10px] font-black uppercase tracking-widest text-left">Notes</th>
               </tr>
             </thead>
             <tbody>
               {printEmpty ? (
-                Array.from({ length: 25 }).map((_, i) => (
-                  <tr key={i} className="border-b border-gray-200 h-10">
-                    <td className="py-2 px-1"></td>
-                    <td className="py-2 px-1"></td>
-                    <td className="py-2 px-1"></td>
-                    <td className="py-2 px-1"></td>
-                    <td className="py-2 px-1"></td>
+                Array.from({ length: 30 }).map((_, i) => (
+                  <tr key={i} className="border-b border-gray-300 h-12">
+                    <td className="py-2 px-2 border-r border-gray-300"></td>
+                    <td className="py-2 px-2 border-r border-gray-300"></td>
+                    <td className="py-2 px-2 border-r border-gray-300"></td>
+                    <td className="py-2 px-2 border-r border-gray-300"></td>
+                    <td className="py-2 px-2"></td>
                   </tr>
                 ))
               ) : (
                 sortedBirds.filter(b => selectedBirds.includes(b.id)).map(bird => {
                   const cage = cages.find(c => c.id === bird.cageId);
                   return (
-                    <tr key={bird.id} className="border-b border-gray-200 h-10">
-                      <td className="py-2 px-1 text-sm font-bold">{cage?.name || '-'}</td>
-                      <td className="py-2 px-1 text-sm">{bird.name}</td>
-                      <td className="py-2 px-1 text-sm font-bold">{bird.sex}</td>
-                      <td className="py-2 px-1 text-sm">{bird.species} {bird.mutations?.join(', ')}</td>
-                      <td className="py-2 px-1 text-sm"></td>
+                    <tr key={bird.id} className="border-b border-gray-300 h-12">
+                      <td className="py-2 px-2 border-r border-gray-300 text-xs font-black uppercase">{cage?.name || '-'}</td>
+                      <td className="py-2 px-2 border-r border-gray-300 text-xs font-bold">{bird.name}</td>
+                      <td className="py-2 px-2 border-r border-gray-300 text-xs font-black uppercase">{bird.sex}</td>
+                      <td className="py-2 px-2 border-r border-gray-300 text-xs">{bird.species} {bird.mutations?.join(', ')}</td>
+                      <td className="py-2 px-2 text-xs"></td>
                     </tr>
                   );
                 })
@@ -3561,8 +3607,8 @@ function PrintListModal({ birds, cages, onClose }: { birds: Bird[], cages: Cage[
           </table>
         </div>
         
-        <div className="mt-8 pt-4 border-t border-gray-300 text-[10px] text-gray-400 flex justify-between uppercase tracking-widest font-bold">
-          <span>Generated by Aviary Manager App</span>
+        <div className="mt-12 pt-6 border-t-2 border-black text-[10px] text-gray-500 flex justify-between uppercase tracking-[0.2em] font-black">
+          <span>Generated by Aviary Manager Pro</span>
           <span>Page 1 of 1</span>
         </div>
       </div>

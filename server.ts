@@ -3,17 +3,18 @@ import { createServer as createViteServer } from "vite";
 import path from "path";
 import dotenv from "dotenv";
 import webpush from "web-push";
-import admin from "firebase-admin";
+import { initializeApp } from "firebase-admin/app";
+import { getFirestore } from "firebase-admin/firestore";
 import fs from "fs";
 
 dotenv.config();
 
 // Initialize Firebase Admin for server-side use
 const firebaseConfig = JSON.parse(fs.readFileSync('./firebase-applet-config.json', 'utf8'));
-admin.initializeApp({
+initializeApp({
   projectId: firebaseConfig.projectId
 });
-const db = admin.firestore(firebaseConfig.firestoreDatabaseId);
+const db = getFirestore(firebaseConfig.firestoreDatabaseId);
 
 // Configure web-push
 webpush.setVapidDetails(
