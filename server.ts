@@ -3,7 +3,7 @@ import { createServer as createViteServer } from "vite";
 import path from "path";
 import dotenv from "dotenv";
 import webpush from "web-push";
-import { initializeApp, applicationDefault } from "firebase-admin/app";
+import { initializeApp, applicationDefault, getApp, getApps } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 import fs from "fs";
 
@@ -12,23 +12,33 @@ dotenv.config();
 // Initialize Firebase Admin for server-side use
 const firebaseConfig = JSON.parse(fs.readFileSync('./firebase-applet-config.json', 'utf8'));
 
-// Initialize with explicit projectId and applicationDefault credentials
-try {
-  initializeApp({
-    projectId: firebaseConfig.projectId,
-    credential: applicationDefault()
-  });
-  console.log(`[Firebase Admin] Initialized for project: ${firebaseConfig.projectId}`);
-} catch (err: any) {
-  if (!err.message.includes('already exists')) {
+let adminApp;
+if (getApps().length === 0) {
+  try {
+    adminApp = initializeApp({
+      projectId: firebaseConfig.projectId,
+      credential: applicationDefault()
+    });
+    console.log(`[Firebase Admin] Initialized for project: ${firebaseConfig.projectId}`);
+  } catch (err: any) {
     console.error('[Firebase Admin] Initialization error:', err);
+    // Fallback to default initialization if explicit fails
+    adminApp = initializeApp();
   }
+} else {
+  adminApp = getApp();
 }
 
-// In AI Studio, the service account might only have access to the default database
-// or the named database might require specific permissions.
-// Let's try to use the named database if provided, but fallback to default if it fails.
-const db = getFirestore(firebaseConfig.firestoreDatabaseId);
+// Initialize Firestore with the specific database ID
+// Fallback to default database if the named one fails (common in some environments)
+let db: any;
+try {
+  db = getFirestore(adminApp, firebaseConfig.firestoreDatabaseId);
+  console.log(`[Firestore Admin] Using database: ${firebaseConfig.firestoreDatabaseId}`);
+} catch (err) {
+  console.warn(`[Firestore Admin] Failed to use named database, falling back to default:`, err);
+  db = getFirestore(adminApp);
+}
 
 // Configure web-push
 webpush.setVapidDetails(

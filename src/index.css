@@ -51,18 +51,5 @@ input:-webkit-autofill:active  {
 }
 
 @media print {
-  body * {
-    visibility: hidden;
-  }
-  .print-only, .print-only * {
-    visibility: visible;
-  }
-  .print-only {
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 100%;
-    background: white;
-    color: black;
-  }
+  /* Print styles are handled in App.tsx for better control */
 }

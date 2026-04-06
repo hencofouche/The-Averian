@@ -3124,9 +3124,11 @@ function SettingsView({ settings, onUpdate, allData, user, isSyncing, setDeleteC
 
 function PrintListModal({ birds, cages, onClose }: { birds: Bird[], cages: Cage[], onClose: () => void }) {
   const [selectedBirds, setSelectedBirds] = useState<string[]>([]);
+  const [selectedCages, setSelectedCages] = useState<string[]>([]);
   const [isPrinting, setIsPrinting] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [printEmpty, setPrintEmpty] = useState(false);
+  const [printMode, setPrintMode] = useState<'birds' | 'cages'>('birds');
 
   const sortedBirds = useMemo(() => {
     return [...birds].sort((a, b) => {
@@ -3149,16 +3151,26 @@ function PrintListModal({ birds, cages, onClose }: { birds: Bird[], cages: Cage[
     );
   });
 
+  const filteredCages = cages.filter(cage => {
+    const searchLower = searchQuery.toLowerCase();
+    return (
+      cage.name.toLowerCase().includes(searchLower) ||
+      cage.type.toLowerCase().includes(searchLower) ||
+      (cage.location || '').toLowerCase().includes(searchLower)
+    );
+  });
+
   const handlePrint = () => {
     setIsPrinting(true);
+    // Increased timeout to ensure portal is fully rendered before print dialog
     setTimeout(() => {
       window.print();
       setIsPrinting(false);
       onClose();
-    }, 1000);
+    }, 1500);
   };
 
-  const toggleAll = () => {
+  const toggleAllBirds = () => {
     if (selectedBirds.length === filteredBirds.length) {
       setSelectedBirds([]);
     } else {
@@ -3166,15 +3178,30 @@ function PrintListModal({ birds, cages, onClose }: { birds: Bird[], cages: Cage[
     }
   };
 
+  const toggleAllCages = () => {
+    if (selectedCages.length === filteredCages.length) {
+      setSelectedCages([]);
+    } else {
+      setSelectedCages(filteredCages.map(c => c.id));
+    }
+  };
+
   const toggleBird = (id: string) => {
     setSelectedBirds(prev => prev.includes(id) ? prev.filter(bId => bId !== id) : [...prev, id]);
   };
 
-  const birdsToPrint = printEmpty ? Array.from({ length: 20 }) : sortedBirds.filter(b => selectedBirds.includes(b.id));
-  const pageSize = 20;
+  const toggleCage = (id: string) => {
+    setSelectedCages(prev => prev.includes(id) ? prev.filter(cId => cId !== id) : [...prev, id]);
+  };
+
+  const itemsToPrint = printMode === 'birds' 
+    ? (printEmpty ? Array.from({ length: 20 }) : sortedBirds.filter(b => selectedBirds.includes(b.id)))
+    : (printEmpty ? Array.from({ length: 10 }) : cages.filter(c => selectedCages.includes(c.id)));
+
+  const pageSize = printMode === 'birds' ? 20 : 10;
   const pages = [];
-  for (let i = 0; i < birdsToPrint.length; i += pageSize) {
-    pages.push(birdsToPrint.slice(i, i + pageSize));
+  for (let i = 0; i < itemsToPrint.length; i += pageSize) {
+    pages.push(itemsToPrint.slice(i, i + pageSize));
   }
   if (pages.length === 0 && printEmpty) pages.push([]);
 
@@ -3184,27 +3211,30 @@ function PrintListModal({ birds, cages, onClose }: { birds: Bird[], cages: Cage[
         @media print {
           @page {
             size: A4 portrait;
-            margin: 15mm;
+            margin: 10mm;
           }
           body {
             background: white !important;
             color: black !important;
+            visibility: hidden;
           }
-          #root {
-            display: none !important;
-          }
-          #print-area-portal {
-            display: block !important;
-            position: relative !important;
+          .print-only {
+            visibility: visible !important;
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
             width: 100% !important;
-            height: auto !important;
-            overflow: visible !important;
+            background: white !important;
+            color: black !important;
+            z-index: 99999 !important;
           }
           .print-page {
-            page-break-after: always;
-            min-height: 260mm;
-            display: flex;
-            flex-direction: column;
+            page-break-after: always !important;
+            min-height: 280mm !important;
+            display: flex !important;
+            flex-direction: column !important;
+            padding: 15mm !important;
+            background: white !important;
           }
           .print-page:last-child {
             page-break-after: auto;
@@ -3213,164 +3243,278 @@ function PrintListModal({ birds, cages, onClose }: { birds: Bird[], cages: Cage[
             width: 100% !important;
             border-collapse: collapse !important;
             table-layout: fixed !important;
+            border: 2px solid black !important;
+            margin-bottom: 20px !important;
           }
           th, td {
-            border: 1px solid #000 !important;
-            padding: 6px 8px !important;
-            font-size: 10px !important;
-            height: 40px !important;
-            vertical-align: middle !important;
+            border: 1.5px solid black !important;
+            padding: 10px !important;
+            font-size: 12px !important;
+            height: ${printMode === 'birds' ? '48px' : '95px'} !important;
+            vertical-align: top !important;
+            color: black !important;
+            overflow: hidden !important;
+            word-wrap: break-word !important;
           }
           th {
-            background-color: #f3f4f6 !important;
+            background-color: #f0f0f0 !important;
+            font-weight: 900 !important;
+            text-transform: uppercase !important;
             -webkit-print-color-adjust: exact;
+            height: 40px !important;
+            vertical-align: middle !important;
+            text-align: left !important;
           }
           .col-cage { width: 15%; }
-          .col-id { width: 20%; }
+          .col-id { width: 25%; }
           .col-sex { width: 10%; }
           .col-species { width: 25%; }
-          .col-notes { width: 30%; }
+          .col-notes { width: 25%; }
+          
+          .col-cage-name { width: 20%; }
+          .col-cage-type { width: 20%; }
+          .col-cage-loc { width: 20%; }
+          .col-cage-notes { width: 40%; }
         }
       `}</style>
       <div className="space-y-4">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-black-400" size={16} />
-            <input
-              type="text"
-              placeholder="Search birds or cages..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-black-900/50 border border-black-700 rounded-xl text-sm focus:outline-none focus:border-gold-500 transition-colors"
-            />
-          </div>
-          <div className="flex items-center gap-2">
-            <Button 
-              onClick={() => setPrintEmpty(!printEmpty)} 
-              variant="secondary" 
-              className="py-2 px-4 text-[10px] whitespace-nowrap"
+        <div className="flex flex-col gap-4">
+          <div className="flex bg-black-900/50 p-1 rounded-xl border border-black-800">
+            <button 
+              onClick={() => setPrintMode('birds')}
+              className={cn(
+                "flex-1 py-2 text-xs font-bold rounded-lg transition-all",
+                printMode === 'birds' ? "bg-gold-500 text-black" : "text-black-400 hover:text-white"
+              )}
             >
-              Mode: {printEmpty ? 'Empty List' : 'Selection'}
-            </Button>
-            {!printEmpty && (
-              <Button onClick={toggleAll} variant="secondary" className="py-2 px-4 text-[10px] whitespace-nowrap">
-                {selectedBirds.length === filteredBirds.length ? 'Deselect All' : 'Select All'}
+              Birds (20/pg)
+            </button>
+            <button 
+              onClick={() => setPrintMode('cages')}
+              className={cn(
+                "flex-1 py-2 text-xs font-bold rounded-lg transition-all",
+                printMode === 'cages' ? "bg-gold-500 text-black" : "text-black-400 hover:text-white"
+              )}
+            >
+              Cages (10/pg)
+            </button>
+          </div>
+
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-black-400" size={16} />
+              <input
+                type="text"
+                placeholder={`Search ${printMode}...`}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 bg-black-900/50 border border-black-700 rounded-xl text-sm focus:outline-none focus:border-gold-500 transition-colors"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <Button 
+                onClick={() => setPrintEmpty(!printEmpty)} 
+                variant="secondary" 
+                className="py-2 px-4 text-[10px] whitespace-nowrap"
+              >
+                Mode: {printEmpty ? 'Empty List' : 'Selection'}
               </Button>
-            )}
+              {!printEmpty && (
+                <Button 
+                  onClick={printMode === 'birds' ? toggleAllBirds : toggleAllCages} 
+                  variant="secondary" 
+                  className="py-2 px-4 text-[10px] whitespace-nowrap"
+                >
+                  {(printMode === 'birds' ? selectedBirds.length === filteredBirds.length : selectedCages.length === filteredCages.length) ? 'Deselect All' : 'Select All'}
+                </Button>
+              )}
+            </div>
           </div>
         </div>
 
         {!printEmpty && (
           <div className="max-h-[50vh] overflow-y-auto space-y-2 custom-scrollbar pr-2">
-            {filteredBirds.map(bird => {
-              const cage = cages.find(c => c.id === bird.cageId);
-              const isSelected = selectedBirds.includes(bird.id);
-              return (
-                <div 
-                  key={bird.id} 
-                  className={cn(
-                    "flex items-center gap-3 p-3 rounded-xl border transition-all cursor-pointer",
-                    isSelected ? "bg-gold-500/10 border-gold-500/50" : "bg-zinc-900/50 border-black-800 hover:border-black-600"
-                  )} 
-                  onClick={() => toggleBird(bird.id)}
-                >
-                  <div className={cn("w-5 h-5 rounded border flex items-center justify-center transition-colors", isSelected ? "bg-gold-500 border-gold-500 text-black" : "border-black-600")}>
-                    {isSelected && <CheckSquare size={14} />}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="text-sm font-bold text-white truncate">{bird.name}</p>
-                      <Badge variant={bird.sex === 'Male' ? 'info' : bird.sex === 'Female' ? 'warning' : 'neutral'} className="text-[8px] px-1 py-0">{bird.sex}</Badge>
+            {printMode === 'birds' ? (
+              filteredBirds.map(bird => {
+                const cage = cages.find(c => c.id === bird.cageId);
+                const isSelected = selectedBirds.includes(bird.id);
+                return (
+                  <div 
+                    key={bird.id} 
+                    className={cn(
+                      "flex items-center gap-3 p-3 rounded-xl border transition-all cursor-pointer",
+                      isSelected ? "bg-gold-500/10 border-gold-500/50" : "bg-zinc-900/50 border-black-800 hover:border-black-600"
+                    )} 
+                    onClick={() => toggleBird(bird.id)}
+                  >
+                    <div className={cn("w-5 h-5 rounded border flex items-center justify-center transition-colors", isSelected ? "bg-gold-500 border-gold-500 text-black" : "border-black-600")}>
+                      {isSelected && <CheckSquare size={14} />}
                     </div>
-                    <p className="text-[10px] text-black-200 uppercase tracking-widest truncate">
-                      {cage?.name || 'No Cage'} • {bird.species}
-                    </p>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-sm font-bold text-white truncate">{bird.name}</p>
+                        <Badge variant={bird.sex === 'Male' ? 'info' : bird.sex === 'Female' ? 'warning' : 'neutral'} className="text-[8px] px-1 py-0">{bird.sex}</Badge>
+                      </div>
+                      <p className="text-[10px] text-black-200 uppercase tracking-widest truncate">
+                        {cage?.name || 'No Cage'} • {bird.species}
+                      </p>
+                    </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })
+            ) : (
+              filteredCages.map(cage => {
+                const isSelected = selectedCages.includes(cage.id);
+                return (
+                  <div 
+                    key={cage.id} 
+                    className={cn(
+                      "flex items-center gap-3 p-3 rounded-xl border transition-all cursor-pointer",
+                      isSelected ? "bg-gold-500/10 border-gold-500/50" : "bg-zinc-900/50 border-black-800 hover:border-black-600"
+                    )} 
+                    onClick={() => toggleCage(cage.id)}
+                  >
+                    <div className={cn("w-5 h-5 rounded border flex items-center justify-center transition-colors", isSelected ? "bg-gold-500 border-gold-500 text-black" : "border-black-600")}>
+                      {isSelected && <CheckSquare size={14} />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-bold text-white truncate">{cage.name}</p>
+                      <p className="text-[10px] text-black-200 uppercase tracking-widest truncate">
+                        {cage.type} • {cage.location || 'No Location'}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })
+            )}
           </div>
         )}
 
         {printEmpty && (
           <div className="p-4 bg-zinc-900/50 border border-black-800 rounded-xl text-center space-y-2">
             <Printer size={32} className="mx-auto text-gold-500/50" />
-            <p className="text-sm text-white font-medium">Empty List Mode</p>
-            <p className="text-xs text-black-400">This will print a blank table with 20 lines per page.</p>
+            <p className="text-sm text-white font-medium">Empty List Mode ({printMode === 'birds' ? '20' : '10'} lines)</p>
+            <p className="text-xs text-black-400">This will print a blank table for manual notes.</p>
           </div>
         )}
 
-        <Button onClick={handlePrint} disabled={!printEmpty && selectedBirds.length === 0} className="w-full py-4 mt-4">
+        <Button 
+          onClick={handlePrint} 
+          disabled={!printEmpty && (printMode === 'birds' ? selectedBirds.length === 0 : selectedCages.length === 0)} 
+          className="w-full py-4 mt-4"
+        >
           <Printer size={18} className="mr-2" />
           Confirm & Print
         </Button>
       </div>
 
       {isPrinting && createPortal(
-        <div id="print-area-portal" className="fixed inset-0 z-[9999] bg-white text-black p-0 overflow-y-auto">
-          {pages.map((pageBirds, pageIdx) => (
-            <div key={pageIdx} className="print-page p-[15mm]">
-              <div className="flex justify-between items-end border-b-4 border-black pb-6 mb-8">
+        <div className="print-only">
+          {pages.map((pageItems, pageIdx) => (
+            <div key={pageIdx} className="print-page">
+              <div className="flex justify-between items-end border-b-4 border-black pb-4 mb-6">
                 <div>
-                  <h1 className="text-4xl font-black uppercase tracking-tighter mb-2">Aviary Records</h1>
-                  <p className="text-sm font-black text-gray-600 uppercase tracking-[0.3em]">Official Breeding Log</p>
+                  <h1 className="text-3xl font-black uppercase tracking-tighter mb-1">Aviary Records</h1>
+                  <p className="text-xs font-black text-gray-600 uppercase tracking-[0.3em]">
+                    {printMode === 'birds' ? 'Bird Inventory Log' : 'Cage Management Log'}
+                  </p>
                 </div>
                 <div className="text-right">
-                  <p className="text-sm font-bold text-gray-800 uppercase tracking-widest mb-1">Date: {new Date().toLocaleDateString()}</p>
-                  <p className="text-xs font-black uppercase tracking-widest text-gray-500">Page {pageIdx + 1} of {pages.length}</p>
+                  <p className="text-xs font-bold text-gray-800 uppercase tracking-widest mb-1">Date: {new Date().toLocaleDateString()}</p>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-gray-500">
+                    Total {printMode === 'birds' ? 'Birds' : 'Cages'}: {itemsToPrint.length} • Page {pageIdx + 1} of {pages.length}
+                  </p>
                 </div>
               </div>
 
               <div className="flex-1">
-                <table className="w-full border-2 border-black">
+                <table className="w-full">
                   <thead>
-                    <tr className="bg-gray-100 border-b-2 border-black">
-                      <th className="col-cage text-left uppercase tracking-widest font-black">Cage</th>
-                      <th className="col-id text-left uppercase tracking-widest font-black">Bird ID / Ring</th>
-                      <th className="col-sex text-left uppercase tracking-widest font-black">Sex</th>
-                      <th className="col-species text-left uppercase tracking-widest font-black">Species / Mutation</th>
-                      <th className="col-notes text-left uppercase tracking-widest font-black">Notes</th>
-                    </tr>
+                    {printMode === 'birds' ? (
+                      <tr>
+                        <th className="col-cage">Cage</th>
+                        <th className="col-id">Bird ID / Ring</th>
+                        <th className="col-sex">Sex</th>
+                        <th className="col-species">Species / Mutation</th>
+                        <th className="col-notes">Notes</th>
+                      </tr>
+                    ) : (
+                      <tr>
+                        <th className="col-cage-name">Cage Name</th>
+                        <th className="col-cage-type">Type</th>
+                        <th className="col-cage-loc">Location</th>
+                        <th className="col-cage-notes">Notes / Occupants</th>
+                      </tr>
+                    )}
                   </thead>
                   <tbody>
-                    {pageBirds.map((bird: any, i: number) => {
+                    {pageItems.map((item: any, i: number) => {
                       if (printEmpty) {
                         return (
-                          <tr key={i} className="border-b border-gray-300">
-                            <td className="border-r border-gray-300"></td>
-                            <td className="border-r border-gray-300"></td>
-                            <td className="border-r border-gray-300"></td>
-                            <td className="border-r border-gray-300"></td>
+                          <tr key={i}>
+                            {printMode === 'birds' ? (
+                              <>
+                                <td className="col-cage"></td>
+                                <td className="col-id"></td>
+                                <td className="col-sex"></td>
+                                <td className="col-species"></td>
+                                <td className="col-notes"></td>
+                              </>
+                            ) : (
+                              <>
+                                <td className="col-cage-name"></td>
+                                <td className="col-cage-type"></td>
+                                <td className="col-cage-loc"></td>
+                                <td className="col-cage-notes"></td>
+                              </>
+                            )}
+                          </tr>
+                        );
+                      }
+                      
+                      if (printMode === 'birds') {
+                        const bird = item as Bird;
+                        const cage = cages.find(c => c.id === bird.cageId);
+                        return (
+                          <tr key={bird.id}>
+                            <td className="font-black uppercase truncate">{cage?.name || '-'}</td>
+                            <td className="font-bold truncate">{bird.name}</td>
+                            <td className="font-black uppercase">{bird.sex}</td>
+                            <td className="truncate">{bird.species} {bird.mutations?.join(', ')}</td>
+                            <td></td>
+                          </tr>
+                        );
+                      } else {
+                        const cage = item as Cage;
+                        return (
+                          <tr key={cage.id}>
+                            <td className="font-black uppercase truncate">{cage.name}</td>
+                            <td className="truncate">{cage.type}</td>
+                            <td className="truncate">{cage.location || '-'}</td>
                             <td></td>
                           </tr>
                         );
                       }
-                      const cage = cages.find(c => c.id === bird.cageId);
-                      return (
-                        <tr key={bird.id} className="border-b border-gray-300">
-                          <td className="border-r border-gray-300 text-xs font-black uppercase truncate">{cage?.name || '-'}</td>
-                          <td className="border-r border-gray-300 text-xs font-bold truncate">{bird.name}</td>
-                          <td className="border-r border-gray-300 text-xs font-black uppercase">{bird.sex}</td>
-                          <td className="border-r border-gray-300 text-xs truncate">{bird.species} {bird.mutations?.join(', ')}</td>
-                          <td className="text-xs"></td>
-                        </tr>
-                      );
                     })}
-                    {/* Fill remaining space to ensure 20 lines if it's the last page and not full */}
-                    {pageBirds.length < pageSize && Array.from({ length: pageSize - pageBirds.length }).map((_, i) => (
-                      <tr key={`empty-${i}`} className="border-b border-gray-300">
-                        <td className="border-r border-gray-300"></td>
-                        <td className="border-r border-gray-300"></td>
-                        <td className="border-r border-gray-300"></td>
-                        <td className="border-r border-gray-300"></td>
-                        <td></td>
+                    {/* Fill remaining space */}
+                    {pageItems.length < pageSize && Array.from({ length: pageSize - pageItems.length }).map((_, i) => (
+                      <tr key={`empty-${i}`}>
+                        {printMode === 'birds' ? (
+                          <>
+                            <td></td><td></td><td></td><td></td><td></td>
+                          </>
+                        ) : (
+                          <>
+                            <td></td><td></td><td></td><td></td>
+                          </>
+                        )}
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
               
-              <div className="mt-8 pt-4 border-t border-gray-200 text-[10px] text-gray-400 flex justify-between uppercase tracking-[0.2em] font-black">
+              <div className="mt-6 pt-4 border-t border-gray-200 text-[9px] text-gray-400 flex justify-between uppercase tracking-[0.2em] font-black">
                 <span>Generated by Aviary Manager Pro</span>
                 <span>{new Date().toLocaleTimeString()}</span>
               </div>
