@@ -24,6 +24,14 @@
   --color-black-800: #454545;
   --color-black-900: #3d3d3d;
   --color-black-950: #0a0a0a;
+
+  --color-blue-400: #60a5fa;
+  --color-blue-500: #3b82f6;
+  --color-rose-400: #fb7185;
+  --color-rose-500: #f43f5e;
+  --color-zinc-400: #a1a1aa;
+  --color-zinc-800: #27272a;
+  --color-zinc-900: #18181b;
 }
 
 body {

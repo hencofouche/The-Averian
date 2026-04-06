@@ -143,11 +143,11 @@
     },
     "SharedItem": {
       "title": "Shared Item",
-      "description": "A shared or transferred item (bird, pair, cage).",
+      "description": "A shared item (bird, pair, cage).",
       "type": "object",
       "properties": {
         "type": { "type": "string", "enum": ["bird", "pair", "cage"] },
-        "action": { "type": "string", "enum": ["share", "transfer"] },
+        "action": { "type": "string", "enum": ["share"] },
         "data": { "type": "string", "description": "JSON stringified data of the item." },
         "createdAt": { "type": "string", "format": "date-time" },
         "createdBy": { "type": "string" }
