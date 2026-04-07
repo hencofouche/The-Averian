@@ -12,6 +12,9 @@ dotenv.config();
 // Initialize Firebase Admin for server-side use
 const firebaseConfig = JSON.parse(fs.readFileSync('./firebase-applet-config.json', 'utf8'));
 
+console.log(`[Firebase Admin] Project ID: ${firebaseConfig.projectId}`);
+console.log(`[Firebase Admin] Database ID: ${firebaseConfig.firestoreDatabaseId || '(default)'}`);
+
 // Initialize with explicit projectId and applicationDefault credentials
 try {
   if (process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
@@ -37,7 +40,8 @@ try {
 // In AI Studio, the service account might only have access to the default database
 // or the named database might require specific permissions.
 // Let's try to use the named database if provided, but fallback to default if it fails.
-const db = getFirestore(firebaseConfig.firestoreDatabaseId);
+const databaseId = firebaseConfig.firestoreDatabaseId || '(default)';
+const db = getFirestore(databaseId);
 
 // Configure web-push
 webpush.setVapidDetails(

@@ -5,16 +5,16 @@ import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import firebaseConfig from '../firebase-applet-config.json';
 import { OperationType, FirestoreErrorInfo } from './types';
 
-console.log("Loaded Firebase Config:", firebaseConfig);
-console.log("API Key:", firebaseConfig?.apiKey);
+const firebaseConfigObj = (firebaseConfig as any).default || firebaseConfig;
 
-const app = initializeApp(firebaseConfig);
+console.log('[Firebase Config] Initializing with Project ID:', firebaseConfigObj.projectId);
+console.log('[Firebase Config] Using Firestore Database ID:', firebaseConfigObj.firestoreDatabaseId || '(default)');
+
+const app = initializeApp(firebaseConfigObj);
 export const auth = getAuth(app);
 
-// Ensure firestore is registered by calling getFirestore
-export const db = firebaseConfig.firestoreDatabaseId 
-  ? getFirestore(app, firebaseConfig.firestoreDatabaseId)
-  : getFirestore(app);
+// Use getFirestore with explicit databaseId for named databases
+export const db = getFirestore(app, firebaseConfigObj.firestoreDatabaseId || '(default)');
 export const storage = getStorage(app);
 
 export const googleProvider = new GoogleAuthProvider();

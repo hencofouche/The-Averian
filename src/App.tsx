@@ -310,7 +310,7 @@ function SubscriptionGate({ settings, onRenew, children }: { settings: UserSetti
             <div className="mt-4 p-4 bg-red-950/50 border border-red-900 rounded-lg max-w-md">
               <p className="text-red-400 text-sm mb-2">This is taking longer than expected.</p>
               <p className="text-black-300 text-xs">If this continues, please check your internet connection, disable any adblockers that might be blocking database connections, or try clearing your browser cache/service workers.</p>
-              <Button onClick={() => window.location.reload()} variant="outline" className="mt-4 w-full border-red-900 text-red-400 hover:bg-red-900/50">
+              <Button onClick={() => window.location.reload()} variant="secondary" className="mt-4 w-full border-red-900 text-red-400 hover:bg-red-900/50">
                 Reload Page
               </Button>
             </div>
