@@ -3,7 +3,7 @@ import { createServer as createViteServer } from "vite";
 import path from "path";
 import dotenv from "dotenv";
 import webpush from "web-push";
-import { initializeApp, applicationDefault, cert } from "firebase-admin/app";
+import { initializeApp } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 import fs from "fs";
 
@@ -11,37 +11,10 @@ dotenv.config();
 
 // Initialize Firebase Admin for server-side use
 const firebaseConfig = JSON.parse(fs.readFileSync('./firebase-applet-config.json', 'utf8'));
-
-console.log(`[Firebase Admin] Project ID: ${firebaseConfig.projectId}`);
-console.log(`[Firebase Admin] Database ID: ${firebaseConfig.firestoreDatabaseId || '(default)'}`);
-
-// Initialize with explicit projectId and applicationDefault credentials
-try {
-  if (process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
-    const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY);
-    initializeApp({
-      credential: cert(serviceAccount),
-      projectId: firebaseConfig.projectId
-    });
-    console.log(`[Firebase Admin] Initialized with service account key for project: ${firebaseConfig.projectId}`);
-  } else {
-    initializeApp({
-      projectId: firebaseConfig.projectId,
-      credential: applicationDefault()
-    });
-    console.log(`[Firebase Admin] Initialized with applicationDefault for project: ${firebaseConfig.projectId}`);
-  }
-} catch (err: any) {
-  if (!err.message.includes('already exists')) {
-    console.error('[Firebase Admin] Initialization error:', err);
-  }
-}
-
-// In AI Studio, the service account might only have access to the default database
-// or the named database might require specific permissions.
-// Let's try to use the named database if provided, but fallback to default if it fails.
-const databaseId = firebaseConfig.firestoreDatabaseId || '(default)';
-const db = getFirestore(databaseId);
+initializeApp({
+  projectId: firebaseConfig.projectId
+});
+const db = getFirestore(firebaseConfig.firestoreDatabaseId);
 
 // Configure web-push
 webpush.setVapidDetails(
@@ -50,22 +23,10 @@ webpush.setVapidDetails(
   process.env.VAPID_PRIVATE_KEY || 'uuvXpzIkGXcdPJl8do9liQ3zqQaqGBH554CXz9Da0iw'
 );
 
-let hasPermissionError = false;
-
 // Background loop for reminders
 setInterval(async () => {
-  if (hasPermissionError) return;
-  
   try {
     const now = new Date();
-    // console.log(`[Reminder Loop] Checking for reminders at ${now.toISOString()}`);
-    
-    // Check if db is initialized
-    if (!db) {
-      console.error("[Reminder Loop] Firestore not initialized");
-      return;
-    }
-
     const tasksRef = db.collection('tasks');
     const snapshot = await tasksRef.where('status', '!=', 'Completed').get();
     
@@ -77,7 +38,6 @@ setInterval(async () => {
         
         // If reminder is due (within last 5 minutes)
         if (diff >= 0 && diff < 300000) {
-          // console.log(`[Reminder Loop] Sending notification for task: ${task.title}`);
           // Get user subscriptions
           const subsRef = db.collection('push_subscriptions');
           const subSnapshot = await subsRef.where('userId', '==', task.uid).get();
@@ -111,13 +71,8 @@ setInterval(async () => {
         }
       }
     }
-  } catch (error: any) {
-    if (error.code === 7 || (error.message && error.message.includes('PERMISSION_DENIED'))) {
-      console.error("[Reminder Loop] PERMISSION_DENIED. The server lacks Datastore access to this Firebase project. To fix this, provide a FIREBASE_SERVICE_ACCOUNT_KEY in the environment variables. The reminder loop is now disabled.");
-      hasPermissionError = true;
-    } else {
-      console.error("Error in reminder loop:", error);
-    }
+  } catch (error) {
+    console.error("Error in reminder loop:", error);
   }
 }, 60000);
 

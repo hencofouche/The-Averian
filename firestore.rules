@@ -215,7 +215,7 @@ service cloud.firestore {
     function isValidSharedItem(data) {
       return hasRequiredFields(['type', 'action', 'data', 'createdAt', 'createdBy']) &&
              data.type in ['bird', 'pair', 'cage'] &&
-             data.action == 'share' &&
+             data.action in ['share', 'transfer'] &&
              data.data is string && data.data.size() < 1500000 &&
              data.createdAt is string &&
              data.createdBy is string;

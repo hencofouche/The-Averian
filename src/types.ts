@@ -27,7 +27,7 @@ export interface UserSettings {
 export interface SharedItem {
   id: string;
   type: 'bird' | 'pair' | 'cage';
-  action: 'share';
+  action: 'share' | 'transfer';
   data: string; // JSON stringified data
   createdAt: string;
   createdBy: string;
