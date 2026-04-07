@@ -3230,10 +3230,10 @@ function PrintListModal({ birds, cages, onClose }: { birds: Bird[], cages: Cage[
           }
           .print-page {
             page-break-after: always !important;
-            min-height: 280mm !important;
+            min-height: 277mm !important; /* A4 is 297mm, minus 20mm margins */
             display: flex !important;
             flex-direction: column !important;
-            padding: 15mm !important;
+            padding: 10mm !important;
             background: white !important;
           }
           .print-page:last-child {
@@ -3244,37 +3244,61 @@ function PrintListModal({ birds, cages, onClose }: { birds: Bird[], cages: Cage[
             border-collapse: collapse !important;
             table-layout: fixed !important;
             border: 2px solid black !important;
-            margin-bottom: 20px !important;
+            margin-bottom: 0 !important;
           }
           th, td {
-            border: 1.5px solid black !important;
-            padding: 10px !important;
-            font-size: 12px !important;
-            height: ${printMode === 'birds' ? '48px' : '95px'} !important;
-            vertical-align: top !important;
+            border: 1px solid #000 !important;
+            padding: 4px 8px !important;
+            font-size: 10px !important;
+            /* 
+               ROW HEIGHT CALCULATION FOR 20 ENTRIES:
+               A4 Height: 297mm
+               Margins: 10mm top + 10mm bottom = 20mm
+               Padding: 10mm top + 10mm bottom = 20mm
+               Header Area: ~35mm
+               Footer Area: ~15mm
+               Table Header: 10mm
+               Total Non-Row Height: 20 + 20 + 35 + 15 + 10 = 100mm
+               Remaining Height for 20 Rows: 297 - 100 = 197mm
+               Height per Row: 197 / 20 = 9.85mm
+               We use 9.5mm to ensure it fits comfortably on one page.
+            */
+            height: ${printMode === 'birds' ? '9.5mm' : '19mm'} !important;
+            vertical-align: middle !important;
             color: black !important;
             overflow: hidden !important;
-            word-wrap: break-word !important;
+            white-space: nowrap !important;
+            text-overflow: ellipsis !important;
           }
           th {
-            background-color: #f0f0f0 !important;
+            background-color: #e5e7eb !important;
             font-weight: 900 !important;
             text-transform: uppercase !important;
             -webkit-print-color-adjust: exact;
-            height: 40px !important;
+            print-color-adjust: exact;
+            height: 10mm !important;
             vertical-align: middle !important;
             text-align: left !important;
+            border-bottom: 2px solid black !important;
           }
-          .col-cage { width: 15%; }
-          .col-id { width: 25%; }
-          .col-sex { width: 10%; }
+          .col-cage { width: 12%; }
+          .col-id { width: 20%; }
+          .col-sex { width: 8%; text-align: center !important; }
           .col-species { width: 25%; }
-          .col-notes { width: 25%; }
+          .col-notes { width: 35%; position: relative; }
           
-          .col-cage-name { width: 20%; }
-          .col-cage-type { width: 20%; }
-          .col-cage-loc { width: 20%; }
-          .col-cage-notes { width: 40%; }
+          .col-cage-name { width: 15%; }
+          .col-cage-type { width: 15%; }
+          .col-cage-loc { width: 15%; }
+          .col-cage-notes { width: 55%; position: relative; }
+
+          /* Writing lines for empty cells or notes */
+          .write-lines {
+            background-image: repeating-linear-gradient(transparent, transparent 21px, #d1d5db 21px, #d1d5db 22px) !important;
+            background-position: 0 6px !important;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+          }
         }
       `}</style>
       <div className="space-y-4">
@@ -3454,18 +3478,18 @@ function PrintListModal({ birds, cages, onClose }: { birds: Bird[], cages: Cage[
                           <tr key={i}>
                             {printMode === 'birds' ? (
                               <>
-                                <td className="col-cage"></td>
-                                <td className="col-id"></td>
-                                <td className="col-sex"></td>
-                                <td className="col-species"></td>
-                                <td className="col-notes"></td>
+                                <td className="col-cage write-lines"></td>
+                                <td className="col-id write-lines"></td>
+                                <td className="col-sex write-lines"></td>
+                                <td className="col-species write-lines"></td>
+                                <td className="col-notes write-lines"></td>
                               </>
                             ) : (
                               <>
-                                <td className="col-cage-name"></td>
-                                <td className="col-cage-type"></td>
-                                <td className="col-cage-loc"></td>
-                                <td className="col-cage-notes"></td>
+                                <td className="col-cage-name write-lines"></td>
+                                <td className="col-cage-type write-lines"></td>
+                                <td className="col-cage-loc write-lines"></td>
+                                <td className="col-cage-notes write-lines"></td>
                               </>
                             )}
                           </tr>
@@ -3481,7 +3505,7 @@ function PrintListModal({ birds, cages, onClose }: { birds: Bird[], cages: Cage[
                             <td className="font-bold truncate">{bird.name}</td>
                             <td className="font-black uppercase">{bird.sex}</td>
                             <td className="truncate">{bird.species} {bird.mutations?.join(', ')}</td>
-                            <td></td>
+                            <td className="write-lines"></td>
                           </tr>
                         );
                       } else {
@@ -3491,7 +3515,7 @@ function PrintListModal({ birds, cages, onClose }: { birds: Bird[], cages: Cage[
                             <td className="font-black uppercase truncate">{cage.name}</td>
                             <td className="truncate">{cage.type}</td>
                             <td className="truncate">{cage.location || '-'}</td>
-                            <td></td>
+                            <td className="write-lines"></td>
                           </tr>
                         );
                       }
@@ -3501,11 +3525,11 @@ function PrintListModal({ birds, cages, onClose }: { birds: Bird[], cages: Cage[
                       <tr key={`empty-${i}`}>
                         {printMode === 'birds' ? (
                           <>
-                            <td></td><td></td><td></td><td></td><td></td>
+                            <td className="write-lines"></td><td className="write-lines"></td><td className="write-lines"></td><td className="write-lines"></td><td className="write-lines"></td>
                           </>
                         ) : (
                           <>
-                            <td></td><td></td><td></td><td></td>
+                            <td className="write-lines"></td><td className="write-lines"></td><td className="write-lines"></td><td className="write-lines"></td>
                           </>
                         )}
                       </tr>

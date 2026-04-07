@@ -5,11 +5,16 @@ import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import firebaseConfig from '../firebase-applet-config.json';
 import { OperationType, FirestoreErrorInfo } from './types';
 
+console.log("Loaded Firebase Config:", firebaseConfig);
+console.log("API Key:", firebaseConfig?.apiKey);
+
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 
 // Ensure firestore is registered by calling getFirestore
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+export const db = firebaseConfig.firestoreDatabaseId 
+  ? getFirestore(app, firebaseConfig.firestoreDatabaseId)
+  : getFirestore(app);
 export const storage = getStorage(app);
 
 export const googleProvider = new GoogleAuthProvider();

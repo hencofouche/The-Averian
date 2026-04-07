@@ -33,8 +33,13 @@ if (getApps().length === 0) {
 // Fallback to default database if the named one fails (common in some environments)
 let db: any;
 try {
-  db = getFirestore(adminApp, firebaseConfig.firestoreDatabaseId);
-  console.log(`[Firestore Admin] Using database: ${firebaseConfig.firestoreDatabaseId}`);
+  if (firebaseConfig.firestoreDatabaseId) {
+    db = getFirestore(adminApp, firebaseConfig.firestoreDatabaseId);
+    console.log(`[Firestore Admin] Using database: ${firebaseConfig.firestoreDatabaseId}`);
+  } else {
+    db = getFirestore(adminApp);
+    console.log(`[Firestore Admin] Using default database`);
+  }
 } catch (err) {
   console.warn(`[Firestore Admin] Failed to use named database, falling back to default:`, err);
   db = getFirestore(adminApp);
@@ -93,13 +98,25 @@ setInterval(async () => {
               notifiedAny = true;
             } catch (err: any) {
               if (err.statusCode === 410 || err.statusCode === 404) {
-                await subDoc.ref.delete();
+                try {
+                  await subDoc.ref.delete();
+                } catch (deleteErr: any) {
+                  if (deleteErr.code !== 5) { // Ignore NOT_FOUND
+                    console.error("Failed to delete subscription:", deleteErr);
+                  }
+                }
               }
             }
           }
           
           if (notifiedAny) {
-            await taskDoc.ref.update({ serverNotified: true });
+            try {
+              await taskDoc.ref.update({ serverNotified: true });
+            } catch (updateErr: any) {
+              if (updateErr.code !== 5) { // Ignore NOT_FOUND
+                console.error("Failed to update task:", updateErr);
+              }
+            }
           }
         }
       }
