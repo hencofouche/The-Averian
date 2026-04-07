@@ -3,7 +3,7 @@ import { createServer as createViteServer } from "vite";
 import path from "path";
 import dotenv from "dotenv";
 import webpush from "web-push";
-import { initializeApp, applicationDefault, getApp, getApps } from "firebase-admin/app";
+import { initializeApp, applicationDefault, cert } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 import fs from "fs";
 
@@ -12,38 +12,32 @@ dotenv.config();
 // Initialize Firebase Admin for server-side use
 const firebaseConfig = JSON.parse(fs.readFileSync('./firebase-applet-config.json', 'utf8'));
 
-let adminApp;
-if (getApps().length === 0) {
-  try {
-    adminApp = initializeApp({
+// Initialize with explicit projectId and applicationDefault credentials
+try {
+  if (process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
+    const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY);
+    initializeApp({
+      credential: cert(serviceAccount),
+      projectId: firebaseConfig.projectId
+    });
+    console.log(`[Firebase Admin] Initialized with service account key for project: ${firebaseConfig.projectId}`);
+  } else {
+    initializeApp({
       projectId: firebaseConfig.projectId,
       credential: applicationDefault()
     });
-    console.log(`[Firebase Admin] Initialized for project: ${firebaseConfig.projectId}`);
-  } catch (err: any) {
-    console.error('[Firebase Admin] Initialization error:', err);
-    // Fallback to default initialization if explicit fails
-    adminApp = initializeApp();
+    console.log(`[Firebase Admin] Initialized with applicationDefault for project: ${firebaseConfig.projectId}`);
   }
-} else {
-  adminApp = getApp();
+} catch (err: any) {
+  if (!err.message.includes('already exists')) {
+    console.error('[Firebase Admin] Initialization error:', err);
+  }
 }
 
-// Initialize Firestore with the specific database ID
-// Fallback to default database if the named one fails (common in some environments)
-let db: any;
-try {
-  if (firebaseConfig.firestoreDatabaseId) {
-    db = getFirestore(adminApp, firebaseConfig.firestoreDatabaseId);
-    console.log(`[Firestore Admin] Using database: ${firebaseConfig.firestoreDatabaseId}`);
-  } else {
-    db = getFirestore(adminApp);
-    console.log(`[Firestore Admin] Using default database`);
-  }
-} catch (err) {
-  console.warn(`[Firestore Admin] Failed to use named database, falling back to default:`, err);
-  db = getFirestore(adminApp);
-}
+// In AI Studio, the service account might only have access to the default database
+// or the named database might require specific permissions.
+// Let's try to use the named database if provided, but fallback to default if it fails.
+const db = getFirestore(firebaseConfig.firestoreDatabaseId);
 
 // Configure web-push
 webpush.setVapidDetails(
@@ -52,8 +46,12 @@ webpush.setVapidDetails(
   process.env.VAPID_PRIVATE_KEY || 'uuvXpzIkGXcdPJl8do9liQ3zqQaqGBH554CXz9Da0iw'
 );
 
+let hasPermissionError = false;
+
 // Background loop for reminders
 setInterval(async () => {
+  if (hasPermissionError) return;
+  
   try {
     const now = new Date();
     // console.log(`[Reminder Loop] Checking for reminders at ${now.toISOString()}`);
@@ -98,31 +96,24 @@ setInterval(async () => {
               notifiedAny = true;
             } catch (err: any) {
               if (err.statusCode === 410 || err.statusCode === 404) {
-                try {
-                  await subDoc.ref.delete();
-                } catch (deleteErr: any) {
-                  if (deleteErr.code !== 5) { // Ignore NOT_FOUND
-                    console.error("Failed to delete subscription:", deleteErr);
-                  }
-                }
+                await subDoc.ref.delete();
               }
             }
           }
           
           if (notifiedAny) {
-            try {
-              await taskDoc.ref.update({ serverNotified: true });
-            } catch (updateErr: any) {
-              if (updateErr.code !== 5) { // Ignore NOT_FOUND
-                console.error("Failed to update task:", updateErr);
-              }
-            }
+            await taskDoc.ref.update({ serverNotified: true });
           }
         }
       }
     }
-  } catch (error) {
-    console.error("Error in reminder loop:", error);
+  } catch (error: any) {
+    if (error.code === 7 || (error.message && error.message.includes('PERMISSION_DENIED'))) {
+      console.error("[Reminder Loop] PERMISSION_DENIED. The server lacks Datastore access to this Firebase project. To fix this, provide a FIREBASE_SERVICE_ACCOUNT_KEY in the environment variables. The reminder loop is now disabled.");
+      hasPermissionError = true;
+    } else {
+      console.error("Error in reminder loop:", error);
+    }
   }
 }, 60000);
 
