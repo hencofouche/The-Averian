@@ -8,7 +8,7 @@ import {
   Tag, Calendar, ChevronDown, ChevronUp, ChevronRight, X, GitBranch,
   Image as ImageIcon, Loader2, DollarSign, TrendingUp, TrendingDown,
   Activity, ArrowUpRight, ArrowDownRight, BarChart3, PieChart as PieChartIcon,
-  Menu, Egg, LayoutGrid, Grid3x3, List as ListIcon, AlertTriangle, CreditCard, CheckCircle2, Bell, Cloud, Maximize2, Share2, Send, Printer
+  Menu, Egg, LayoutGrid, Grid3x3, List as ListIcon, AlertTriangle, CreditCard, CheckCircle2, Bell, Cloud, Maximize2, Share2, Send, Printer, MoreHorizontal
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -135,21 +135,9 @@ const Button = ({
   );
 };
 
-const Input = ({ className, ...props }: React.InputHTMLAttributes<HTMLInputElement>) => (
-  <input 
-    className={cn('w-full px-4 py-3 bg-black border border-black-700 text-white rounded-2xl focus:outline-none focus:ring-2 focus:ring-gold-500/20 focus:border-gold-500 transition-all placeholder:text-white/30 text-sm font-medium', className)} 
-    {...props} 
-  />
-);
+const Input = ({ className, id, name, ...props }: React.InputHTMLAttributes<HTMLInputElement>) => { const generatedId = React.useId(); return ( <input id={id || generatedId} name={name || id || generatedId} className={cn('w-full px-4 py-3 bg-black border border-black-700 text-white rounded-2xl focus:outline-none focus:ring-2 focus:ring-gold-500/20 focus:border-gold-500 transition-all placeholder:text-white/30 text-sm font-medium', className)} {...props} /> ); };
 
-const Select = ({ className, children, ...props }: React.SelectHTMLAttributes<HTMLSelectElement>) => (
-  <select 
-    className={cn('w-full px-4 py-3 bg-black border border-black-700 text-white rounded-2xl focus:outline-none focus:ring-2 focus:ring-gold-500/20 focus:border-gold-500 transition-all appearance-none text-sm font-medium', className)} 
-    {...props}
-  >
-    {children}
-  </select>
-);
+const Select = ({ className, children, id, name, ...props }: React.SelectHTMLAttributes<HTMLSelectElement>) => { const generatedId = React.useId(); return ( <select id={id || generatedId} name={name || id || generatedId} className={cn('w-full px-4 py-3 bg-black border border-black-700 text-white rounded-2xl focus:outline-none focus:ring-2 focus:ring-gold-500/20 focus:border-gold-500 transition-all appearance-none text-sm font-medium', className)} {...props} > {children} </select> ); };
 
 const Card = ({ children, className, ...props }: { children: React.ReactNode, className?: string } & React.HTMLAttributes<HTMLDivElement>) => (
   <div className={cn('bg-zinc-800 border border-black-700 rounded-2xl overflow-hidden shadow-2xl', className)} {...props}>
@@ -581,6 +569,7 @@ export default function App() {
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'tasks'));
 
     const qTransactions = query(collection(db, 'transactions'), where('uid', '==', user.uid), orderBy('date', 'desc'));
+    const fixingSettings = new Set<string>();
     const unsubTransactions = onSnapshot(qTransactions, (snapshot) => {
       setTransactions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Transaction)));
       setIsSyncing(snapshot.metadata.hasPendingWrites);
@@ -608,30 +597,7 @@ export default function App() {
         }
 
         // If expiry date is missing for some reason, fix it with a trial
-        if (!data.account_expiry_date) {
-          const trialExpiry = new Date();
-          trialExpiry.setDate(trialExpiry.getDate() + 30);
-          const updated = { ...data, account_expiry_date: trialExpiry.toISOString() };
-          updateDoc(docRef, { account_expiry_date: updated.account_expiry_date });
-          setUserSettings({ id: docSnap.id, ...updated });
-        } else {
-          // Cap the expiry at 365 days from now if it's excessively high (due to the loop error)
-          const expiry = new Date(data.account_expiry_date);
-          const now = new Date();
-          const maxExpiry = new Date();
-          maxExpiry.setFullYear(maxExpiry.getFullYear() + 1);
-          maxExpiry.setDate(maxExpiry.getDate() + 30); // 30 day buffer
-
-          if (expiry > maxExpiry) {
-            console.log("Subscription expiry excessively high, capping at 1 year.");
-            const cappedExpiry = new Date();
-            cappedExpiry.setFullYear(cappedExpiry.getFullYear() + 1);
-            updateDoc(docRef, { account_expiry_date: cappedExpiry.toISOString() });
-            setUserSettings({ id: docSnap.id, ...data, account_expiry_date: cappedExpiry.toISOString() });
-          } else {
-            setUserSettings({ id: docSnap.id, ...data });
-          }
-        }
+        if (!data.account_expiry_date) { if (fixingSettings.has(user.uid)) { setUserSettings({ id: docSnap.id, ...data, account_expiry_date: new Date(Date.now() + 30*24*60*60*1000).toISOString() }); return; } fixingSettings.add(user.uid); const trialExpiry = new Date(); trialExpiry.setDate(trialExpiry.getDate() + 30); const updated = { species: [], subspecies: [], mutations: [], uid: user.uid, currency: 'ZAR', ...data, account_expiry_date: trialExpiry.toISOString() }; setDoc(docRef, updated, { merge: true }).catch(e => console.error('Failed to fix settings', e)); setUserSettings({ id: docSnap.id, ...updated }); } else { const expiry = new Date(data.account_expiry_date); const now = new Date(); const maxExpiry = new Date(); maxExpiry.setFullYear(maxExpiry.getFullYear() + 1); maxExpiry.setDate(maxExpiry.getDate() + 30); if (expiry > maxExpiry) { if (fixingSettings.has(user.uid + '_cap')) { setUserSettings({ id: docSnap.id, ...data, account_expiry_date: new Date(Date.now() + 365*24*60*60*1000).toISOString() }); return; } fixingSettings.add(user.uid + '_cap'); console.log('Subscription expiry excessively high, capping at 1 year.'); const cappedExpiry = new Date(); cappedExpiry.setFullYear(cappedExpiry.getFullYear() + 1); const updated = { species: [], subspecies: [], mutations: [], uid: user.uid, currency: 'ZAR', ...data, account_expiry_date: cappedExpiry.toISOString() }; setDoc(docRef, updated, { merge: true }).catch(e => console.error('Failed to cap settings', e)); setUserSettings({ id: docSnap.id, ...updated }); } else { setUserSettings({ id: docSnap.id, ...data }); } }
       } else {
         // Only create initial settings if we are sure it doesn't exist on server
         // and we are not just waiting for the server response.
@@ -1244,7 +1210,7 @@ export default function App() {
                 activeTab === 'tasks' ? "max-w-3xl mx-auto grid-cols-1" : 
                 activeTab === 'financials' ? "grid-cols-1" :
                 activeTab === 'settings' || activeTab === 'subscription' ? "grid-cols-1 max-w-7xl mx-auto w-full" :
-                viewMode === 'grid-large' ? "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5" :
+                activeTab === 'pairs' && viewMode === 'grid-large' ? "grid-cols-1 md:grid-cols-2 max-w-5xl mx-auto" : viewMode === 'grid-large' ? "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5" :
                 "grid-cols-1 max-w-4xl mx-auto"
               )}>
                 {activeTab === 'birds' && (
@@ -1310,15 +1276,7 @@ export default function App() {
                 {activeTab === 'pairs' && (
                   (filteredItems as Pair[]).length > 0 ? (
                     (filteredItems as Pair[]).map(pair => (
-                      <PairCard 
-                        key={pair.id} 
-                        pair={pair} 
-                        male={birds.find(b => b.id === pair.maleId)}
-                        female={birds.find(b => b.id === pair.femaleId)}
-                        cages={cages}
-                        viewMode={viewMode}
-                        onBirdRef={handleBirdRef}
-                        onNavigate={handleNavigate}
+                      <PairCard key={pair.id} pair={pair} male={birds.find(b => b.id === pair.maleId)} female={birds.find(b => b.id === pair.femaleId)} cages={cages} birds={birds} currency={userSettings?.currency} viewMode={viewMode} onBirdRef={handleBirdRef} onNavigate={handleNavigate}
                         onEdit={() => { setEditingItem(pair); setIsModalOpen(true); }}
                         onDelete={() => setDeleteConfirmation({ 
                           title: 'Delete Pair', 
@@ -1667,6 +1625,7 @@ function BirdCard({ bird, cage, birds, viewMode = 'grid-large', currency, onBird
   const [isExpanded, setIsExpanded] = useState(false);
   const [fullscreenImage, setFullscreenImage] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [showActions, setShowActions] = useState(false);
   const symbol = getCurrencySymbol(currency);
   const offspring = birds.filter(b => b.motherId === bird.id || b.fatherId === bird.id || bird.offspringIds?.includes(b.id));
   const mother = birds.find(b => b.id === bird.motherId);
@@ -1816,54 +1775,8 @@ function BirdCard({ bird, cage, birds, viewMode = 'grid-large', currency, onBird
             </div>
           )}
         </div>
-
-        {/* 5. Breeding History Button */}
-        <button 
-          onClick={(e) => { e.stopPropagation(); onNavigate('breeding', bird.name); }}
-          className="w-full p-2 bg-gold-500/10 border border-gold-500/20 rounded-lg text-[10px] text-gold-500 font-black uppercase tracking-widest hover:bg-gold-500/20 transition-colors flex items-center justify-center gap-2"
-        >
-          <Egg size={12} className="text-gold-500" />
-          Breeding History
-        </button>
-
-        {/* 5.5 Share Button */}
+<div className="pt-2 border-t border-black-800/50"> <button onClick={(e) => { e.stopPropagation(); setShowActions(!showActions); }} className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-xl transition-all border border-black-700"> <MoreHorizontal size={16} /> <span className="text-[10px] font-black uppercase tracking-widest">Actions</span> </button> <AnimatePresence> {showActions && ( <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden"> <div className="flex flex-wrap items-center gap-2 pt-2"> <button onClick={(e) => { e.stopPropagation(); onNavigate('breeding', bird.name); }} className="flex-1 p-2 bg-gold-500/10 border border-gold-500/20 rounded-lg text-[10px] text-gold-500 font-black uppercase tracking-widest hover:bg-gold-500/20 transition-colors flex items-center justify-center gap-2 min-w-[100px]"> <Egg size={12} className="text-gold-500" /> Breeding </button> <button onClick={handleShare} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-zinc-700 hover:bg-zinc-600 text-white hover:text-gold-500 rounded-lg transition-all border border-black-700 min-w-[100px]"> <Share2 size={14} /> <span className="text-[9px] font-black uppercase tracking-widest">Share</span> </button> </div> <div className="flex flex-wrap items-center gap-2 pt-2"> <button onClick={(e) => { e.stopPropagation(); setShowTree(!showTree); }} className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 bg-gold-500/10 hover:bg-gold-500/20 text-gold-500 rounded-xl transition-all border border-gold-500/20 group/btn min-w-[80px]"> <GitBranch size={16} className="group-hover/btn:scale-110 transition-transform" /> <span className="text-[10px] font-black uppercase tracking-widest whitespace-nowrap">Pedigree</span> </button> <button onClick={(e) => { e.stopPropagation(); onEdit(); }} className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-white rounded-xl transition-all border border-black-700 group/btn min-w-[80px]"> <Edit2 size={16} className="group-hover/btn:scale-110 transition-transform" /> <span className="text-[10px] font-black uppercase tracking-widest whitespace-nowrap">Edit</span> </button> <button onClick={(e) => { e.stopPropagation(); onDelete(); }} className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-xl transition-all border border-red-500/20 group/btn min-w-[80px]"> <Trash2 size={16} className="group-hover/btn:scale-110 transition-transform" /> <span className="text-[10px] font-black uppercase tracking-widest whitespace-nowrap">Delete</span> </button> </div> </motion.div> )} </AnimatePresence> </div> <Modal isOpen={isShareModalOpen} onClose={() => setIsShareModalOpen(false)} title="Share Bird"> <ShareBirdModal bird={bird} mother={mother} father={father} mate={mate} onClose={() => setIsShareModalOpen(false)} /> </Modal>
         <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-black-800/50">
-          <button 
-            onClick={handleShare}
-            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-zinc-700 hover:bg-zinc-600 text-white hover:text-gold-500 rounded-lg transition-all border border-black-700 min-w-[80px]"
-          >
-            <Share2 size={14} />
-            <span className="text-[9px] font-black uppercase tracking-widest">Share / Transfer</span>
-          </button>
-        </div>
-
-        <Modal isOpen={isShareModalOpen} onClose={() => setIsShareModalOpen(false)} title="Share Bird">
-          <ShareBirdModal bird={bird} mother={mother} father={father} mate={mate} onClose={() => setIsShareModalOpen(false)} />
-        </Modal>
-
-        {/* 6. Action Buttons - Always Last, Under everything, Next to each other */}
-        <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-black-800/50">
-          <button 
-            onClick={(e) => { e.stopPropagation(); setShowTree(!showTree); }} 
-            className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 bg-gold-500/10 hover:bg-gold-500/20 text-gold-500 rounded-xl transition-all border border-gold-500/20 group/btn min-w-[80px]"
-          >
-            <GitBranch size={16} className="group-hover/btn:scale-110 transition-transform" />
-            <span className="text-[10px] font-black uppercase tracking-widest whitespace-nowrap">Pedigree</span>
-          </button>
-          <button 
-            onClick={(e) => { e.stopPropagation(); onEdit(); }} 
-            className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-white rounded-xl transition-all border border-black-700 group/btn min-w-[80px]"
-          >
-            <Edit2 size={16} className="group-hover/btn:scale-110 transition-transform" />
-            <span className="text-[10px] font-black uppercase tracking-widest whitespace-nowrap">Edit</span>
-          </button>
-          <button 
-            onClick={(e) => { e.stopPropagation(); onDelete(); }} 
-            className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-xl transition-all border border-red-500/20 group/btn min-w-[80px]"
-          >
-            <Trash2 size={16} className="group-hover/btn:scale-110 transition-transform" />
-            <span className="text-[10px] font-black uppercase tracking-widest whitespace-nowrap">Delete</span>
-          </button>
           {viewMode === 'list' && (
             <button 
               onClick={(e) => { e.stopPropagation(); setIsExpanded(!isExpanded); }}
@@ -2064,7 +1977,7 @@ function CageCard({ cage, birds, viewMode = 'grid-large', onBirdRef, onNavigate,
   );
 }
 
-function PairCard({ pair, male, female, cages, onBirdRef, onNavigate, onEdit, onDelete, viewMode = 'grid-large' }: { pair: Pair, male?: Bird, female?: Bird, cages: Cage[], onBirdRef: (name: string) => void, onNavigate: (tab: string, query?: string) => void, onEdit: () => void, onDelete: () => void, viewMode?: 'grid-large' | 'list' }) {
+function PairCard({ pair, male, female, cages, birds, currency, onBirdRef, onNavigate, onEdit, onDelete, viewMode = 'grid-large' }: { pair: Pair, male?: Bird, female?: Bird, cages: Cage[], birds: Bird[], currency?: string, onBirdRef: (name: string) => void, onNavigate: (tab: string, query?: string) => void, onEdit: () => void, onDelete: () => void, viewMode?: 'grid-large' | 'list' }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const effectiveViewMode = (viewMode === 'list' && isExpanded) ? 'grid-large' : viewMode;
   const cage = cages.find(c => c.id === (male?.cageId || female?.cageId));
@@ -2630,9 +2543,7 @@ function BreedingRecordForm({ user, initialData, pairs, birds, onClose }: { user
       </div>
       <div className="space-y-1">
         <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Notes</label>
-        <textarea 
-          className="w-full px-4 py-3 bg-black border border-black-700 rounded-2xl focus:outline-none focus:ring-2 focus:ring-gold-500/20 focus:border-gold-500 text-white transition-all min-h-[80px] text-sm font-medium placeholder:text-white/30" 
-          placeholder="Breeding notes..."
+        <textarea name="breedingNotes" id="breedingNotes" className="w-full px-4 py-3 bg-black border border-black-700 rounded-2xl focus:outline-none focus:ring-2 focus:ring-gold-500/20 focus:border-gold-500 text-white transition-all min-h-[80px] text-sm font-medium placeholder:text-white/30" placeholder="Breeding notes..."
           value={formData.notes} 
           onChange={e => setFormData({ ...formData, notes: e.target.value })} 
         />
@@ -2714,9 +2625,7 @@ function TransactionForm({ user, initialData, birds, currency, onClose }: { user
       </div>
       <div className="space-y-2">
         <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Description</label>
-        <textarea 
-          className="w-full px-4 py-3 bg-black border border-black-700 rounded-2xl focus:outline-none focus:ring-2 focus:ring-gold-500/20 focus:border-gold-500 text-white transition-all min-h-[100px] text-sm font-medium placeholder:text-white/30" 
-          placeholder="Enter transaction details..."
+        <textarea name="transactionDescription" id="transactionDescription" className="w-full px-4 py-3 bg-black border border-black-700 rounded-2xl focus:outline-none focus:ring-2 focus:ring-gold-500/20 focus:border-gold-500 text-white transition-all min-h-[100px] text-sm font-medium placeholder:text-white/30" placeholder="Enter transaction details..."
           value={formData.description} 
           onChange={e => setFormData({ ...formData, description: e.target.value })} 
         />
@@ -3395,15 +3304,7 @@ function PrintListModal({ birds, cages, onClose }: { birds: Bird[], cages: Cage[
     );
   });
 
-  const handlePrint = () => {
-    setIsPrinting(true);
-    // Use a longer delay to ensure the print area is fully rendered and visible in the portal
-    setTimeout(() => {
-      window.print();
-      setIsPrinting(false);
-      onClose();
-    }, 800);
-  };
+  const handlePrint = () => { setIsPrinting(true); setTimeout(() => { window.print(); const cleanup = () => { setIsPrinting(false); onClose(); window.removeEventListener('afterprint', cleanup); }; window.addEventListener('afterprint', cleanup); }, 800); };
 
   const toggleAll = () => {
     if (selectedBirds.length === filteredBirds.length) {
@@ -3459,9 +3360,7 @@ function PrintListModal({ birds, cages, onClose }: { birds: Bird[], cages: Cage[
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-black-400" size={16} />
-            <input
-              type="text"
-              placeholder="Search birds or cages..."
+            <input id="search-birds" name="search-birds" type="text" placeholder="Search birds or cages..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-10 pr-4 py-2 bg-black-900/50 border border-black-700 rounded-xl text-sm focus:outline-none focus:border-gold-500 transition-colors"
@@ -3536,7 +3435,7 @@ function PrintListModal({ birds, cages, onClose }: { birds: Bird[], cages: Cage[
 
       {/* Hidden Print Area rendered via Portal */}
       {isPrinting && createPortal(
-        <div id="print-area-portal" className="fixed inset-0 z-[9999] bg-white text-black p-10 overflow-y-auto">
+        <div id="print-area-portal" className="fixed inset-0 z-[9999] bg-white text-black p-10 overflow-y-auto"><button className="no-print fixed top-4 right-4 bg-red-500 text-white px-4 py-2 rounded-full font-bold shadow-lg z-[10000]" onClick={() => { setIsPrinting(false); onClose(); }}>Close Print View</button>
           <div className="flex justify-between items-end border-b-4 border-black pb-6 mb-8">
             <div>
               <h1 className="text-4xl font-black uppercase tracking-tighter mb-2">Aviary Records</h1>
@@ -3816,12 +3715,7 @@ function BirdForm({ user, initialData, cages, birds, pairs, userSettings, onAddS
         <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Image</label>
         <div className="flex items-center gap-3">
           <div className="flex-1">
-            <input 
-              type="file" 
-              accept="image/*" 
-              onChange={handleFileChange}
-              className="hidden"
-              id="bird-image-upload"
+            <input type="file" accept="image/*" onChange={handleFileChange} className="hidden" id="bird-image-upload" name="bird-image-upload"
               disabled={isUploading}
             />
             <label 
@@ -3969,9 +3863,7 @@ function BirdForm({ user, initialData, cages, birds, pairs, userSettings, onAddS
 
       <div className="space-y-1">
         <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Notes</label>
-        <textarea 
-          className="w-full px-4 py-3 bg-black border border-black-700 rounded-2xl focus:outline-none focus:ring-2 focus:ring-gold-500/20 focus:border-gold-500 text-white transition-all min-h-[100px] text-sm font-medium placeholder:text-white/30" 
-          placeholder="Additional notes..."
+        <textarea name="birdNotes" id="birdNotes" className="w-full px-4 py-3 bg-black border border-black-700 rounded-2xl focus:outline-none focus:ring-2 focus:ring-gold-500/20 focus:border-gold-500 text-white transition-all min-h-[100px] text-sm font-medium placeholder:text-white/30" placeholder="Additional notes..."
           value={formData.notes} 
           onChange={e => setFormData({ ...formData, notes: e.target.value })} 
         />
@@ -4042,7 +3934,7 @@ function CageForm({ user, initialData, onClose }: { user: FirebaseUser, initialD
           </div>
           <label className="absolute -bottom-2 -right-2 p-2 bg-gold-500 text-black-950 rounded-xl cursor-pointer shadow-lg hover:bg-gold-600 transition-colors">
             <Plus size={16} />
-            <input type="file" className="hidden" accept="image/*" onChange={handleFileChange} />
+            <input type="file" className="hidden" accept="image/*" onChange={handleFileChange} id="cage-image-upload" name="cage-image-upload" />
           </label>
         </div>
       </div>
@@ -4163,9 +4055,7 @@ function TaskForm({ user, initialData, birds, onClose }: { user: FirebaseUser, i
       </div>
       <div className="space-y-1">
         <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Description</label>
-        <textarea 
-          className="w-full px-4 py-3 bg-black border border-black-700 rounded-2xl focus:outline-none focus:ring-2 focus:ring-gold-500/20 focus:border-gold-500 text-white transition-all min-h-[80px] text-sm font-medium placeholder:text-white/30" 
-          placeholder="Task description..."
+        <textarea name="taskDescription" id="taskDescription" className="w-full px-4 py-3 bg-black border border-black-700 rounded-2xl focus:outline-none focus:ring-2 focus:ring-gold-500/20 focus:border-gold-500 text-white transition-all min-h-[80px] text-sm font-medium placeholder:text-white/30" placeholder="Task description..."
           value={formData.description} 
           onChange={e => setFormData({ ...formData, description: e.target.value })} 
         />

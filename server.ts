@@ -11,14 +11,12 @@ dotenv.config();
 
 // Initialize Firebase Admin for server-side use
 const firebaseConfig = JSON.parse(fs.readFileSync('./firebase-applet-config.json', 'utf8'));
-initializeApp({
-  projectId: firebaseConfig.projectId
-});
+initializeApp();
 const db = getFirestore(firebaseConfig.firestoreDatabaseId);
 
 // Configure web-push
 webpush.setVapidDetails(
-  process.env.VAPID_EMAIL || 'mailto:clashfouche@gmail.com',
+  process.env.VAPID_EMAIL?.startsWith('mailto:') ? process.env.VAPID_EMAIL : 'mailto:' + (process.env.VAPID_EMAIL || 'clashfouche@gmail.com'),
   process.env.VITE_VAPID_PUBLIC_KEY || 'BJqzp7rkr1obW1Tr2C7_Jm-7H_pS1ybLDsgJBeQewq46Ws2HpXF1jF_g1h9sthZw7KmmtnjziqdIXfiyB7wGLno',
   process.env.VAPID_PRIVATE_KEY || 'uuvXpzIkGXcdPJl8do9liQ3zqQaqGBH554CXz9Da0iw'
 );
