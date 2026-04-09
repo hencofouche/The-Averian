@@ -515,16 +515,6 @@ export default function App() {
             applicationServerKey: publicKey
           });
         }
-
-        // Send to server
-        await fetch('/api/save-subscription', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            subscription,
-            userId: user.uid
-          })
-        });
       } catch (error) {
         console.error('Failed to subscribe to push notifications:', error);
       }
@@ -1984,40 +1974,54 @@ function PairCard({ pair, male, female, cages, birds, currency, onBirdRef, onNav
 
   const BirdInfo = ({ bird, sex }: { bird?: Bird, sex: 'Male' | 'Female' }) => (
     <div className={cn(
-      "flex-1 min-w-0 p-4 rounded-3xl border transition-all relative overflow-hidden",
-      sex === 'Male' ? "bg-info-500/5 border-info-500/20" : "bg-rose-500/5 border-rose-500/20",
+      "flex-1 min-w-0 rounded-2xl border transition-all relative overflow-hidden flex flex-col bg-black/20",
+      sex === 'Male' ? "border-info-500/20" : "border-rose-500/20",
       !bird && "opacity-50 grayscale"
     )}>
-      {/* Background Sex Icon */}
-      <div className="absolute -right-2 -bottom-2 opacity-10 pointer-events-none">
-        {sex === 'Male' ? <Activity size={60} /> : <Heart size={60} />}
+      {/* Bird Image */}
+      <div className="h-24 sm:h-28 w-full relative bg-black/40 overflow-hidden">
+        {bird?.imageUrl ? (
+          <img 
+            src={bird.imageUrl} 
+            alt={bird.name} 
+            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+            referrerPolicy="no-referrer"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-white/5">
+            <BirdIcon size={32} />
+          </div>
+        )}
+        <div className="absolute top-2 right-2">
+          <Badge 
+            variant={sex === 'Male' ? 'info' : 'warning'} 
+            className="text-[8px] px-1.5 py-0.5 shadow-lg backdrop-blur-md bg-black/40"
+          >
+            {sex}
+          </Badge>
+        </div>
       </div>
 
-      <div className="relative z-10 space-y-3">
-        <div className="flex flex-col gap-1">
-          <div className="flex items-center justify-between gap-2">
-            <h4 className="text-base sm:text-lg font-black text-white truncate uppercase tracking-tight leading-none">
-              {bird ? bird.name : 'Unknown'}
-            </h4>
-            <Badge 
-              variant={sex === 'Male' ? 'info' : 'warning'} 
-              className="text-[10px] uppercase tracking-widest font-black px-2.5 py-1 shadow-lg"
-            >
-              {sex}
-            </Badge>
-          </div>
-          <p className="text-[11px] font-black text-gold-500 uppercase tracking-[0.2em]">
+      <div className="p-2.5 space-y-1 flex-1 flex flex-col justify-between">
+        <div className="min-w-0">
+          <h4 className="text-xs sm:text-sm font-black text-white truncate uppercase tracking-tight leading-tight">
+            {bird ? bird.name : 'Unknown'}
+          </h4>
+          <p className="text-[9px] font-black text-gold-500 uppercase tracking-widest truncate opacity-80">
             {bird?.species || 'Ringneck'}
           </p>
         </div>
         
         {bird && bird.mutations && bird.mutations.length > 0 && (
-          <div className="flex flex-wrap gap-1.5">
-            {bird.mutations.map((m, i) => (
-              <span key={i} className="text-[9px] px-2 py-1 bg-black/60 border border-white/10 rounded-lg text-white font-black uppercase tracking-tighter shadow-sm">
+          <div className="flex flex-wrap gap-1 mt-1">
+            {bird.mutations.slice(0, 2).map((m, i) => (
+              <span key={i} className="text-[7px] px-1.5 py-0.5 bg-white/5 border border-white/5 rounded text-white/60 font-bold uppercase truncate max-w-full">
                 {m}
               </span>
             ))}
+            {bird.mutations.length > 2 && (
+              <span className="text-[7px] text-white/30 font-bold">+{bird.mutations.length - 2}</span>
+            )}
           </div>
         )}
       </div>
@@ -2028,79 +2032,82 @@ function PairCard({ pair, male, female, cages, birds, currency, onBirdRef, onNav
     <Card 
       onClick={() => viewMode === 'list' && setIsExpanded(!isExpanded)}
       className={cn(
-        "group transition-all duration-300 overflow-hidden border-black-800 hover:border-gold-500/40 shadow-xl", 
-        effectiveViewMode === 'list' ? "flex flex-row items-center p-4 gap-4 cursor-pointer hover:bg-black-900/50" : "cursor-default"
+        "group transition-all duration-500 overflow-hidden border-black-800 hover:border-gold-500/40 shadow-2xl flex flex-col bg-zinc-900/40 backdrop-blur-sm", 
+        effectiveViewMode === 'list' ? "cursor-pointer hover:bg-black-900/50" : "cursor-default"
       )}
     >
-      <div className={cn("space-y-4 relative w-full", effectiveViewMode === 'list' ? "flex-1 flex flex-col space-y-3" : "p-4 sm:p-6")}>
-        {/* Cage Info at Top */}
-        <div className="flex items-center justify-between bg-black-900/80 -mx-4 sm:-mx-6 -mt-4 sm:-mt-6 px-4 sm:px-6 py-4 border-b border-black-800">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-gold-500/10 rounded-xl border border-gold-500/20">
-              <Home size={16} className="text-gold-500" />
-            </div>
-            <div className="flex flex-col">
-              <span className="text-[9px] font-black text-gold-500 uppercase tracking-widest leading-none mb-1">Location / Cage</span>
-              <span className="text-xs sm:text-sm font-black uppercase tracking-widest text-white">
-                {cage?.name || 'Unassigned'}
-              </span>
-            </div>
+      {/* Cage Header - Always on top */}
+      <div className="bg-black-950/80 px-4 py-2.5 border-b border-black-800 flex items-center justify-between relative z-10">
+        <div className="flex items-center gap-2.5">
+          <div className="p-1.5 bg-gold-500/10 rounded-lg border border-gold-500/20">
+            <Home size={12} className="text-gold-500" />
           </div>
-          <Badge variant={pair.status === 'Active' ? 'success' : 'neutral'} className="text-[10px] uppercase tracking-widest font-black px-4 py-1 rounded-full shadow-lg border border-white/5">{pair.status}</Badge>
+          <div className="flex flex-col">
+            <span className="text-[8px] font-black text-gold-500/60 uppercase tracking-[0.2em] leading-none mb-0.5">Aviary Unit</span>
+            <span className="text-[10px] sm:text-xs font-black uppercase tracking-widest text-white truncate max-w-[120px] sm:max-w-[180px]">
+              {cage?.name || 'Unassigned'}
+            </span>
+          </div>
         </div>
+        <Badge variant={pair.status === 'Active' ? 'success' : 'neutral'} className="text-[8px] px-3 py-1 rounded-full border border-white/5 shadow-inner">
+          {pair.status}
+        </Badge>
+      </div>
 
+      <div className={cn("p-3 sm:p-4 space-y-3 flex-1 flex flex-col", effectiveViewMode === 'list' ? "flex-row items-center gap-4 space-y-0" : "")}>
+        {/* Birds Section */}
         <div 
           onClick={(e) => { e.stopPropagation(); onNavigate('birds', pair.id); }}
           className={cn(
-            "cursor-pointer group/members py-2",
-            effectiveViewMode === 'list' ? "flex-1" : ""
+            "cursor-pointer flex gap-2 items-stretch relative",
+            effectiveViewMode === 'list' ? "flex-1" : "h-full"
           )}
         >
-          <div className="flex flex-col sm:flex-row gap-4 items-stretch">
-            <BirdInfo bird={male} sex="Male" />
-            <div className="hidden sm:flex items-center justify-center -mx-2 relative z-20">
-              <div className="p-2 bg-zinc-900 rounded-full border-4 border-zinc-800 shadow-xl">
-                <Heart size={24} className={cn(pair.status === 'Active' ? 'text-rose-500 fill-rose-500 animate-pulse' : 'text-black-700')} />
-              </div>
-            </div>
-            <BirdInfo bird={female} sex="Female" />
+          <BirdInfo bird={male} sex="Male" />
+          <div className="flex items-center justify-center relative z-10 -mx-1 sm:-mx-2">
+             <div className="p-1.5 sm:p-2 bg-zinc-900 rounded-full border-2 border-zinc-800 shadow-xl group-hover:scale-110 transition-transform duration-500">
+                <Heart size={14} className={cn(pair.status === 'Active' ? 'text-rose-500 fill-rose-500 animate-pulse' : 'text-black-700')} />
+             </div>
           </div>
+          <BirdInfo bird={female} sex="Female" />
         </div>
 
-        <div className="flex items-center justify-between text-[10px] text-white/40 uppercase tracking-widest font-black pt-2 border-t border-black-800/30">
-          <div className="flex items-center gap-2">
-            <Calendar size={14} className="text-gold-500" />
-            <span>Pairing Date: {pair.startDate || 'N/A'}</span>
-          </div>
-          {pair.endDate && (
-            <div className="flex items-center gap-2">
-              <span className="text-rose-500">Ended: {pair.endDate}</span>
+        {/* Footer Info & Actions */}
+        <div className={cn("space-y-3", effectiveViewMode === 'list' ? "w-48" : "mt-auto")}>
+          <div className="flex items-center justify-between text-[8px] text-white/30 uppercase tracking-widest font-black pt-2 border-t border-black-800/30">
+            <div className="flex items-center gap-1.5">
+              <Calendar size={10} className="text-gold-500/50" />
+              <span>{pair.startDate || 'N/A'}</span>
             </div>
-          )}
-        </div>
+            {pair.endDate && <span className="text-rose-500/60">Ended: {pair.endDate}</span>}
+          </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
-          <button 
-            onClick={(e) => { e.stopPropagation(); onNavigate('breeding', male?.name || female?.name || ''); }}
-            className="flex items-center justify-center gap-2 px-4 py-3 bg-gold-500/10 hover:bg-gold-500/20 text-gold-500 rounded-2xl transition-all border border-gold-500/20 group/btn"
-          >
-            <Egg size={16} className="group-hover/btn:scale-110 transition-transform" />
-            <span className="text-xs font-black uppercase tracking-widest whitespace-nowrap">Breeding</span>
-          </button>
-          <button 
-            onClick={(e) => { e.stopPropagation(); onEdit(); }} 
-            className="flex items-center justify-center gap-2 px-4 py-3 bg-zinc-800 hover:bg-zinc-700 text-white rounded-2xl transition-all border border-black-700 group/btn"
-          >
-            <Edit2 size={16} className="group-hover/btn:scale-110 transition-transform" />
-            <span className="text-xs font-black uppercase tracking-widest whitespace-nowrap">Edit</span>
-          </button>
-          <button 
-            onClick={(e) => { e.stopPropagation(); onDelete(); }} 
-            className="flex items-center justify-center gap-2 px-4 py-3 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-2xl transition-all border border-red-500/20 group/btn"
-          >
-            <Trash2 size={16} className="group-hover/btn:scale-110 transition-transform" />
-            <span className="text-xs font-black uppercase tracking-widest whitespace-nowrap">Delete</span>
-          </button>
+          <div className="grid grid-cols-3 gap-1.5">
+            <button 
+              onClick={(e) => { e.stopPropagation(); onNavigate('breeding', male?.name || female?.name || ''); }} 
+              className="flex flex-col items-center justify-center py-2 bg-gold-500/5 hover:bg-gold-500/10 text-gold-500 rounded-xl border border-gold-500/10 transition-all active:scale-95"
+              title="Breeding"
+            >
+              <Egg size={14} />
+              <span className="text-[7px] font-black uppercase mt-1">Breeding</span>
+            </button>
+            <button 
+              onClick={(e) => { e.stopPropagation(); onEdit(); }} 
+              className="flex flex-col items-center justify-center py-2 bg-zinc-800/50 hover:bg-zinc-700 text-white/60 rounded-xl border border-white/5 transition-all active:scale-95"
+              title="Edit"
+            >
+              <Edit2 size={14} />
+              <span className="text-[7px] font-black uppercase mt-1">Edit</span>
+            </button>
+            <button 
+              onClick={(e) => { e.stopPropagation(); onDelete(); }} 
+              className="flex flex-col items-center justify-center py-2 bg-rose-500/5 hover:bg-rose-500/10 text-rose-500 rounded-xl border border-rose-500/10 transition-all active:scale-95"
+              title="Delete"
+            >
+              <Trash2 size={14} />
+              <span className="text-[7px] font-black uppercase mt-1">Delete</span>
+            </button>
+          </div>
         </div>
       </div>
     </Card>
@@ -3304,7 +3311,71 @@ function PrintListModal({ birds, cages, onClose }: { birds: Bird[], cages: Cage[
     );
   });
 
-  const handlePrint = () => { setIsPrinting(true); setTimeout(() => { window.print(); const cleanup = () => { setIsPrinting(false); onClose(); window.removeEventListener('afterprint', cleanup); }; window.addEventListener('afterprint', cleanup); }, 800); };
+  const handlePrint = () => {
+    setIsPrinting(true);
+    
+    // Detect mobile
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    
+    if (isMobile) {
+      // For mobile, we open a new window with the content to print
+      const printWindow = window.open('', '_blank');
+      if (printWindow) {
+        // Wait for the portal to be rendered
+        setTimeout(() => {
+          const printContent = document.getElementById('print-area-portal')?.innerHTML;
+          const styles = Array.from(document.querySelectorAll('style, link[rel="stylesheet"]'))
+            .map(s => s.outerHTML)
+            .join('');
+            
+          printWindow.document.write(`
+            <html>
+              <head>
+                <title>Aviary Records</title>
+                ${styles}
+                <style>
+                  @page { size: A4 portrait; margin: 10mm; }
+                  body { background: white !important; color: black !important; padding: 20px; }
+                  .no-print { display: none !important; }
+                  #root { display: none !important; }
+                  table { width: 100% !important; border-collapse: collapse !important; }
+                  th, td { border: 1px solid #000 !important; padding: 8px !important; }
+                </style>
+              </head>
+              <body>
+                ${printContent}
+                <script>
+                  window.onload = () => {
+                    setTimeout(() => {
+                      window.print();
+                      window.onafterprint = () => window.close();
+                    }, 500);
+                  };
+                </script>
+              </body>
+            </html>
+          `);
+          printWindow.document.close();
+          setIsPrinting(false);
+          onClose();
+        }, 500);
+      } else {
+        toast.error("Please allow popups to print on mobile.");
+        setIsPrinting(false);
+      }
+    } else {
+      // Desktop behavior
+      setTimeout(() => {
+        window.print();
+        const cleanup = () => {
+          setIsPrinting(false);
+          onClose();
+          window.removeEventListener('afterprint', cleanup);
+        };
+        window.addEventListener('afterprint', cleanup);
+      }, 800);
+    }
+  };
 
   const toggleAll = () => {
     if (selectedBirds.length === filteredBirds.length) {
