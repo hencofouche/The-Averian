@@ -1145,7 +1145,7 @@ export default function App() {
 
       {/* Sidebar */}
       <aside className={cn(
-        "fixed inset-y-0 left-0 z-50 w-64 bg-black border-r border-black-800 p-4 flex flex-col transition-transform duration-300 ease-in-out md:sticky md:top-0 md:h-screen md:translate-x-0",
+        "fixed inset-y-0 left-0 z-50 w-64 bg-black border-r border-black-800 p-4 flex flex-col transition-transform duration-300 ease-in-out xl:sticky xl:top-0 xl:h-screen xl:translate-x-0",
         isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
       )}>
         <div className="flex items-center justify-between px-2 mb-10">
@@ -1229,10 +1229,10 @@ export default function App() {
 
       {/* Main Content */}
       <main className="flex-grow flex flex-col min-w-0 bg-black w-full">
-        <header className="shrink-0 bg-black/80 backdrop-blur-md border-b border-black-800 px-4 md:px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between sticky top-0 z-10 gap-4">
-          <div className="flex items-center justify-between w-full sm:w-auto">
+        <header className="shrink-0 bg-black/80 backdrop-blur-md border-b border-black-800 px-4 xl:px-6 py-4 flex flex-col xl:flex-row xl:items-center justify-between sticky top-0 z-10 gap-4">
+          <div className="flex items-center justify-between w-full xl:w-auto">
             <div className="flex items-center gap-3">
-              <button className="md:hidden p-2 -ml-2 text-black-50 hover:text-white" onClick={() => setIsMobileMenuOpen(true)}>
+              <button className="xl:hidden p-2 -ml-2 text-black-50 hover:text-white" onClick={() => setIsMobileMenuOpen(true)}>
                 <Menu size={24} />
               </button>
               <h2 className="text-xl font-black uppercase tracking-widest text-white">
@@ -1243,7 +1243,7 @@ export default function App() {
               </h2>
             </div>
             {activeTab !== 'settings' && activeTab !== 'genetics' && activeTab !== 'stats' && (
-              <div className="flex gap-2 sm:hidden">
+              <div className="flex gap-2 xl:hidden">
                 <Button onClick={() => setIsScanModalOpen(true)} className="py-3 px-4 text-sm font-bold bg-zinc-800 text-white hover:bg-zinc-700 hover:text-gold-500">
                   <Scan size={18} />
                 </Button>
@@ -1254,9 +1254,9 @@ export default function App() {
             )}
           </div>
           
-          <div className="flex items-center gap-2 w-full sm:w-auto mt-2 sm:mt-0">
+          <div className="flex items-center gap-2 w-full xl:w-auto mt-2 xl:mt-0">
             {activeTab !== 'settings' && activeTab !== 'genetics' && activeTab !== 'stats' && (
-              <div className="relative flex-1 sm:w-64">
+              <div className="relative flex-1 xl:w-64">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-black-100" size={16} />
                 <Input 
                   placeholder={`Search ${activeTab === 'tasks' ? 'tasks & reminders' : activeTab}...`} 
@@ -1310,12 +1310,12 @@ export default function App() {
             )}
             
             {activeTab !== 'settings' && activeTab !== 'genetics' && activeTab !== 'stats' && (
-              <div className="hidden sm:flex gap-2">
+              <div className="hidden xl:flex gap-2">
                 <Button onClick={() => setIsScanModalOpen(true)} className="py-3 px-4 text-sm font-bold uppercase tracking-widest bg-zinc-800 text-gold-500 border border-gold-500/20 hover:bg-zinc-700">
                   <Scan size={18} />
                   <span className="ml-2">Scan</span>
                 </Button>
-                <Button onClick={() => { setEditingItem(null); setIsModalOpen(true); }} className="py-3 px-5 text-sm font-bold uppercase tracking-widest">
+                <Button onClick={() => { setEditingItem(null); setIsModalOpen(true); }} className="py-3 px-5 text-sm font-bold uppercase tracking-widest text-black">
                   <Plus size={18} />
                   <span className="ml-2">
                     Add {
@@ -4515,14 +4515,16 @@ function ScannerModal({ isOpen, onClose, onScan }: { isOpen: boolean, onClose: (
         <div className="p-6 bg-black relative flex items-center justify-center min-h-[300px]">
            {isOpen && (
              <Scanner
-                onResult={(text) => {
-                  onScan(text);
-                  onClose();
+                onScan={(result) => {
+                  if (result && result.length > 0) {
+                    onScan(result[0].rawValue);
+                    onClose();
+                  }
                 }}
                 onError={(error) => {
                   console.error(error);
                 }}
-                components={{ audio: false, finder: false }}
+                components={{ finder: false }}
              />
            )}
            <div className="absolute inset-0 pointer-events-none border-[40px] border-black/80 z-10" />
