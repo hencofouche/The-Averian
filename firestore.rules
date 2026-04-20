@@ -221,9 +221,26 @@ service cloud.firestore {
              data.createdBy is string;
     }
 
+    function isValidContact(data) {
+      return hasRequiredFields(['name', 'type', 'uid']) &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             data.type in ['Buyer', 'Seller', 'Vet', 'Other', 'Both'] &&
+             (!('phone' in data) || (data.phone is string && data.phone.size() < 50)) &&
+             (!('email' in data) || (data.email is string && data.email.size() < 100)) &&
+             (!('address' in data) || (data.address is string && data.address.size() < 200)) &&
+             (!('notes' in data) || (data.notes is string && data.notes.size() < 2000));
+    }
+
     // ===============================================================
     // Rules
     // ===============================================================
+
+    match /contacts/{contactId} {
+      allow read: if isDocOwner();
+      allow create: if isAuthenticated() && isValidContact(request.resource.data) && (uidUnchanged() || isAdmin());
+      allow update: if isDocOwner() && isValidContact(request.resource.data) && uidNotModified();
+      allow delete: if isDocOwner();
+    }
 
     match /birds/{birdId} {
       allow read: if isDocOwner();

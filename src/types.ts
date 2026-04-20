@@ -22,6 +22,10 @@ export interface UserSettings {
   uid: string;
   currency?: string;
   account_expiry_date?: string; // ISO date string
+  themeColor?: string; // Hex color string
+  textColor?: string; 
+  backgroundColor?: string;
+  cardColor?: string;
 }
 
 export interface SharedItem {
@@ -53,6 +57,7 @@ export interface Bird {
   purchaseDate?: string;
   purchasePrice?: number;
   estimatedValue?: number;
+  boughtFromId?: string;
   uid: string;
 }
 
@@ -63,7 +68,20 @@ export interface Transaction {
   amount: number;
   date: string;
   birdId?: string;
+  pairId?: string;
+  contactId?: string;
   description?: string;
+  uid: string;
+}
+
+export interface Contact {
+  id: string;
+  name: string;
+  type: 'Buyer' | 'Seller' | 'Both';
+  email?: string;
+  phone?: string;
+  address?: string;
+  notes?: string;
   uid: string;
 }
 
@@ -80,6 +98,7 @@ export interface Pair {
   id: string;
   maleId: string;
   femaleId: string;
+  cageId?: string;
   startDate?: string;
   endDate?: string;
   status: 'Active' | 'Inactive';

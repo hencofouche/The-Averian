@@ -8,8 +8,12 @@ import {
   Tag, Calendar, ChevronDown, ChevronUp, ChevronRight, X, GitBranch,
   Image as ImageIcon, Loader2, DollarSign, TrendingUp, TrendingDown,
   Activity, ArrowUpRight, ArrowDownRight, BarChart3, PieChart as PieChartIcon,
-  Menu, Egg, LayoutGrid, Grid3x3, List as ListIcon, AlertTriangle, CreditCard, CheckCircle2, Bell, Cloud, Maximize2, Share2, Send, Printer, MoreHorizontal
+  Menu, Egg, LayoutGrid, Grid3x3, List as ListIcon, AlertTriangle, CreditCard, CheckCircle2, Bell, Cloud, Maximize2, Share2, Send, Printer, MoreHorizontal, Dna, Users, Palette, QrCode, Scan
 } from 'lucide-react';
+import GeneticsCalculator from './components/GeneticsCalculator';
+import { ContactsView } from './components/ContactsView';
+import { QRCodeSVG } from 'qrcode.react';
+import { Scanner } from '@yudiel/react-qr-scanner';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
@@ -26,10 +30,12 @@ import {
   updateDoc, deleteDoc, doc, getDocs, orderBy, setDoc, getDocFromServer
 } from 'firebase/firestore';
 import { 
-  Bird, Cage, Pair, Task, Transaction, OperationType, BreedingRecord, UserSettings, Species, SubSpecies, Mutation, SharedItem
+  Bird, Cage, Pair, Task, Transaction, OperationType, BreedingRecord, UserSettings, Species, SubSpecies, Mutation, SharedItem, Contact
 } from './types';
-import { cn } from './lib/utils';
-import { startOfDay, startOfWeek, startOfMonth, subDays, subWeeks, subMonths, isWithinInterval, parseISO } from 'date-fns';
+import { cn, generateColorPalette } from './lib/utils';
+import ColorWheel from '@uiw/react-color-wheel';
+import { hexToHsva, hsvaToHex } from '@uiw/color-convert';
+import { startOfDay, startOfWeek, startOfMonth, endOfMonth, endOfWeek, addDays, addMonths, isSameMonth, subDays, subWeeks, subMonths, isWithinInterval, parseISO } from 'date-fns';
 
 // --- Helpers ---
 const getCurrencySymbol = (currency?: string) => {
@@ -140,18 +146,30 @@ const Input = ({ className, id, name, ...props }: React.InputHTMLAttributes<HTML
 const Select = ({ className, children, id, name, ...props }: React.SelectHTMLAttributes<HTMLSelectElement>) => { const generatedId = React.useId(); return ( <select id={id || generatedId} name={name || id || generatedId} className={cn('w-full px-4 py-3 bg-black border border-black-700 text-white rounded-2xl focus:outline-none focus:ring-2 focus:ring-gold-500/20 focus:border-gold-500 transition-all appearance-none text-sm font-medium', className)} {...props} > {children} </select> ); };
 
 const Card = ({ children, className, ...props }: { children: React.ReactNode, className?: string } & React.HTMLAttributes<HTMLDivElement>) => (
-  <div className={cn('bg-zinc-800 border border-black-700 rounded-2xl overflow-hidden shadow-2xl', className)} {...props}>
+  <div className={cn('bg-black-950 border border-black-700 rounded-2xl overflow-hidden shadow-2xl', className)} {...props}>
     {children}
   </div>
 );
 
-const Badge = ({ children, className, variant = 'neutral' }: { children: React.ReactNode, className?: string, variant?: 'neutral' | 'success' | 'warning' | 'info' | 'destructive' }) => {
+const Textarea = ({ className, ...props }: React.TextareaHTMLAttributes<HTMLTextAreaElement>) => (
+  <textarea
+    className={cn(
+      "flex min-h-[80px] w-full rounded-xl border border-black-700 bg-black px-3 py-2 text-sm text-white ring-offset-black placeholder:text-zinc-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
+      className
+    )}
+    {...props}
+  />
+);
+
+const Badge = ({ children, className, variant = 'neutral' }: { children: React.ReactNode, className?: string, variant?: 'neutral' | 'success' | 'warning' | 'info' | 'destructive' | 'female' | 'male' }) => {
   const variants = {
     neutral: 'bg-black text-white border border-black-700',
     success: 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30',
     warning: 'bg-amber-500/20 text-amber-400 border border-amber-500/30',
     info: 'bg-gold-500/20 text-gold-400 border border-gold-500/30',
     destructive: 'bg-rose-500/20 text-rose-400 border border-rose-500/30',
+    female: 'bg-gold-500/20 text-gold-400 border border-gold-500/30',
+    male: 'bg-gold-500/20 text-gold-400 border border-gold-500/30',
   };
   return (
     <span className={cn('px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest', variants[variant], className)}>
@@ -160,7 +178,7 @@ const Badge = ({ children, className, variant = 'neutral' }: { children: React.R
   );
 };
 
-const SearchableSelect = ({ 
+export const SearchableSelect = ({ 
   label, 
   options, 
   value, 
@@ -342,15 +360,15 @@ function SubscriptionGate({ settings, onRenew, children }: { settings: UserSetti
   }
 
   return (
-    <div className="flex flex-col h-screen">
+    <div className="min-h-[100dvh] flex flex-col">
       {(daysLeft <= 30) && (
-        <div className="bg-gold-500 text-black-950 px-4 py-1.5 text-center text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 flex-shrink-0">
+        <div className="bg-gold-500 text-black-950 px-4 py-1.5 text-center text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 flex-shrink-0 sticky top-0 z-[60]">
           <AlertTriangle size={14} />
           {daysLeft === 0 ? "Last day" : `${daysLeft} days left`} in your {daysLeft <= 30 ? 'trial' : 'subscription'}
           <button onClick={handlePay} className="ml-4 underline hover:text-white transition-colors">Renew Now</button>
         </div>
       )}
-      <div className="flex-1 overflow-hidden">
+      <div className="flex-grow">
         {children}
       </div>
     </div>
@@ -364,9 +382,14 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'birds' | 'cages' | 'pairs' | 'breeding' | 'tasks' | 'financials' | 'settings' | 'subscription'>('birds');
+  const [isScanModalOpen, setIsScanModalOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<'birds' | 'cages' | 'pairs' | 'breeding' | 'financials' | 'tasks' | 'settings' | 'genetics' | 'contacts' | 'stats'>('birds');
+  const [statsFilter, setStatsFilter] = useState<{ birdId?: string, pairId?: string } | null>(null);
+  const [activeSubTab, setActiveSubTab] = useState<'overview' | 'pairs' | 'contacts'>('overview');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [viewMode, setViewMode] = useState<'grid-large' | 'list'>('grid-large');
+  const [taskViewMode, setTaskViewMode] = useState<'list' | 'calendar'>('list');
+  const [currentMonth, setCurrentMonth] = useState(new Date());
   const [viewingImage, setViewingImage] = useState<string | null>(null);
   
   const [birds, setBirds] = useState<Bird[]>([]);
@@ -375,6 +398,7 @@ export default function App() {
   const [breedingRecords, setBreedingRecords] = useState<BreedingRecord[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [contacts, setContacts] = useState<Contact[]>([]);
   const [userSettings, setUserSettings] = useState<UserSettings | null>(null);
   
   const [searchQuery, setSearchQuery] = useState('');
@@ -394,6 +418,41 @@ export default function App() {
       });
     }
     setDeleteConfirmation(null);
+  };
+
+  const handleScanResult = (text: string) => {
+    try {
+      const data = JSON.parse(text);
+      if (data.t === 'b') {
+        const bird = birds.find(b => b.id === data.id);
+        if (bird) {
+          setActiveTab('birds');
+          setSearchQuery(bird.name);
+        } else {
+          toast.error("Bird not found in your collection.");
+        }
+      } else if (data.t === 'p') {
+        const pair = pairs.find(p => p.id === data.id);
+        if (pair) {
+          setActiveTab('pairs');
+          setSearchQuery(pair.id);
+        } else {
+          toast.error("Pair not found in your collection.");
+        }
+      } else if (data.t === 'c') {
+        const cage = cages.find(c => c.id === data.id);
+        if (cage) {
+          setActiveTab('cages');
+          setSearchQuery(cage.name);
+        } else {
+          toast.error("Cage not found in your collection.");
+        }
+      } else {
+        toast.error("Invalid Averian QR code format.");
+      }
+    } catch(e) {
+      toast.error("Invalid QR code.");
+    }
   };
 
   useEffect(() => {
@@ -559,11 +618,18 @@ export default function App() {
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'tasks'));
 
     const qTransactions = query(collection(db, 'transactions'), where('uid', '==', user.uid), orderBy('date', 'desc'));
-    const fixingSettings = new Set<string>();
     const unsubTransactions = onSnapshot(qTransactions, (snapshot) => {
       setTransactions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Transaction)));
       setIsSyncing(snapshot.metadata.hasPendingWrites);
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'transactions'));
+
+    const qContacts = query(collection(db, 'contacts'), where('uid', '==', user.uid), orderBy('name', 'asc'));
+    const unsubContacts = onSnapshot(qContacts, (snapshot) => {
+      setContacts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Contact)));
+      setIsSyncing(snapshot.metadata.hasPendingWrites);
+    }, (err) => handleFirestoreError(err, OperationType.LIST, 'contacts'));
+
+    const fixingSettings = new Set<string>();
 
     const docRef = doc(db, 'userSettings', user.uid);
     const unsubSettings = onSnapshot(docRef, (docSnap: any) => {
@@ -616,6 +682,7 @@ export default function App() {
       unsubBreeding();
       unsubTasks();
       unsubTransactions();
+      unsubContacts();
       unsubSettings();
     };
   }, [user]);
@@ -645,10 +712,11 @@ export default function App() {
         });
       case 'cages':
         return cages
-          .filter(c => c.name.toLowerCase().includes(query))
+          .filter(c => c.id.toLowerCase() === query || c.name.toLowerCase().includes(query))
           .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
       case 'pairs':
         return pairs.filter(p => {
+          if (p.id.toLowerCase() === query) return true;
           const male = birds.find(b => b.id === p.maleId);
           const female = birds.find(b => b.id === p.femaleId);
           if (!male && !female) return false;
@@ -663,14 +731,16 @@ export default function App() {
           const female = birds.find(b => b.id === pair?.femaleId);
           return male?.name.toLowerCase().includes(query) || female?.name.toLowerCase().includes(query) || br.notes?.toLowerCase().includes(query);
         });
-      case 'tasks':
-        return tasks.filter(t => t.title.toLowerCase().includes(query));
       case 'financials':
         return transactions.filter(t => t.category.toLowerCase().includes(query) || t.description?.toLowerCase().includes(query));
+      case 'tasks':
+        return tasks.filter(t => t.title.toLowerCase().includes(query));
+      case 'contacts':
+        return contacts.filter(c => c.name.toLowerCase().includes(query));
       default:
         return [];
     }
-  }, [activeTab, birds, cages, pairs, tasks, searchQuery]);
+  }, [activeTab, birds, cages, pairs, tasks, transactions, contacts, searchQuery]);
 
   const handleLogin = async () => {
     if (isLoggingIn) return;
@@ -685,6 +755,39 @@ export default function App() {
       setIsLoggingIn(false);
     }
   };
+
+  useEffect(() => {
+    const root = document.documentElement;
+
+    if (userSettings?.themeColor) {
+      const palette = generateColorPalette(userSettings.themeColor);
+      Object.entries(palette).forEach(([shade, color]) => {
+        root.style.setProperty(`--theme-color-${shade}`, color);
+      });
+    } else {
+      ['50', '100', '200', '300', '400', '500', '600', '700', '800', '900', '950'].forEach(shade => {
+        root.style.removeProperty(`--theme-color-${shade}`);
+      });
+    }
+
+    if (userSettings?.textColor) {
+      root.style.setProperty('--theme-text-color', userSettings.textColor);
+    } else {
+      root.style.removeProperty('--theme-text-color');
+    }
+
+    if (userSettings?.backgroundColor) {
+      root.style.setProperty('--theme-bg-color', userSettings.backgroundColor);
+    } else {
+      root.style.removeProperty('--theme-bg-color');
+    }
+
+    if (userSettings?.cardColor) {
+      root.style.setProperty('--theme-card-color', userSettings.cardColor);
+    } else {
+      root.style.removeProperty('--theme-card-color');
+    }
+  }, [userSettings?.themeColor, userSettings?.textColor, userSettings?.backgroundColor, userSettings?.cardColor]);
 
   const handleUpdateSettings = async (newSettings: UserSettings) => {
     if (!user) return;
@@ -774,7 +877,7 @@ export default function App() {
               <BirdIcon size={40} />
             </div>
             <h1 className="text-5xl font-black tracking-tighter text-white">THE AV<span className="text-gold-500">ERIAN</span></h1>
-            <p className="text-black-50 font-medium">Professional bird breeding management</p>
+            <p className="text-black-50 font-medium">By The Averian</p>
           </div>
           <Button 
             onClick={handleLogin} 
@@ -795,10 +898,11 @@ export default function App() {
     );
   }
 
-  const handleNavigate = (tab: any, query: string = '') => {
+  const handleNavigate = (tab: any, query: string = '', filter: { birdId?: string, pairId?: string } | null = null) => {
     setActiveTab(tab);
     setSearchQuery(query);
     setIsMobileMenuOpen(false);
+    setStatsFilter(filter);
   };
 
   const handleBirdRef = (birdName: string) => {
@@ -930,7 +1034,7 @@ export default function App() {
                   <div>
                     <h2 className="text-3xl font-black text-white flex items-center gap-3">
                       {data.name}
-                      <Badge variant={data.sex === 'Male' ? 'info' : data.sex === 'Female' ? 'warning' : 'neutral'}>{data.sex}</Badge>
+                      <Badge variant={data.sex === 'Male' ? 'male' : data.sex === 'Female' ? 'female' : 'neutral'}>{data.sex}</Badge>
                     </h2>
                     <p className="text-gold-500 font-bold uppercase tracking-widest text-xs mt-1">
                       {data.species} {data.subSpecies ? `• ${data.subSpecies}` : ''}
@@ -1010,7 +1114,7 @@ export default function App() {
                     <p className="text-black-200 uppercase tracking-widest text-[10px] font-black">Residents ({data.birds.length})</p>
                     <div className="flex flex-wrap gap-2">
                       {data.birds.map((b: any, i: number) => (
-                        <Badge key={i} variant={b.sex === 'Male' ? 'info' : b.sex === 'Female' ? 'warning' : 'neutral'}>
+                        <Badge key={i} variant={b.sex === 'Male' ? 'male' : b.sex === 'Female' ? 'female' : 'neutral'}>
                           {b.name}
                         </Badge>
                       ))}
@@ -1033,7 +1137,7 @@ export default function App() {
 
   return (
     <SubscriptionGate settings={userSettings} onRenew={handleRenew}>
-      <div className="min-h-screen bg-black text-white flex font-sans overflow-hidden">
+      <div className="bg-black text-white flex flex-col md:flex-row font-sans min-h-[100dvh]">
       {/* Mobile Overlay */}
       {isMobileMenuOpen && (
         <div className="fixed inset-0 bg-black/80 z-40 md:hidden backdrop-blur-sm" onClick={() => setIsMobileMenuOpen(false)} />
@@ -1041,7 +1145,7 @@ export default function App() {
 
       {/* Sidebar */}
       <aside className={cn(
-        "fixed inset-y-0 left-0 z-50 w-64 bg-black border-r border-black-800 p-4 flex flex-col transition-transform duration-300 ease-in-out md:relative md:translate-x-0",
+        "fixed inset-y-0 left-0 z-50 w-64 bg-black border-r border-black-800 p-4 flex flex-col transition-transform duration-300 ease-in-out md:sticky md:top-0 md:h-screen md:translate-x-0",
         isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
       )}>
         <div className="flex items-center justify-between px-2 mb-10">
@@ -1061,10 +1165,11 @@ export default function App() {
           <NavItem active={activeTab === 'cages'} onClick={() => handleNavigate('cages')} icon={<Home size={18} />} label="Cages" count={cages.length} />
           <NavItem active={activeTab === 'pairs'} onClick={() => handleNavigate('pairs')} icon={<Heart size={18} />} label="Pairs" count={pairs.filter(p => birds.some(b => b.id === p.maleId) || birds.some(b => b.id === p.femaleId)).length} />
           <NavItem active={activeTab === 'breeding'} onClick={() => handleNavigate('breeding')} icon={<Egg size={18} />} label="Breeding" count={breedingRecords.length} />
-          <NavItem active={activeTab === 'tasks'} onClick={() => handleNavigate('tasks')} icon={<CheckSquare size={18} />} label="Tasks & Reminders" count={tasks.length} />
           <NavItem active={activeTab === 'financials'} onClick={() => handleNavigate('financials')} icon={<DollarSign size={18} />} label="Financials" count={transactions.length} />
-          <NavItem active={false} onClick={() => setIsPrintModalOpen(true)} icon={<Printer size={18} />} label="Print List" count={0} />
-          <NavItem active={activeTab === 'subscription'} onClick={() => handleNavigate('subscription')} icon={<CreditCard size={18} />} label="Subscription" count={0} />
+          <NavItem active={activeTab === 'genetics'} onClick={() => handleNavigate('genetics')} icon={<Dna size={18} />} label="Genetics" count={0} />
+          <NavItem active={activeTab === 'tasks'} onClick={() => handleNavigate('tasks')} icon={<CheckSquare size={18} />} label="Tasks & Reminders" count={tasks.length} />
+          <NavItem active={activeTab === 'contacts'} onClick={() => handleNavigate('contacts')} icon={<Users size={18} />} label="Contacts" count={contacts.length} />
+          <NavItem active={false} onClick={() => setIsPrintModalOpen(true)} icon={<QrCode size={18} />} label="Print QR & Lists" count={0} />
           <NavItem active={activeTab === 'settings'} onClick={() => handleNavigate('settings')} icon={<Tag size={18} />} label="Settings" count={0} />
         </nav>
 
@@ -1123,24 +1228,34 @@ export default function App() {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden bg-black">
+      <main className="flex-grow flex flex-col min-w-0 bg-black w-full">
         <header className="shrink-0 bg-black/80 backdrop-blur-md border-b border-black-800 px-4 md:px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between sticky top-0 z-10 gap-4">
           <div className="flex items-center justify-between w-full sm:w-auto">
             <div className="flex items-center gap-3">
               <button className="md:hidden p-2 -ml-2 text-black-50 hover:text-white" onClick={() => setIsMobileMenuOpen(true)}>
                 <Menu size={24} />
               </button>
-              <h2 className="text-xl font-black uppercase tracking-widest text-white">{activeTab === 'tasks' ? 'Tasks & Reminders' : activeTab}</h2>
+              <h2 className="text-xl font-black uppercase tracking-widest text-white">
+                {activeTab === 'tasks' ? 'Tasks & Reminders' : 
+                 activeTab === 'genetics' ? 'Genetics Engine' : 
+                 activeTab === 'stats' ? 'Entity Stats' :
+                 activeTab}
+              </h2>
             </div>
-            {activeTab !== 'settings' && activeTab !== 'subscription' && (
-              <Button onClick={() => { setEditingItem(null); setIsModalOpen(true); }} className="sm:hidden py-3 px-4 text-sm font-bold">
-                <Plus size={18} />
-              </Button>
+            {activeTab !== 'settings' && activeTab !== 'genetics' && activeTab !== 'stats' && (
+              <div className="flex gap-2 sm:hidden">
+                <Button onClick={() => setIsScanModalOpen(true)} className="py-3 px-4 text-sm font-bold bg-zinc-800 text-white hover:bg-zinc-700 hover:text-gold-500">
+                  <Scan size={18} />
+                </Button>
+                <Button onClick={() => { setEditingItem(null); setIsModalOpen(true); }} className="py-3 px-4 text-sm font-bold">
+                  <Plus size={18} />
+                </Button>
+              </div>
             )}
           </div>
           
           <div className="flex items-center gap-2 w-full sm:w-auto mt-2 sm:mt-0">
-            {activeTab !== 'settings' && activeTab !== 'subscription' && (
+            {activeTab !== 'settings' && activeTab !== 'genetics' && activeTab !== 'stats' && (
               <div className="relative flex-1 sm:w-64">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-black-100" size={16} />
                 <Input 
@@ -1160,7 +1275,24 @@ export default function App() {
               </div>
             )}
             
-            {activeTab !== 'financials' && activeTab !== 'tasks' && activeTab !== 'settings' && activeTab !== 'subscription' && (
+            {activeTab === 'tasks' && (
+              <div className="flex items-center bg-black-900 rounded-lg p-1 border border-black-800 shrink-0">
+                <button 
+                  onClick={() => setTaskViewMode('list')}
+                  className={cn("p-1.5 rounded-md transition-colors", taskViewMode === 'list' ? "bg-zinc-700 text-gold-500" : "text-black-100 hover:text-white")}
+                >
+                  <ListIcon size={16} />
+                </button>
+                <button 
+                  onClick={() => setTaskViewMode('calendar')}
+                  className={cn("p-1.5 rounded-md transition-colors", taskViewMode === 'calendar' ? "bg-zinc-700 text-gold-500" : "text-black-100 hover:text-white")}
+                >
+                  <Calendar size={16} />
+                </button>
+              </div>
+            )}
+            
+            {activeTab !== 'financials' && activeTab !== 'stats' && activeTab !== 'tasks' && activeTab !== 'settings' && activeTab !== 'genetics' && (
               <div className="flex items-center bg-black-900 rounded-lg p-1 border border-black-800 shrink-0">
                 <button 
                   onClick={() => setViewMode('grid-large')}
@@ -1177,16 +1309,29 @@ export default function App() {
               </div>
             )}
             
-            {activeTab !== 'settings' && activeTab !== 'subscription' && (
-              <Button onClick={() => { setEditingItem(null); setIsModalOpen(true); }} className="hidden sm:flex py-3 px-5 text-sm font-bold uppercase tracking-widest">
-                <Plus size={18} />
-                <span className="ml-2">Add {activeTab === 'breeding' ? 'Record' : activeTab === 'tasks' ? 'Task / Reminder' : activeTab.slice(0, -1)}</span>
-              </Button>
+            {activeTab !== 'settings' && activeTab !== 'genetics' && activeTab !== 'stats' && (
+              <div className="hidden sm:flex gap-2">
+                <Button onClick={() => setIsScanModalOpen(true)} className="py-3 px-4 text-sm font-bold uppercase tracking-widest bg-zinc-800 text-gold-500 border border-gold-500/20 hover:bg-zinc-700">
+                  <Scan size={18} />
+                  <span className="ml-2">Scan</span>
+                </Button>
+                <Button onClick={() => { setEditingItem(null); setIsModalOpen(true); }} className="py-3 px-5 text-sm font-bold uppercase tracking-widest">
+                  <Plus size={18} />
+                  <span className="ml-2">
+                    Add {
+                      activeTab === 'breeding' ? 'Record' : 
+                      activeTab === 'tasks' ? 'Task / Reminder' : 
+                      activeTab === 'financials' ? 'Transaction' :
+                      activeTab.slice(0, -1)
+                    }
+                  </span>
+                </Button>
+              </div>
             )}
           </div>
         </header>
 
-        <div className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar">
+        <div className={cn("custom-scrollbar", activeTab === 'genetics' ? "p-0" : "p-4 md:p-8")}>
           <AnimatePresence mode="wait">
             <motion.div
               key={activeTab}
@@ -1198,8 +1343,9 @@ export default function App() {
               <div className={cn(
                 "grid gap-4",
                 activeTab === 'tasks' ? "max-w-3xl mx-auto grid-cols-1" : 
-                activeTab === 'financials' ? "grid-cols-1" :
-                activeTab === 'settings' || activeTab === 'subscription' ? "grid-cols-1 max-w-7xl mx-auto w-full" :
+                activeTab === 'financials' || activeTab === 'stats' ? "grid-cols-1" :
+                activeTab === 'genetics' ? "grid-cols-1 w-full" :
+                activeTab === 'settings' ? "grid-cols-1 max-w-7xl mx-auto w-full" :
                 activeTab === 'pairs' && viewMode === 'grid-large' ? "grid-cols-1 md:grid-cols-2 max-w-5xl mx-auto" : viewMode === 'grid-large' ? "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5" :
                 "grid-cols-1 max-w-4xl mx-auto"
               )}>
@@ -1296,8 +1442,6 @@ export default function App() {
                         male={birds.find(b => b.id === pairs.find(p => p.id === record.pairId)?.maleId)}
                         female={birds.find(b => b.id === pairs.find(p => p.id === record.pairId)?.femaleId)}
                         birds={birds}
-                        viewMode={viewMode}
-                        onBirdRef={handleBirdRef}
                         onEdit={() => { setEditingItem(record); setIsModalOpen(true); }}
                         onDelete={() => setDeleteConfirmation({ 
                           title: 'Delete Breeding Record', 
@@ -1307,6 +1451,8 @@ export default function App() {
                             catch (e) { handleFirestoreError(e, OperationType.DELETE, 'breedingRecords'); }
                           }
                         })}
+                        onBirdRef={handleBirdRef}
+                        viewMode={viewMode}
                       />
                     ))
                   ) : (
@@ -1317,7 +1463,108 @@ export default function App() {
                   )
                 )}
 
+                {activeTab === 'financials' && (
+                  <FinancialsView 
+                    transactions={filteredItems as Transaction[]} 
+                    birds={birds} 
+                    contacts={contacts}
+                    currency={userSettings?.currency}
+                    onBirdRef={handleBirdRef}
+                    onEditTransaction={(t) => { setEditingItem(t); setIsModalOpen(true); }}
+                    onDeleteTransaction={(id) => setDeleteConfirmation({
+                      title: 'Delete Transaction',
+                      message: 'Are you sure you want to delete this transaction? This action cannot be undone.',
+                      onConfirm: async () => {
+                        try { await deleteDoc(doc(db, 'transactions', id)); }
+                        catch (e) { handleFirestoreError(e, OperationType.DELETE, 'transactions'); }
+                      }
+                    })}
+                  />
+                )}
+
+                {activeTab === 'stats' && statsFilter && (
+                  <EntityStatsView 
+                    filter={statsFilter}
+                    birds={birds}
+                    pairs={pairs}
+                    breedingRecords={breedingRecords}
+                    transactions={transactions}
+                    cages={cages}
+                    contacts={contacts}
+                    currency={userSettings?.currency}
+                    onBirdRef={handleBirdRef}
+                    onEditBreeding={(r) => { setEditingItem(r); setIsModalOpen(true); }}
+                    onDeleteBreeding={(id) => setDeleteConfirmation({
+                      title: 'Delete Breeding Record',
+                      message: 'Are you sure you want to delete this breeding record? This action cannot be undone.',
+                      onConfirm: async () => {
+                        try { await deleteDoc(doc(db, 'breedingRecords', id)); }
+                        catch (e) { handleFirestoreError(e, OperationType.DELETE, 'breedingRecords'); }
+                      }
+                    })}
+                    onEditTransaction={(t) => { setEditingItem(t); setIsModalOpen(true); }}
+                    onDeleteTransaction={(id) => setDeleteConfirmation({
+                      title: 'Delete Transaction',
+                      message: 'Are you sure you want to delete this transaction? This action cannot be undone.',
+                      onConfirm: async () => {
+                        try { await deleteDoc(doc(db, 'transactions', id)); }
+                        catch (e) { handleFirestoreError(e, OperationType.DELETE, 'transactions'); }
+                      }
+                    })}
+                  />
+                )}
+
+                {activeTab === 'genetics' && (
+                  <GeneticsCalculator userMutations={userSettings?.mutations || []} />
+                )}
+
                 {activeTab === 'tasks' && (
+                  taskViewMode === 'calendar' ? (
+                    <div className="bg-black-950 border border-black-800 rounded-2xl overflow-hidden">
+                      <div className="flex items-center justify-between p-4 border-b border-black-800">
+                        <h3 className="text-lg font-black text-white">{format(currentMonth, 'MMMM yyyy')}</h3>
+                        <div className="flex gap-2">
+                          <Button variant="secondary" className="px-3 py-1" onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}><ChevronDown className="rotate-90" size={16} /></Button>
+                          <Button variant="secondary" className="px-3 py-1" onClick={() => setCurrentMonth(new Date())}>Today</Button>
+                          <Button variant="secondary" className="px-3 py-1" onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}><ChevronRight size={16} /></Button>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-7 text-center border-b border-black-800 bg-black-900">
+                        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+                          <div key={day} className="py-2 text-[10px] font-black text-black-200 uppercase tracking-widest">{day}</div>
+                        ))}
+                      </div>
+                      <div className="grid grid-cols-7">
+                        {(() => {
+                          const monthStart = startOfMonth(currentMonth);
+                          const monthEnd = endOfMonth(monthStart);
+                          const startDate = startOfWeek(monthStart);
+                          const endDate = endOfWeek(monthEnd);
+                          const days = [];
+                          let day = startDate;
+                          while (day <= endDate) {
+                            const cloneDay = day;
+                            const formattedDate = format(cloneDay, 'yyyy-MM-dd');
+                            const dayTasks = tasks.filter(t => t.dueDate === formattedDate);
+                            days.push(
+                              <div key={day.toString()} className={cn("p-1 sm:p-2 border-b border-r border-black-800 min-h-[80px] sm:min-h-[100px]", !isSameMonth(day, monthStart) ? "text-black-500 bg-black/50" : "bg-black-950")}>
+                                <span className="text-xs font-bold">{format(day, 'd')}</span>
+                                <div className="mt-1 space-y-1">
+                                  {dayTasks.map(t => (
+                                    <div key={t.id} className="text-[9px] bg-gold-500/20 text-gold-400 p-1 rounded truncate cursor-pointer hover:bg-gold-500/30 transition-colors" onClick={() => { setEditingItem(t); setIsModalOpen(true); }}>
+                                      {t.title}
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            );
+                            day = addDays(day, 1);
+                          }
+                          return days;
+                        })()}
+                      </div>
+                    </div>
+                  ) : (
                   (filteredItems as Task[]).length > 0 ? (
                     (filteredItems as Task[]).map(task => (
                       <TaskCard 
@@ -1350,24 +1597,23 @@ export default function App() {
                       <p className="text-black-100 font-black uppercase tracking-widest">No tasks found</p>
                     </div>
                   )
+                  )
                 )}
 
-                {activeTab === 'financials' && (
-                  <FinancialsView 
-                    transactions={transactions} 
-                    filteredTransactions={filteredItems as Transaction[]}
-                    birds={birds}
-                    currency={userSettings?.currency}
-                    onBirdRef={handleBirdRef}
-                    onEdit={(t) => { setEditingItem(t); setIsModalOpen(true); }}
-                    onDelete={(id) => setDeleteConfirmation({ 
-                      title: 'Delete Transaction', 
-                      message: 'Are you sure you want to delete this transaction? This action cannot be undone.',
+                {activeTab === 'contacts' && (
+                  <ContactsView 
+                    contacts={contacts}
+                    transactions={transactions}
+                    onEdit={(c) => { setEditingItem(c); setIsModalOpen(true); }}
+                    onDelete={(id) => setDeleteConfirmation({
+                      title: 'Delete Contact',
+                      message: 'Are you sure you want to delete this contact? This action cannot be undone.',
                       onConfirm: async () => {
-                        try { await deleteDoc(doc(db, 'transactions', id)); }
-                        catch (e) { handleFirestoreError(e, OperationType.DELETE, 'transactions'); }
+                        try { await deleteDoc(doc(db, 'contacts', id)); }
+                        catch (e) { handleFirestoreError(e, OperationType.DELETE, 'contacts'); }
                       }
                     })}
+                    symbol={getCurrencySymbol(userSettings?.currency)}
                   />
                 )}
 
@@ -1375,17 +1621,11 @@ export default function App() {
                   <SettingsView 
                     settings={userSettings} 
                     onUpdate={handleUpdateSettings} 
-                    allData={{ birds, cages, pairs, breedingRecords, tasks, transactions, userSettings }}
+                    allData={{ birds, cages, pairs, breedingRecords, tasks, transactions, contacts, userSettings }}
                     user={user}
                     isSyncing={isSyncing}
                     setDeleteConfirmation={setDeleteConfirmation}
-                  />
-                )}
-
-                {activeTab === 'subscription' && userSettings && (
-                  <SubscriptionView 
-                    settings={userSettings} 
-                    onRenew={handleRenew} 
+                    onRenew={handleRenew}
                   />
                 )}
               </div>
@@ -1397,7 +1637,12 @@ export default function App() {
       <Modal 
         isOpen={isModalOpen} 
         onClose={() => { setIsModalOpen(false); setEditingItem(null); }}
-        title={`${editingItem ? 'Edit' : 'Add'} ${activeTab === 'breeding' ? 'Record' : activeTab === 'tasks' ? 'Task / Reminder' : activeTab.slice(0, -1)}`}
+        title={`${editingItem ? 'Edit' : 'Add'} ${
+          activeTab === 'breeding' ? 'Breeding Record' :
+          activeTab === 'financials' ? 'Transaction' :
+          activeTab === 'tasks' ? 'Task / Reminder' : 
+          activeTab.slice(0, -1)
+        }`}
       >
         {activeTab === 'birds' && (
           <BirdForm 
@@ -1406,6 +1651,7 @@ export default function App() {
             cages={cages} 
             birds={birds} 
             pairs={pairs}
+            contacts={contacts}
             userSettings={userSettings}
             onAddSpecies={handleAddSpecies}
             onAddSubSpecies={handleAddSubSpecies}
@@ -1417,16 +1663,23 @@ export default function App() {
         {activeTab === 'pairs' && <PairForm user={user} initialData={editingItem} birds={birds} onClose={() => setIsModalOpen(false)} />}
         {activeTab === 'breeding' && <BreedingRecordForm user={user} initialData={editingItem} pairs={pairs} birds={birds} onClose={() => setIsModalOpen(false)} />}
         {activeTab === 'tasks' && <TaskForm user={user} initialData={editingItem} birds={birds} onClose={() => setIsModalOpen(false)} />}
-        {activeTab === 'financials' && <TransactionForm user={user} initialData={editingItem} birds={birds} currency={userSettings?.currency} onClose={() => setIsModalOpen(false)} />}
+        {activeTab === 'financials' && <TransactionForm user={user} initialData={editingItem} birds={birds} pairs={pairs} contacts={contacts} currency={userSettings?.currency} onClose={() => setIsModalOpen(false)} />}
+        {activeTab === 'contacts' && <ContactForm user={user} initialData={editingItem} onClose={() => setIsModalOpen(false)} />}
       </Modal>
 
       <Modal
         isOpen={isPrintModalOpen}
         onClose={() => setIsPrintModalOpen(false)}
-        title="Print List"
+        title="Print QR & List"
       >
-        <PrintListModal birds={birds} cages={cages} onClose={() => setIsPrintModalOpen(false)} />
+        <PrintAndQRModal birds={birds} pairs={pairs} cages={cages} onClose={() => setIsPrintModalOpen(false)} />
       </Modal>
+
+      <ScannerModal 
+        isOpen={isScanModalOpen}
+        onClose={() => setIsScanModalOpen(false)}
+        onScan={handleScanResult}
+      />
 
       <ConfirmModal 
         isOpen={!!deleteConfirmation}
@@ -1610,7 +1863,7 @@ function ShareBirdModal({ bird, mother, father, mate, onClose }: { bird: Bird, m
   );
 }
 
-function BirdCard({ bird, cage, birds, viewMode = 'grid-large', currency, onBirdRef, onNavigate, onEdit, onDelete }: { bird: Bird, cage?: Cage, birds: Bird[], viewMode?: 'grid-large' | 'list', currency?: string, onBirdRef: (name: string) => void, onNavigate: (tab: string, query?: string) => void, onEdit: () => void, onDelete: () => void }) {
+function BirdCard({ bird, cage, birds, viewMode = 'grid-large', currency, onBirdRef, onNavigate, onEdit, onDelete }: { bird: Bird, cage?: Cage, birds: Bird[], viewMode?: 'grid-large' | 'list', currency?: string, onBirdRef: (name: string) => void, onNavigate: (tab: string, query?: string, filter?: any) => void, onEdit: () => void, onDelete: () => void }) {
   const [showTree, setShowTree] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [fullscreenImage, setFullscreenImage] = useState(false);
@@ -1707,7 +1960,7 @@ function BirdCard({ bird, cage, birds, viewMode = 'grid-large', currency, onBird
           <div className="space-y-1 min-w-0 flex-1">
             <h3 className={cn("font-black text-white flex items-center gap-2 tracking-tight text-lg")}>
               <span className="truncate">{bird.name}</span>
-              <Badge variant={bird.sex === 'Male' ? 'info' : bird.sex === 'Female' ? 'warning' : 'neutral'} className="shrink-0">{bird.sex}</Badge>
+              <Badge variant={bird.sex === 'Male' ? 'male' : bird.sex === 'Female' ? 'female' : 'neutral'} className="shrink-0">{bird.sex}</Badge>
             </h3>
             
             {/* 2. Species & Sub-species */}
@@ -1765,7 +2018,7 @@ function BirdCard({ bird, cage, birds, viewMode = 'grid-large', currency, onBird
             </div>
           )}
         </div>
-<div className="pt-2 border-t border-black-800/50"> <button onClick={(e) => { e.stopPropagation(); setShowActions(!showActions); }} className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-xl transition-all border border-black-700"> <MoreHorizontal size={16} /> <span className="text-[10px] font-black uppercase tracking-widest">Actions</span> </button> <AnimatePresence> {showActions && ( <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden"> <div className="flex flex-wrap items-center gap-2 pt-2"> <button onClick={(e) => { e.stopPropagation(); onNavigate('breeding', bird.name); }} className="flex-1 p-2 bg-gold-500/10 border border-gold-500/20 rounded-lg text-[10px] text-gold-500 font-black uppercase tracking-widest hover:bg-gold-500/20 transition-colors flex items-center justify-center gap-2 min-w-[100px]"> <Egg size={12} className="text-gold-500" /> Breeding </button> <button onClick={handleShare} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-zinc-700 hover:bg-zinc-600 text-white hover:text-gold-500 rounded-lg transition-all border border-black-700 min-w-[100px]"> <Share2 size={14} /> <span className="text-[9px] font-black uppercase tracking-widest">Share</span> </button> </div> <div className="flex flex-wrap items-center gap-2 pt-2"> <button onClick={(e) => { e.stopPropagation(); setShowTree(!showTree); }} className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 bg-gold-500/10 hover:bg-gold-500/20 text-gold-500 rounded-xl transition-all border border-gold-500/20 group/btn min-w-[80px]"> <GitBranch size={16} className="group-hover/btn:scale-110 transition-transform" /> <span className="text-[10px] font-black uppercase tracking-widest whitespace-nowrap">Pedigree</span> </button> <button onClick={(e) => { e.stopPropagation(); onEdit(); }} className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-white rounded-xl transition-all border border-black-700 group/btn min-w-[80px]"> <Edit2 size={16} className="group-hover/btn:scale-110 transition-transform" /> <span className="text-[10px] font-black uppercase tracking-widest whitespace-nowrap">Edit</span> </button> <button onClick={(e) => { e.stopPropagation(); onDelete(); }} className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-xl transition-all border border-red-500/20 group/btn min-w-[80px]"> <Trash2 size={16} className="group-hover/btn:scale-110 transition-transform" /> <span className="text-[10px] font-black uppercase tracking-widest whitespace-nowrap">Delete</span> </button> </div> </motion.div> )} </AnimatePresence> </div> <Modal isOpen={isShareModalOpen} onClose={() => setIsShareModalOpen(false)} title="Share Bird"> <ShareBirdModal bird={bird} mother={mother} father={father} mate={mate} onClose={() => setIsShareModalOpen(false)} /> </Modal>
+<div className="pt-2 border-t border-black-800/50"> <button onClick={(e) => { e.stopPropagation(); setShowActions(!showActions); }} className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-xl transition-all border border-black-700"> <MoreHorizontal size={16} /> <span className="text-[10px] font-black uppercase tracking-widest">Actions</span> </button> <AnimatePresence> {showActions && ( <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden"> <div className="flex flex-wrap items-center gap-2 pt-2"> <button onClick={(e) => { e.stopPropagation(); onNavigate('stats', '', { birdId: bird.id }); }} className="flex-1 p-2 bg-gold-500/10 border border-gold-500/20 rounded-lg text-[10px] text-gold-500 font-black uppercase tracking-widest hover:bg-gold-500/20 transition-colors flex items-center justify-center gap-2 min-w-[100px]"> <Egg size={12} className="text-gold-500" /> Breeding </button> <button onClick={handleShare} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-zinc-700 hover:bg-zinc-600 text-white hover:text-gold-500 rounded-lg transition-all border border-black-700 min-w-[100px]"> <Share2 size={14} /> <span className="text-[9px] font-black uppercase tracking-widest">Share</span> </button> </div> <div className="flex flex-wrap items-center gap-2 pt-2"> <button onClick={(e) => { e.stopPropagation(); setShowTree(!showTree); }} className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 bg-gold-500/10 hover:bg-gold-500/20 text-gold-500 rounded-xl transition-all border border-gold-500/20 group/btn min-w-[80px]"> <GitBranch size={16} className="group-hover/btn:scale-110 transition-transform" /> <span className="text-[10px] font-black uppercase tracking-widest whitespace-nowrap">Pedigree</span> </button> <button onClick={(e) => { e.stopPropagation(); onEdit(); }} className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-white rounded-xl transition-all border border-black-700 group/btn min-w-[80px]"> <Edit2 size={16} className="group-hover/btn:scale-110 transition-transform" /> <span className="text-[10px] font-black uppercase tracking-widest whitespace-nowrap">Edit</span> </button> <button onClick={(e) => { e.stopPropagation(); onDelete(); }} className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-xl transition-all border border-red-500/20 group/btn min-w-[80px]"> <Trash2 size={16} className="group-hover/btn:scale-110 transition-transform" /> <span className="text-[10px] font-black uppercase tracking-widest whitespace-nowrap">Delete</span> </button> </div> </motion.div> )} </AnimatePresence> </div> <Modal isOpen={isShareModalOpen} onClose={() => setIsShareModalOpen(false)} title="Share Bird"> <ShareBirdModal bird={bird} mother={mother} father={father} mate={mate} onClose={() => setIsShareModalOpen(false)} /> </Modal>
         <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-black-800/50">
           {viewMode === 'list' && (
             <button 
@@ -1868,7 +2121,7 @@ function BirdCard({ bird, cage, birds, viewMode = 'grid-large', currency, onBird
   );
 }
 
-function CageCard({ cage, birds, viewMode = 'grid-large', onBirdRef, onNavigate, onEdit, onDelete }: { cage: Cage, birds: Bird[], viewMode?: 'grid-large' | 'list', onBirdRef: (name: string) => void, onNavigate: (tab: string, query?: string) => void, onEdit: () => void, onDelete: () => void }) {
+function CageCard({ cage, birds, viewMode = 'grid-large', onBirdRef, onNavigate, onEdit, onDelete }: { cage: Cage, birds: Bird[], viewMode?: 'grid-large' | 'list', onBirdRef: (name: string) => void, onNavigate: (tab: string, query?: string, filter?: any) => void, onEdit: () => void, onDelete: () => void }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const effectiveViewMode = (viewMode === 'list' && isExpanded) ? 'grid-large' : viewMode;
   const cageBirds = birds.filter(b => b.cageId === cage.id);
@@ -1937,7 +2190,7 @@ function CageCard({ cage, birds, viewMode = 'grid-large', onBirdRef, onNavigate,
             <div className="flex flex-col gap-2 pointer-events-none">
               {cageBirds.map(b => (
                 <div key={b.id} className="flex items-center gap-2 flex-wrap bg-black/20 p-2 rounded-lg border border-white/5">
-                  <Badge variant={b.sex === 'Male' ? 'info' : b.sex === 'Female' ? 'warning' : 'neutral'} className="text-[8px] px-1 py-0 shrink-0">
+                  <Badge variant={b.sex === 'Male' ? 'male' : b.sex === 'Female' ? 'female' : 'neutral'} className="text-[8px] px-1 py-0 shrink-0">
                     {b.sex === 'Male' ? 'M' : b.sex === 'Female' ? 'F' : '?'}
                   </Badge>
                   <span className="text-xs font-bold text-white truncate max-w-[120px]">{b.name}</span>
@@ -1985,7 +2238,7 @@ function CageCard({ cage, birds, viewMode = 'grid-large', onBirdRef, onNavigate,
   );
 }
 
-function PairCard({ pair, male, female, cages, birds, currency, onBirdRef, onNavigate, onEdit, onDelete, viewMode = 'grid-large' }: { pair: Pair, male?: Bird, female?: Bird, cages: Cage[], birds: Bird[], currency?: string, onBirdRef: (name: string) => void, onNavigate: (tab: string, query?: string) => void, onEdit: () => void, onDelete: () => void, viewMode?: 'grid-large' | 'list' }) {
+function PairCard({ pair, male, female, cages, birds, currency, onBirdRef, onNavigate, onEdit, onDelete, viewMode = 'grid-large' }: { pair: Pair, male?: Bird, female?: Bird, cages: Cage[], birds: Bird[], currency?: string, onBirdRef: (name: string) => void, onNavigate: (tab: string, query?: string, filter?: any) => void, onEdit: () => void, onDelete: () => void, viewMode?: 'grid-large' | 'list' }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const effectiveViewMode = (viewMode === 'list' && !isExpanded) ? 'list' : 'grid-large';
   const cage = cages.find(c => c.id === (male?.cageId || female?.cageId));
@@ -2062,7 +2315,7 @@ function PairCard({ pair, male, female, cages, birds, currency, onBirdRef, onNav
         <div className="flex items-center gap-3 flex-1 min-w-0">
           <div className="flex-1 min-w-0 space-y-1.5">
             <div className="flex items-center gap-2 flex-wrap">
-              <Badge variant="info" className="text-[8px] px-1 py-0 shrink-0">M</Badge>
+              <Badge variant="male" className="text-[8px] px-1 py-0 shrink-0">M</Badge>
               <span className="text-xs font-bold text-white truncate max-w-[120px]">{male?.name || 'Unknown'}</span>
               <span className="text-[9px] text-black-400 truncate uppercase tracking-widest">
                 {male?.species}{male?.subSpecies ? ` • ${male.subSpecies}` : ''}
@@ -2079,7 +2332,7 @@ function PairCard({ pair, male, female, cages, birds, currency, onBirdRef, onNav
               )}
             </div>
             <div className="flex items-center gap-2 flex-wrap">
-              <Badge variant="warning" className="text-[8px] px-1 py-0 shrink-0">F</Badge>
+              <Badge variant="female" className="text-[8px] px-1 py-0 shrink-0">F</Badge>
               <span className="text-xs font-bold text-white truncate max-w-[120px]">{female?.name || 'Unknown'}</span>
               <span className="text-[9px] text-black-400 truncate uppercase tracking-widest">
                 {female?.species}{female?.subSpecies ? ` • ${female.subSpecies}` : ''}
@@ -2164,7 +2417,7 @@ function PairCard({ pair, male, female, cages, birds, currency, onBirdRef, onNav
 
           <div className="grid grid-cols-3 gap-1.5">
             <button 
-              onClick={(e) => { e.stopPropagation(); onNavigate('breeding', male?.name || female?.name || ''); }} 
+              onClick={(e) => { e.stopPropagation(); onNavigate('stats', '', { pairId: pair.id }); }} 
               className="flex flex-col items-center justify-center py-2 bg-gold-500/5 hover:bg-gold-500/10 text-gold-500 rounded-xl border border-gold-500/10 transition-all active:scale-95"
               title="Breeding"
             >
@@ -2194,44 +2447,51 @@ function PairCard({ pair, male, female, cages, birds, currency, onBirdRef, onNav
   );
 }
 
-function FinancialsView({ transactions, filteredTransactions, birds, currency, onBirdRef, onEdit, onDelete }: { transactions: Transaction[], filteredTransactions: Transaction[], birds: Bird[], currency?: string, onBirdRef: (name: string) => void, onEdit: (t: Transaction) => void, onDelete: (id: string) => void }) {
+function FinancialsView({ 
+  transactions, 
+  birds, 
+  contacts,
+  currency, 
+  onBirdRef, 
+  onEditTransaction, 
+  onDeleteTransaction
+}: { 
+  transactions: Transaction[], 
+  birds: Bird[], 
+  contacts: Contact[],
+  currency?: string, 
+  onBirdRef: (name: string) => void, 
+  onEditTransaction: (t: Transaction) => void, 
+  onDeleteTransaction: (id: string) => void
+}) {
   const [timeRange, setTimeRange] = useState<'daily' | 'weekly' | 'monthly'>('weekly');
   const symbol = getCurrencySymbol(currency);
 
   const stats = useMemo(() => {
     const income = transactions.filter(t => t.type === 'Income').reduce((acc, t) => acc + t.amount, 0);
     const expenses = transactions.filter(t => t.type === 'Expense').reduce((acc, t) => acc + t.amount, 0);
-    const birdValue = birds.reduce((acc, b) => acc + (b.estimatedValue || 0), 0);
-    const birdCost = birds.reduce((acc, b) => acc + (b.purchasePrice || 0), 0);
     
     return {
       totalIncome: income,
       totalExpenses: expenses,
-      netProfit: income - expenses,
-      totalBirdValue: birdValue,
-      totalBirdCost: birdCost,
-      inventoryValue: birdValue - birdCost
+      netProfit: income - expenses
     };
-  }, [transactions, birds]);
+  }, [transactions]);
 
   const chartData = useMemo(() => {
     const now = new Date();
-    let startDate: Date;
-    let formatStr: string;
     let points: number;
+    let formatStr: string;
 
     if (timeRange === 'daily') {
-      startDate = subDays(now, 7);
-      formatStr = 'EEE';
       points = 7;
+      formatStr = 'EEE';
     } else if (timeRange === 'weekly') {
-      startDate = subWeeks(now, 4);
-      formatStr = 'MMM d';
       points = 4;
+      formatStr = 'MMM d';
     } else {
-      startDate = subMonths(now, 6);
-      formatStr = 'MMM';
       points = 6;
+      formatStr = 'MMM';
     }
 
     const data: any[] = [];
@@ -2270,7 +2530,7 @@ function FinancialsView({ transactions, filteredTransactions, birds, currency, o
   return (
     <div className="space-y-6 max-w-6xl mx-auto">
       {/* Summary Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4">
         <Card className="p-4 sm:p-5 bg-zinc-800 border-black-700 flex flex-col justify-between">
           <div className="flex items-center justify-between mb-3 sm:mb-4">
             <p className="text-[8px] sm:text-[10px] font-black text-white uppercase tracking-widest">Net Profit</p>
@@ -2278,23 +2538,13 @@ function FinancialsView({ transactions, filteredTransactions, birds, currency, o
           </div>
           <div>
             <p className="text-xl sm:text-2xl font-black text-white tracking-tight">{symbol}{stats.netProfit.toFixed(2)}</p>
-            <p className="text-[8px] sm:text-[9px] text-white/50 mt-1 font-bold uppercase tracking-tighter">Total income minus expenses</p>
-          </div>
-        </Card>
-        <Card className="p-4 sm:p-5 bg-zinc-800 border-black-700 flex flex-col justify-between">
-          <div className="flex items-center justify-between mb-3 sm:mb-4">
-            <p className="text-[8px] sm:text-[10px] font-black text-white uppercase tracking-widest">Inventory Value</p>
-            <Activity size={16} className="text-gold-500" />
-          </div>
-          <div>
-            <p className="text-xl sm:text-2xl font-black text-white tracking-tight">{symbol}{stats.totalBirdValue.toFixed(2)}</p>
-            <p className="text-[8px] sm:text-[9px] text-white mt-1 font-bold uppercase tracking-tighter">Est. value of all birds</p>
+            <p className="text-[8px] sm:text-[9px] text-white/50 mt-1 font-bold uppercase tracking-tighter">Overall Performance</p>
           </div>
         </Card>
         <Card className="p-4 sm:p-5 bg-zinc-800 border-black-700 flex flex-col justify-between">
           <div className="flex items-center justify-between mb-3 sm:mb-4">
             <p className="text-[8px] sm:text-[10px] font-black text-white uppercase tracking-widest">Total Income</p>
-            <ArrowUpRight size={16} className="text-emerald-500" />
+            <ArrowUpRight size={16} className="text-emerald-400" />
           </div>
           <div>
             <p className="text-xl sm:text-2xl font-black text-emerald-500 tracking-tight">{symbol}{stats.totalIncome.toFixed(2)}</p>
@@ -2303,7 +2553,7 @@ function FinancialsView({ transactions, filteredTransactions, birds, currency, o
         <Card className="p-4 sm:p-5 bg-zinc-800 border-black-700 flex flex-col justify-between">
           <div className="flex items-center justify-between mb-3 sm:mb-4">
             <p className="text-[8px] sm:text-[10px] font-black text-white uppercase tracking-widest">Total Expenses</p>
-            <ArrowDownRight size={16} className="text-rose-500" />
+            <ArrowDownRight size={16} className="text-rose-400" />
           </div>
           <div>
             <p className="text-xl sm:text-2xl font-black text-rose-500 tracking-tight">{symbol}{stats.totalExpenses.toFixed(2)}</p>
@@ -2319,7 +2569,7 @@ function FinancialsView({ transactions, filteredTransactions, birds, currency, o
               <div className="p-2 bg-gold-500/10 rounded-lg">
                 <BarChart3 size={20} className="text-gold-500" />
               </div>
-              <h3 className="font-black text-lg text-white tracking-tight uppercase">Performance</h3>
+              <h3 className="font-black text-lg text-white tracking-tight uppercase">Financial Performance</h3>
             </div>
             <div className="flex bg-black p-1 rounded-xl border border-black-700">
               {(['daily', 'weekly', 'monthly'] as const).map(range => (
@@ -2347,11 +2597,12 @@ function FinancialsView({ transactions, filteredTransactions, birds, currency, o
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#1f1f1f" />
                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#525252', fontWeight: 'bold' }} dy={10} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#525252', fontWeight: 'bold' }} tickFormatter={(v) => `$${v}`} />
+                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#525252', fontWeight: 'bold' }} tickFormatter={(v) => `${symbol}${v}`} />
                 <Tooltip 
                   contentStyle={{ backgroundColor: '#0a0a0a', borderRadius: '12px', border: '1px solid #1f1f1f', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.5)' }}
                   itemStyle={{ fontSize: '11px', fontWeight: 'bold' }}
                   labelStyle={{ color: '#d4af37', fontWeight: 'black', marginBottom: '4px', textTransform: 'uppercase', fontSize: '10px', letterSpacing: '0.1em' }}
+                  formatter={(value: any) => [`${symbol}${value}`, '']}
                 />
                 <Area type="monotone" dataKey="profit" stroke="#d4af37" strokeWidth={3} fillOpacity={1} fill="url(#colorProfit)" />
                 <Area type="monotone" dataKey="income" stroke="#10b981" strokeWidth={2} fill="transparent" strokeDasharray="5 5" />
@@ -2362,25 +2613,27 @@ function FinancialsView({ transactions, filteredTransactions, birds, currency, o
         </Card>
 
         {/* Transactions List */}
-        <div className="flex flex-col space-y-4">
+        <div className="flex flex-col space-y-4 lg:col-span-1">
           <div className="flex items-center justify-between">
             <h3 className="font-black text-white uppercase tracking-widest text-sm">Recent Transactions</h3>
           </div>
           <div className="grid gap-3 overflow-y-auto pr-2 custom-scrollbar" style={{ maxHeight: 'calc(100vh - 350px)' }}>
-            {filteredTransactions.map(t => (
+            {transactions.map(t => (
               <TransactionCard 
                 key={t.id} 
                 transaction={t} 
                 bird={birds.find(b => b.id === t.birdId)}
+                contact={contacts.find(c => c.id === t.contactId)}
                 onBirdRef={onBirdRef}
-                onEdit={() => onEdit(t)}
-                onDelete={() => onDelete(t.id)}
+                onEdit={() => onEditTransaction(t)}
+                onDelete={() => onDeleteTransaction(t.id)}
                 viewMode="list"
+                currency={currency}
               />
             ))}
-            {filteredTransactions.length === 0 && (
+            {transactions.length === 0 && (
               <div className="text-center py-12 bg-black/50 border border-dashed border-black-700 rounded-2xl">
-                <DollarSign size={32} className="mx-auto text-white mb-2" />
+                <Activity size={32} className="mx-auto text-white mb-2" />
                 <p className="text-white text-sm font-bold uppercase tracking-widest">No transactions found</p>
               </div>
             )}
@@ -2391,7 +2644,311 @@ function FinancialsView({ transactions, filteredTransactions, birds, currency, o
   );
 }
 
-function TransactionCard({ transaction, bird, currency, onBirdRef, onEdit, onDelete, viewMode = 'list' }: { transaction: Transaction, bird?: Bird, currency?: string, onBirdRef: (name: string) => void, onEdit: () => void, onDelete: () => void, viewMode?: 'grid-large' | 'list' }) {
+function EntityStatsView({
+  filter,
+  birds,
+  pairs,
+  breedingRecords,
+  transactions,
+  cages,
+  contacts,
+  currency,
+  onBirdRef,
+  onEditBreeding,
+  onDeleteBreeding,
+  onEditTransaction,
+  onDeleteTransaction
+}: {
+  filter: { birdId?: string, pairId?: string },
+  birds: Bird[],
+  pairs: Pair[],
+  breedingRecords: BreedingRecord[],
+  transactions: Transaction[],
+  cages: Cage[],
+  contacts: Contact[],
+  currency?: string,
+  onBirdRef: (name: string) => void,
+  onEditBreeding: (r: BreedingRecord) => void,
+  onDeleteBreeding: (id: string) => void,
+  onEditTransaction: (t: Transaction) => void,
+  onDeleteTransaction: (id: string) => void
+}) {
+  const [activeTab, setActiveTab] = useState<'roi' | 'breeding'>('roi');
+  const [searchQuery, setSearchQuery] = useState('');
+  const symbol = getCurrencySymbol(currency);
+
+  const entityName = useMemo(() => {
+    if (filter.birdId) {
+      return birds.find(b => b.id === filter.birdId)?.name || 'Unknown Bird';
+    }
+    if (filter.pairId) {
+      const pair = pairs.find(p => p.id === filter.pairId);
+      if (pair) {
+        const male = birds.find(b => b.id === pair.maleId);
+        const female = birds.find(b => b.id === pair.femaleId);
+        return `${male?.name || 'Unknown'} x ${female?.name || 'Unknown'}`;
+      }
+      return 'Unknown Pair';
+    }
+    return 'Stats';
+  }, [filter, birds, pairs]);
+
+  const filteredTransactions = useMemo(() => {
+    let filtered = transactions;
+    if (filter.birdId) {
+      filtered = filtered.filter(t => t.birdId === filter.birdId);
+    }
+    if (filter.pairId) {
+      filtered = filtered.filter(t => t.pairId === filter.pairId);
+    }
+    if (searchQuery) {
+      filtered = filtered.filter(t => t.category.toLowerCase().includes(searchQuery.toLowerCase()) || t.description?.toLowerCase().includes(searchQuery.toLowerCase()));
+    }
+    return filtered;
+  }, [transactions, filter, searchQuery]);
+
+  const filteredBreedingRecords = useMemo(() => {
+    let filtered = breedingRecords;
+    if (filter.birdId) {
+      filtered = filtered.filter(r => {
+        const pair = pairs.find(p => p.id === r.pairId);
+        return pair?.maleId === filter.birdId || pair?.femaleId === filter.birdId;
+      });
+    }
+    if (filter.pairId) {
+      filtered = filtered.filter(r => r.pairId === filter.pairId);
+    }
+    if (searchQuery) {
+      filtered = filtered.filter(r => r.notes?.toLowerCase().includes(searchQuery.toLowerCase()));
+    }
+    return filtered;
+  }, [breedingRecords, filter, pairs, searchQuery]);
+
+  const stats = useMemo(() => {
+    const income = filteredTransactions.filter(t => t.type === 'Income').reduce((acc, t) => acc + t.amount, 0);
+    const expenses = filteredTransactions.filter(t => t.type === 'Expense').reduce((acc, t) => acc + t.amount, 0);
+    
+    const relevantBirds = filter.birdId 
+      ? birds.filter(b => b.id === filter.birdId) 
+      : filter.pairId 
+        ? birds.filter(b => {
+            const pair = pairs.find(p => p.id === filter.pairId);
+            return b.id === pair?.maleId || b.id === pair?.femaleId;
+          })
+        : birds;
+    const birdValue = relevantBirds.reduce((acc, b) => acc + (b.estimatedValue || 0), 0);
+    const birdCost = relevantBirds.reduce((acc, b) => acc + (b.purchasePrice || 0), 0);
+    
+    const totalEggs = filteredBreedingRecords.reduce((acc, r) => acc + (r.eggsLaid || 0), 0);
+    const totalHatched = filteredBreedingRecords.reduce((acc, r) => acc + (r.eggsHatched || 0), 0);
+    const totalWeaned = filteredBreedingRecords.reduce((acc, r) => acc + (r.chicksWeaned || 0), 0);
+    
+    return {
+      totalIncome: income,
+      totalExpenses: expenses,
+      netProfit: income - expenses,
+      totalBirdValue: birdValue,
+      totalBirdCost: birdCost,
+      inventoryValue: birdValue - birdCost,
+      totalEggs,
+      totalHatched,
+      totalWeaned,
+      hatchRate: totalEggs > 0 ? (totalHatched / totalEggs) * 100 : 0,
+      weanRate: totalHatched > 0 ? (totalWeaned / totalHatched) * 100 : 0
+    };
+  }, [filteredTransactions, filteredBreedingRecords, birds, filter]);
+
+  return (
+    <div className="space-y-6 max-w-6xl mx-auto">
+      <div className="bg-gold-500/10 border border-gold-500/20 p-4 rounded-2xl flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-gold-500 rounded-lg text-black">
+            <Activity size={20} />
+          </div>
+          <div>
+            <h3 className="text-sm font-black text-white uppercase tracking-widest">
+              Stats: {entityName}
+            </h3>
+            <p className="text-[10px] text-gold-500 font-bold uppercase tracking-widest">Showing breeding and financial ROI</p>
+          </div>
+        </div>
+        <Button variant="secondary" className="px-4 py-2 text-[10px]" onClick={() => onBirdRef('')}>Close Stats</Button>
+      </div>
+
+      <div className="flex bg-zinc-900 p-1 rounded-2xl border border-black-700 w-fit mx-auto">
+        {(['roi', 'breeding'] as const).map(tab => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className={cn(
+              "px-6 py-2.5 text-[10px] font-black rounded-xl transition-all uppercase tracking-widest flex items-center gap-2",
+              activeTab === tab ? "bg-gold-500 text-black-950 shadow-lg shadow-gold-500/20" : "text-white/50 hover:text-white"
+            )}
+          >
+            {tab === 'roi' && <DollarSign size={14} />}
+            {tab === 'breeding' && <Egg size={14} />}
+            {tab === 'roi' ? 'ROI & Finances' : 'Breeding Stats'}
+          </button>
+        ))}
+      </div>
+
+      {activeTab === 'roi' && (
+        <div className="space-y-6">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+            <Card className="p-4 sm:p-5 bg-zinc-800 border-black-700 flex flex-col justify-between">
+              <div className="flex items-center justify-between mb-3 sm:mb-4">
+                <p className="text-[8px] sm:text-[10px] font-black text-white uppercase tracking-widest">Net Profit</p>
+                <TrendingUp size={16} className={stats.netProfit >= 0 ? 'text-emerald-400' : 'text-rose-400'} />
+              </div>
+              <div>
+                <p className="text-xl sm:text-2xl font-black text-white tracking-tight">{symbol}{stats.netProfit.toFixed(2)}</p>
+                <p className="text-[8px] sm:text-[9px] text-white/50 mt-1 font-bold uppercase tracking-tighter">ROI Performance</p>
+              </div>
+            </Card>
+            <Card className="p-4 sm:p-5 bg-zinc-800 border-black-700 flex flex-col justify-between">
+              <div className="flex items-center justify-between mb-3 sm:mb-4">
+                <p className="text-[8px] sm:text-[10px] font-black text-white uppercase tracking-widest">Total Income</p>
+                <ArrowUpRight size={16} className="text-emerald-400" />
+              </div>
+              <div>
+                <p className="text-xl sm:text-2xl font-black text-emerald-500 tracking-tight">{symbol}{stats.totalIncome.toFixed(2)}</p>
+              </div>
+            </Card>
+            <Card className="p-4 sm:p-5 bg-zinc-800 border-black-700 flex flex-col justify-between">
+              <div className="flex items-center justify-between mb-3 sm:mb-4">
+                <p className="text-[8px] sm:text-[10px] font-black text-white uppercase tracking-widest">Total Expenses</p>
+                <ArrowDownRight size={16} className="text-rose-400" />
+              </div>
+              <div>
+                <p className="text-xl sm:text-2xl font-black text-rose-500 tracking-tight">{symbol}{stats.totalExpenses.toFixed(2)}</p>
+              </div>
+            </Card>
+            <Card className="p-4 sm:p-5 bg-zinc-800 border-black-700 flex flex-col justify-between">
+              <div className="flex items-center justify-between mb-3 sm:mb-4">
+                <p className="text-[8px] sm:text-[10px] font-black text-white uppercase tracking-widest">Inventory Value</p>
+                <Activity size={16} className="text-sky-400" />
+              </div>
+              <div>
+                <p className="text-xl sm:text-2xl font-black text-sky-500 tracking-tight">{symbol}{stats.inventoryValue.toFixed(2)}</p>
+              </div>
+            </Card>
+          </div>
+
+          <div className="flex flex-col space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="font-black text-white uppercase tracking-widest text-sm">Transactions</h3>
+              <div className="relative w-full sm:w-64">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30" size={16} />
+                <Input 
+                  placeholder="Search transactions..." 
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  className="pl-10 py-2 text-xs"
+                />
+              </div>
+            </div>
+            <div className="grid gap-3">
+              {filteredTransactions.map(t => (
+                <TransactionCard 
+                  key={t.id} 
+                  transaction={t} 
+                  bird={birds.find(b => b.id === t.birdId)}
+                  contact={contacts.find(c => c.id === t.contactId)}
+                  onBirdRef={onBirdRef}
+                  onEdit={() => onEditTransaction(t)}
+                  onDelete={() => onDeleteTransaction(t.id)}
+                  viewMode="list"
+                  currency={currency}
+                />
+              ))}
+              {filteredTransactions.length === 0 && (
+                <div className="text-center py-12 bg-black/50 border border-dashed border-black-700 rounded-2xl">
+                  <Activity size={32} className="mx-auto text-white mb-2" />
+                  <p className="text-white text-sm font-bold uppercase tracking-widest">No transactions found</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'breeding' && (
+        <div className="space-y-6">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+            <Card className="p-4 sm:p-5 bg-zinc-800 border-black-700 flex flex-col justify-between">
+              <div className="flex items-center justify-between mb-3 sm:mb-4">
+                <p className="text-[8px] sm:text-[10px] font-black text-white uppercase tracking-widest">Total Eggs</p>
+                <Egg size={16} className="text-white" />
+              </div>
+              <div>
+                <p className="text-xl sm:text-2xl font-black text-white tracking-tight">{stats.totalEggs}</p>
+              </div>
+            </Card>
+            <Card className="p-4 sm:p-5 bg-zinc-800 border-black-700 flex flex-col justify-between">
+              <div className="flex items-center justify-between mb-3 sm:mb-4">
+                <p className="text-[8px] sm:text-[10px] font-black text-white uppercase tracking-widest">Total Hatched</p>
+                <Egg size={16} className="text-sky-400" />
+              </div>
+              <div>
+                <p className="text-xl sm:text-2xl font-black text-sky-400 tracking-tight">{stats.totalHatched}</p>
+                <p className="text-[8px] sm:text-[9px] text-white/50 mt-1 font-bold uppercase tracking-tighter">{stats.hatchRate.toFixed(0)}% Hatch Rate</p>
+              </div>
+            </Card>
+            <Card className="p-4 sm:p-5 bg-zinc-800 border-black-700 flex flex-col justify-between">
+              <div className="flex items-center justify-between mb-3 sm:mb-4">
+                <p className="text-[8px] sm:text-[10px] font-black text-white uppercase tracking-widest">Total Weaned</p>
+                <Egg size={16} className="text-emerald-400" />
+              </div>
+              <div>
+                <p className="text-xl sm:text-2xl font-black text-emerald-400 tracking-tight">{stats.totalWeaned}</p>
+                <p className="text-[8px] sm:text-[9px] text-white/50 mt-1 font-bold uppercase tracking-tighter">{stats.weanRate.toFixed(0)}% Wean Rate</p>
+              </div>
+            </Card>
+          </div>
+
+          <div className="flex flex-col space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="font-black text-white uppercase tracking-widest text-sm">Breeding Records</h3>
+              <div className="relative w-full sm:w-64">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30" size={16} />
+                <Input 
+                  placeholder="Search records..." 
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  className="pl-10 py-2 text-xs"
+                />
+              </div>
+            </div>
+            <div className="grid gap-3">
+              {filteredBreedingRecords.map(r => (
+                <BreedingRecordCard 
+                  key={r.id}
+                  record={r}
+                  pair={pairs.find(p => p.id === r.pairId)}
+                  male={birds.find(b => b.id === pairs.find(p => p.id === r.pairId)?.maleId)}
+                  female={birds.find(b => b.id === pairs.find(p => p.id === r.pairId)?.femaleId)}
+                  birds={birds}
+                  onEdit={() => onEditBreeding(r)}
+                  onDelete={() => onDeleteBreeding(r.id)}
+                  onBirdRef={onBirdRef}
+                  viewMode="list"
+                />
+              ))}
+              {filteredBreedingRecords.length === 0 && (
+                <div className="text-center py-12 bg-black/50 border border-dashed border-black-700 rounded-2xl">
+                  <Activity size={32} className="mx-auto text-white mb-2" />
+                  <p className="text-white text-sm font-bold uppercase tracking-widest">No breeding records found</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TransactionCard({ transaction, bird, contact, currency, onBirdRef, onEdit, onDelete, viewMode = 'list' }: { transaction: Transaction, bird?: Bird, contact?: Contact, currency?: string, onBirdRef: (name: string) => void, onEdit: () => void, onDelete: () => void, viewMode?: 'grid-large' | 'list' }) {
   const symbol = getCurrencySymbol(currency);
   return (
     <Card className={cn(
@@ -2412,6 +2969,9 @@ function TransactionCard({ transaction, bird, currency, onBirdRef, onEdit, onDel
               <button onClick={() => onBirdRef(bird.name)} className="transition-transform hover:scale-105 shrink-0">
                 <Badge variant="info" className="text-[7px] sm:text-[8px] hover:bg-sky-500/20 cursor-pointer">{bird.name}</Badge>
               </button>
+            )}
+            {contact && (
+              <Badge variant="warning" className="text-[7px] sm:text-[8px] bg-gold-500/10 text-gold-500 border-gold-500/20">{contact.name}</Badge>
             )}
           </div>
           <p className="text-[10px] sm:text-[11px] text-white truncate font-medium">{transaction.description || 'No description'}</p>
@@ -2635,6 +3195,42 @@ function BreedingRecordForm({ user, initialData, pairs, birds, onClose }: { user
           onChange={e => setFormData({ ...formData, notes: e.target.value })} 
         />
       </div>
+      
+      <div className="pt-2 pb-2 border-t border-black-800">
+        <p className="text-[10px] font-black text-black-200 uppercase tracking-widest mb-2">Quick Actions</p>
+        <Button 
+          type="button" 
+          variant="secondary" 
+          className="w-full text-xs py-2"
+          onClick={async () => {
+             const hatchDate = new Date(formData.startDate || new Date());
+             hatchDate.setDate(hatchDate.getDate() + 21);
+             const formattedDate = hatchDate.toISOString().split('T')[0];
+             
+             const newNotes = formData.notes ? `${formData.notes}\n[Reminder: Expected Hatch on ${formattedDate}]` : `[Reminder: Expected Hatch on ${formattedDate}]`;
+             setFormData({ ...formData, notes: newNotes });
+             
+             try {
+               await addDoc(collection(db, 'tasks'), {
+                 title: `Hatch Expected: ${pairs.find(p => p.id === formData.pairId)?.id || 'Selected Pair'}`,
+                 description: `Expected hatch date for breeding record.`,
+                 dueDate: formattedDate,
+                 reminderDate: new Date(hatchDate.getTime() - 24*60*60*1000).toISOString(),
+                 status: 'Pending',
+                 uid: user.uid,
+                 createdAt: new Date().toISOString()
+               });
+               toast.success('Hatch reminder task created for ' + formattedDate);
+             } catch (e) {
+               toast.error('Failed to create task');
+             }
+          }}
+        >
+          <Bell size={14} />
+          Add 21-Day Hatch Reminder
+        </Button>
+      </div>
+
       <Button type="submit" className="w-full py-4 text-sm uppercase tracking-widest font-black" disabled={isSaving}>
         {isSaving ? <Loader2 className="animate-spin mr-2" size={16} /> : null}
         {initialData ? 'Update' : 'Add'} Record
@@ -2643,7 +3239,7 @@ function BreedingRecordForm({ user, initialData, pairs, birds, onClose }: { user
   );
 }
 
-function TransactionForm({ user, initialData, birds, currency, onClose }: { user: FirebaseUser, initialData?: Transaction, birds: Bird[], currency?: string, onClose: () => void }) {
+function TransactionForm({ user, initialData, birds, pairs, contacts, currency, onClose }: { user: FirebaseUser, initialData?: Transaction, birds: Bird[], pairs: Pair[], contacts: Contact[], currency?: string, onClose: () => void }) {
   const symbol = getCurrencySymbol(currency);
   const [formData, setFormData] = useState<Partial<Transaction>>(initialData || {
     type: 'Expense',
@@ -2651,6 +3247,8 @@ function TransactionForm({ user, initialData, birds, currency, onClose }: { user
     amount: 0,
     date: format(new Date(), 'yyyy-MM-dd'),
     birdId: '',
+    pairId: '',
+    contactId: '',
     description: ''
   });
   const [isSaving, setIsSaving] = useState(false);
@@ -2699,27 +3297,123 @@ function TransactionForm({ user, initialData, birds, currency, onClose }: { user
           <Input type="date" required value={formData.date} onChange={e => setFormData({ ...formData, date: e.target.value })} />
         </div>
       </div>
-      <div className="space-y-2">
-        <SearchableSelect 
-          label="Related Bird (Optional)"
-          value={formData.birdId || ''}
-          onChange={(val) => setFormData({ ...formData, birdId: val })}
-          options={[
-            { id: '', name: 'None' },
-            ...birds.map(b => ({ id: b.id, name: b.name }))
-          ]}
-        />
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="space-y-2">
+          <SearchableSelect 
+            label="Related Bird"
+            value={formData.birdId || ''}
+            onChange={(val) => setFormData({ ...formData, birdId: val })}
+            options={[
+              { id: '', name: 'None' },
+              ...birds.map(b => ({ id: b.id, name: b.name }))
+            ]}
+          />
+        </div>
+        <div className="space-y-2">
+          <SearchableSelect 
+            label="Related Pair"
+            value={formData.pairId || ''}
+            onChange={(val) => setFormData({ ...formData, pairId: val })}
+            options={[
+              { id: '', name: 'None' },
+              ...pairs.map(p => {
+                const m = birds.find(b => b.id === p.maleId)?.name || 'Unknown';
+                const f = birds.find(b => b.id === p.femaleId)?.name || 'Unknown';
+                return { id: p.id, name: `${m} x ${f}` };
+              })
+            ]}
+          />
+        </div>
+        <div className="space-y-2">
+          <SearchableSelect 
+            label="Contact"
+            value={formData.contactId || ''}
+            onChange={(val) => setFormData({ ...formData, contactId: val })}
+            options={[
+              { id: '', name: 'None' },
+              ...contacts.map(c => ({ id: c.id, name: c.name }))
+            ]}
+          />
+        </div>
       </div>
       <div className="space-y-2">
         <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Description</label>
-        <textarea name="transactionDescription" id="transactionDescription" className="w-full px-4 py-3 bg-black border border-black-700 rounded-2xl focus:outline-none focus:ring-2 focus:ring-gold-500/20 focus:border-gold-500 text-white transition-all min-h-[100px] text-sm font-medium placeholder:text-white/30" placeholder="Enter transaction details..."
-          value={formData.description} 
-          onChange={e => setFormData({ ...formData, description: e.target.value })} 
-        />
+        <Textarea rows={3} placeholder="Additional details..." value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} />
       </div>
-      <Button type="submit" className="w-full py-4 text-sm uppercase tracking-widest font-black" disabled={isSaving}>
+      <Button type="submit" className="w-full py-4 text-sm font-bold shadow-xl shadow-gold-500/20" disabled={isSaving}>
         {isSaving ? <Loader2 className="animate-spin mr-2" size={16} /> : null}
         {initialData ? 'Update' : 'Add'} Transaction
+      </Button>
+    </form>
+  );
+}
+
+function ContactForm({ user, initialData, onClose }: { user: FirebaseUser, initialData?: Contact, onClose: () => void }) {
+  const [formData, setFormData] = useState<Partial<Contact>>(initialData || {
+    name: '',
+    type: 'Both',
+    email: '',
+    phone: '',
+    address: '',
+    notes: ''
+  });
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (isSaving) return;
+    setIsSaving(true);
+    
+    const savePromise = async () => {
+      try {
+        const data = { ...formData, uid: user.uid };
+        if (initialData?.id) { await updateDoc(doc(db, 'contacts', initialData.id), data); } 
+        else { 
+          const docRef = doc(collection(db, 'contacts'));
+          await setDoc(docRef, data); 
+        }
+      } catch (err) { handleFirestoreError(err, initialData ? OperationType.UPDATE : OperationType.CREATE, 'contacts'); }
+    };
+
+    savePromise();
+    onClose();
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-6">
+      <div className="space-y-2">
+        <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Name</label>
+        <Input required placeholder="Contact Name" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} />
+      </div>
+      <div className="space-y-2">
+        <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Type</label>
+        <Select value={formData.type} onChange={e => setFormData({ ...formData, type: e.target.value as any })}>
+          <option value="Buyer" className="bg-black text-white">Buyer</option>
+          <option value="Seller" className="bg-black text-white">Seller</option>
+          <option value="Both" className="bg-black text-white">Both</option>
+        </Select>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Email</label>
+          <Input type="email" placeholder="Email Address" value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} />
+        </div>
+        <div className="space-y-2">
+          <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Phone</label>
+          <Input type="tel" placeholder="Phone Number" value={formData.phone} onChange={e => setFormData({ ...formData, phone: e.target.value })} />
+        </div>
+      </div>
+      <div className="space-y-2">
+        <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Address</label>
+        <Input placeholder="Physical Address" value={formData.address} onChange={e => setFormData({ ...formData, address: e.target.value })} />
+      </div>
+      <div className="space-y-2">
+        <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Notes</label>
+        <Textarea rows={3} placeholder="Additional details..." value={formData.notes} onChange={e => setFormData({ ...formData, notes: e.target.value })} />
+      </div>
+      <Button type="submit" className="w-full py-4 text-sm font-bold shadow-xl shadow-gold-500/20" disabled={isSaving}>
+        {isSaving ? <Loader2 className="animate-spin mr-2" size={16} /> : null}
+        {initialData ? 'Update' : 'Add'} Contact
       </Button>
     </form>
   );
@@ -2958,10 +3652,170 @@ function SubscriptionView({ settings, onRenew }: { settings: UserSettings, onRen
   );
 }
 
+function ThemeColorPicker({ label, color, defaultColor, onChange }: { label: string, color: string | undefined, defaultColor: string, onChange: (color: string) => void }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [localColor, setLocalColor] = useState(color || defaultColor);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setLocalColor(color || defaultColor);
+    }
+  }, [color, defaultColor, isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    
+    let targetVar = '';
+    if (label === 'Accent Color') targetVar = '--theme-color-500';
+    else if (label === 'Text Color') targetVar = '--theme-text-color';
+    else if (label === 'Background Color') targetVar = '--theme-bg-color';
+    else if (label === 'Card Color') targetVar = '--theme-card-color';
+
+    if (targetVar) {
+      if (label === 'Accent Color') {
+        const palette = generateColorPalette(localColor);
+        Object.entries(palette).forEach(([shade, c]) => {
+          document.documentElement.style.setProperty(`--theme-color-${shade}`, c);
+        });
+      } else {
+        document.documentElement.style.setProperty(targetVar, localColor);
+      }
+    }
+  }, [localColor, isOpen, label]);
+
+  const handleClose = () => {
+    let targetVar = '';
+    if (label === 'Accent Color') targetVar = '--theme-color-500';
+    else if (label === 'Text Color') targetVar = '--theme-text-color';
+    else if (label === 'Background Color') targetVar = '--theme-bg-color';
+    else if (label === 'Card Color') targetVar = '--theme-card-color';
+
+    if (targetVar) {
+      const origColor = color || defaultColor;
+      if (label === 'Accent Color') {
+        const palette = generateColorPalette(origColor);
+        Object.entries(palette).forEach(([shade, c]) => {
+          document.documentElement.style.setProperty(`--theme-color-${shade}`, c);
+        });
+      } else {
+        document.documentElement.style.setProperty(targetVar, origColor);
+      }
+    }
+    setIsOpen(false);
+  };
+
+  const handleDone = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onChange(localColor);
+    setIsOpen(false);
+  };
+
+  const hsva = hexToHsva(localColor);
+
+  return (
+    <div className="flex flex-col gap-2 w-full">
+      <div 
+        className="flex items-center gap-3 bg-black-900 border border-black-800 rounded-2xl p-2 cursor-pointer touch-manipulation hover:bg-black-800 transition-colors"
+        onClick={() => setIsOpen(!isOpen)}
+      >
+        <div 
+          className="w-10 h-10 rounded border border-black-800 flex-shrink-0 relative overflow-hidden" 
+        >
+          <div className="absolute inset-0" style={{ backgroundColor: color || defaultColor }} />
+        </div>
+        <div className="flex flex-col flex-1">
+          <span className="text-sm font-bold text-white uppercase">{color || defaultColor}</span>
+          <span className="text-[10px] text-black-400 font-bold uppercase tracking-widest">{label}</span>
+        </div>
+        {(color && color !== defaultColor) && (
+          <button 
+            onClick={(e) => { e.stopPropagation(); onChange(''); }}
+            className="ml-auto text-[10px] bg-black-800 hover:bg-black-700 text-white px-2 py-1 rounded-lg transition-colors uppercase font-bold"
+          >
+            Reset
+          </button>
+        )}
+      </div>
+
+      {createPortal(
+        <AnimatePresence>
+          {isOpen && (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/90 backdrop-blur-xl" onClick={(e) => { e.stopPropagation(); handleClose(); }}>
+               <motion.div 
+                 initial={{ opacity: 0, scale: 0.95 }}
+                 animate={{ opacity: 1, scale: 1 }}
+                 exit={{ opacity: 0, scale: 0.95 }}
+                 className="w-full max-w-sm bg-black-950 border border-black-700 rounded-[2.5rem] overflow-hidden shadow-2xl relative"
+                 onClick={(e) => e.stopPropagation()}
+               >
+                  <div className="p-6 border-b border-black-700 flex items-center justify-between">
+                    <h3 className="text-xl font-black text-white uppercase tracking-widest flex items-center gap-3">
+                      <Palette size={20} style={{color: localColor}} />
+                      Pick Color
+                    </h3>
+                    <button onClick={handleClose} className="p-2 hover:bg-black/20 rounded-xl text-white/50 hover:text-gold-500 transition-all">
+                      <X size={20} />
+                    </button>
+                  </div>
+                  
+                  <div className="p-6 flex flex-col items-center gap-8">
+                    <div className="touch-none select-none flex justify-center">
+                      <ColorWheel
+                        color={hsva}
+                        onChange={(c) => {
+                          const newHsva = { ...c.hsva, v: hsva.v };
+                          setLocalColor(hsvaToHex(newHsva));
+                        }}
+                        width={240}
+                        height={240}
+                      />
+                    </div>
+                    
+                    <div className="w-full space-y-4">
+                      <div className="flex justify-between items-center text-[10px] font-black text-black-200 uppercase tracking-widest">
+                        <span>Brightness</span>
+                        <span className="text-gold-500">{Math.round(hsva.v)}%</span>
+                      </div>
+                      <input 
+                        type="range" 
+                        min="0" max="100" 
+                        value={hsva.v} 
+                        onChange={(e) => {
+                          const newHsva = { ...hsva, v: Number(e.target.value) };
+                          setLocalColor(hsvaToHex(newHsva));
+                        }} 
+                        className="w-full h-2 bg-black-800 rounded-lg appearance-none cursor-pointer accent-gold-500"
+                        style={{
+                          WebkitAppearance: 'none',
+                          background: `linear-gradient(to right, #000, ${hsvaToHex({...hsva, v: 100})})`
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="p-6 bg-black/40 border-t border-black-700 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full border border-black-700" style={{backgroundColor: localColor}} />
+                      <span className="font-mono text-sm tracking-widest text-white">{localColor}</span>
+                    </div>
+                    <Button onClick={handleDone} variant="primary" className="py-2 px-6 bg-[#24D408] hover:bg-[#1cae06] text-black">
+                      DONE
+                    </Button>
+                  </div>
+               </motion.div>
+            </div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
+    </div>
+  );
+}
+
 // --- Settings View ---
 
-function SettingsView({ settings, onUpdate, allData, user, isSyncing, setDeleteConfirmation }: { settings: UserSettings, onUpdate: (s: UserSettings) => void, allData: any, user: FirebaseUser | null, isSyncing: boolean, setDeleteConfirmation: (data: any) => void }) {
-  const [activeSection, setActiveSection] = useState<'general' | 'species' | 'subspecies' | 'mutations' | 'data' | null>('general');
+function SettingsView({ settings, onUpdate, allData, user, isSyncing, setDeleteConfirmation, onRenew }: { settings: UserSettings, onUpdate: (s: UserSettings) => void, allData: any, user: FirebaseUser | null, isSyncing: boolean, setDeleteConfirmation: (data: any) => void, onRenew: () => void }) {
+  const [activeSection, setActiveSection] = useState<'general' | 'species' | 'subspecies' | 'mutations' | 'data' | 'subscription' | null>('general');
   const [newSpecies, setNewSpecies] = useState('');
   const [newMutation, setNewMutation] = useState('');
   const [newSubSpecies, setNewSubSpecies] = useState('');
@@ -3108,11 +3962,29 @@ function SettingsView({ settings, onUpdate, allData, user, isSyncing, setDeleteC
           active={activeSection === 'data'} 
           onClick={() => setActiveSection('data')} 
         />
+        <SettingRow 
+          icon={CreditCard} 
+          title="Subscription" 
+          description="Manage Plan" 
+          active={activeSection === 'subscription'} 
+          onClick={() => setActiveSection('subscription')} 
+        />
       </div>
 
       {/* Content Area */}
       <div className="flex-1 bg-black-900/50 border border-black-800 rounded-3xl p-6 lg:p-8 overflow-y-auto custom-scrollbar">
         <AnimatePresence mode="wait">
+          {activeSection === 'subscription' && (
+            <motion.div 
+              key="subscription"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+            >
+              <SubscriptionView settings={settings} onRenew={onRenew} />
+            </motion.div>
+          )}
+
           {activeSection === 'general' && (
             <motion.div 
               key="general"
@@ -3124,17 +3996,44 @@ function SettingsView({ settings, onUpdate, allData, user, isSyncing, setDeleteC
               <div className="space-y-4">
                 <h3 className="text-lg font-black uppercase tracking-widest text-gold-500">General Settings</h3>
                 
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-black-100 uppercase tracking-widest ml-1">Currency</label>
-                  <Select 
-                    value={settings.currency || 'ZAR'} 
-                    onChange={e => onUpdate({ ...settings, currency: e.target.value })}
-                  >
-                    <option value="ZAR">Rand (R)</option>
-                    <option value="USD">USD ($)</option>
-                    <option value="EUR">Euro (€)</option>
-                    <option value="GBP">Pound (£)</option>
-                  </Select>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-black-100 uppercase tracking-widest ml-1">Currency</label>
+                    <Select 
+                      value={settings.currency || 'ZAR'} 
+                      onChange={e => onUpdate({ ...settings, currency: e.target.value })}
+                    >
+                      <option value="ZAR">Rand (R)</option>
+                      <option value="USD">USD ($)</option>
+                      <option value="EUR">Euro (€)</option>
+                      <option value="GBP">Pound (£)</option>
+                    </Select>
+                  </div>
+
+                  <ThemeColorPicker 
+                    label="Accent Color"
+                    color={settings.themeColor} 
+                    defaultColor="#d4af37"
+                    onChange={(hex) => onUpdate({ ...settings, themeColor: hex })}
+                  />
+                  <ThemeColorPicker 
+                    label="Text Color"
+                    color={settings.textColor} 
+                    defaultColor="#ffffff"
+                    onChange={(hex) => onUpdate({ ...settings, textColor: hex })}
+                  />
+                  <ThemeColorPicker 
+                    label="Background Color"
+                    color={settings.backgroundColor} 
+                    defaultColor="#000000"
+                    onChange={(hex) => onUpdate({ ...settings, backgroundColor: hex })}
+                  />
+                  <ThemeColorPicker 
+                    label="Card Color"
+                    color={settings.cardColor} 
+                    defaultColor="#0a0a0a"
+                    onChange={(hex) => onUpdate({ ...settings, cardColor: hex })}
+                  />
                 </div>
               </div>
             </motion.div>
@@ -3362,19 +4261,20 @@ function SettingsView({ settings, onUpdate, allData, user, isSyncing, setDeleteC
   );
 }
 
-function PrintListModal({ birds, cages, onClose }: { birds: Bird[], cages: Cage[], onClose: () => void }) {
+function PrintAndQRModal({ birds, pairs, cages, onClose }: { birds: Bird[], pairs: Pair[], cages: Cage[], onClose: () => void }) {
+  const [printMode, setPrintMode] = useState<'list' | 'qr'>('list');
   const [selectedBirds, setSelectedBirds] = useState<string[]>([]);
   const [isPrinting, setIsPrinting] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [printEmpty, setPrintEmpty] = useState(false);
+  const [qrType, setQrType] = useState<'bird' | 'pair' | 'cage'>('bird');
+  const [qrSelection, setQrSelection] = useState<string>('');
 
   const sortedBirds = useMemo(() => {
     return [...birds].sort((a, b) => {
-      const cageA = cages.find(c => c.id === a.cageId)?.name || 'ZZZ'; // Unassigned at the end
+      const cageA = cages.find(c => c.id === a.cageId)?.name || 'ZZZ';
       const cageB = cages.find(c => c.id === b.cageId)?.name || 'ZZZ';
-      
       if (cageA !== cageB) return cageA.localeCompare(cageB);
-      
       const sexOrder: Record<string, number> = { 'Male': 0, 'Female': 1, 'Unknown': 2 };
       return (sexOrder[a.sex] ?? 2) - (sexOrder[b.sex] ?? 2);
     });
@@ -3393,255 +4293,205 @@ function PrintListModal({ birds, cages, onClose }: { birds: Bird[], cages: Cage[
 
   const handlePrint = () => {
     setIsPrinting(true);
-    
-    // Detect mobile
-    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-    
-    if (isMobile) {
-      // For mobile, we open a new window with the content to print
-      const printWindow = window.open('', '_blank');
-      if (printWindow) {
-        // Wait for the portal to be rendered
-        setTimeout(() => {
-          const printContent = document.getElementById('print-area-portal')?.innerHTML;
-          const styles = Array.from(document.querySelectorAll('style, link[rel="stylesheet"]'))
-            .map(s => s.outerHTML)
-            .join('');
-            
-          printWindow.document.write(`
-            <html>
-              <head>
-                <title>Aviary Records</title>
-                ${styles}
-                <style>
-                  @page { size: A4 portrait; margin: 10mm; }
-                  body { background: white !important; color: black !important; padding: 20px; }
-                  .no-print { display: none !important; }
-                  #root { display: none !important; }
-                  table { width: 100% !important; border-collapse: collapse !important; }
-                  th, td { border: 1px solid #000 !important; padding: 8px !important; }
-                </style>
-              </head>
-              <body>
-                ${printContent}
-                <script>
-                  window.onload = () => {
-                    setTimeout(() => {
-                      window.print();
-                      window.onafterprint = () => window.close();
-                    }, 500);
-                  };
-                </script>
-              </body>
-            </html>
-          `);
-          printWindow.document.close();
-          setIsPrinting(false);
-          onClose();
-        }, 500);
-      } else {
-        toast.error("Please allow popups to print on mobile.");
+    setTimeout(() => {
+      window.print();
+      const cleanup = () => {
         setIsPrinting(false);
-      }
-    } else {
-      // Desktop behavior
-      setTimeout(() => {
-        window.print();
-        const cleanup = () => {
-          setIsPrinting(false);
-          onClose();
-          window.removeEventListener('afterprint', cleanup);
-        };
-        window.addEventListener('afterprint', cleanup);
-      }, 800);
-    }
+        onClose();
+        window.removeEventListener('afterprint', cleanup);
+      };
+      window.addEventListener('afterprint', cleanup);
+    }, 800);
   };
 
   const toggleAll = () => {
-    if (selectedBirds.length === filteredBirds.length) {
-      setSelectedBirds([]);
-    } else {
-      setSelectedBirds(filteredBirds.map(b => b.id));
-    }
+    if (selectedBirds.length === filteredBirds.length) setSelectedBirds([]);
+    else setSelectedBirds(filteredBirds.map(b => b.id));
   };
+  const toggleBird = (id: string) => setSelectedBirds(prev => prev.includes(id) ? prev.filter(bId => bId !== id) : [...prev, id]);
 
-  const toggleBird = (id: string) => {
-    setSelectedBirds(prev => prev.includes(id) ? prev.filter(bId => bId !== id) : [...prev, id]);
+  const getQRData = () => {
+     if (!qrSelection) return '';
+     return JSON.stringify({ t: qrType === 'bird' ? 'b' : qrType === 'pair' ? 'p' : 'c', id: qrSelection });
   };
 
   return (
     <>
       <style>{`
         @media print {
-          @page {
-            size: A4 portrait;
-            margin: 10mm;
-          }
-          body > #root {
-            display: none !important;
-          }
+          @page { size: A4 portrait; margin: 10mm; }
+          body > #root { display: none !important; }
           body > #print-area-portal {
-            display: block !important;
-            visibility: visible !important;
-            position: static !important;
-            width: 100% !important;
-            height: auto !important;
-            background: white !important;
-            color: black !important;
+            display: block !important; visibility: visible !important;
+            position: static !important; width: 100% !important; height: auto !important;
+            background: white !important; color: black !important;
           }
-          #print-area-portal * {
-            visibility: visible !important;
-            color: black !important;
-            border-color: #000 !important;
-          }
-          .no-print {
-            display: none !important;
-          }
-          table {
-            width: 100% !important;
-            border-collapse: collapse !important;
-          }
-          th, td {
-            border: 1px solid #000 !important;
-            padding: 8px !important;
-          }
+          #print-area-portal * { visibility: visible !important; color: black !important; border-color: #000 !important; }
+          .no-print { display: none !important; }
+          table { width: 100% !important; border-collapse: collapse !important; }
+          th, td { border: 1px solid #000 !important; padding: 8px !important; }
         }
       `}</style>
-      <div className="space-y-4">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-black-400" size={16} />
-            <input id="search-birds" name="search-birds" type="text" placeholder="Search birds or cages..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-black-900/50 border border-black-700 rounded-xl text-sm focus:outline-none focus:border-gold-500 transition-colors"
-            />
-          </div>
-          <div className="flex items-center gap-2">
-            <Button 
-              onClick={() => setPrintEmpty(!printEmpty)} 
-              variant="secondary" 
-              className="py-2 px-4 text-[10px] whitespace-nowrap"
-            >
-              Mode: {printEmpty ? 'Empty List' : 'Selection'}
-            </Button>
-            {!printEmpty && (
-              <Button onClick={toggleAll} variant="secondary" className="py-2 px-4 text-[10px] whitespace-nowrap">
-                {selectedBirds.length === filteredBirds.length ? 'Deselect All' : 'Select All'}
-              </Button>
-            )}
-          </div>
-        </div>
-
-        {!printEmpty && (
-          <div className="max-h-[50vh] overflow-y-auto space-y-2 custom-scrollbar pr-2">
-            {filteredBirds.map(bird => {
-              const cage = cages.find(c => c.id === bird.cageId);
-              const isSelected = selectedBirds.includes(bird.id);
-              return (
-                <div 
-                  key={bird.id} 
-                  className={cn(
-                    "flex items-center gap-3 p-3 rounded-xl border transition-all cursor-pointer",
-                    isSelected ? "bg-gold-500/10 border-gold-500/50" : "bg-zinc-900/50 border-black-800 hover:border-black-600"
-                  )} 
-                  onClick={() => toggleBird(bird.id)}
-                >
-                  <div className={cn("w-5 h-5 rounded border flex items-center justify-center transition-colors", isSelected ? "bg-gold-500 border-gold-500 text-black" : "border-black-600")}>
-                    {isSelected && <CheckSquare size={14} />}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="text-sm font-bold text-white truncate">{bird.name}</p>
-                      <Badge variant={bird.sex === 'Male' ? 'info' : bird.sex === 'Female' ? 'warning' : 'neutral'} className="text-[8px] px-1 py-0">{bird.sex}</Badge>
-                    </div>
-                    <p className="text-[10px] text-black-200 uppercase tracking-widest truncate">
-                      {cage?.name || 'No Cage'} • {bird.species}
-                    </p>
-                  </div>
-                </div>
-              );
-            })}
-            {filteredBirds.length === 0 && (
-              <div className="text-center py-8 text-black-400">
-                <p className="text-sm">No birds found matching your search.</p>
-              </div>
-            )}
-          </div>
-        )}
-
-        {printEmpty && (
-          <div className="p-4 bg-zinc-900/50 border border-black-800 rounded-xl text-center space-y-2">
-            <Printer size={32} className="mx-auto text-gold-500/50" />
-            <p className="text-sm text-white font-medium">Empty List Mode</p>
-            <p className="text-xs text-black-400">This will print a blank table for manual entry.</p>
-          </div>
-        )}
-
-        <Button onClick={handlePrint} disabled={!printEmpty && selectedBirds.length === 0} className="w-full py-4 mt-4">
-          <Printer size={18} className="mr-2" />
-          Confirm & Print
-        </Button>
+      
+      <div className="flex bg-black-900 p-1 rounded-xl mb-4 text-xs font-bold w-full uppercase tracking-widest border border-black-800">
+        <button className={cn("flex-1 py-3 rounded-lg transition-colors", printMode === 'list' && "bg-gold-500 text-black")} onClick={() => setPrintMode('list')}>Table List</button>
+        <button className={cn("flex-1 py-3 rounded-lg transition-colors", printMode === 'qr' && "bg-gold-500 text-black")} onClick={() => setPrintMode('qr')}>QR Barcodes</button>
       </div>
+
+      {printMode === 'list' ? (
+        <div className="space-y-4">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-black-400" size={16} />
+              <input type="text" placeholder="Search birds or cages..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full pl-10 pr-4 py-2 bg-black-900/50 border border-black-700 rounded-xl text-sm focus:outline-none focus:border-gold-500" />
+            </div>
+            <div className="flex items-center gap-2">
+              <Button onClick={() => setPrintEmpty(!printEmpty)} variant="secondary" className="py-2 px-4 text-[10px] whitespace-nowrap">Mode: {printEmpty ? 'Empty List' : 'Selection'}</Button>
+              {!printEmpty && <Button onClick={toggleAll} variant="secondary" className="py-2 px-4 text-[10px] whitespace-nowrap">{selectedBirds.length === filteredBirds.length ? 'Deselect All' : 'Select All'}</Button>}
+            </div>
+          </div>
+
+          {!printEmpty && (
+            <div className="max-h-[50vh] overflow-y-auto space-y-2 custom-scrollbar pr-2">
+              {filteredBirds.map(bird => {
+                const cage = cages.find(c => c.id === bird.cageId);
+                const isSelected = selectedBirds.includes(bird.id);
+                return (
+                  <div key={bird.id} className={cn("flex items-center gap-3 p-3 rounded-xl border transition-all cursor-pointer", isSelected ? "bg-gold-500/10 border-gold-500/50" : "bg-zinc-900/50 border-black-800")} onClick={() => toggleBird(bird.id)}>
+                    <div className={cn("w-5 h-5 rounded border flex items-center justify-center transition-colors", isSelected ? "bg-gold-500 border-gold-500 text-black" : "border-black-600")}>
+                      {isSelected && <CheckSquare size={14} />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-sm font-bold text-white truncate">{bird.name}</p>
+                        <Badge variant={bird.sex === 'Male' ? 'male' : bird.sex === 'Female' ? 'female' : 'neutral'} className="text-[8px] px-1 py-0">{bird.sex}</Badge>
+                      </div>
+                      <p className="text-[10px] text-black-200 uppercase tracking-widest truncate">{cage?.name || 'No Cage'} • {bird.species}</p>
+                    </div>
+                  </div>
+                );
+              })}
+              {filteredBirds.length === 0 && <p className="text-center py-8 text-black-400 text-sm">No birds found.</p>}
+            </div>
+          )}
+          {printEmpty && (
+            <div className="p-4 bg-zinc-900/50 border border-black-800 rounded-xl text-center space-y-2">
+              <Printer size={32} className="mx-auto text-gold-500/50" />
+              <p className="text-sm text-white font-medium">Empty List Mode</p>
+              <p className="text-xs text-black-400">This will print a blank table for manual entry.</p>
+            </div>
+          )}
+          <Button onClick={handlePrint} disabled={!printEmpty && selectedBirds.length === 0} className="w-full py-4 mt-4">
+            <Printer size={18} className="mr-2" /> Confirm & Print
+          </Button>
+        </div>
+      ) : (
+        <div className="space-y-4">
+           <div className="flex items-center gap-2 mb-2 bg-black-900 border border-black-700 p-1 rounded-xl">
+             <button onClick={() => { setQrType('bird'); setQrSelection(''); }} className={cn("flex-1 py-3 rounded-lg text-xs font-bold uppercase transition-colors tracking-widest", qrType === 'bird' && "bg-zinc-700 text-gold-500")}>Bird</button>
+             <button onClick={() => { setQrType('pair'); setQrSelection(''); }} className={cn("flex-1 py-3 rounded-lg text-xs font-bold uppercase transition-colors tracking-widest", qrType === 'pair' && "bg-zinc-700 text-gold-500")}>Pair</button>
+             <button onClick={() => { setQrType('cage'); setQrSelection(''); }} className={cn("flex-1 py-3 rounded-lg text-xs font-bold uppercase transition-colors tracking-widest", qrType === 'cage' && "bg-zinc-700 text-gold-500")}>Cage</button>
+           </div>
+           
+           {qrType === 'bird' ? (
+             <SearchableSelect 
+               label="Select Bird"
+               options={birds.map(b => ({ id: b.id, name: `${b.name} (${b.species})` }))}
+               value={qrSelection}
+               onChange={(val) => setQrSelection(val)}
+             />
+           ) : qrType === 'pair' ? (
+             <SearchableSelect 
+               label="Select Pair"
+               options={pairs.map(p => {
+                 const m = birds.find(b => b.id === p.maleId)?.name || 'Unknown';
+                 const f = birds.find(b => b.id === p.femaleId)?.name || 'Unknown';
+                 return { id: p.id, name: `${m} x ${f}` };
+               })}
+               value={qrSelection}
+               onChange={(val) => setQrSelection(val)}
+             />
+           ) : (
+             <SearchableSelect 
+               label="Select Cage"
+               options={cages.map(c => ({ id: c.id, name: c.name }))}
+               value={qrSelection}
+               onChange={(val) => setQrSelection(val)}
+             />
+           )}
+
+           {qrSelection && (
+             <div className="p-8 bg-white rounded-2xl flex flex-col items-center justify-center my-6">
+               <QRCodeSVG value={getQRData()} size={240} level="H" />
+               <p className="text-black font-black mt-6 uppercase tracking-widest text-center text-sm">
+                 {qrType === 'bird' ? birds.find(b=>b.id === qrSelection)?.name : 
+                  qrType === 'pair' ? `PAIR: ${pairs.find(p=>p.id === qrSelection)?.id.slice(0,6)}` :
+                  `CAGE: ${cages.find(c=>c.id === qrSelection)?.name}`
+                 }
+               </p>
+             </div>
+           )}
+
+           <Button onClick={handlePrint} disabled={!qrSelection} className="w-full py-4 mt-4">
+             <QrCode size={18} className="mr-2" />
+             Confirm & Print QR
+           </Button>
+        </div>
+      )}
 
       {/* Hidden Print Area rendered via Portal */}
       {isPrinting && createPortal(
-        <div id="print-area-portal" className="fixed inset-0 z-[9999] bg-white text-black p-10 overflow-y-auto"><button className="no-print fixed top-4 right-4 bg-red-500 text-white px-4 py-2 rounded-full font-bold shadow-lg z-[10000]" onClick={() => { setIsPrinting(false); onClose(); }}>Close Print View</button>
-          <div className="flex justify-between items-end border-b-4 border-black pb-6 mb-8">
-            <div>
-              <h1 className="text-4xl font-black uppercase tracking-tighter mb-2">Aviary Records</h1>
-              <p className="text-sm font-black text-gray-600 uppercase tracking-[0.3em]">Official Breeding Log</p>
-            </div>
-            <div className="text-right">
-              <p className="text-sm font-bold text-gray-800 uppercase tracking-widest mb-1">Date: {new Date().toLocaleDateString()}</p>
-              <p className="text-xs font-black uppercase tracking-widest text-gray-500">Total Birds: {printEmpty ? '___' : selectedBirds.length}</p>
-            </div>
-          </div>
-
-          <div className="min-h-[900px]">
-            <table className="w-full border-2 border-black">
-              <thead>
-                <tr className="bg-gray-100 border-b-2 border-black">
+        <div id="print-area-portal" className="fixed inset-0 z-[9999] bg-white text-black p-10 overflow-y-auto w-full min-h-screen">
+          <button className="no-print fixed top-4 right-4 bg-red-500 text-white px-4 py-2 rounded-full font-bold shadow-lg z-[10000]" onClick={() => { setIsPrinting(false); onClose(); }}>Close Print View</button>
+          
+          {printMode === 'list' ? (
+            <>
+              <div className="flex justify-between items-end border-b-4 border-black pb-6 mb-8">
+                <div>
+                  <h1 className="text-4xl font-black uppercase tracking-tighter mb-2">Aviary Records</h1>
+                  <p className="text-sm font-black text-gray-600 uppercase tracking-[0.3em]">The Averian</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm font-bold text-gray-800 uppercase tracking-widest mb-1">Date: {new Date().toLocaleDateString()}</p>
+                  <p className="text-xs font-black uppercase tracking-widest text-gray-500">Total Birds: {printEmpty ? '___' : selectedBirds.length}</p>
+                </div>
+              </div>
+              <table className="w-full border-2 border-black">
+                <thead><tr className="bg-gray-100 border-b-2 border-black">
                   <th className="py-3 px-2 text-[10px] font-black uppercase tracking-widest text-left border-r border-black">Cage</th>
                   <th className="py-3 px-2 text-[10px] font-black uppercase tracking-widest text-left border-r border-black">Bird ID / Ring</th>
                   <th className="py-3 px-2 text-[10px] font-black uppercase tracking-widest text-left border-r border-black">Sex</th>
                   <th className="py-3 px-2 text-[10px] font-black uppercase tracking-widest text-left border-r border-black">Species / Mutation</th>
                   <th className="py-3 px-2 text-[10px] font-black uppercase tracking-widest text-left">Notes</th>
-                </tr>
-              </thead>
-              <tbody>
-                {printEmpty ? (
-                  Array.from({ length: 30 }).map((_, i) => (
-                    <tr key={i} className="border-b border-gray-300 h-12">
-                      <td className="py-2 px-2 border-r border-gray-300"></td>
-                      <td className="py-2 px-2 border-r border-gray-300"></td>
-                      <td className="py-2 px-2 border-r border-gray-300"></td>
-                      <td className="py-2 px-2 border-r border-gray-300"></td>
-                      <td className="py-2 px-2"></td>
+                </tr></thead>
+                <tbody>
+                  {printEmpty ? Array.from({ length: 30 }).map((_, i) => (
+                    <tr key={i} className="border-b border-gray-300 h-12"><td className="border-r border-gray-300"></td><td className="border-r border-gray-300"></td><td className="border-r border-gray-300"></td><td className="border-r border-gray-300"></td><td></td></tr>
+                  )) : sortedBirds.filter(b => selectedBirds.includes(b.id)).map(bird => (
+                    <tr key={bird.id} className="border-b border-gray-300 h-12">
+                      <td className="py-2 px-2 border-r border-gray-300 text-xs font-black uppercase">{cages.find(c => c.id === bird.cageId)?.name || '-'}</td>
+                      <td className="py-2 px-2 border-r border-gray-300 text-xs font-bold">{bird.name}</td>
+                      <td className="py-2 px-2 border-r border-gray-300 text-xs font-black uppercase">{bird.sex}</td>
+                      <td className="py-2 px-2 border-r border-gray-300 text-xs">{bird.species} {bird.mutations?.join(', ')}</td>
+                      <td className="border-gray-300"></td>
                     </tr>
-                  ))
-                ) : (
-                  sortedBirds.filter(b => selectedBirds.includes(b.id)).map(bird => {
-                    const cage = cages.find(c => c.id === bird.cageId);
-                    return (
-                      <tr key={bird.id} className="border-b border-gray-300 h-12">
-                        <td className="py-2 px-2 border-r border-gray-300 text-xs font-black uppercase">{cage?.name || '-'}</td>
-                        <td className="py-2 px-2 border-r border-gray-300 text-xs font-bold">{bird.name}</td>
-                        <td className="py-2 px-2 border-r border-gray-300 text-xs font-black uppercase">{bird.sex}</td>
-                        <td className="py-2 px-2 border-r border-gray-300 text-xs">{bird.species} {bird.mutations?.join(', ')}</td>
-                        <td className="py-2 px-2 text-xs"></td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-          
-          <div className="mt-12 pt-6 border-t-2 border-black text-[10px] text-gray-500 flex justify-between uppercase tracking-[0.2em] font-black">
-            <span>Generated by Aviary Manager Pro</span>
-            <span>Page 1 of 1</span>
-          </div>
+                  ))}
+                </tbody>
+              </table>
+            </>
+          ) : (
+            <div className="flex flex-col items-center justify-center p-20">
+               <h1 className="text-3xl font-black uppercase tracking-tighter mb-8">
+                  {qrType === 'bird' ? birds.find(b=>b.id === qrSelection)?.name : 
+                   qrType === 'pair' ? `PAIR: ${pairs.find(p=>p.id === qrSelection)?.id.slice(0,6)}` :
+                   `CAGE: ${cages.find(c=>c.id === qrSelection)?.name}`}
+               </h1>
+               <div className="p-8 border-4 border-black">
+                 <QRCodeSVG value={getQRData()} size={400} level="H" />
+               </div>
+               <p className="text-lg font-black text-gray-500 uppercase tracking-[0.3em] mt-8">The Averian</p>
+            </div>
+          )}
         </div>,
         document.body
       )}
@@ -3649,16 +4499,55 @@ function PrintListModal({ birds, cages, onClose }: { birds: Bird[], cages: Cage[
   );
 }
 
+function ScannerModal({ isOpen, onClose, onScan }: { isOpen: boolean, onClose: () => void, onScan: (result: string) => void }) {
+  return (
+    <div className={cn("fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/90 backdrop-blur-xl transition-all duration-300", isOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none")}>
+      <motion.div className="w-full max-w-sm bg-black-950 border border-black-700 rounded-[2.5rem] overflow-hidden shadow-2xl relative">
+        <div className="p-6 border-b border-black-700 flex items-center justify-between">
+          <h3 className="text-xl font-black text-white uppercase tracking-widest flex items-center gap-3">
+             <QrCode size={20} className="text-gold-500" />
+             Scan QR Label
+          </h3>
+          <button onClick={onClose} className="p-2 hover:bg-black/20 rounded-xl text-white/50 hover:text-gold-500 transition-all">
+             <X size={20} />
+          </button>
+        </div>
+        <div className="p-6 bg-black relative flex items-center justify-center min-h-[300px]">
+           {isOpen && (
+             <Scanner
+                onResult={(text) => {
+                  onScan(text);
+                  onClose();
+                }}
+                onError={(error) => {
+                  console.error(error);
+                }}
+                components={{ audio: false, finder: false }}
+             />
+           )}
+           <div className="absolute inset-0 pointer-events-none border-[40px] border-black/80 z-10" />
+           <div className="absolute inset-0 pointer-events-none flex items-center justify-center z-20">
+             <div className="w-48 h-48 border-2 border-gold-500/50 rounded-xl" />
+           </div>
+        </div>
+        <div className="p-6 bg-black-950 text-center">
+           <p className="text-xs text-black-300 font-bold tracking-widest uppercase">Center the Averian QR code in the frame</p>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
 function Modal({ isOpen, onClose, title, children }: { isOpen: boolean, onClose: () => void, title: string, children: React.ReactNode }) {
   if (!isOpen) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-xl">
-      <motion.div initial={{ scale: 0.95, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} className="bg-zinc-800 border border-black-700 rounded-[2rem] shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
-        <div className="p-6 border-b border-black-700 flex items-center justify-between bg-zinc-800">
+      <motion.div initial={{ scale: 0.95, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} className="bg-black-950 border border-black-700 rounded-[2rem] shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
+        <div className="p-6 border-b border-black-700 flex items-center justify-between bg-black-950">
           <h3 className="text-xl font-black text-white uppercase tracking-widest">{title}</h3>
           <button onClick={onClose} className="p-2 hover:bg-black/20 rounded-xl text-white/50 hover:text-gold-500 transition-all"><X size={20} /></button>
         </div>
-        <div className="p-6 overflow-y-auto custom-scrollbar bg-zinc-800 text-white">{children}</div>
+        <div className="p-6 overflow-y-auto custom-scrollbar bg-black-950 text-white">{children}</div>
       </motion.div>
     </div>
   );
@@ -3671,7 +4560,7 @@ function ConfirmModal({ isOpen, onClose, onConfirm, title, message }: { isOpen: 
       <motion.div 
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="w-full max-w-md bg-zinc-800 border border-black-700 rounded-[2.5rem] overflow-hidden shadow-2xl"
+        className="w-full max-w-md bg-black-950 border border-black-700 rounded-[2.5rem] overflow-hidden shadow-2xl"
       >
         <div className="p-8 space-y-6">
           <div className="flex items-center gap-4 text-red-500">
@@ -3693,7 +4582,7 @@ function ConfirmModal({ isOpen, onClose, onConfirm, title, message }: { isOpen: 
 
 // --- Forms ---
 
-function BirdForm({ user, initialData, cages, birds, pairs, userSettings, onAddSpecies, onAddSubSpecies, onAddMutation, onClose }: { user: FirebaseUser, initialData?: Bird | null, cages: Cage[], birds: Bird[], pairs: Pair[], userSettings: UserSettings | null, onAddSpecies: (n: string) => void, onAddSubSpecies: (n: string, sid: string) => void, onAddMutation: (n: string) => void, onClose: () => void }) {
+function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettings, onAddSpecies, onAddSubSpecies, onAddMutation, onClose }: { user: FirebaseUser, initialData?: Bird | null, cages: Cage[], birds: Bird[], pairs: Pair[], contacts: Contact[], userSettings: UserSettings | null, onAddSpecies: (n: string) => void, onAddSubSpecies: (n: string, sid: string) => void, onAddMutation: (n: string) => void, onClose: () => void }) {
   const symbol = getCurrencySymbol(userSettings?.currency);
   const [formData, setFormData] = useState<Partial<Bird>>(initialData || { 
     name: '', 
@@ -3705,6 +4594,7 @@ function BirdForm({ user, initialData, cages, birds, pairs, userSettings, onAddS
     purchaseDate: '',
     purchasePrice: 0,
     estimatedValue: 0,
+    boughtFromId: '',
     notes: '', 
     motherId: '', 
     fatherId: '', 
@@ -3715,6 +4605,7 @@ function BirdForm({ user, initialData, cages, birds, pairs, userSettings, onAddS
     statuses: [],
     imageUrl: '' 
   });
+  const [addToExpenses, setAddToExpenses] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -3784,6 +4675,19 @@ function BirdForm({ user, initialData, cages, birds, pairs, userSettings, onAddS
           } else {
             await addDoc(collection(db, 'pairs'), pairData);
           }
+        }
+
+        if (addToExpenses && formData.purchasePrice && formData.purchasePrice > 0) {
+          await addDoc(collection(db, 'transactions'), {
+            type: 'Expense',
+            category: 'Bird Purchase',
+            amount: formData.purchasePrice,
+            date: formData.purchaseDate || format(new Date(), 'yyyy-MM-dd'),
+            description: `Purchase of bird: ${formData.name}`,
+            birdId: birdId,
+            contactId: formData.boughtFromId || '',
+            uid: user.uid
+          });
         }
       } catch (err) { 
         handleFirestoreError(err, initialData ? OperationType.UPDATE : OperationType.CREATE, 'birds'); 
@@ -3983,8 +4887,30 @@ function BirdForm({ user, initialData, cages, birds, pairs, userSettings, onAddS
           <label className="text-[10px] font-black text-black-100 uppercase tracking-widest ml-1">Est. Value ({symbol})</label>
           <Input type="number" min="0" step="0.01" value={formData.estimatedValue} onChange={e => setFormData({ ...formData, estimatedValue: parseFloat(e.target.value) || 0 })} />
         </div>
-        <div className="space-y-2">
-          <label className="text-[10px] font-black text-black-100 uppercase tracking-widest ml-1">Custom Statuses</label>
+        <SearchableSelect 
+          label="Bought From"
+          options={[{ id: '', name: 'None' }, ...contacts.map(c => ({ id: c.id, name: c.name }))]}
+          value={formData.boughtFromId || ''}
+          onChange={(id) => setFormData({ ...formData, boughtFromId: id })}
+          placeholder="Select Contact"
+        />
+      </div>
+
+      <div className="flex items-center gap-2">
+        <input 
+          type="checkbox" 
+          id="add-to-expenses" 
+          checked={addToExpenses} 
+          onChange={(e) => setAddToExpenses(e.target.checked)}
+          className="w-4 h-4 rounded border-black-700 bg-black text-gold-500 focus:ring-gold-500"
+        />
+        <label htmlFor="add-to-expenses" className="text-[10px] font-black text-white uppercase tracking-widest cursor-pointer">
+          Add Purchase to Expenses
+        </label>
+      </div>
+
+      <div className="space-y-2">
+        <label className="text-[10px] font-black text-black-100 uppercase tracking-widest ml-1">Custom Statuses</label>
           <div className="flex gap-2">
             <Input 
               placeholder="Add status (e.g., Sold, Sick)..." 
@@ -4010,7 +4936,6 @@ function BirdForm({ user, initialData, cages, birds, pairs, userSettings, onAddS
             ))}
           </div>
         </div>
-      </div>
 
       <div className="space-y-1">
         <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Notes</label>
