@@ -37,6 +37,15 @@ export interface SharedItem {
   createdBy: string;
 }
 
+export interface BirdDocument {
+  id: string;
+  name: string;
+  url: string;
+  type: string;
+  fileType: string;
+  createdAt: string;
+}
+
 export interface Bird {
   id: string;
   name: string;
@@ -59,6 +68,7 @@ export interface Bird {
   estimatedValue?: number;
   boughtFromId?: string;
   uid: string;
+  documents?: BirdDocument[];
 }
 
 export interface Transaction {

@@ -23,7 +23,21 @@
         "purchaseDate": { "type": "string", "format": "date" },
         "purchasePrice": { "type": "number" },
         "estimatedValue": { "type": "number" },
-        "uid": { "type": "string", "description": "The owner's user ID." }
+        "uid": { "type": "string", "description": "The owner's user ID." },
+        "documents": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "name": { "type": "string" },
+              "url": { "type": "string" },
+              "type": { "type": "string" },
+              "fileType": { "type": "string" },
+              "createdAt": { "type": "string", "format": "date-time" }
+            }
+          }
+        }
       },
       "required": ["name", "species", "sex", "uid"]
     },

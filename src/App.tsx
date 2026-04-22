@@ -8,7 +8,7 @@ import {
   Tag, Calendar, ChevronDown, ChevronUp, ChevronRight, X, GitBranch,
   Image as ImageIcon, Loader2, DollarSign, TrendingUp, TrendingDown,
   Activity, ArrowUpRight, ArrowDownRight, BarChart3, PieChart as PieChartIcon,
-  Menu, Egg, LayoutGrid, Grid3x3, List as ListIcon, AlertTriangle, CreditCard, CheckCircle2, Bell, Cloud, Maximize2, Share2, Send, Printer, MoreHorizontal, Dna, Users, Palette, QrCode, Scan
+  Menu, Egg, LayoutGrid, Grid3x3, List as ListIcon, AlertTriangle, CreditCard, CheckCircle2, Bell, Cloud, Maximize2, Share2, Send, Printer, MoreHorizontal, Dna, Users, Palette, QrCode, Scan, FileText, ExternalLink
 } from 'lucide-react';
 import GeneticsCalculator from './components/GeneticsCalculator';
 import { ContactsView } from './components/ContactsView';
@@ -20,7 +20,7 @@ import {
   BarChart, Bar, Cell, Legend, PieChart, Pie, AreaChart, Area
 } from 'recharts';
 import { 
-  auth, db, loginWithGoogle, logout, handleFirestoreError, testConnection
+  auth, db, storage, loginWithGoogle, logout, handleFirestoreError, testConnection
 } from './firebase';
 import { 
   onAuthStateChanged, User as FirebaseUser 
@@ -29,8 +29,9 @@ import {
   collection, onSnapshot, query, where, addDoc, 
   updateDoc, deleteDoc, doc, getDocs, orderBy, setDoc, getDocFromServer
 } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { 
-  Bird, Cage, Pair, Task, Transaction, OperationType, BreedingRecord, UserSettings, Species, SubSpecies, Mutation, SharedItem, Contact
+  Bird, Cage, Pair, Task, Transaction, OperationType, BreedingRecord, UserSettings, Species, SubSpecies, Mutation, SharedItem, Contact, BirdDocument
 } from './types';
 import { cn, generateColorPalette } from './lib/utils';
 import ColorWheel from '@uiw/react-color-wheel';
@@ -220,7 +221,7 @@ export const SearchableSelect = ({
       >
         <span className={cn("truncate", !value && !selectedValues.length && "text-black-100")}>
           {multi 
-            ? (selectedValues.length ? selectedValues.join(', ') : placeholder)
+            ? (selectedValues.length ? selectedValues.map(v => options.find(o => o.id === v)?.name || v).join(', ') : placeholder)
             : (options.find(o => o.id === value)?.name || placeholder)
           }
         </span>
@@ -253,7 +254,7 @@ export const SearchableSelect = ({
                       key={opt.id}
                       className={cn(
                         "px-3 py-2 text-xs cursor-pointer hover:bg-zinc-700 transition-colors flex items-center justify-between",
-                        (multi ? selectedValues.includes(opt.name) : value === opt.id) && "text-gold-500 bg-zinc-700"
+                        (multi ? selectedValues.includes(opt.id) : value === opt.id) && "text-gold-500 bg-zinc-700"
                       )}
                       onClick={() => {
                         onChange(opt.id);
@@ -261,7 +262,7 @@ export const SearchableSelect = ({
                       }}
                     >
                       {opt.name}
-                      {(multi ? selectedValues.includes(opt.name) : value === opt.id) && <CheckSquare size={12} />}
+                      {(multi ? selectedValues.includes(opt.id) : value === opt.id) && <CheckSquare size={12} />}
                     </div>
                   ))
                 ) : (
@@ -513,78 +514,6 @@ export default function App() {
   const [isSyncing, setIsSyncing] = useState(false);
 
   useEffect(() => {
-    if (!user || tasks.length === 0) return;
-
-    if ('Notification' in window && Notification.permission !== 'granted' && Notification.permission !== 'denied') {
-      Notification.requestPermission();
-    }
-
-    const interval = setInterval(() => {
-      const now = new Date();
-      tasks.forEach(task => {
-        if (task.status !== 'Completed' && task.reminderDate) {
-          const reminderTime = new Date(task.reminderDate);
-          const diff = now.getTime() - reminderTime.getTime();
-          // Notify if the reminder time has passed within the last 60 seconds
-          if (diff >= 0 && diff < 60000) {
-            const notifiedKey = `notified_${task.id}_${task.reminderDate}`;
-            if (!localStorage.getItem(notifiedKey)) {
-              localStorage.setItem(notifiedKey, 'true');
-              if ('Notification' in window && Notification.permission === 'granted') {
-                if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-                  navigator.serviceWorker.ready.then(registration => {
-                    registration.showNotification('The Averian Reminder', {
-                      body: task.title,
-                      icon: '/pwa-192.png'
-                    });
-                  });
-                } else {
-                  new Notification('The Averian Reminder', {
-                    body: task.title,
-                    icon: '/pwa-192.png'
-                  });
-                }
-              } else {
-                toast.info(`Reminder: ${task.title}`);
-              }
-            }
-          }
-        }
-      });
-    }, 30000);
-
-    return () => clearInterval(interval);
-  }, [user, tasks]);
-
-  useEffect(() => {
-    if (!user || !('serviceWorker' in navigator)) return;
-
-    const subscribeToPush = async () => {
-      try {
-        const registration = await navigator.serviceWorker.ready;
-        
-        // Get existing subscription
-        let subscription = await registration.pushManager.getSubscription();
-        
-        if (!subscription) {
-          // Subscribe
-          const publicKey = import.meta.env.VITE_VAPID_PUBLIC_KEY || 'BJqzp7rkr1obW1Tr2C7_Jm-7H_pS1ybLDsgJBeQewq46Ws2HpXF1jF_g1h9sthZw7KmmtnjziqdIXfiyB7wGLno';
-          subscription = await registration.pushManager.subscribe({
-            userVisibleOnly: true,
-            applicationServerKey: publicKey
-          });
-        }
-      } catch (error) {
-        console.error('Failed to subscribe to push notifications:', error);
-      }
-    };
-
-    if (Notification.permission === 'granted') {
-      subscribeToPush();
-    }
-  }, [user]);
-
-  useEffect(() => {
     if (!user) return;
 
     const qBirds = query(collection(db, 'birds'), where('uid', '==', user.uid));
@@ -694,9 +623,18 @@ export default function App() {
         return birds.filter(b => {
           const cage = cages.find(c => c.id === b.cageId);
           const inPair = pairs.find(p => p.id.toLowerCase() === query && (p.maleId === b.id || p.femaleId === b.id));
+          const cageLabel = cage ? cage.name : 'unassigned';
+          const bornLabel = b.birthDate || 'unknown';
+          
           return b.name.toLowerCase().includes(query) || 
+                 b.id.toLowerCase().includes(query) ||
                  b.species.toLowerCase().includes(query) ||
-                 (cage && cage.name.toLowerCase().includes(query)) ||
+                 b.subSpecies?.toLowerCase().includes(query) ||
+                 (b.mutations || []).some(m => m.toLowerCase().includes(query)) ||
+                 (b.splitMutations || []).some(m => m.toLowerCase().includes(query)) ||
+                 cageLabel.toLowerCase().includes(query) ||
+                 (cage && cage.id.toLowerCase().includes(query)) ||
+                 bornLabel.toLowerCase().includes(query) ||
                  !!inPair;
         }).sort((a, b) => {
           const cageA = cages.find(c => c.id === a.cageId)?.name || 'ZZZ';
@@ -712,16 +650,46 @@ export default function App() {
         });
       case 'cages':
         return cages
-          .filter(c => c.id.toLowerCase() === query || c.name.toLowerCase().includes(query))
+          .filter(c => {
+            if (c.id.toLowerCase() === query || c.name.toLowerCase().includes(query) || c.location?.toLowerCase().includes(query)) return true;
+            // Also check if any bird in this cage matches the query
+            return birds.some(b => 
+              b.cageId === c.id && (
+                b.name.toLowerCase().includes(query) ||
+                b.id.toLowerCase().includes(query) ||
+                b.species.toLowerCase().includes(query) ||
+                b.subSpecies?.toLowerCase().includes(query) ||
+                (b.mutations || []).some(m => m.toLowerCase().includes(query)) ||
+                (b.splitMutations || []).some(m => m.toLowerCase().includes(query))
+              )
+            );
+          })
           .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
       case 'pairs':
         return pairs.filter(p => {
-          if (p.id.toLowerCase() === query) return true;
           const male = birds.find(b => b.id === p.maleId);
           const female = birds.find(b => b.id === p.femaleId);
+          
+          // Only show pairs if both birds exist
           if (!male && !female) return false;
+
           if (!query) return true;
-          return (male?.name.toLowerCase().includes(query) || female?.name.toLowerCase().includes(query));
+          if (p.id.toLowerCase() === query) return true;
+          const cage = cages.find(c => c.id === p.cageId) || cages.find(c => c.id === male?.cageId) || cages.find(c => c.id === female?.cageId);
+          const cageLabel = cage ? cage.name : 'unassigned';
+
+          const birdMatches = (b: Bird) => 
+            b.name.toLowerCase().includes(query) ||
+            b.id.toLowerCase().includes(query) ||
+            b.species.toLowerCase().includes(query) ||
+            b.subSpecies?.toLowerCase().includes(query) ||
+            (b.mutations || []).some(m => m.toLowerCase().includes(query)) ||
+            (b.splitMutations || []).some(m => m.toLowerCase().includes(query));
+
+          return (male && birdMatches(male)) || 
+                 (female && birdMatches(female)) ||
+                 cageLabel.toLowerCase().includes(query) ||
+                 (cage && cage.id.toLowerCase().includes(query));
         });
       case 'breeding':
         return breedingRecords.filter(br => {
@@ -729,7 +697,21 @@ export default function App() {
           const pair = pairs.find(p => p.id === br.pairId);
           const male = birds.find(b => b.id === pair?.maleId);
           const female = birds.find(b => b.id === pair?.femaleId);
-          return male?.name.toLowerCase().includes(query) || female?.name.toLowerCase().includes(query) || br.notes?.toLowerCase().includes(query);
+          const cage = cages.find(c => c.id === pair?.cageId) || cages.find(c => c.id === male?.cageId) || cages.find(c => c.id === female?.cageId);
+          
+          const birdMatches = (b: Bird) => 
+            b.name.toLowerCase().includes(query) ||
+            b.id.toLowerCase().includes(query) ||
+            b.species.toLowerCase().includes(query) ||
+            b.subSpecies?.toLowerCase().includes(query) ||
+            (b.mutations || []).some(m => m.toLowerCase().includes(query)) ||
+            (b.splitMutations || []).some(m => m.toLowerCase().includes(query));
+
+          return (male && birdMatches(male)) || 
+                 (female && birdMatches(female)) ||
+                 (cage && (cage.name.toLowerCase().includes(query) || cage.id.toLowerCase().includes(query))) ||
+                 br.notes?.toLowerCase().includes(query) ||
+                 br.id.toLowerCase().includes(query);
         });
       case 'financials':
         return transactions.filter(t => t.category.toLowerCase().includes(query) || t.description?.toLowerCase().includes(query));
@@ -1343,7 +1325,7 @@ export default function App() {
               <div className={cn(
                 "grid gap-4",
                 activeTab === 'tasks' ? "max-w-3xl mx-auto grid-cols-1" : 
-                activeTab === 'financials' || activeTab === 'stats' ? "grid-cols-1" :
+                activeTab === 'financials' || activeTab === 'stats' || activeTab === 'contacts' ? "grid-cols-1" :
                 activeTab === 'genetics' ? "grid-cols-1 w-full" :
                 activeTab === 'settings' ? "grid-cols-1 max-w-7xl mx-auto w-full" :
                 activeTab === 'pairs' && viewMode === 'grid-large' ? "grid-cols-1 md:grid-cols-2 max-w-5xl mx-auto" : viewMode === 'grid-large' ? "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5" :
@@ -1357,6 +1339,7 @@ export default function App() {
                         bird={bird} 
                         cage={cages.find(c => c.id === bird.cageId)}
                         birds={birds}
+                        cages={cages}
                         viewMode={viewMode}
                         currency={userSettings?.currency}
                         onBirdRef={handleBirdRef}
@@ -1604,6 +1587,7 @@ export default function App() {
                   <ContactsView 
                     contacts={contacts}
                     transactions={transactions}
+                    viewMode={viewMode}
                     onEdit={(c) => { setEditingItem(c); setIsModalOpen(true); }}
                     onDelete={(id) => setDeleteConfirmation({
                       title: 'Delete Contact',
@@ -1662,7 +1646,7 @@ export default function App() {
         {activeTab === 'cages' && <CageForm user={user} initialData={editingItem} onClose={() => setIsModalOpen(false)} />}
         {activeTab === 'pairs' && <PairForm user={user} initialData={editingItem} birds={birds} onClose={() => setIsModalOpen(false)} />}
         {activeTab === 'breeding' && <BreedingRecordForm user={user} initialData={editingItem} pairs={pairs} birds={birds} onClose={() => setIsModalOpen(false)} />}
-        {activeTab === 'tasks' && <TaskForm user={user} initialData={editingItem} birds={birds} onClose={() => setIsModalOpen(false)} />}
+        {activeTab === 'tasks' && <TaskForm user={user} initialData={editingItem} birds={birds} cages={cages} onClose={() => setIsModalOpen(false)} />}
         {activeTab === 'financials' && <TransactionForm user={user} initialData={editingItem} birds={birds} pairs={pairs} contacts={contacts} currency={userSettings?.currency} onClose={() => setIsModalOpen(false)} />}
         {activeTab === 'contacts' && <ContactForm user={user} initialData={editingItem} onClose={() => setIsModalOpen(false)} />}
       </Modal>
@@ -1731,8 +1715,8 @@ function NavItem({ active, onClick, icon, label, count }: { active: boolean, onC
   );
 }
 
-function ShareBirdModal({ bird, mother, father, mate, onClose }: { bird: Bird, mother?: Bird, father?: Bird, mate?: Bird, onClose: () => void }) {
-  const [selectedFields, setSelectedFields] = useState<string[]>(['name', 'sex', 'species', 'mutations', 'image']);
+function ShareBirdModal({ bird, mother, father, mate, offspring, cages, cageName, onClose }: { bird: Bird, mother?: Bird, father?: Bird, mate?: Bird, offspring: Bird[], cages: Cage[], cageName?: string, onClose: () => void }) {
+  const [selectedFields, setSelectedFields] = useState<string[]>(['name', 'sex', 'species', 'mutations', 'splitMutations', 'cage', 'mate', 'offspring', 'parents', 'birthDate', 'image']);
   const [isTransferMode, setIsTransferMode] = useState(false);
 
   const fields = [
@@ -1740,34 +1724,72 @@ function ShareBirdModal({ bird, mother, father, mate, onClose }: { bird: Bird, m
     { id: 'sex', label: 'Sex' },
     { id: 'species', label: 'Species & Sub-species' },
     { id: 'mutations', label: 'Mutations' },
+    { id: 'splitMutations', label: 'Split Mutations' },
+    { id: 'cage', label: 'Cage Number' },
+    { id: 'mate', label: 'Current Mate' },
+    { id: 'offspring', label: 'Offspring List' },
     { id: 'birthDate', label: 'Birth Date' },
     { id: 'parents', label: 'Parents (Names)' },
     { id: 'image', label: 'Bird Image' },
     { id: 'notes', label: 'Notes' },
   ];
 
-  const handleShare = async () => {
-    let shareText = `🐦 Bird Details: ${bird.name}\n\n`;
+  const formatBirdInfo = (targetBird: Bird, title: string, includeImage: boolean = false) => {
+    let text = `📍 ${title}: ${targetBird.name}\n`;
+    const indent = "   ";
     
-    if (selectedFields.includes('sex')) shareText += `Sex: ${bird.sex}\n`;
+    if (selectedFields.includes('sex')) text += `${indent}• Sex: ${targetBird.sex}\n`;
     if (selectedFields.includes('species')) {
-      shareText += `Species: ${bird.species}${bird.subSpecies ? ` (${bird.subSpecies})` : ''}\n`;
+      text += `${indent}• Species: ${targetBird.species}${targetBird.subSpecies ? ` (${targetBird.subSpecies})` : ''}\n`;
     }
-    if (selectedFields.includes('mutations') && bird.mutations?.length) {
-      shareText += `Mutations: ${bird.mutations.join(', ')}\n`;
+    if (selectedFields.includes('mutations') && targetBird.mutations?.length) {
+      text += `${indent}• Mutations: ${targetBird.mutations.join(', ')}\n`;
     }
-    if (selectedFields.includes('birthDate') && bird.birthDate) {
-      shareText += `Born: ${bird.birthDate}\n`;
+    if (selectedFields.includes('splitMutations') && targetBird.splitMutations?.length) {
+      text += `${indent}• Split: ${targetBird.splitMutations.join(', ')}\n`;
     }
+    if (selectedFields.includes('birthDate') && targetBird.birthDate) {
+      text += `${indent}• Born: ${targetBird.birthDate}\n`;
+    }
+    if (selectedFields.includes('cage')) {
+      const birdCage = cages.find(c => c.id === targetBird.cageId);
+      if (birdCage) text += `${indent}• Cage: ${birdCage.name}\n`;
+      else if (targetBird.id === bird.id && cageName) text += `${indent}• Cage: ${cageName}\n`;
+    }
+    if (includeImage && selectedFields.includes('image') && targetBird.imageUrl && !targetBird.imageUrl.startsWith('data:')) {
+      text += `${indent}• Image: ${targetBird.imageUrl}\n`;
+    }
+    return text + "\n";
+  };
+
+  const handleShare = async () => {
+    let shareText = `🕊️ BIRD PROFILE: ${bird.name}\n`;
+    shareText += `====================\n\n`;
+    
+    shareText += formatBirdInfo(bird, "MAIN DETAILS", true);
+    
     if (selectedFields.includes('parents')) {
-      if (father) shareText += `Father: ${father.name}\n`;
-      if (mother) shareText += `Mother: ${mother.name}\n`;
+      if (father || mother) {
+        shareText += `🧬 PARENTS\n`;
+        if (father) shareText += formatBirdInfo(father, "Father");
+        if (mother) shareText += formatBirdInfo(mother, "Mother");
+      }
     }
+
+    if (selectedFields.includes('mate') && mate) {
+      shareText += `💝 CURRENT MATE\n`;
+      shareText += formatBirdInfo(mate, "Mate");
+    }
+
+    if (selectedFields.includes('offspring') && offspring.length > 0) {
+      shareText += `🐣 OFFSPRING (${offspring.length})\n`;
+      offspring.forEach((o, i) => {
+        shareText += formatBirdInfo(o, `Child #${i + 1}`);
+      });
+    }
+
     if (selectedFields.includes('notes') && bird.notes) {
-      shareText += `Notes: ${bird.notes}\n`;
-    }
-    if (selectedFields.includes('image') && bird.imageUrl) {
-      shareText += `\nImage: ${bird.imageUrl}\n`;
+      shareText += `📝 NOTES\n${bird.notes}\n\n`;
     }
 
     if (isTransferMode) {
@@ -1803,15 +1825,35 @@ function ShareBirdModal({ bird, mother, father, mate, onClose }: { bird: Bird, m
       }
     }
 
+    const shareData: any = {
+      title: `Bird: ${bird.name}`,
+      text: shareText
+    };
+
+    if (selectedFields.includes('image') && bird.imageUrl?.startsWith('data:')) {
+      try {
+        const res = await fetch(bird.imageUrl);
+        const blob = await res.blob();
+        const file = new File([blob], `${bird.name.replace(/[^a-zA-Z0-9]/g, '_')}.webp`, { type: 'image/webp' });
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          shareData.files = [file];
+        }
+      } catch (err) {
+        console.error('Failed to prepare image for sharing:', err);
+      }
+    }
+
     if (navigator.share) {
       try {
-        await navigator.share({
-          title: `Bird: ${bird.name}`,
-          text: shareText
-        });
+        await navigator.share(shareData);
         onClose();
       } catch (err) {
-        console.error('Share failed:', err);
+        if ((err as Error).name !== 'AbortError') {
+          console.error('Share failed:', err);
+          navigator.clipboard.writeText(shareText);
+          toast.success('Bird info copied to clipboard');
+        }
+        onClose();
       }
     } else {
       navigator.clipboard.writeText(shareText);
@@ -1863,17 +1905,18 @@ function ShareBirdModal({ bird, mother, father, mate, onClose }: { bird: Bird, m
   );
 }
 
-function BirdCard({ bird, cage, birds, viewMode = 'grid-large', currency, onBirdRef, onNavigate, onEdit, onDelete }: { bird: Bird, cage?: Cage, birds: Bird[], viewMode?: 'grid-large' | 'list', currency?: string, onBirdRef: (name: string) => void, onNavigate: (tab: string, query?: string, filter?: any) => void, onEdit: () => void, onDelete: () => void }) {
+function BirdCard({ bird, cage, birds, cages, viewMode = 'grid-large', currency, onBirdRef, onNavigate, onEdit, onDelete }: { bird: Bird, cage?: Cage, birds: Bird[], cages: Cage[], viewMode?: 'grid-large' | 'list', currency?: string, onBirdRef: (name: string) => void, onNavigate: (tab: string, query?: string, filter?: any) => void, onEdit: () => void, onDelete: () => void }) {
   const [showTree, setShowTree] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [fullscreenImage, setFullscreenImage] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [showDocs, setShowDocs] = useState(false);
   const [showActions, setShowActions] = useState(false);
   const symbol = getCurrencySymbol(currency);
   const offspring = birds.filter(b => b.motherId === bird.id || b.fatherId === bird.id || bird.offspringIds?.includes(b.id));
   const mother = birds.find(b => b.id === bird.motherId);
   const father = birds.find(b => b.id === bird.fatherId);
-  const mate = birds.find(b => b.id === bird.mateId);
+  const mate = birds.find(b => b.id === bird.mateId) || birds.find(b => b.mateId === bird.id);
 
   const effectiveViewMode = (viewMode === 'list' && isExpanded) ? 'grid-large' : viewMode;
   const imageUrl = bird.imageUrl || null;
@@ -2018,7 +2061,79 @@ function BirdCard({ bird, cage, birds, viewMode = 'grid-large', currency, onBird
             </div>
           )}
         </div>
-<div className="pt-2 border-t border-black-800/50"> <button onClick={(e) => { e.stopPropagation(); setShowActions(!showActions); }} className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-xl transition-all border border-black-700"> <MoreHorizontal size={16} /> <span className="text-[10px] font-black uppercase tracking-widest">Actions</span> </button> <AnimatePresence> {showActions && ( <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden"> <div className="flex flex-wrap items-center gap-2 pt-2"> <button onClick={(e) => { e.stopPropagation(); onNavigate('stats', '', { birdId: bird.id }); }} className="flex-1 p-2 bg-gold-500/10 border border-gold-500/20 rounded-lg text-[10px] text-gold-500 font-black uppercase tracking-widest hover:bg-gold-500/20 transition-colors flex items-center justify-center gap-2 min-w-[100px]"> <Egg size={12} className="text-gold-500" /> Breeding </button> <button onClick={handleShare} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-zinc-700 hover:bg-zinc-600 text-white hover:text-gold-500 rounded-lg transition-all border border-black-700 min-w-[100px]"> <Share2 size={14} /> <span className="text-[9px] font-black uppercase tracking-widest">Share</span> </button> </div> <div className="flex flex-wrap items-center gap-2 pt-2"> <button onClick={(e) => { e.stopPropagation(); setShowTree(!showTree); }} className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 bg-gold-500/10 hover:bg-gold-500/20 text-gold-500 rounded-xl transition-all border border-gold-500/20 group/btn min-w-[80px]"> <GitBranch size={16} className="group-hover/btn:scale-110 transition-transform" /> <span className="text-[10px] font-black uppercase tracking-widest whitespace-nowrap">Pedigree</span> </button> <button onClick={(e) => { e.stopPropagation(); onEdit(); }} className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-white rounded-xl transition-all border border-black-700 group/btn min-w-[80px]"> <Edit2 size={16} className="group-hover/btn:scale-110 transition-transform" /> <span className="text-[10px] font-black uppercase tracking-widest whitespace-nowrap">Edit</span> </button> <button onClick={(e) => { e.stopPropagation(); onDelete(); }} className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-xl transition-all border border-red-500/20 group/btn min-w-[80px]"> <Trash2 size={16} className="group-hover/btn:scale-110 transition-transform" /> <span className="text-[10px] font-black uppercase tracking-widest whitespace-nowrap">Delete</span> </button> </div> </motion.div> )} </AnimatePresence> </div> <Modal isOpen={isShareModalOpen} onClose={() => setIsShareModalOpen(false)} title="Share Bird"> <ShareBirdModal bird={bird} mother={mother} father={father} mate={mate} onClose={() => setIsShareModalOpen(false)} /> </Modal>
+        <div className="pt-2 border-t border-black-800/50">
+          <button 
+            onClick={(e) => { e.stopPropagation(); setShowActions(!showActions); }} 
+            className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-xl transition-all border border-black-700"
+          >
+            <MoreHorizontal size={16} />
+            <span className="text-[10px] font-black uppercase tracking-widest">Actions</span>
+          </button>
+          
+          <AnimatePresence>
+            {showActions && (
+              <motion.div 
+                initial={{ height: 0, opacity: 0 }} 
+                animate={{ height: 'auto', opacity: 1 }} 
+                exit={{ height: 0, opacity: 0 }} 
+                className="overflow-hidden"
+              >
+                <div className="flex flex-wrap items-center gap-2 pt-2">
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); onNavigate('stats', '', { birdId: bird.id }); }} 
+                    className="flex-1 p-2 bg-gold-500/10 border border-gold-500/20 rounded-lg text-[10px] text-gold-500 font-black uppercase tracking-widest hover:bg-gold-500/20 transition-colors flex items-center justify-center gap-2 min-w-[100px]"
+                  >
+                    <Egg size={12} className="text-gold-500" />
+                    Breeding
+                  </button>
+                  <button 
+                    onClick={handleShare} 
+                    className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-zinc-700 hover:bg-zinc-600 text-white hover:text-gold-500 rounded-lg transition-all border border-black-700 min-w-[100px]"
+                  >
+                    <Share2 size={14} />
+                    <span className="text-[9px] font-black uppercase tracking-widest">Share</span>
+                  </button>
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); setShowDocs(true); }} 
+                    className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-zinc-700 hover:bg-zinc-600 text-white hover:text-gold-500 rounded-lg transition-all border border-black-700 min-w-[100px]"
+                  >
+                    <FileText size={14} />
+                    <span className="text-[9px] font-black uppercase tracking-widest">Docs</span>
+                  </button>
+                </div>
+                <div className="flex flex-wrap items-center gap-2 pt-2">
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); setShowTree(!showTree); }} 
+                    className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 bg-gold-500/10 hover:bg-gold-500/20 text-gold-500 rounded-xl transition-all border border-gold-500/20 group/btn min-w-[80px]"
+                  >
+                    <GitBranch size={16} className="group-hover/btn:scale-110 transition-transform" />
+                    <span className="text-[10px] font-black uppercase tracking-widest whitespace-nowrap">Pedigree</span>
+                  </button>
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); onEdit(); }} 
+                    className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-white rounded-xl transition-all border border-black-700 group/btn min-w-[80px]"
+                  >
+                    <Edit2 size={16} className="group-hover/btn:scale-110 transition-transform" />
+                    <span className="text-[10px] font-black uppercase tracking-widest whitespace-nowrap">Edit</span>
+                  </button>
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); onDelete(); }} 
+                    className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-xl transition-all border border-red-500/20 group/btn min-w-[80px]"
+                  >
+                    <Trash2 size={16} className="group-hover/btn:scale-110 transition-transform" />
+                    <span className="text-[10px] font-black uppercase tracking-widest whitespace-nowrap">Delete</span>
+                  </button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+        <Modal isOpen={isShareModalOpen} onClose={() => setIsShareModalOpen(false)} title="Share Bird"> 
+          <ShareBirdModal bird={bird} mother={mother} father={father} mate={mate} offspring={offspring} cages={cages} cageName={cage?.name} onClose={() => setIsShareModalOpen(false)} /> 
+        </Modal> 
+        <Modal isOpen={showDocs} onClose={() => setShowDocs(false)} title={`Documents - ${bird.name}`}> 
+          <BirdDocumentsModal bird={bird} onClose={() => setShowDocs(false)} /> 
+        </Modal>
         <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-black-800/50">
           {viewMode === 'list' && (
             <button 
@@ -2285,7 +2400,7 @@ function PairCard({ pair, male, female, cages, birds, currency, onBirdRef, onNav
               {bird ? bird.name : 'Unknown'}
             </h4>
             <p className="text-[9px] font-black text-gold-500 uppercase tracking-widest truncate opacity-80">
-              {bird?.species || 'Ringneck'}{bird?.subSpecies ? ` • ${bird.subSpecies}` : ''}
+              {bird?.species || 'Unknown Species'}{bird?.subSpecies ? ` • ${bird.subSpecies}` : ''}
             </p>
           </div>
           
@@ -3177,7 +3292,7 @@ function BreedingRecordForm({ user, initialData, pairs, birds, onClose }: { user
           label="Tag Offspring"
           options={birds.map(b => ({ id: b.id, name: b.name }))}
           multi
-          selectedValues={formData.offspringIds?.map(id => birds.find(b => b.id === id)?.name || id) || []}
+          selectedValues={formData.offspringIds || []}
           onChange={(id) => {
             const current = formData.offspringIds || [];
             setFormData({ 
@@ -3419,6 +3534,31 @@ function ContactForm({ user, initialData, onClose }: { user: FirebaseUser, initi
   );
 }
 
+const getGoogleCalendarUrl = (task: Task) => {
+  const isAllDay = !task.reminderDate && !!task.dueDate;
+  const baseDate = task.reminderDate ? new Date(task.reminderDate) : (task.dueDate ? new Date(task.dueDate) : new Date());
+  
+  const formatDate = (date: Date, allday: boolean) => {
+    const iso = date.toISOString();
+    if (allday) return iso.split('T')[0].replace(/-/g, '');
+    return iso.replace(/-|:|\.\d+/g, '');
+  };
+
+  const start = formatDate(baseDate, isAllDay);
+  const duration = isAllDay ? 24 * 60 * 60 * 1000 : 60 * 60 * 1000;
+  const end = formatDate(new Date(baseDate.getTime() + duration), isAllDay);
+  
+  const title = encodeURIComponent(task.title);
+  let descriptionText = task.description || '';
+  if (task.subTasks && task.subTasks.length > 0) {
+    descriptionText += '\n\nSubtasks:\n' + task.subTasks.map(st => `${st.completed ? '✅' : '⭕'} ${st.title}`).join('\n');
+  }
+  descriptionText += '\n\n— Generated by Aviary Manager Pro —';
+  const encodedDescription = encodeURIComponent(descriptionText);
+  
+  return `https://www.google.com/calendar/render?action=TEMPLATE&text=${title}&details=${encodedDescription}&dates=${start}/${end}`;
+};
+
 function TaskCard({ task, birds, onBirdRef, onToggle, onEdit, onDelete, viewMode = 'grid-large' }: { task: Task, birds: Bird[], onBirdRef: (name: string) => void, onToggle: () => void, onEdit: () => void, onDelete: () => void, viewMode?: 'grid-large' | 'list' }) {
   const [expanded, setExpanded] = useState(false);
   const effectiveViewMode = (viewMode === 'list' && expanded) ? 'grid-large' : viewMode;
@@ -3485,6 +3625,16 @@ function TaskCard({ task, birds, onBirdRef, onToggle, onEdit, onDelete, viewMode
               <Edit2 size={14} />
               <span className="text-[9px] font-black uppercase tracking-widest">Edit</span>
             </button>
+            <a 
+              href={getGoogleCalendarUrl(task)}
+              target="_blank"
+              rel="noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 rounded-lg transition-all border border-blue-500/20"
+            >
+              <Calendar size={14} />
+              <span className="text-[9px] font-black uppercase tracking-widest">Add to Calendar</span>
+            </a>
             <button onClick={(e) => { e.stopPropagation(); onDelete(); }} className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-lg transition-all border border-red-500/20">
               <Trash2 size={14} />
               <span className="text-[9px] font-black uppercase tracking-widest">Delete</span>
@@ -3563,6 +3713,16 @@ function TaskCard({ task, birds, onBirdRef, onToggle, onEdit, onDelete, viewMode
               <Edit2 size={14} />
               <span className="text-[9px] font-black uppercase tracking-widest hidden sm:inline">Edit</span>
             </button>
+            <a 
+              href={getGoogleCalendarUrl(task)}
+              target="_blank"
+              rel="noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="flex-1 flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-2 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 rounded-lg transition-all border border-blue-500/20 min-w-0"
+            >
+              <Calendar size={14} />
+              <span className="text-[9px] font-black uppercase tracking-widest hidden sm:inline">Add to Calendar</span>
+            </a>
             <button onClick={(e) => { e.stopPropagation(); onDelete(); }} className="flex-1 flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-lg transition-all border border-red-500/20 min-w-0">
               <Trash2 size={14} />
               <span className="text-[9px] font-black uppercase tracking-widest hidden sm:inline">Delete</span>
@@ -4268,7 +4428,7 @@ function PrintAndQRModal({ birds, pairs, cages, onClose }: { birds: Bird[], pair
   const [searchQuery, setSearchQuery] = useState('');
   const [printEmpty, setPrintEmpty] = useState(false);
   const [qrType, setQrType] = useState<'bird' | 'pair' | 'cage'>('bird');
-  const [qrSelection, setQrSelection] = useState<string>('');
+  const [qrSelections, setQrSelections] = useState<string[]>([]);
 
   const sortedBirds = useMemo(() => {
     return [...birds].sort((a, b) => {
@@ -4281,13 +4441,19 @@ function PrintAndQRModal({ birds, pairs, cages, onClose }: { birds: Bird[], pair
   }, [birds, cages]);
 
   const filteredBirds = sortedBirds.filter(bird => {
-    const cageName = cages.find(c => c.id === bird.cageId)?.name || 'No Cage';
+    const cage = cages.find(c => c.id === bird.cageId);
+    const cageName = cage?.name || 'No Cage';
+    const cageId = cage?.id || '';
     const searchLower = searchQuery.toLowerCase();
     return (
       bird.name.toLowerCase().includes(searchLower) ||
+      bird.id.toLowerCase().includes(searchLower) ||
       cageName.toLowerCase().includes(searchLower) ||
+      cageId.toLowerCase().includes(searchLower) ||
       bird.species.toLowerCase().includes(searchLower) ||
-      (bird.mutations || []).some(m => m.toLowerCase().includes(searchLower))
+      bird.subSpecies?.toLowerCase().includes(searchLower) ||
+      (bird.mutations || []).some(m => m.toLowerCase().includes(searchLower)) ||
+      (bird.splitMutations || []).some(m => m.toLowerCase().includes(searchLower))
     );
   });
 
@@ -4310,10 +4476,11 @@ function PrintAndQRModal({ birds, pairs, cages, onClose }: { birds: Bird[], pair
   };
   const toggleBird = (id: string) => setSelectedBirds(prev => prev.includes(id) ? prev.filter(bId => bId !== id) : [...prev, id]);
 
-  const getQRData = () => {
-     if (!qrSelection) return '';
-     return JSON.stringify({ t: qrType === 'bird' ? 'b' : qrType === 'pair' ? 'p' : 'c', id: qrSelection });
+  const getQRData = (id: string) => {
+     return JSON.stringify({ t: qrType === 'bird' ? 'b' : qrType === 'pair' ? 'p' : 'c', id });
   };
+
+  const toggleQrSelection = (id: string) => setQrSelections(prev => prev.includes(id) ? prev.filter(sid => sid !== id) : [...prev, id]);
 
   return (
     <>
@@ -4330,6 +4497,24 @@ function PrintAndQRModal({ birds, pairs, cages, onClose }: { birds: Bird[], pair
           .no-print { display: none !important; }
           table { width: 100% !important; border-collapse: collapse !important; }
           th, td { border: 1px solid #000 !important; padding: 8px !important; }
+          .qr-print-container { 
+            display: flex !important; 
+            flex-wrap: wrap !important; 
+            gap: 10px !important; 
+            justify-content: center !important; 
+          }
+          .qr-print-item {
+            width: 5cm !important;
+            height: 5cm !important;
+            border: 1px solid #000 !important;
+            display: flex !important;
+            flex-direction: column !important;
+            align-items: center !important;
+            justify-content: center !important;
+            padding: 5mm !important;
+            page-break-inside: avoid !important;
+            background: white !important;
+          }
         }
       `}</style>
       
@@ -4388,53 +4573,68 @@ function PrintAndQRModal({ birds, pairs, cages, onClose }: { birds: Bird[], pair
       ) : (
         <div className="space-y-4">
            <div className="flex items-center gap-2 mb-2 bg-black-900 border border-black-700 p-1 rounded-xl">
-             <button onClick={() => { setQrType('bird'); setQrSelection(''); }} className={cn("flex-1 py-3 rounded-lg text-xs font-bold uppercase transition-colors tracking-widest", qrType === 'bird' && "bg-zinc-700 text-gold-500")}>Bird</button>
-             <button onClick={() => { setQrType('pair'); setQrSelection(''); }} className={cn("flex-1 py-3 rounded-lg text-xs font-bold uppercase transition-colors tracking-widest", qrType === 'pair' && "bg-zinc-700 text-gold-500")}>Pair</button>
-             <button onClick={() => { setQrType('cage'); setQrSelection(''); }} className={cn("flex-1 py-3 rounded-lg text-xs font-bold uppercase transition-colors tracking-widest", qrType === 'cage' && "bg-zinc-700 text-gold-500")}>Cage</button>
+             <button onClick={() => { setQrType('bird'); setQrSelections([]); }} className={cn("flex-1 py-3 rounded-lg text-xs font-bold uppercase transition-colors tracking-widest", qrType === 'bird' && "bg-zinc-700 text-gold-500")}>Bird</button>
+             <button onClick={() => { setQrType('pair'); setQrSelections([]); }} className={cn("flex-1 py-3 rounded-lg text-xs font-bold uppercase transition-colors tracking-widest", qrType === 'pair' && "bg-zinc-700 text-gold-500")}>Pair</button>
+             <button onClick={() => { setQrType('cage'); setQrSelections([]); }} className={cn("flex-1 py-3 rounded-lg text-xs font-bold uppercase transition-colors tracking-widest", qrType === 'cage' && "bg-zinc-700 text-gold-500")}>Cage</button>
            </div>
            
            {qrType === 'bird' ? (
              <SearchableSelect 
-               label="Select Bird"
-               options={birds.map(b => ({ id: b.id, name: `${b.name} (${b.species})` }))}
-               value={qrSelection}
-               onChange={(val) => setQrSelection(val)}
+               label="Select Birds"
+               options={birds.map(b => {
+                 const cage = cages.find(c => c.id === b.cageId);
+                 return { id: b.id, name: `${b.name} (${b.species})${cage ? ` - ${cage.name}` : ''}` };
+               })}
+               multi
+               selectedValues={qrSelections}
+               onChange={(val) => toggleQrSelection(val)}
              />
            ) : qrType === 'pair' ? (
              <SearchableSelect 
-               label="Select Pair"
+               label="Select Pairs"
                options={pairs.map(p => {
-                 const m = birds.find(b => b.id === p.maleId)?.name || 'Unknown';
-                 const f = birds.find(b => b.id === p.femaleId)?.name || 'Unknown';
-                 return { id: p.id, name: `${m} x ${f}` };
+                 const male = birds.find(b => b.id === p.maleId);
+                 const female = birds.find(b => b.id === p.femaleId);
+                 const mName = male?.name || 'Unknown';
+                 const fName = female?.name || 'Unknown';
+                 const cageId = male?.cageId || female?.cageId;
+                 const cage = cages.find(c => c.id === cageId);
+                 return { id: p.id, name: `${mName} x ${fName}${cage ? ` - ${cage.name}` : ''}` };
                })}
-               value={qrSelection}
-               onChange={(val) => setQrSelection(val)}
+               multi
+               selectedValues={qrSelections}
+               onChange={(val) => toggleQrSelection(val)}
              />
            ) : (
              <SearchableSelect 
-               label="Select Cage"
+               label="Select Cages"
                options={cages.map(c => ({ id: c.id, name: c.name }))}
-               value={qrSelection}
-               onChange={(val) => setQrSelection(val)}
+               multi
+               selectedValues={qrSelections}
+               onChange={(val) => toggleQrSelection(val)}
              />
            )}
 
-           {qrSelection && (
-             <div className="p-8 bg-white rounded-2xl flex flex-col items-center justify-center my-6">
-               <QRCodeSVG value={getQRData()} size={240} level="H" />
-               <p className="text-black font-black mt-6 uppercase tracking-widest text-center text-sm">
-                 {qrType === 'bird' ? birds.find(b=>b.id === qrSelection)?.name : 
-                  qrType === 'pair' ? `PAIR: ${pairs.find(p=>p.id === qrSelection)?.id.slice(0,6)}` :
-                  `CAGE: ${cages.find(c=>c.id === qrSelection)?.name}`
-                 }
-               </p>
+           {qrSelections.length > 0 && (
+             <div className="max-h-48 overflow-y-auto space-y-2 custom-scrollbar p-2 bg-black/20 rounded-xl border border-black-800">
+                {qrSelections.map(id => (
+                  <div key={id} className="flex items-center justify-between p-2 bg-zinc-900 rounded-lg border border-black-700 group">
+                    <span className="text-xs text-white font-medium">
+                      {qrType === 'bird' ? birds.find(b=>b.id === id)?.name : 
+                       qrType === 'pair' ? `PAIR: ${id.slice(0,6)}` :
+                       cages.find(c=>c.id === id)?.name}
+                    </span>
+                    <button onClick={() => toggleQrSelection(id)} className="text-black-100 hover:text-red-500 transition-colors">
+                      <X size={14} />
+                    </button>
+                  </div>
+                ))}
              </div>
            )}
 
-           <Button onClick={handlePrint} disabled={!qrSelection} className="w-full py-4 mt-4">
+           <Button onClick={handlePrint} disabled={qrSelections.length === 0} className="w-full py-4 mt-4">
              <QrCode size={18} className="mr-2" />
-             Confirm & Print QR
+             Confirm & Print {qrSelections.length} QR{qrSelections.length !== 1 ? 's' : ''}
            </Button>
         </div>
       )}
@@ -4480,16 +4680,18 @@ function PrintAndQRModal({ birds, pairs, cages, onClose }: { birds: Bird[], pair
               </table>
             </>
           ) : (
-            <div className="flex flex-col items-center justify-center p-20">
-               <h1 className="text-3xl font-black uppercase tracking-tighter mb-8">
-                  {qrType === 'bird' ? birds.find(b=>b.id === qrSelection)?.name : 
-                   qrType === 'pair' ? `PAIR: ${pairs.find(p=>p.id === qrSelection)?.id.slice(0,6)}` :
-                   `CAGE: ${cages.find(c=>c.id === qrSelection)?.name}`}
-               </h1>
-               <div className="p-8 border-4 border-black">
-                 <QRCodeSVG value={getQRData()} size={400} level="H" />
-               </div>
-               <p className="text-lg font-black text-gray-500 uppercase tracking-[0.3em] mt-8">The Averian</p>
+            <div className="qr-print-container">
+               {qrSelections.map(id => (
+                 <div key={id} className="qr-print-item">
+                    <QRCodeSVG value={getQRData(id)} size={140} level="H" />
+                    <p className="text-[10px] font-black uppercase text-center mt-3 leading-tight truncate w-full px-1">
+                       {qrType === 'bird' ? birds.find(b=>b.id === id)?.name : 
+                        qrType === 'pair' ? `PAIR: ${id.slice(0,6)}` :
+                        cages.find(c=>c.id === id)?.name}
+                    </p>
+                    <p className="text-[7px] font-black text-gray-400 border-t border-gray-100 pt-1 uppercase tracking-widest mt-1">The Averian</p>
+                 </div>
+               ))}
             </div>
           )}
         </div>,
@@ -4555,6 +4757,54 @@ function Modal({ isOpen, onClose, title, children }: { isOpen: boolean, onClose:
   );
 }
 
+function BirdDocumentsModal({ bird, onClose }: { bird: Bird, onClose: () => void }) {
+  if (!bird.documents || bird.documents.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12 text-center text-white">
+        <div className="w-16 h-16 bg-zinc-800 rounded-full flex items-center justify-center mb-4 border border-black-700">
+          <FileText size={32} className="text-zinc-600" />
+        </div>
+        <h3 className="text-white font-bold mb-1">No documents found</h3>
+        <p className="text-white/40 text-xs">This bird has no attached DNA certificates, vet records or permits.</p>
+        <Button onClick={onClose} variant="secondary" className="mt-6">Close</Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-3">
+        {bird.documents.map((doc) => (
+          <div key={doc.id} className="flex items-center justify-between p-4 bg-black rounded-2xl border border-black-800 group hover:border-gold-500/50 transition-all">
+            <div className="flex items-center gap-4">
+              <div className="w-10 h-10 bg-zinc-800 rounded-xl flex items-center justify-center border border-black-700">
+                <FileText size={20} className="text-gold-500" />
+              </div>
+              <div className="flex flex-col">
+                <span className="text-sm font-bold text-white leading-tight mb-1">{doc.name}</span>
+                <div className="flex items-center gap-2">
+                  <Badge variant="neutral" className="bg-zinc-800 text-gold-500 text-[8px] px-1.5 py-0">{doc.type}</Badge>
+                  <span className="text-[10px] text-white/30">{format(new Date(doc.createdAt), 'MMM dd, yyyy')}</span>
+                </div>
+              </div>
+            </div>
+            <a 
+              href={doc.url} 
+              target="_blank" 
+              rel="noreferrer" 
+              className="px-4 py-2 bg-gold-500/10 hover:bg-gold-500 text-gold-500 hover:text-black rounded-xl transition-all border border-gold-500/20 text-[10px] font-black uppercase tracking-widest flex items-center gap-2"
+            >
+              <ExternalLink size={14} />
+              View
+            </a>
+          </div>
+        ))}
+      </div>
+      <Button onClick={onClose} variant="secondary" className="w-full py-4 text-xs">Close</Button>
+    </div>
+  );
+}
+
 function ConfirmModal({ isOpen, onClose, onConfirm, title, message }: { isOpen: boolean, onClose: () => void, onConfirm: () => void, title: string, message: string }) {
   if (!isOpen) return null;
   return (
@@ -4586,7 +4836,8 @@ function ConfirmModal({ isOpen, onClose, onConfirm, title, message }: { isOpen: 
 
 function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettings, onAddSpecies, onAddSubSpecies, onAddMutation, onClose }: { user: FirebaseUser, initialData?: Bird | null, cages: Cage[], birds: Bird[], pairs: Pair[], contacts: Contact[], userSettings: UserSettings | null, onAddSpecies: (n: string) => void, onAddSubSpecies: (n: string, sid: string) => void, onAddMutation: (n: string) => void, onClose: () => void }) {
   const symbol = getCurrencySymbol(userSettings?.currency);
-  const [formData, setFormData] = useState<Partial<Bird>>(initialData || { 
+  const detectedMateId = initialData ? (initialData.mateId || birds.find(b => b.mateId === initialData.id)?.id || '') : '';
+  const [formData, setFormData] = useState<Partial<Bird>>(initialData ? { ...initialData, mateId: detectedMateId } : { 
     name: '', 
     species: '', 
     subSpecies: '',
@@ -4611,7 +4862,41 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
   const [isUploading, setIsUploading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [isUploadingDoc, setIsUploadingDoc] = useState(false);
+  const [docType, setDocType] = useState('General');
   const [newStatus, setNewStatus] = useState('');
+
+  const handleDocUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploadingDoc(true);
+    try {
+      const storageRef = ref(storage, `documents/${user.uid}/${Date.now()}_${file.name}`);
+      const snapshot = await uploadBytes(storageRef, file);
+      const url = await getDownloadURL(snapshot.ref);
+      
+      const newDoc: BirdDocument = {
+        id: Math.random().toString(36).substr(2, 9),
+        name: file.name,
+        url,
+        type: docType,
+        fileType: file.type,
+        createdAt: new Date().toISOString()
+      };
+
+      setFormData(prev => ({
+        ...prev,
+        documents: [...(prev.documents || []), newDoc]
+      }));
+      toast.success('Document uploaded');
+    } catch (err) {
+      toast.error('Failed to upload document');
+      console.error(err);
+    } finally {
+      setIsUploadingDoc(false);
+    }
+  };
 
   const speciesOptions = userSettings?.species.map(s => ({ id: s.id, name: s.name })) || [];
   const selectedSpecies = userSettings?.species.find(s => s.name === formData.species);
@@ -4638,6 +4923,10 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!formData.name?.trim()) {
+      toast.error('Please enter a name or ID for the bird.');
+      return;
+    }
     if (isUploading || isSaving) return;
     setIsSaving(true);
     
@@ -4655,27 +4944,30 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
         }
 
         // Auto-pairing logic
-        if (formData.mateId && birdId) {
+        if (formData.mateId && birdId && formData.sex !== 'Unknown') {
           const mateId = formData.mateId;
+          const mateBird = birds.find(b => b.id === mateId);
           
-          // Update mate's record to point back to this bird
-          await updateDoc(doc(db, 'birds', mateId), { mateId: birdId });
+          if (mateBird && mateBird.sex !== 'Unknown' && mateBird.sex !== formData.sex) {
+            // Update mate's record to point back to this bird
+            await updateDoc(doc(db, 'birds', mateId), { mateId: birdId });
 
-          // Create or update Pair document
-          const existingPair = pairs.find(p => (p.maleId === birdId && p.femaleId === mateId) || (p.maleId === mateId && p.femaleId === birdId));
+            // Create or update Pair document
+            const existingPair = pairs.find(p => (p.maleId === birdId && p.femaleId === mateId) || (p.maleId === mateId && p.femaleId === birdId));
 
-          const pairData = {
-            maleId: formData.sex === 'Male' ? birdId : mateId,
-            femaleId: formData.sex === 'Female' ? birdId : mateId,
-            status: 'Active',
-            startDate: format(new Date(), 'yyyy-MM-dd'),
-            uid: user.uid
-          };
+            const pairData = {
+              maleId: formData.sex === 'Male' ? birdId : mateId,
+              femaleId: formData.sex === 'Female' ? birdId : mateId,
+              status: 'Active',
+              startDate: format(new Date(), 'yyyy-MM-dd'),
+              uid: user.uid
+            };
 
-          if (existingPair) {
-            await updateDoc(doc(db, 'pairs', existingPair.id), pairData as any);
-          } else {
-            await addDoc(collection(db, 'pairs'), pairData);
+            if (existingPair) {
+              await updateDoc(doc(db, 'pairs', existingPair.id), pairData as any);
+            } else {
+              await addDoc(collection(db, 'pairs'), pairData);
+            }
           }
         }
 
@@ -4738,7 +5030,7 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
           label="Mutations"
           options={mutationOptions}
           multi
-          selectedValues={formData.mutations || []}
+          selectedValues={formData.mutations?.map(m => mutationOptions.find(o => o.name === m)?.id || m) || []}
           onChange={(id) => {
             const name = mutationOptions.find(o => o.id === id)?.name || '';
             const current = formData.mutations || [];
@@ -4754,7 +5046,7 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
           label="Split Mutations"
           options={mutationOptions}
           multi
-          selectedValues={formData.splitMutations || []}
+          selectedValues={formData.splitMutations?.map(m => mutationOptions.find(o => o.name === m)?.id || m) || []}
           onChange={(id) => {
             const name = mutationOptions.find(o => o.id === id)?.name || '';
             const current = formData.splitMutations || [];
@@ -4856,12 +5148,7 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
             return { id: b.id, name: cage ? `${b.name} (${cage.name})` : b.name };
           })}
           multi
-          selectedValues={formData.offspringIds?.map(id => {
-            const b = birds.find(b => b.id === id);
-            if (!b) return id;
-            const cage = cages.find(c => c.id === b.cageId);
-            return cage ? `${b.name} (${cage.name})` : b.name;
-          }) || []}
+          selectedValues={formData.offspringIds || []}
           onChange={(id) => {
             const current = formData.offspringIds || [];
             setFormData({ 
@@ -4945,6 +5232,62 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
           value={formData.notes} 
           onChange={e => setFormData({ ...formData, notes: e.target.value })} 
         />
+      </div>
+
+      <div className="space-y-3 pt-2 border-t border-black-800">
+        <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Documents (DNA, Vet, Permits)</label>
+        
+        <div className="flex gap-2">
+          <Select 
+            value={docType} 
+            onChange={e => setDocType(e.target.value)}
+            className="flex-1"
+          >
+            <option value="General" className="bg-black text-white">General</option>
+            <option value="DNA Sexing" className="bg-black text-white">DNA Sexing</option>
+            <option value="Vet Check" className="bg-black text-white">Vet Check</option>
+            <option value="Permit" className="bg-black text-white">Permit</option>
+            <option value="Purchase Invoice" className="bg-black text-white">Invoice</option>
+          </Select>
+          
+          <input type="file" onChange={handleDocUpload} className="hidden" id="bird-doc-upload" disabled={isUploadingDoc} />
+          <label 
+            htmlFor="bird-doc-upload"
+            className={cn(
+              "flex items-center justify-center gap-2 px-6 py-2 bg-zinc-800 border border-black-700 rounded-xl cursor-pointer hover:bg-zinc-700 transition-all text-xs font-black uppercase tracking-widest text-white hover:text-gold-500",
+              isUploadingDoc && "opacity-50 cursor-not-allowed"
+            )}
+          >
+            {isUploadingDoc ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
+            Upload
+          </label>
+        </div>
+
+        <div className="space-y-2">
+          {formData.documents?.map((doc) => (
+            <div key={doc.id} className="flex items-center justify-between p-3 bg-black rounded-xl border border-black-800 group">
+              <div className="flex items-center gap-3">
+                <FileText size={16} className="text-gold-500" />
+                <div className="flex flex-col">
+                  <span className="text-xs font-bold text-white leading-tight">{doc.name}</span>
+                  <span className="text-[9px] text-gold-500 font-black uppercase tracking-widest">{doc.type}</span>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <a href={doc.url} target="_blank" rel="noreferrer" className="p-2 hover:bg-zinc-800 rounded-lg text-white transition-colors">
+                  <ExternalLink size={14} />
+                </a>
+                <button 
+                  type="button" 
+                  onClick={() => setFormData(prev => ({ ...prev, documents: prev.documents?.filter(d => d.id !== doc.id) }))}
+                  className="p-2 hover:bg-red-500/10 rounded-lg text-white hover:text-red-500 transition-colors"
+                >
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
       <Button type="submit" className="w-full py-4 text-sm uppercase tracking-widest font-black" disabled={isUploading || isSaving}>
         {isSaving ? <Loader2 className="animate-spin mr-2" size={16} /> : null}
@@ -5092,10 +5435,21 @@ function PairForm({ user, initialData, birds, onClose }: { user: FirebaseUser, i
   );
 }
 
-function TaskForm({ user, initialData, birds, onClose }: { user: FirebaseUser, initialData?: Task, birds: Bird[], onClose: () => void }) {
+function TaskForm({ user, initialData, birds, cages, onClose }: { user: FirebaseUser, initialData?: Task, birds: Bird[], cages: Cage[], onClose: () => void }) {
   const [formData, setFormData] = useState<Partial<Task>>(initialData || { title: '', description: '', status: 'Pending', priority: 'Medium', category: 'General', dueDate: '', reminderDate: '', birdIds: [], subTasks: [] });
   const [newSubTask, setNewSubTask] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [birdSearch, setBirdSearch] = useState('');
+  const [isBirdDropdownOpen, setIsBirdDropdownOpen] = useState(false);
+
+  const filteredUnselectedBirds = birds.filter(b => {
+    const cage = cages.find(c => c.id === b.cageId);
+    const searchStr = `${b.name} ${b.species} ${b.subSpecies || ''} ${cage?.name || ''} ${b.mutations?.join(' ') || ''} ${b.splitMutations?.join(' ') || ''}`.toLowerCase();
+    return !formData.birdIds?.includes(b.id) && searchStr.includes(birdSearch.toLowerCase());
+  });
+
+  const selectedBirdsData = birds.filter(b => formData.birdIds?.includes(b.id));
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (isSaving) return;
@@ -5104,11 +5458,21 @@ function TaskForm({ user, initialData, birds, onClose }: { user: FirebaseUser, i
     const savePromise = async () => {
       try {
         const data = { ...formData, uid: user.uid };
-        if (initialData?.id) { await updateDoc(doc(db, 'tasks', initialData.id), data); } 
-        else { 
+        let promise;
+        if (initialData?.id) { 
+          promise = updateDoc(doc(db, 'tasks', initialData.id), data); 
+        } else { 
           const docRef = doc(collection(db, 'tasks'));
-          await setDoc(docRef, data); 
+          promise = setDoc(docRef, data); 
         }
+
+        toast.promise(promise, {
+          loading: initialData ? 'Updating task...' : 'Creating task...',
+          success: initialData ? 'Task updated!' : 'Task created!',
+          error: (err) => `Error: ${err.message}`
+        });
+
+        await promise;
       } catch (err) { handleFirestoreError(err, initialData ? OperationType.UPDATE : OperationType.CREATE, 'tasks'); }
     };
 
@@ -5143,33 +5507,126 @@ function TaskForm({ user, initialData, birds, onClose }: { user: FirebaseUser, i
         <div className="space-y-1"><label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Due Date</label><Input type="date" value={formData.dueDate} onChange={e => setFormData({ ...formData, dueDate: e.target.value })} /></div>
       </div>
       <div className="space-y-1">
-        <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Reminder (Push Notification)</label>
+        <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Calendar & Reminder (Recommended)</label>
         <Input type="datetime-local" value={formData.reminderDate || ''} onChange={e => setFormData({ ...formData, reminderDate: e.target.value })} />
-        <p className="text-[10px] text-white ml-1">You will receive a notification when the app is open or running in the background.</p>
+        <p className="text-[10px] text-white/50 ml-1">Set a date and time. Use the button below to sync this with your Google Calendar for reliable mobile notifications.</p>
+        
+        {formData.title && (formData.reminderDate || formData.dueDate) && (
+          <Button 
+            type="button" 
+            variant="secondary" 
+            className="w-full mt-2 py-3 text-[10px] font-black uppercase tracking-widest border-gold-500/30 hover:border-gold-500 group" 
+            onClick={() => window.open(getGoogleCalendarUrl(formData as Task), '_blank')}
+          >
+            <Calendar size={14} className="mr-2 text-gold-500 group-hover:scale-110 transition-transform" />
+            Add to Google Calendar
+          </Button>
+        )}
       </div>
-      <div className="space-y-2">
+      <div className="space-y-2 relative">
         <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Tag Birds</label>
-        <div className="flex flex-wrap gap-2 p-3 border border-black-700 rounded-2xl bg-black min-h-[50px] items-center">
-          {birds.length === 0 ? (
-            <span className="text-xs text-white italic px-2">No birds available to tag</span>
-          ) : (
-            birds.map(b => (
+        
+        {/* Selected Birds Chips */}
+        <div className="flex flex-wrap gap-2 mb-2">
+          {selectedBirdsData.map(b => (
+            <div key={b.id} className="flex items-center gap-2 px-3 py-1.5 bg-gold-500 text-black-950 rounded-xl shadow-lg shadow-gold-500/20 animate-in fade-in zoom-in duration-200">
+              <span className="text-[10px] font-black uppercase tracking-widest">{b.name}</span>
               <button 
-                key={b.id} 
                 type="button" 
-                onClick={() => toggleBirdTag(b.id)} 
-                className={cn(
-                  'px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all', 
-                  formData.birdIds?.includes(b.id) 
-                    ? 'bg-gold-500 text-black-950 shadow-lg shadow-gold-500/20' 
-                    : 'bg-zinc-700 text-white border border-black-700 hover:border-gold-500/50'
-                )}
+                onClick={() => toggleBirdTag(b.id)}
+                className="hover:scale-110 transition-transform"
               >
-                {b.name}
+                <X size={12} className="stroke-[3px]" />
               </button>
-            ))
+            </div>
+          ))}
+          {selectedBirdsData.length === 0 && !isBirdDropdownOpen && (
+            <span className="text-[10px] text-white/30 italic ml-1 leading-8">No birds tagged yet...</span>
           )}
         </div>
+
+        {/* Search Input */}
+        <div className="relative">
+          <div className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30">
+            <Search size={14} />
+          </div>
+          <Input 
+            placeholder="Search birds by name or species..." 
+            value={birdSearch}
+            onChange={e => {
+              setBirdSearch(e.target.value);
+              setIsBirdDropdownOpen(true);
+            }}
+            onFocus={() => setIsBirdDropdownOpen(true)}
+            className="pl-10"
+          />
+          {isBirdDropdownOpen && (
+            <button 
+              type="button"
+              onClick={() => setIsBirdDropdownOpen(false)}
+              className="absolute right-4 top-1/2 -translate-y-1/2 text-white/30 hover:text-white"
+            >
+              <X size={14} />
+            </button>
+          )}
+        </div>
+
+        {/* Dropdown Results */}
+        <AnimatePresence>
+          {isBirdDropdownOpen && (
+            <motion.div 
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="absolute z-50 left-0 right-0 top-full mt-2 bg-zinc-900 border border-black-700 rounded-2xl shadow-2xl overflow-hidden max-h-[200px] overflow-y-auto custom-scrollbar"
+            >
+              {filteredUnselectedBirds.length === 0 ? (
+                <div className="p-4 text-center text-xs text-white/30">
+                  {birdSearch ? 'No birds found matching your search' : 'All birds are already tagged'}
+                </div>
+              ) : (
+                <div className="p-2 space-y-1">
+                  {filteredUnselectedBirds.map(b => (
+                    <button
+                      key={b.id}
+                      type="button"
+                      onClick={() => {
+                        toggleBirdTag(b.id);
+                        setBirdSearch('');
+                        setIsBirdDropdownOpen(false);
+                      }}
+                      className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-gold-500/10 group transition-colors text-left border-b border-white/5 last:border-0"
+                    >
+                      <div className="flex flex-col gap-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-black text-white group-hover:text-gold-500 transition-colors">{b.name}</span>
+                          <Badge variant={b.sex === 'Male' ? 'male' : b.sex === 'Female' ? 'female' : 'neutral'} className="text-[7px] py-0 px-1">{b.sex}</Badge>
+                          {b.cageId && (
+                            <span className="text-[8px] font-bold text-sky-400 uppercase flex items-center gap-1">
+                              <Home size={8} /> {cages.find(c => c.id === b.cageId)?.name}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex flex-wrap gap-1 items-center">
+                          <span className="text-[9px] text-gold-500/80 font-bold uppercase tracking-tight">{b.species}</span>
+                          {b.subSpecies && <span className="text-[8px] text-white/40">•</span>}
+                          {b.subSpecies && <span className="text-[9px] text-white/60 font-medium">{b.subSpecies}</span>}
+                        </div>
+                        {(b.mutations?.length || b.splitMutations?.length) ? (
+                          <div className="flex flex-wrap gap-1 mt-0.5">
+                            {b.mutations?.slice(0, 2).map(m => <span key={m} className="text-[8px] px-1.5 py-0.5 bg-zinc-800 text-white/50 rounded-md font-bold uppercase">{m}</span>)}
+                            {b.splitMutations?.slice(0, 2).map(m => <span key={m} className="text-[8px] px-1.5 py-0.5 bg-zinc-800 text-gold-500/50 rounded-md font-bold uppercase italic">Split {m}</span>)}
+                          </div>
+                        ) : null}
+                      </div>
+                      <Plus size={14} className="text-white/30 group-hover:text-gold-500 transition-colors ml-2 shrink-0" />
+                    </button>
+                  ))}
+                </div>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
       <div className="space-y-2">
         <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Subtasks</label>
