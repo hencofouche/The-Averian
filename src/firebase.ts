@@ -21,6 +21,7 @@ import {
   persistentMultipleTabManager
 } from 'firebase/firestore';
 import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { toast } from 'sonner';
 import firebaseConfig from '../firebase-applet-config.json';
 import { OperationType, FirestoreErrorInfo } from './types';
 
@@ -48,6 +49,8 @@ export const logout = () => {
   return signOut(auth);
 };
 
+let hasShownQuotaToast = false;
+
 export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
   const errInfo: FirestoreErrorInfo = {
     error: error instanceof Error ? error.message : String(error),
@@ -68,6 +71,16 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
     path
   };
   console.error('Firestore Error: ', JSON.stringify(errInfo));
+  
+  if ((operationType === OperationType.LIST || operationType === OperationType.GET) && errInfo.error.includes("Quota limit exceeded")) {
+    console.warn("Quota limit exceeded. Running from local cache.");
+    if (!hasShownQuotaToast) {
+      toast.error("Cloud limit reached. Running securely offline from device memory.", { id: 'quota-toast', duration: 4000 });
+      hasShownQuotaToast = true;
+    }
+    return;
+  }
+  
   throw new Error(JSON.stringify(errInfo));
 }
 

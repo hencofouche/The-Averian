@@ -27,7 +27,7 @@ import {
 } from 'firebase/auth';
 import { 
   collection, onSnapshot, query, where, addDoc, 
-  updateDoc, deleteDoc, doc, getDocs, orderBy, setDoc, getDocFromServer
+  updateDoc, deleteDoc, doc, getDocs, orderBy, setDoc, getDocFromServer, writeBatch, getDocsFromCache, getDocFromCache, disableNetwork
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { 
@@ -447,6 +447,7 @@ function SubscriptionGate({ settings, onRenew, children }: { settings: UserSetti
 
 export default function App() {
   const [user, setUser] = useState<FirebaseUser | null>(null);
+  const [isOfflineForced, setIsOfflineForced] = useState(false);
   const [loading, setLoading] = useState(true);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [isScanModalOpen, setIsScanModalOpen] = useState(false);
@@ -583,47 +584,41 @@ export default function App() {
   useEffect(() => {
     if (!user) return;
 
+    const setupListener = <T extends any>(q: any, setter: any, type: string) => {
+      return onSnapshot(q, (snapshot: any) => {
+        setter(snapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() } as T)));
+        setIsSyncing(snapshot.metadata.hasPendingWrites);
+      }, async (err: any) => {
+        handleFirestoreError(err, OperationType.LIST, type);
+        if (String(err).includes("Quota") || String(err).includes("quota")) {
+          if (!isOfflineForced) {
+            disableNetwork(db).catch(() => {});
+            setIsOfflineForced(true);
+          }
+        }
+      });
+    };
+
     const qBirds = query(collection(db, 'birds'), where('uid', '==', user.uid));
-    const unsubBirds = onSnapshot(qBirds, (snapshot) => {
-      setBirds(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Bird)));
-      setIsSyncing(snapshot.metadata.hasPendingWrites);
-    }, (err) => handleFirestoreError(err, OperationType.LIST, 'birds'));
+    const unsubBirds = setupListener<Bird>(qBirds, setBirds, 'birds');
 
     const qCages = query(collection(db, 'cages'), where('uid', '==', user.uid));
-    const unsubCages = onSnapshot(qCages, (snapshot) => {
-      setCages(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Cage)));
-      setIsSyncing(snapshot.metadata.hasPendingWrites);
-    }, (err) => handleFirestoreError(err, OperationType.LIST, 'cages'));
+    const unsubCages = setupListener<Cage>(qCages, setCages, 'cages');
 
     const qPairs = query(collection(db, 'pairs'), where('uid', '==', user.uid));
-    const unsubPairs = onSnapshot(qPairs, (snapshot) => {
-      setPairs(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Pair)));
-      setIsSyncing(snapshot.metadata.hasPendingWrites);
-    }, (err) => handleFirestoreError(err, OperationType.LIST, 'pairs'));
+    const unsubPairs = setupListener<Pair>(qPairs, setPairs, 'pairs');
 
     const qBreeding = query(collection(db, 'breedingRecords'), where('uid', '==', user.uid));
-    const unsubBreeding = onSnapshot(qBreeding, (snapshot) => {
-      setBreedingRecords(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as BreedingRecord)));
-      setIsSyncing(snapshot.metadata.hasPendingWrites);
-    }, (err) => handleFirestoreError(err, OperationType.LIST, 'breedingRecords'));
+    const unsubBreeding = setupListener<BreedingRecord>(qBreeding, setBreedingRecords, 'breedingRecords');
 
     const qTasks = query(collection(db, 'tasks'), where('uid', '==', user.uid));
-    const unsubTasks = onSnapshot(qTasks, (snapshot) => {
-      setTasks(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Task)));
-      setIsSyncing(snapshot.metadata.hasPendingWrites);
-    }, (err) => handleFirestoreError(err, OperationType.LIST, 'tasks'));
+    const unsubTasks = setupListener<Task>(qTasks, setTasks, 'tasks');
 
     const qTransactions = query(collection(db, 'transactions'), where('uid', '==', user.uid), orderBy('date', 'desc'));
-    const unsubTransactions = onSnapshot(qTransactions, (snapshot) => {
-      setTransactions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Transaction)));
-      setIsSyncing(snapshot.metadata.hasPendingWrites);
-    }, (err) => handleFirestoreError(err, OperationType.LIST, 'transactions'));
+    const unsubTransactions = setupListener<Transaction>(qTransactions, setTransactions, 'transactions');
 
     const qContacts = query(collection(db, 'contacts'), where('uid', '==', user.uid), orderBy('name', 'asc'));
-    const unsubContacts = onSnapshot(qContacts, (snapshot) => {
-      setContacts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Contact)));
-      setIsSyncing(snapshot.metadata.hasPendingWrites);
-    }, (err) => handleFirestoreError(err, OperationType.LIST, 'contacts'));
+    const unsubContacts = setupListener<Contact>(qContacts, setContacts, 'contacts');
 
     const fixingSettings = new Set<string>();
 
@@ -669,7 +664,15 @@ export default function App() {
         setDoc(docRef, initialSettings);
         setUserSettings(initialSettings);
       }
-    }, (err) => handleFirestoreError(err, OperationType.GET, 'userSettings'));
+    }, async (err: any) => {
+      handleFirestoreError(err, OperationType.GET, 'userSettings');
+      if (String(err).includes("Quota") || String(err).includes("quota")) {
+        if (!isOfflineForced) {
+          disableNetwork(db).catch(() => {});
+          setIsOfflineForced(true);
+        }
+      }
+    });
 
     return () => {
       unsubBirds();
@@ -681,7 +684,7 @@ export default function App() {
       unsubContacts();
       unsubSettings();
     };
-  }, [user]);
+  }, [user?.uid, isOfflineForced]);
 
   const filteredItems = useMemo(() => {
     const query = searchQuery.toLowerCase();
@@ -718,8 +721,21 @@ export default function App() {
       case 'cages':
         return cages
           .filter(c => {
-            if (c.id.toLowerCase() === query || c.name.toLowerCase().includes(query) || c.location?.toLowerCase().includes(query)) return true;
-            // Also check if any bird in this cage matches the query
+            const lowName = c.name.toLowerCase();
+            const lowLoc = (c.location || '').toLowerCase();
+
+            // Always allow exact ID match
+            if (c.id.toLowerCase() === query) return true;
+
+            // For short queries (1 or 2 chars), be strict: only prefix matches for name/location
+            if (query.length <= 2) {
+              return lowName.startsWith(query) || lowLoc.startsWith(query);
+            }
+
+            // For longer queries, allow full content search
+            if (lowName.includes(query) || lowLoc.includes(query)) return true;
+            
+            // Also check if any bird in this cage matches the query (only for 3+ chars)
             return birds.some(b => 
               b.cageId === c.id && (
                 b.name.toLowerCase().includes(query) ||
@@ -737,9 +753,6 @@ export default function App() {
           const male = birds.find(b => b.id === p.maleId);
           const female = birds.find(b => b.id === p.femaleId);
           
-          // Only show pairs if both birds exist
-          if (!male && !female) return false;
-
           if (!query) return true;
           if (p.id.toLowerCase() === query) return true;
           const cage = cages.find(c => c.id === p.cageId) || cages.find(c => c.id === male?.cageId) || cages.find(c => c.id === female?.cageId);
@@ -1742,7 +1755,7 @@ export default function App() {
             onClose={() => setIsModalOpen(false)} 
           />
         )}
-        {activeTab === 'cages' && <CageForm user={user} initialData={editingItem} onClose={() => setIsModalOpen(false)} />}
+        {activeTab === 'cages' && <CageForm user={user} initialData={editingItem} cages={cages} onClose={() => setIsModalOpen(false)} />}
         {activeTab === 'pairs' && <PairForm user={user} initialData={editingItem} birds={birds} cages={cages} onClose={() => setIsModalOpen(false)} />}
         {activeTab === 'breeding' && <BreedingRecordForm user={user} initialData={editingItem} pairs={pairs} birds={birds} cages={cages} onClose={() => setIsModalOpen(false)} />}
         {activeTab === 'tasks' && <TaskForm user={user} initialData={editingItem} birds={birds} cages={cages} onClose={() => setIsModalOpen(false)} />}
@@ -2848,7 +2861,7 @@ function EntityStatsView({
       if (pair) {
         const male = birds.find(b => b.id === pair.maleId);
         const female = birds.find(b => b.id === pair.femaleId);
-        return `${male?.name || 'Unknown'} x ${female?.name || 'Unknown'}`;
+        return `${male?.name || 'Empty'} x ${female?.name || 'Empty'}`;
       }
       return 'Unknown Pair';
     }
@@ -3322,12 +3335,12 @@ function BreedingRecordForm({ user, initialData, pairs, birds, cages, onClose }:
           onChange={(val) => setFormData({ ...formData, pairId: val })}
           options={[
             { id: '', name: 'Select Pair' },
-            ...pairs.map(p => {
+            ...pairs.filter(p => birds.some(b => b.id === p.maleId) || birds.some(b => b.id === p.femaleId)).map(p => {
               const male = birds.find(b => b.id === p.maleId);
               const female = birds.find(b => b.id === p.femaleId);
               return { 
                 id: p.id, 
-                name: `${male?.name || 'Unknown'} × ${female?.name || 'Unknown'}`,
+                name: `${male?.name || 'Empty'} × ${female?.name || 'Empty'}`,
                 details: p.status,
                 subText: male?.species || ''
               };
@@ -3509,9 +3522,9 @@ function TransactionForm({ user, initialData, birds, pairs, cages, contacts, cur
             onChange={(val) => setFormData({ ...formData, pairId: val })}
             options={[
               { id: '', name: 'None' },
-              ...pairs.map(p => {
-                const m = birds.find(b => b.id === p.maleId)?.name || 'Unknown';
-                const f = birds.find(b => b.id === p.femaleId)?.name || 'Unknown';
+              ...pairs.filter(p => birds.some(b => b.id === p.maleId) || birds.some(b => b.id === p.femaleId)).map(p => {
+                const m = birds.find(b => b.id === p.maleId)?.name || 'Empty';
+                const f = birds.find(b => b.id === p.femaleId)?.name || 'Empty';
                 const species = birds.find(b => b.id === p.maleId)?.species || '';
                 return { 
                   id: p.id, 
@@ -4579,17 +4592,21 @@ function PrintView({ birds, pairs, cages, onBirdRef }: { birds: Bird[], pairs: P
     };
   });
 
-  const pairOptions = pairs.map(p => {
+  const pairOptions = pairs.filter(p => birds.some(b => b.id === p.maleId) || birds.some(b => b.id === p.femaleId)).map(p => {
     const male = birds.find(b => b.id === p.maleId);
     const female = birds.find(b => b.id === p.femaleId);
-    const mName = male?.name || 'Unknown';
-    const fName = female?.name || 'Unknown';
+    const mName = male?.name || 'Empty';
+    const fName = female?.name || 'Empty';
     const cageId = male?.cageId || female?.cageId;
     const cage = cages.find(c => c.id === cageId);
+    
+    const maleInfo = male ? `${male.species} ${male.mutations?.join(', ')}${male.splitMutations?.length ? ` / ${male.splitMutations.join(', ')}` : ''}` : '';
+    const femaleInfo = female ? `${female.species} ${female.mutations?.join(', ')}${female.splitMutations?.length ? ` / ${female.splitMutations.join(', ')}` : ''}` : '';
+
     return { 
       id: p.id, 
       name: `${mName} x ${fName}`, 
-      details: `${male?.species || ''}${cage ? ` - Cage: ${cage.name}` : ''}` 
+      details: `${maleInfo ? `♂ ${maleInfo}` : ''}${femaleInfo ? ` | ♀ ${femaleInfo}` : ''}${cage ? ` - Cage: ${cage.name}` : ''}` 
     };
   });
 
@@ -4792,50 +4809,223 @@ function PrintView({ birds, pairs, cages, onBirdRef }: { birds: Bird[], pairs: P
                   <p className="text-sm font-bold text-gray-600 uppercase tracking-widest">Date Generated: {format(new Date(), 'PPPP')}</p>
                 </div>
               </div>
-              <table className="w-full border-4 border-black">
-                <thead><tr className="bg-gray-100 border-b-4 border-black">
-                  <th className="py-4 px-3 text-xs font-black uppercase tracking-widest text-left border-r-2 border-black">Cage</th>
-                  <th className="py-4 px-3 text-xs font-black uppercase tracking-widest text-left border-r-2 border-black">Name / ID</th>
-                  <th className="py-4 px-3 text-xs font-black uppercase tracking-widest text-left border-r-2 border-black">Sex</th>
-                  <th className="py-4 px-3 text-xs font-black uppercase tracking-widest text-left border-r-2 border-black">Genetics</th>
-                  <th className="py-4 px-3 text-xs font-black uppercase tracking-widest text-left">Internal Notes</th>
-                </tr></thead>
-                <tbody>
-                  {printEmpty ? Array.from({ length: 25 }).map((_, i) => (
-                    <tr key={i} className="border-b border-gray-400 h-16"><td className="border-r-2 border-gray-400"></td><td className="border-r-2 border-gray-400"></td><td className="border-r-2 border-gray-400"></td><td className="border-r-2 border-gray-400"></td><td></td></tr>
-                  )) : sortedBirds.filter(b => qrSelections.includes(b.id)).map(bird => (
-                    <tr key={bird.id} className="border-b border-gray-400 h-16">
-                      <td className="py-3 px-3 border-r-2 border-gray-400 text-sm font-black uppercase tracking-tighter">{cages.find(c => c.id === bird.cageId)?.name || '-'}</td>
-                      <td className="py-3 px-3 border-r-2 border-gray-400 text-sm font-bold">{bird.name}</td>
-                      <td className="py-3 px-3 border-r-2 border-gray-400 text-xs font-black uppercase">{bird.sex}</td>
-                      <td className="py-3 px-3 border-r-2 border-gray-400 text-xs leading-relaxed font-medium">
-                        <span className="font-bold">{bird.species}</span>
-                        {bird.mutations && bird.mutations.length > 0 && <span className="block text-[10px] text-gray-500">{bird.mutations.join(' • ')}</span>}
-                      </td>
-                      <td></td>
+              {qrType === 'bird' && (
+                <table className="w-full border-4 border-black">
+                  <thead><tr className="bg-gray-100 border-b-4 border-black">
+                    <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black">Ring / Name</th>
+                    <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black">Species</th>
+                    <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black">Sub</th>
+                    <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black">Sex</th>
+                    <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black">Cage</th>
+                    <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black">Mutation</th>
+                    <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left">Split</th>
+                  </tr></thead>
+                  <tbody>
+                    {printEmpty ? Array.from({ length: 25 }).map((_, i) => (
+                      <tr key={i} className="border-b border-gray-400 h-16">
+                        <td className="border-r-2 border-gray-400"></td>
+                        <td className="border-r-2 border-gray-400"></td>
+                        <td className="border-r-2 border-gray-400"></td>
+                        <td className="border-r-2 border-gray-400"></td>
+                        <td className="border-r-2 border-gray-400"></td>
+                        <td className="border-r-2 border-gray-400"></td>
+                        <td></td>
+                      </tr>
+                    )) : sortedBirds.filter(b => qrSelections.includes(b.id)).map(bird => (
+                      <tr key={bird.id} className="border-b border-gray-400 h-16">
+                        <td className="py-2 px-3 border-r-2 border-gray-400 text-[10px] font-black uppercase">{bird.name}</td>
+                        <td className="py-2 px-3 border-r-2 border-gray-400 text-[10px] font-bold uppercase">{bird.species}</td>
+                        <td className="py-2 px-3 border-r-2 border-gray-400 text-[10px] font-bold uppercase">{bird.subSpecies || '-'}</td>
+                        <td className="py-2 px-3 border-r-2 border-gray-400 text-[10px] font-black uppercase">{bird.sex}</td>
+                        <td className="py-2 px-3 border-r-2 border-gray-400 text-[10px] font-black uppercase tracking-tighter">{cages.find(c => c.id === bird.cageId)?.name || '-'}</td>
+                        <td className="py-2 px-3 border-r-2 border-gray-400 text-[9px] font-bold uppercase leading-tight">
+                          {bird.mutations?.join(' • ') || '-'}
+                        </td>
+                        <td className="py-2 px-3 text-[9px] font-bold uppercase italic text-gray-500 leading-tight">
+                          {bird.splitMutations?.join(' • ') || '-'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+
+              {qrType === 'pair' && (
+                <table className="w-full border-4 border-black">
+                  <thead>
+                    <tr className="bg-gray-100 border-b-4 border-black">
+                      <th colSpan={6} className="py-4 px-3 text-[14px] font-black uppercase tracking-widest text-center border-r-4 border-black bg-blue-50/50 text-blue-900">Male (♂)</th>
+                      <th colSpan={6} className="py-4 px-3 text-[14px] font-black uppercase tracking-widest text-center bg-pink-50/50 text-pink-900">Female (♀)</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                    <tr className="bg-gray-100 border-b-4 border-black">
+                      <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black">Ring / Name</th>
+                      <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black">Species</th>
+                      <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black">Sub</th>
+                      <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black">Cage</th>
+                      <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black">Mutation</th>
+                      <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-4 border-black">Split</th>
+                      
+                      <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black">Ring / Name</th>
+                      <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black">Species</th>
+                      <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black">Sub</th>
+                      <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black">Cage</th>
+                      <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black">Mutation</th>
+                      <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left">Split</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {printEmpty ? Array.from({ length: 15 }).map((_, i) => (
+                      <tr key={i} className="border-b border-gray-400 h-24">
+                        <td className="border-r-2 border-gray-400"></td>
+                        <td className="border-r-2 border-gray-400"></td>
+                        <td className="border-r-2 border-gray-400"></td>
+                        <td className="border-r-2 border-gray-400"></td>
+                        <td className="border-r-2 border-gray-400"></td>
+                        <td className="border-r-4 border-black"></td>
+                        <td className="border-r-2 border-gray-400"></td>
+                        <td className="border-r-2 border-gray-400"></td>
+                        <td className="border-r-2 border-gray-400"></td>
+                        <td className="border-r-2 border-gray-400"></td>
+                        <td className="border-r-2 border-gray-400"></td>
+                        <td></td>
+                      </tr>
+                    )) : pairs.filter(p => qrSelections.includes(p.id)).map(pair => {
+                      const male = birds.find(b => b.id === pair.maleId);
+                      const female = birds.find(b => b.id === pair.femaleId);
+                      const mCage = cages.find(c => c.id === male?.cageId)?.name || '-';
+                      const fCage = cages.find(c => c.id === female?.cageId)?.name || '-';
+
+                      return (
+                        <tr key={pair.id} className="border-b border-gray-400">
+                          <td className="py-4 px-3 border-r-2 border-gray-400 text-[10px] font-black uppercase bg-blue-50/10">{male?.name || '-'}</td>
+                          <td className="py-4 px-3 border-r-2 border-gray-400 text-[10px] font-bold uppercase bg-blue-50/10">{male?.species || '-'}</td>
+                          <td className="py-4 px-3 border-r-2 border-gray-400 text-[10px] font-bold uppercase bg-blue-50/10">{male?.subSpecies || '-'}</td>
+                          <td className="py-4 px-3 border-r-2 border-gray-400 text-[10px] font-black uppercase tracking-tighter bg-blue-50/10">{mCage}</td>
+                          <td className="py-4 px-3 border-r-2 border-gray-400 text-[9px] font-bold uppercase leading-tight bg-blue-50/10">{male?.mutations?.join(' • ') || '-'}</td>
+                          <td className="py-4 px-3 text-[9px] font-bold uppercase italic text-gray-500 leading-tight border-r-4 border-black bg-blue-50/10">{male?.splitMutations?.join(' • ') || '-'}</td>
+
+                          <td className="py-4 px-3 border-r-2 border-gray-400 text-[10px] font-black uppercase bg-pink-50/10">{female?.name || '-'}</td>
+                          <td className="py-4 px-3 border-r-2 border-gray-400 text-[10px] font-bold uppercase bg-pink-50/10">{female?.species || '-'}</td>
+                          <td className="py-4 px-3 border-r-2 border-gray-400 text-[10px] font-bold uppercase bg-pink-50/10">{female?.subSpecies || '-'}</td>
+                          <td className="py-4 px-3 border-r-2 border-gray-400 text-[10px] font-black uppercase tracking-tighter bg-pink-50/10">{fCage}</td>
+                          <td className="py-4 px-3 border-r-2 border-gray-400 text-[9px] font-bold uppercase leading-tight bg-pink-50/10">{female?.mutations?.join(' • ') || '-'}</td>
+                          <td className="py-4 px-3 text-[9px] font-bold uppercase italic text-gray-500 leading-tight bg-pink-50/10">{female?.splitMutations?.join(' • ') || '-'}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )}
+
+              {qrType === 'cage' && (
+                <table className="w-full border-4 border-black">
+                  <thead><tr className="bg-gray-100 border-b-4 border-black">
+                    <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black">Cage ID / Number</th>
+                    <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black">Location</th>
+                    <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left">Type</th>
+                  </tr></thead>
+                  <tbody>
+                    {printEmpty ? Array.from({ length: 30 }).map((_, i) => (
+                      <tr key={i} className="border-b border-gray-400 h-16">
+                        <td className="border-r-2 border-gray-400"></td>
+                        <td className="border-r-2 border-gray-400"></td>
+                        <td></td>
+                      </tr>
+                    )) : cages.filter(c => qrSelections.includes(c.id)).map(cage => (
+                      <tr key={cage.id} className="border-b border-gray-400 h-16">
+                        <td className="py-3 px-3 border-r-2 border-gray-400 text-[12px] font-black uppercase">{cage.name}</td>
+                        <td className="py-3 px-3 border-r-2 border-gray-400 text-[12px] font-bold uppercase">{cage.location || '-'}</td>
+                        <td className="py-3 px-3 text-[12px] font-bold uppercase text-gray-600">{cage.type}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
               <footer className="mt-12 text-center text-xs font-black uppercase tracking-widest text-gray-400 border-t pt-8">
                  Generated via The Averian Aviary Management System
               </footer>
             </>
           ) : (
             <div className="qr-print-container">
-               {qrSelections.map(id => (
-                 <div key={id} className="qr-print-item shadow-none border-2 border-dashed border-gray-200">
-                    <QRCodeSVG value={getQRData(id)} size={120} level="H" />
-                    <div className="w-full mt-4 space-y-1">
-                      <p className="text-[12px] font-black uppercase text-center leading-tight truncate">
-                         {qrType === 'bird' ? birds.find(b=>b.id === id)?.name : 
-                          qrType === 'pair' ? `PAIR: ${id.slice(0,8).toUpperCase()}` :
-                          cages.find(c=>c.id === id)?.name}
-                      </p>
-                      <p className="text-[8px] font-black text-gray-400 text-center uppercase tracking-[0.2em] pt-1 border-t border-gray-100">The Averian</p>
-                    </div>
-                 </div>
-               ))}
+               {qrSelections.map(id => {
+                 const bird = birds.find(b => b.id === id);
+                 const pair = pairs.find(p => p.id === id);
+                 const cage = cages.find(c => c.id === id);
+
+                 return (
+                   <div key={id} className="qr-print-item shadow-none border-2 border-dashed border-gray-200 min-h-[220px] flex flex-col items-center justify-center p-4">
+                      <QRCodeSVG value={getQRData(id)} size={110} level="H" />
+                      <div className="w-full mt-4 space-y-1.5 text-center px-1">
+                        {qrType === 'bird' && bird && (
+                          <>
+                            <p className="text-[14px] font-black uppercase leading-tight truncate w-full">{bird.name}</p>
+                            <p className="text-[10px] font-bold text-gray-600 uppercase tracking-tight truncate w-full">
+                              {bird.species} {bird.subSpecies ? `• ${bird.subSpecies}` : ''}
+                            </p>
+                            <div className="flex flex-wrap items-center justify-center gap-1.5 pt-0.5">
+                              <span className="text-[8px] font-black uppercase border border-black px-1.5 py-0.5 rounded-sm shrink-0">{bird.sex}</span>
+                              {bird.mutations && bird.mutations.length > 0 && (
+                                <span className="text-[8px] font-bold text-gray-500 truncate uppercase">
+                                  {bird.mutations.join(' • ')}
+                                </span>
+                              )}
+                              {bird.splitMutations && bird.splitMutations.length > 0 && (
+                                <span className="text-[8px] font-bold text-gray-400 truncate uppercase italic">
+                                  / {bird.splitMutations.join(' • ')}
+                                </span>
+                              )}
+                            </div>
+                          </>
+                        )}
+                        
+                        {qrType === 'pair' && pair && (() => {
+                          const male = birds.find(b => b.id === pair.maleId);
+                          const female = birds.find(b => b.id === pair.femaleId);
+                          
+                          const BirdLabelInfo = ({ b, sym }: { b?: Bird, sym: string }) => {
+                            if (!b) return <p className="text-[9px] font-black text-gray-400 uppercase text-center">{sym} EMPTY</p>;
+                            return (
+                              <div className="space-y-0.5 text-center w-full">
+                                <p className="text-[11px] font-black text-gray-800 uppercase truncate">{sym} {b.name}</p>
+                                <p className="text-[8px] font-bold text-gray-500 uppercase tracking-tight truncate">
+                                  {b.species} {b.subSpecies ? `• ${b.subSpecies}` : ''}
+                                </p>
+                                <div className="flex flex-wrap items-center justify-center gap-1 overflow-hidden">
+                                  {b.mutations && b.mutations.length > 0 && (
+                                    <span className="text-[7px] font-bold text-gray-500 uppercase">{b.mutations.slice(0, 3).join('•')}</span>
+                                  )}
+                                  {b.splitMutations && b.splitMutations.length > 0 && (
+                                    <span className="text-[7px] font-bold text-gray-400 uppercase italic">/{b.splitMutations.slice(0, 3).join('•')}</span>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          };
+
+                          return (
+                            <div className="w-full space-y-2 border-y border-gray-100 py-1.5">
+                              <BirdLabelInfo b={male} sym="♂" />
+                              <div className="border-t border-gray-50 scale-x-50 mx-auto" />
+                              <BirdLabelInfo b={female} sym="♀" />
+                            </div>
+                          );
+                        })()}
+
+                        {qrType === 'cage' && cage && (
+                          <>
+                            <p className="text-[18px] font-black uppercase leading-none tracking-tighter">{cage.name}</p>
+                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{cage.location || 'SYSTEM CAGE'}</p>
+                            <p className="text-[8px] font-bold text-zinc-300 uppercase">{cage.type}</p>
+                          </>
+                        )}
+
+                        <div className="pt-2">
+                          <p className="text-[7px] font-black text-gray-300 text-center uppercase tracking-[0.4em] border-t border-gray-50 pt-2">The Averian System</p>
+                        </div>
+                      </div>
+                   </div>
+                 );
+               })}
             </div>
           )}
         </div>,
@@ -5487,11 +5677,16 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
   );
 }
 
-function CageForm({ user, initialData, onClose }: { user: FirebaseUser, initialData?: Cage, onClose: () => void }) {
+function CageForm({ user, initialData, cages, onClose }: { user: FirebaseUser, initialData?: Cage, cages: Cage[], onClose: () => void }) {
   const [formData, setFormData] = useState<Partial<Cage>>(initialData || { name: '', location: '', type: 'Standard', imageUrl: '' });
   const [isUploading, setIsUploading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [isMultiMode, setIsMultiMode] = useState(false);
+  const [multiPrefix, setMultiPrefix] = useState('');
+  const [multiStart, setMultiStart] = useState('1');
+  const [multiEnd, setMultiEnd] = useState('10');
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -5512,23 +5707,68 @@ function CageForm({ user, initialData, onClose }: { user: FirebaseUser, initialD
     e.preventDefault();
     if (isUploading || isSaving) return;
     setIsSaving(true);
+    setError(null);
     
     const savePromise = async () => {
       try {
-        const data = { ...formData, uid: user.uid };
-        if (initialData?.id) { await updateDoc(doc(db, 'cages', initialData.id), data); } 
-        else { 
-          const docRef = doc(collection(db, 'cages'));
-          await setDoc(docRef, data); 
+        if (isMultiMode && !initialData) {
+          const start = parseInt(multiStart);
+          const end = parseInt(multiEnd);
+          if (isNaN(start) || isNaN(end) || start > end) {
+            throw new Error('Invalid range');
+          }
+          if (end - start > 100) {
+            throw new Error('Max 100 cages at once');
+          }
+
+          const batch = writeBatch(db);
+          let duplicates = [];
+          for (let i = start; i <= end; i++) {
+            const cageName = `${multiPrefix}${i}`;
+            if (cages.some(c => c.name.toLowerCase() === cageName.toLowerCase())) {
+              duplicates.push(cageName);
+              continue;
+            }
+            const docRef = doc(collection(db, 'cages'));
+            batch.set(docRef, { ...formData, name: cageName, uid: user.uid });
+          }
+          
+          if (duplicates.length > 0 && duplicates.length === (end - start + 1)) {
+            throw new Error('All specified cages already exist');
+          }
+
+          await batch.commit();
+        } else {
+          if (cages.some(c => c.id !== initialData?.id && c.name.toLowerCase() === formData.name?.toLowerCase())) {
+            throw new Error(`Cage "${formData.name}" already exists`);
+          }
+
+          const data = { ...formData, uid: user.uid };
+          if (initialData?.id) { await updateDoc(doc(db, 'cages', initialData.id), data); } 
+          else { 
+            const docRef = doc(collection(db, 'cages'));
+            await setDoc(docRef, data); 
+          }
         }
-      } catch (err) { handleFirestoreError(err, initialData ? OperationType.UPDATE : OperationType.CREATE, 'cages'); }
+        onClose();
+      } catch (err) { 
+        setError(err instanceof Error ? err.message : 'Action failed');
+      } finally {
+        setIsSaving(false);
+      }
     };
 
     savePromise();
-    onClose();
   };
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      {!initialData && (
+        <div className="flex bg-black-900 p-1 rounded-xl border border-black-800">
+          <button type="button" onClick={() => setIsMultiMode(false)} className={cn("flex-1 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all", !isMultiMode ? "bg-gold-500 text-black shadow-lg shadow-gold-500/20" : "text-black-100 hover:text-white")}>Single Cage</button>
+          <button type="button" onClick={() => setIsMultiMode(true)} className={cn("flex-1 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all", isMultiMode ? "bg-gold-500 text-black shadow-lg shadow-gold-500/20" : "text-black-100 hover:text-white")}>Bulk Create</button>
+        </div>
+      )}
+
       <div className="flex justify-center">
         <div className="relative group">
           <div className="w-24 h-24 rounded-3xl bg-black border border-black-700 flex items-center justify-center overflow-hidden">
@@ -5549,16 +5789,37 @@ function CageForm({ user, initialData, onClose }: { user: FirebaseUser, initialD
           </label>
         </div>
       </div>
-      {uploadError && <p className="text-rose-500 text-[10px] text-center font-bold uppercase tracking-widest">{uploadError}</p>}
+      {(uploadError || error) && <p className="text-rose-500 text-[10px] text-center font-bold uppercase tracking-widest">{uploadError || error}</p>}
 
-      <div className="space-y-1"><label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Cage Name/Number</label><Input required value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} /></div>
+      {isMultiMode && !initialData ? (
+        <div className="space-y-4 bg-black/20 p-4 rounded-2xl border border-black-800 animate-in fade-in slide-in-from-top-2">
+          <div className="space-y-1">
+            <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Name Prefix (e.g. A)</label>
+            <Input required value={multiPrefix} onChange={e => setMultiPrefix(e.target.value)} placeholder="Prefix" />
+          </div>
+          <div className="grid grid-cols-2 gap-4 text-center">
+            <div className="space-y-1">
+              <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Range Start</label>
+              <Input type="number" required value={multiStart} onChange={e => setMultiStart(e.target.value)} />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Range End</label>
+              <Input type="number" required value={multiEnd} onChange={e => setMultiEnd(e.target.value)} />
+            </div>
+          </div>
+          <p className="text-[9px] text-zinc-500 font-bold uppercase tracking-tight text-center italic">Example: {multiPrefix || 'PREFIX'}{multiStart || '1'} TO {multiPrefix || 'PREFIX'}{multiEnd || '10'}</p>
+        </div>
+      ) : (
+        <div className="space-y-1"><label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Cage Name/Number</label><Input required value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} /></div>
+      )}
+
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1"><label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Location</label><Input value={formData.location} onChange={e => setFormData({ ...formData, location: e.target.value })} /></div>
         <div className="space-y-1"><label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Type</label><Select value={formData.type} onChange={e => setFormData({ ...formData, type: e.target.value })}><option value="Standard" className="bg-black text-white">Standard</option><option value="Breeding" className="bg-black text-white">Breeding</option><option value="Flight" className="bg-black text-white">Flight</option><option value="Hospital" className="bg-black text-white">Hospital</option></Select></div>
       </div>
       <Button type="submit" className="w-full py-4 text-sm uppercase tracking-widest font-black" disabled={isUploading || isSaving}>
         {isSaving ? <Loader2 className="animate-spin mr-2" size={16} /> : null}
-        {initialData ? 'Update' : 'Add'} Cage
+        {initialData ? 'Update' : isMultiMode ? `Bulk Create (${Math.max(0, parseInt(multiEnd) - parseInt(multiStart) + 1 || 0)})` : 'Add'} Cage
       </Button>
     </form>
   );
