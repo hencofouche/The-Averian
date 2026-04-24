@@ -27,7 +27,7 @@ import {
 } from 'firebase/auth';
 import { 
   collection, onSnapshot, query, where, addDoc, 
-  updateDoc, deleteDoc, doc, getDocs, orderBy, setDoc, getDocFromServer, writeBatch, getDocsFromCache, getDocFromCache, disableNetwork
+  updateDoc, deleteDoc, doc, getDocs, orderBy, setDoc, getDocFromServer, writeBatch, getDocsFromCache, getDocFromCache
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { 
@@ -443,13 +443,10 @@ function SubscriptionGate({ settings, onRenew, children }: { settings: UserSetti
   );
 }
 
-let globalIsTransitioningToOffline = false;
-
 // --- Main App ---
 
 export default function App() {
   const [user, setUser] = useState<FirebaseUser | null>(null);
-  const [isOfflineForced, setIsOfflineForced] = useState(false);
   const [loading, setLoading] = useState(true);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [isScanModalOpen, setIsScanModalOpen] = useState(false);
@@ -587,37 +584,12 @@ export default function App() {
     if (!user) return;
 
     const setupListener = <T extends any>(q: any, setter: any, type: string) => {
-      let cacheLoaded = false;
       const unsub = onSnapshot(q, { includeMetadataChanges: true }, (snapshot: any) => {
         setter(snapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() } as T)));
         setIsSyncing(snapshot.metadata.hasPendingWrites);
       }, async (err: any) => {
         handleFirestoreError(err, OperationType.LIST, type);
-        if (String(err).includes("Quota") || String(err).includes("quota")) {
-          // Attempt immediate cache load since listener died
-          try {
-            const cacheSnap = await getDocsFromCache(q);
-            setter(cacheSnap.docs.map((doc: any) => ({ id: doc.id, ...doc.data() } as T)));
-          } catch(e) {}
-
-          if (!isOfflineForced && !globalIsTransitioningToOffline) {
-            globalIsTransitioningToOffline = true;
-            disableNetwork(db).then(() => {
-              setIsOfflineForced(true);
-            }).catch(() => {
-              globalIsTransitioningToOffline = false;
-            });
-          }
-        }
       });
-
-      // If we are offline, proactive fetch
-      if (isOfflineForced) {
-        getDocsFromCache(q).then((cacheSnap) => {
-          setter(cacheSnap.docs.map((doc: any) => ({ id: doc.id, ...doc.data() } as T)));
-        }).catch(() => {});
-      }
-
       return unsub;
     };
 
@@ -683,40 +655,12 @@ export default function App() {
           currency: 'ZAR',
           account_expiry_date: trialExpiry.toISOString()
         };
-        // Don't auto-create trial if we know we're restricted by quota and offline
-        if (!isOfflineForced) {
-          setDoc(docRef, initialSettings);
-          setUserSettings(initialSettings);
-        }
+        setDoc(docRef, initialSettings);
+        setUserSettings(initialSettings);
       }
     }, async (err: any) => {
       handleFirestoreError(err, OperationType.GET, 'userSettings');
-      if (String(err).includes("Quota") || String(err).includes("quota")) {
-        try {
-          const cacheSnap = await getDocFromCache(docRef);
-          if (cacheSnap.exists()) {
-            setUserSettings({ id: cacheSnap.id, ...cacheSnap.data() } as UserSettings);
-          }
-        } catch(e) {}
-
-        if (!isOfflineForced && !globalIsTransitioningToOffline) {
-          globalIsTransitioningToOffline = true;
-          disableNetwork(db).then(() => {
-            setIsOfflineForced(true);
-          }).catch(() => {
-            globalIsTransitioningToOffline = false;
-          });
-        }
-      }
     });
-
-    if (isOfflineForced) {
-      getDocFromCache(docRef).then((cacheSnap) => {
-        if (cacheSnap.exists()) {
-          setUserSettings({ id: cacheSnap.id, ...cacheSnap.data() } as UserSettings);
-        }
-      }).catch(() => {});
-    }
 
     return () => {
       unsubBirds();
@@ -728,7 +672,7 @@ export default function App() {
       unsubContacts();
       unsubSettings();
     };
-  }, [user?.uid, isOfflineForced]);
+  }, [user?.uid]);
 
   const filteredItems = useMemo(() => {
     const query = searchQuery.toLowerCase();

@@ -30,11 +30,18 @@ const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
 export const auth = getAuth(app);
 
-// Use initializeFirestore to include persistence settings if needed, 
-// but ensure it's done correctly for the component registration.
-export const db = initializeFirestore(app, {
-  localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
-}, firebaseConfig.firestoreDatabaseId);
+// Use getFirestore to ensure backwards compatibility with older offline data.
+export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+
+enableIndexedDbPersistence(db).catch((err) => {
+  if (err.code == 'failed-precondition') {
+    console.warn("Multiple tabs open, persistence can only be enabled in one tab at a time");
+  } else if (err.code == 'unimplemented') {
+    console.warn("The current browser does not support all of the features required to enable persistence");
+  } else {
+    console.warn("Persistence could not be enabled", err);
+  }
+});
 
 export const storage = getStorage(app);
 
