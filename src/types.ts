@@ -143,6 +143,7 @@ export interface Task {
   category?: string;
   dueDate?: string;
   reminderDate?: string;
+  reminderLeadTime?: number;
   birdIds: string[];
   subTasks: SubTask[];
   uid: string;

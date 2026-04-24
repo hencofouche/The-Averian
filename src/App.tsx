@@ -8,7 +8,7 @@ import {
   Tag, Calendar, ChevronDown, ChevronUp, ChevronRight, X, GitBranch,
   Image as ImageIcon, Loader2, DollarSign, TrendingUp, TrendingDown,
   Activity, ArrowUpRight, ArrowDownRight, BarChart3, PieChart as PieChartIcon,
-  Menu, Egg, LayoutGrid, Grid3x3, List as ListIcon, AlertTriangle, CreditCard, CheckCircle2, Bell, Cloud, Maximize2, Share2, Send, Printer, MoreHorizontal, Dna, Users, Palette, QrCode, Scan, FileText, ExternalLink
+  Menu, Egg, LayoutGrid, Grid3x3, List as ListIcon, AlertTriangle, CreditCard, CheckCircle2, Bell, Cloud, Maximize2, Share2, Send, Printer, MoreHorizontal, Dna, Users, Palette, QrCode, Scan, FileText, ExternalLink, ArrowLeft
 } from 'lucide-react';
 import GeneticsCalculator from './components/GeneticsCalculator';
 import { ContactsView } from './components/ContactsView';
@@ -179,6 +179,50 @@ const Badge = ({ children, className, variant = 'neutral' }: { children: React.R
   );
 };
 
+const BirdCompactInfo = ({ bird, cages, className, onClick }: { bird: Bird, cages: Cage[], className?: string, onClick?: () => void }) => {
+  const cage = cages.find(c => c.id === bird.cageId);
+  return (
+    <div 
+      className={cn("flex flex-col gap-1.5 p-2.5 bg-zinc-900/60 rounded-xl border border-white/10 transition-all text-left w-full", onClick && "cursor-pointer hover:bg-gold-500/10 hover:border-gold-500/30", className)}
+      onClick={(e) => {
+        if (onClick) {
+          e.stopPropagation();
+          onClick();
+        }
+      }}
+    >
+      <div className="flex items-center gap-2">
+        <span className="text-xs font-black text-white uppercase tracking-tight truncate">{bird.name}</span>
+        <Badge variant={bird.sex === 'Male' ? 'male' : bird.sex === 'Female' ? 'female' : 'neutral'} className="text-[7px] py-0 px-1 shrink-0">{bird.sex}</Badge>
+        {cage && (
+          <span className="text-[8px] font-bold text-sky-400/80 uppercase flex items-center gap-1 shrink-0 ml-auto bg-sky-400/5 px-1.5 py-0.5 rounded-md border border-sky-400/10">
+            <Home size={8} /> {cage.name}
+          </span>
+        )}
+      </div>
+      <div className="flex flex-wrap gap-x-2 items-center text-[10px]">
+        <span className="text-gold-500 font-black uppercase tracking-tight">{bird.species}</span>
+        {bird.subSpecies && <span className="text-white/20">•</span>}
+        {bird.subSpecies && <span className="text-white/50 font-bold uppercase tracking-tighter text-[9px]">{bird.subSpecies}</span>}
+      </div>
+      {(bird.mutations?.length || bird.splitMutations?.length) ? (
+        <div className="flex flex-wrap gap-1 mt-0.5">
+          {bird.mutations?.map(m => (
+            <span key={m} className="text-[7px] px-1.5 py-0.5 bg-black/40 text-white/50 rounded-md font-black uppercase border border-white/5">
+              {m}
+            </span>
+          ))}
+          {bird.splitMutations?.map(m => (
+            <span key={m} className="text-[7px] px-1.5 py-0.5 bg-black/40 text-gold-500/50 rounded-md font-black uppercase italic border border-gold-500/5">
+              /{m}
+            </span>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+};
+
 export const SearchableSelect = ({ 
   label, 
   options, 
@@ -191,7 +235,7 @@ export const SearchableSelect = ({
   selectedValues = []
 }: { 
   label: string, 
-  options: { id: string, name: string }[], 
+  options: { id: string, name: string, details?: string, subText?: string, bird?: Bird }[], 
   value?: string, 
   onChange: (val: string) => void, 
   onAdd?: (name: string) => void,
@@ -204,10 +248,30 @@ export const SearchableSelect = ({
   const [search, setSearch] = useState('');
   
   const filteredOptions = options.filter(opt => 
-    opt.name.toLowerCase().includes(search.toLowerCase())
+    opt.name.toLowerCase().includes(search.toLowerCase()) ||
+    (opt.details?.toLowerCase().includes(search.toLowerCase())) ||
+    (opt.subText?.toLowerCase().includes(search.toLowerCase()))
   );
 
   const showAdd = onAdd && search && !options.some(opt => opt.name.toLowerCase() === search.toLowerCase());
+
+  const renderOptionContent = (opt: typeof options[0]) => {
+    if (opt.bird) {
+      return <BirdCompactInfo bird={opt.bird} cages={options.filter(o => !!o.bird).map(o => ({ id: o.bird!.cageId || '', name: o.details || '' } as Cage))} className="border-0 bg-transparent p-0" />;
+    }
+    
+    if (opt.details || opt.subText) {
+      return (
+        <div className="flex flex-col gap-0.5 py-1">
+          <span className="font-bold text-white group-hover:text-gold-500 transition-colors">{opt.name}</span>
+          {opt.details && <span className="text-[10px] text-white/50">{opt.details}</span>}
+          {opt.subText && <span className="text-[9px] text-gold-500/50 italic">{opt.subText}</span>}
+        </div>
+      );
+    }
+    
+    return <span>{opt.name}</span>;
+  };
 
   return (
     <div className="relative space-y-1">
@@ -247,13 +311,13 @@ export const SearchableSelect = ({
                   className="h-8 text-xs"
                 />
               </div>
-              <div className="max-h-48 overflow-y-auto custom-scrollbar">
+              <div className="max-h-64 overflow-y-auto custom-scrollbar">
                 {filteredOptions.length > 0 ? (
                   filteredOptions.map(opt => (
                     <div 
                       key={opt.id}
                       className={cn(
-                        "px-3 py-2 text-xs cursor-pointer hover:bg-zinc-700 transition-colors flex items-center justify-between",
+                        "px-3 py-2 text-xs cursor-pointer hover:bg-zinc-700 transition-colors flex items-center justify-between group",
                         (multi ? selectedValues.includes(opt.id) : value === opt.id) && "text-gold-500 bg-zinc-700"
                       )}
                       onClick={() => {
@@ -261,8 +325,8 @@ export const SearchableSelect = ({
                         if (!multi) setIsOpen(false);
                       }}
                     >
-                      {opt.name}
-                      {(multi ? selectedValues.includes(opt.id) : value === opt.id) && <CheckSquare size={12} />}
+                      {renderOptionContent(opt)}
+                      {(multi ? selectedValues.includes(opt.id) : value === opt.id) && <CheckSquare size={12} className="shrink-0 ml-2" />}
                     </div>
                   ))
                 ) : (
@@ -403,6 +467,7 @@ export default function App() {
   const [userSettings, setUserSettings] = useState<UserSettings | null>(null);
   
   const [searchQuery, setSearchQuery] = useState('');
+  const [navigationHistory, setNavigationHistory] = useState<{ tab: string, query: string } | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<any>(null);
   const [deleteConfirmation, setDeleteConfirmation] = useState<{ title: string, message: string, onConfirm: () => Promise<void> | void } | null>(null);
@@ -880,11 +945,25 @@ export default function App() {
     );
   }
 
-  const handleNavigate = (tab: any, query: string = '', filter: { birdId?: string, pairId?: string } | null = null) => {
+  const handleNavigate = (tab: any, query: string = '', filter: { birdId?: string, pairId?: string } | null = null, isDirectNav: boolean = false) => {
+    if (isDirectNav) {
+      setNavigationHistory(null);
+    } else if (activeTab !== tab || searchQuery !== query) {
+      setNavigationHistory({ tab: activeTab, query: searchQuery });
+    }
     setActiveTab(tab);
     setSearchQuery(query);
     setIsMobileMenuOpen(false);
     setStatsFilter(filter);
+  };
+
+  const handleGoBack = () => {
+    if (navigationHistory) {
+      const { tab, query } = navigationHistory;
+      setActiveTab(tab as any);
+      setSearchQuery(query);
+      setNavigationHistory(null);
+    }
   };
 
   const handleBirdRef = (birdName: string) => {
@@ -1143,16 +1222,16 @@ export default function App() {
         </div>
 
         <nav className="flex-1 space-y-2 overflow-y-auto custom-scrollbar">
-          <NavItem active={activeTab === 'birds'} onClick={() => handleNavigate('birds')} icon={<BirdIcon size={18} />} label="Birds" count={birds.length} />
-          <NavItem active={activeTab === 'cages'} onClick={() => handleNavigate('cages')} icon={<Home size={18} />} label="Cages" count={cages.length} />
-          <NavItem active={activeTab === 'pairs'} onClick={() => handleNavigate('pairs')} icon={<Heart size={18} />} label="Pairs" count={pairs.filter(p => birds.some(b => b.id === p.maleId) || birds.some(b => b.id === p.femaleId)).length} />
-          <NavItem active={activeTab === 'breeding'} onClick={() => handleNavigate('breeding')} icon={<Egg size={18} />} label="Breeding" count={breedingRecords.length} />
-          <NavItem active={activeTab === 'financials'} onClick={() => handleNavigate('financials')} icon={<DollarSign size={18} />} label="Financials" count={transactions.length} />
-          <NavItem active={activeTab === 'genetics'} onClick={() => handleNavigate('genetics')} icon={<Dna size={18} />} label="Genetics" count={0} />
-          <NavItem active={activeTab === 'tasks'} onClick={() => handleNavigate('tasks')} icon={<CheckSquare size={18} />} label="Tasks & Reminders" count={tasks.length} />
-          <NavItem active={activeTab === 'contacts'} onClick={() => handleNavigate('contacts')} icon={<Users size={18} />} label="Contacts" count={contacts.length} />
+          <NavItem active={activeTab === 'birds'} onClick={() => handleNavigate('birds', '', null, true)} icon={<BirdIcon size={18} />} label="Birds" count={birds.length} />
+          <NavItem active={activeTab === 'cages'} onClick={() => handleNavigate('cages', '', null, true)} icon={<Home size={18} />} label="Cages" count={cages.length} />
+          <NavItem active={activeTab === 'pairs'} onClick={() => handleNavigate('pairs', '', null, true)} icon={<Heart size={18} />} label="Pairs" count={pairs.filter(p => birds.some(b => b.id === p.maleId) || birds.some(b => b.id === p.femaleId)).length} />
+          <NavItem active={activeTab === 'breeding'} onClick={() => handleNavigate('breeding', '', null, true)} icon={<Egg size={18} />} label="Breeding" count={breedingRecords.length} />
+          <NavItem active={activeTab === 'financials'} onClick={() => handleNavigate('financials', '', null, true)} icon={<DollarSign size={18} />} label="Financials" count={transactions.length} />
+          <NavItem active={activeTab === 'genetics'} onClick={() => handleNavigate('genetics', '', null, true)} icon={<Dna size={18} />} label="Genetics" count={0} />
+          <NavItem active={activeTab === 'tasks'} onClick={() => handleNavigate('tasks', '', null, true)} icon={<CheckSquare size={18} />} label="Tasks & Reminders" count={tasks.length} />
+          <NavItem active={activeTab === 'contacts'} onClick={() => handleNavigate('contacts', '', null, true)} icon={<Users size={18} />} label="Contacts" count={contacts.length} />
           <NavItem active={false} onClick={() => setIsPrintModalOpen(true)} icon={<QrCode size={18} />} label="Print QR & Lists" count={0} />
-          <NavItem active={activeTab === 'settings'} onClick={() => handleNavigate('settings')} icon={<Tag size={18} />} label="Settings" count={0} />
+          <NavItem active={activeTab === 'settings'} onClick={() => handleNavigate('settings', '', null, true)} icon={<Tag size={18} />} label="Settings" count={0} />
         </nav>
 
         <div className="mt-auto pt-6 border-t border-black-800 shrink-0">
@@ -1237,12 +1316,22 @@ export default function App() {
           </div>
           
           <div className="flex items-center gap-2 w-full xl:w-auto mt-2 xl:mt-0">
+            {navigationHistory && activeTab !== navigationHistory.tab && (
+              <Button 
+                onClick={handleGoBack}
+                variant="secondary"
+                className="shrink-0 flex items-center gap-2 text-[10px] font-black uppercase tracking-widest bg-gold-500/10 text-gold-500 border-gold-500/20 hover:bg-gold-500/20 px-3"
+              >
+                <ArrowLeft size={14} />
+                Back to {navigationHistory.tab === 'birds' ? 'Flock' : navigationHistory.tab}
+              </Button>
+            )}
             {activeTab !== 'settings' && activeTab !== 'genetics' && activeTab !== 'stats' && (
               <div className="relative flex-1 xl:w-64">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-black-100" size={16} />
                 <Input 
                   placeholder={`Search ${activeTab === 'tasks' ? 'tasks & reminders' : activeTab}...`} 
-                  className="pl-11 pr-10 w-full text-sm"
+                  className="pl-11 pr-10 w-full text-sm font-medium"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
@@ -1370,6 +1459,7 @@ export default function App() {
                         key={cage.id} 
                         cage={cage} 
                         birds={birds.filter(b => b.cageId === cage.id)}
+                        cages={cages}
                         viewMode={viewMode}
                         onBirdRef={handleBirdRef}
                         onNavigate={handleNavigate}
@@ -1451,6 +1541,7 @@ export default function App() {
                     transactions={filteredItems as Transaction[]} 
                     birds={birds} 
                     contacts={contacts}
+                    cages={cages}
                     currency={userSettings?.currency}
                     onBirdRef={handleBirdRef}
                     onEditTransaction={(t) => { setEditingItem(t); setIsModalOpen(true); }}
@@ -1554,6 +1645,7 @@ export default function App() {
                         key={task.id} 
                         task={task} 
                         birds={birds}
+                        cages={cages}
                         viewMode={viewMode}
                         onBirdRef={handleBirdRef}
                         onToggle={async () => {
@@ -1644,10 +1736,10 @@ export default function App() {
           />
         )}
         {activeTab === 'cages' && <CageForm user={user} initialData={editingItem} onClose={() => setIsModalOpen(false)} />}
-        {activeTab === 'pairs' && <PairForm user={user} initialData={editingItem} birds={birds} onClose={() => setIsModalOpen(false)} />}
-        {activeTab === 'breeding' && <BreedingRecordForm user={user} initialData={editingItem} pairs={pairs} birds={birds} onClose={() => setIsModalOpen(false)} />}
+        {activeTab === 'pairs' && <PairForm user={user} initialData={editingItem} birds={birds} cages={cages} onClose={() => setIsModalOpen(false)} />}
+        {activeTab === 'breeding' && <BreedingRecordForm user={user} initialData={editingItem} pairs={pairs} birds={birds} cages={cages} onClose={() => setIsModalOpen(false)} />}
         {activeTab === 'tasks' && <TaskForm user={user} initialData={editingItem} birds={birds} cages={cages} onClose={() => setIsModalOpen(false)} />}
-        {activeTab === 'financials' && <TransactionForm user={user} initialData={editingItem} birds={birds} pairs={pairs} contacts={contacts} currency={userSettings?.currency} onClose={() => setIsModalOpen(false)} />}
+        {activeTab === 'financials' && <TransactionForm user={user} initialData={editingItem} birds={birds} pairs={pairs} cages={cages} contacts={contacts} currency={userSettings?.currency} onClose={() => setIsModalOpen(false)} />}
         {activeTab === 'contacts' && <ContactForm user={user} initialData={editingItem} onClose={() => setIsModalOpen(false)} />}
       </Modal>
 
@@ -2052,14 +2144,14 @@ function BirdCard({ bird, cage, birds, cages, viewMode = 'grid-large', currency,
             <p className="text-white uppercase tracking-widest font-black text-[8px]">Value{effectiveViewMode === 'list' ? ':' : ''}</p>
             <p className="text-emerald-500 font-bold flex items-center gap-1.5">{symbol}{bird.estimatedValue?.toFixed(2) || '0.00'}</p>
           </div>
-          {mate && (
-            <div className={cn(effectiveViewMode === 'list' ? "flex items-center gap-2" : "col-span-2 pt-1")}>
+          <div className={cn(effectiveViewMode === 'list' ? "flex items-center gap-2 flex-1" : "col-span-2 space-y-1.5 pt-1 w-full")}>
               <p className="text-white uppercase tracking-widest font-black text-[8px]">Mate{effectiveViewMode === 'list' ? ':' : ''}</p>
-              <button onClick={(e) => { e.stopPropagation(); onBirdRef(mate.name); }} className="text-rose-500 font-bold flex items-center gap-1.5 hover:text-rose-400 transition-colors">
-                <Heart size={10} className="fill-rose-500" /> {mate.name}
-              </button>
+              {mate ? (
+                <BirdCompactInfo bird={mate} cages={cages} onClick={() => onBirdRef(mate.name)} />
+              ) : (
+                <p className="text-white/30 italic text-[10px]">No mate assigned</p>
+              )}
             </div>
-          )}
         </div>
         <div className="pt-2 border-t border-black-800/50">
           <button 
@@ -2148,39 +2240,29 @@ function BirdCard({ bird, cage, birds, cages, viewMode = 'grid-large', currency,
         {effectiveViewMode !== 'list' && showTree && (
           <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="pt-4 border-t border-black-800 space-y-4">
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1">
+              <div className="space-y-2 w-full">
                 <p className="text-[9px] text-white uppercase tracking-widest font-black">Father</p>
-                <button 
-                  onClick={(e) => { e.stopPropagation(); father && onBirdRef(father.name); }}
-                  className="text-[11px] text-white font-bold hover:text-gold-500 transition-colors text-left flex items-center gap-2"
-                >
-                  <div className="w-1.5 h-1.5 rounded-full bg-info" />
-                  {father?.name || 'Unknown'}
-                </button>
+                {father ? (
+                  <BirdCompactInfo bird={father} cages={cages} onClick={() => onBirdRef(father.name)} />
+                ) : (
+                  <p className="text-[10px] text-white/30 italic px-2">Unknown</p>
+                )}
               </div>
-              <div className="space-y-1">
+              <div className="space-y-2 w-full">
                 <p className="text-[9px] text-white uppercase tracking-widest font-black">Mother</p>
-                <button 
-                  onClick={(e) => { e.stopPropagation(); mother && onBirdRef(mother.name); }}
-                  className="text-[11px] text-white font-bold hover:text-gold-500 transition-colors text-left flex items-center gap-2"
-                >
-                  <div className="w-1.5 h-1.5 rounded-full bg-warning" />
-                  {mother?.name || 'Unknown'}
-                </button>
+                {mother ? (
+                  <BirdCompactInfo bird={mother} cages={cages} onClick={() => onBirdRef(mother.name)} />
+                ) : (
+                  <p className="text-[10px] text-white/30 italic px-2">Unknown</p>
+                )}
               </div>
             </div>
             {offspring.length > 0 && (
               <div className="space-y-2">
                 <p className="text-[9px] text-white uppercase tracking-widest font-black">Offspring ({offspring.length})</p>
-                <div className="flex flex-wrap gap-1.5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   {offspring.map(o => (
-                    <button 
-                      key={o.id} 
-                      onClick={(e) => { e.stopPropagation(); onBirdRef(o.name); }}
-                      className="text-[10px] bg-zinc-700 px-2 py-1 rounded-lg border border-black-700 text-white hover:text-gold-500 hover:border-gold-500/50 transition-all font-bold"
-                    >
-                      {o.name}
-                    </button>
+                    <BirdCompactInfo key={o.id} bird={o} cages={cages} onClick={() => onBirdRef(o.name)} />
                   ))}
                 </div>
               </div>
@@ -2236,7 +2318,7 @@ function BirdCard({ bird, cage, birds, cages, viewMode = 'grid-large', currency,
   );
 }
 
-function CageCard({ cage, birds, viewMode = 'grid-large', onBirdRef, onNavigate, onEdit, onDelete }: { cage: Cage, birds: Bird[], viewMode?: 'grid-large' | 'list', onBirdRef: (name: string) => void, onNavigate: (tab: string, query?: string, filter?: any) => void, onEdit: () => void, onDelete: () => void }) {
+function CageCard({ cage, birds, cages, viewMode = 'grid-large', onBirdRef, onNavigate, onEdit, onDelete }: { cage: Cage, birds: Bird[], cages: Cage[], viewMode?: 'grid-large' | 'list', onBirdRef: (name: string) => void, onNavigate: (tab: string, query?: string, filter?: any) => void, onEdit: () => void, onDelete: () => void }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const effectiveViewMode = (viewMode === 'list' && isExpanded) ? 'grid-large' : viewMode;
   const cageBirds = birds.filter(b => b.cageId === cage.id);
@@ -2304,25 +2386,7 @@ function CageCard({ cage, birds, viewMode = 'grid-large', onBirdRef, onNavigate,
             </div>
             <div className="flex flex-col gap-2 pointer-events-none">
               {cageBirds.map(b => (
-                <div key={b.id} className="flex items-center gap-2 flex-wrap bg-black/20 p-2 rounded-lg border border-white/5">
-                  <Badge variant={b.sex === 'Male' ? 'male' : b.sex === 'Female' ? 'female' : 'neutral'} className="text-[8px] px-1 py-0 shrink-0">
-                    {b.sex === 'Male' ? 'M' : b.sex === 'Female' ? 'F' : '?'}
-                  </Badge>
-                  <span className="text-xs font-bold text-white truncate max-w-[120px]">{b.name}</span>
-                  <span className="text-[9px] text-black-400 truncate uppercase tracking-widest">
-                    {b.species}{b.subSpecies ? ` • ${b.subSpecies}` : ''}
-                  </span>
-                  {b.mutations && b.mutations.length > 0 && (
-                    <span className="text-[8px] px-1.5 py-0.5 bg-white/5 border border-white/5 rounded text-white/60 font-bold uppercase truncate">
-                      {b.mutations.join(', ')}
-                    </span>
-                  )}
-                  {b.splitMutations && b.splitMutations.length > 0 && (
-                    <span className="text-[8px] px-1.5 py-0.5 bg-white/5 border border-white/5 rounded text-white/60 font-bold uppercase truncate">
-                      /{b.splitMutations.join(', ')}
-                    </span>
-                  )}
-                </div>
+                <BirdCompactInfo key={b.id} bird={b} cages={cages} />
               ))}
             </div>
           </div>
@@ -2358,68 +2422,49 @@ function PairCard({ pair, male, female, cages, birds, currency, onBirdRef, onNav
   const effectiveViewMode = (viewMode === 'list' && !isExpanded) ? 'list' : 'grid-large';
   const cage = cages.find(c => c.id === (male?.cageId || female?.cageId));
 
-  const BirdInfo = ({ bird, sex }: { bird?: Bird, sex: 'Male' | 'Female' }) => {
-    const allMutations = [
-      ...(bird?.mutations || []),
-      ...(bird?.splitMutations?.map(m => `/${m}`) || [])
-    ];
-
-    return (
-      <div className={cn(
-        "flex-1 min-w-0 rounded-2xl border transition-all relative overflow-hidden flex flex-col bg-black/20",
-        sex === 'Male' ? "border-info-500/20" : "border-rose-500/20",
-        !bird && "opacity-50 grayscale"
-      )}>
-        {/* Bird Image */}
-        <div className="h-24 sm:h-28 w-full relative bg-black/40 overflow-hidden">
-          {bird?.imageUrl ? (
-            <img 
-              src={bird.imageUrl} 
-              alt={bird.name} 
-              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-              referrerPolicy="no-referrer"
-            />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center text-white/5">
-              <BirdIcon size={32} />
+    const BirdInfo = ({ bird, sex }: { bird?: Bird, sex: 'Male' | 'Female' }) => {
+      return (
+        <div className={cn(
+          "flex-1 min-w-0 rounded-2xl border transition-all relative overflow-hidden flex flex-col bg-black/20",
+          sex === 'Male' ? "border-info-500/20" : "border-rose-500/20",
+          !bird && "opacity-50 grayscale"
+        )}>
+          {/* Bird Image */}
+          <div className="h-24 sm:h-28 w-full relative bg-black/40 overflow-hidden">
+            {bird?.imageUrl ? (
+              <img 
+                src={bird.imageUrl} 
+                alt={bird.name} 
+                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                referrerPolicy="no-referrer"
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-white/5">
+                <BirdIcon size={32} />
+              </div>
+            )}
+            <div className="absolute top-2 right-2">
+              <Badge 
+                variant={sex === 'Male' ? 'male' : 'female'} 
+                className="text-[8px] px-1.5 py-0.5 shadow-lg backdrop-blur-md bg-black/40"
+              >
+                {sex}
+              </Badge>
             </div>
-          )}
-          <div className="absolute top-2 right-2">
-            <Badge 
-              variant={sex === 'Male' ? 'info' : 'warning'} 
-              className="text-[8px] px-1.5 py-0.5 shadow-lg backdrop-blur-md bg-black/40"
-            >
-              {sex}
-            </Badge>
+          </div>
+
+          <div className="p-2.5 space-y-1 flex-1 flex flex-col justify-between">
+            {bird ? (
+              <BirdCompactInfo bird={bird} cages={cages} className="border-0 bg-transparent p-0" />
+            ) : (
+              <div className="flex-1 flex items-center justify-center">
+                <span className="text-[10px] text-white/20 font-black uppercase tracking-widest">Unknown</span>
+              </div>
+            )}
           </div>
         </div>
-
-        <div className="p-2.5 space-y-1 flex-1 flex flex-col justify-between">
-          <div className="min-w-0">
-            <h4 className="text-xs sm:text-sm font-black text-white truncate uppercase tracking-tight leading-tight">
-              {bird ? bird.name : 'Unknown'}
-            </h4>
-            <p className="text-[9px] font-black text-gold-500 uppercase tracking-widest truncate opacity-80">
-              {bird?.species || 'Unknown Species'}{bird?.subSpecies ? ` • ${bird.subSpecies}` : ''}
-            </p>
-          </div>
-          
-          {allMutations.length > 0 && (
-            <div className="flex flex-wrap gap-1 mt-1">
-              {allMutations.slice(0, 2).map((m, i) => (
-                <span key={i} className="text-[7px] px-1.5 py-0.5 bg-white/5 border border-white/5 rounded text-white/60 font-bold uppercase truncate max-w-full">
-                  {m}
-                </span>
-              ))}
-              {allMutations.length > 2 && (
-                <span className="text-[7px] text-white/30 font-bold">+{allMutations.length - 2}</span>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  };
+      );
+    };
 
   if (effectiveViewMode === 'list') {
     return (
@@ -2566,6 +2611,7 @@ function FinancialsView({
   transactions, 
   birds, 
   contacts,
+  cages,
   currency, 
   onBirdRef, 
   onEditTransaction, 
@@ -2574,6 +2620,7 @@ function FinancialsView({
   transactions: Transaction[], 
   birds: Bird[], 
   contacts: Contact[],
+  cages: Cage[],
   currency?: string, 
   onBirdRef: (name: string) => void, 
   onEditTransaction: (t: Transaction) => void, 
@@ -2739,6 +2786,7 @@ function FinancialsView({
                 transaction={t} 
                 bird={birds.find(b => b.id === t.birdId)}
                 contact={contacts.find(c => c.id === t.contactId)}
+                cages={cages}
                 onBirdRef={onBirdRef}
                 onEdit={() => onEditTransaction(t)}
                 onDelete={() => onDeleteTransaction(t.id)}
@@ -2969,6 +3017,7 @@ function EntityStatsView({
                   transaction={t} 
                   bird={birds.find(b => b.id === t.birdId)}
                   contact={contacts.find(c => c.id === t.contactId)}
+                  cages={cages}
                   onBirdRef={onBirdRef}
                   onEdit={() => onEditTransaction(t)}
                   onDelete={() => onDeleteTransaction(t.id)}
@@ -3063,7 +3112,7 @@ function EntityStatsView({
   );
 }
 
-function TransactionCard({ transaction, bird, contact, currency, onBirdRef, onEdit, onDelete, viewMode = 'list' }: { transaction: Transaction, bird?: Bird, contact?: Contact, currency?: string, onBirdRef: (name: string) => void, onEdit: () => void, onDelete: () => void, viewMode?: 'grid-large' | 'list' }) {
+function TransactionCard({ transaction, bird, contact, cages, currency, onBirdRef, onEdit, onDelete, viewMode = 'list' }: { transaction: Transaction, bird?: Bird, contact?: Contact, cages: Cage[], currency?: string, onBirdRef: (name: string) => void, onEdit: () => void, onDelete: () => void, viewMode?: 'grid-large' | 'list' }) {
   const symbol = getCurrencySymbol(currency);
   return (
     <Card className={cn(
@@ -3081,9 +3130,13 @@ function TransactionCard({ transaction, bird, contact, currency, onBirdRef, onEd
           <div className="flex items-center gap-2 mb-0.5 sm:mb-1 flex-wrap">
             <p className="font-black text-white uppercase tracking-wider text-[10px] sm:text-xs truncate">{transaction.category}</p>
             {bird && (
-              <button onClick={() => onBirdRef(bird.name)} className="transition-transform hover:scale-105 shrink-0">
-                <Badge variant="info" className="text-[7px] sm:text-[8px] hover:bg-sky-500/20 cursor-pointer">{bird.name}</Badge>
-              </button>
+              <div className="w-full mt-1">
+                <BirdCompactInfo 
+                  bird={bird} 
+                  cages={cages} 
+                  onClick={() => onBirdRef(bird.name)}
+                />
+              </div>
             )}
             {contact && (
               <Badge variant="warning" className="text-[7px] sm:text-[8px] bg-gold-500/10 text-gold-500 border-gold-500/20">{contact.name}</Badge>
@@ -3156,19 +3209,21 @@ function BreedingRecordCard({ record, pair, male, female, birds, onEdit, onDelet
           "flex items-center justify-between gap-2 sm:gap-4 p-3 sm:p-4 bg-black rounded-xl border border-black-700",
           effectiveViewMode === 'list' ? "flex-1 py-2" : ""
         )}>
-          <div className="flex items-center gap-2 min-w-0 flex-1 px-2">
-            <p className="text-[8px] sm:text-[9px] text-white uppercase tracking-widest font-black shrink-0">Pair:</p>
-            <div className="flex items-center gap-1.5 text-xs sm:text-sm font-bold text-white truncate">
+          <div className="flex flex-col gap-2 min-w-0 flex-1 px-2 border-r border-black-800 pr-4">
+            <p className="text-[8px] sm:text-[9px] text-white uppercase tracking-widest font-black shrink-0">Parent Birds:</p>
+            <div className="grid grid-cols-2 gap-2 w-full">
               {male ? (
-                <button onClick={(e) => { e.stopPropagation(); onBirdRef(male.name); }} className="hover:text-gold-500 transition-colors">{male.name}</button>
-              ) : 'Unknown'}
-              <span className="text-white">×</span>
+                <BirdCompactInfo bird={male} cages={[]} onClick={() => onBirdRef(male.name)} className="py-1" />
+              ) : (
+                <div className="text-[10px] text-white/30 italic px-2 py-1 bg-black rounded-lg border border-white/5">No Male</div>
+              )}
               {female ? (
-                <button onClick={(e) => { e.stopPropagation(); onBirdRef(female.name); }} className="hover:text-gold-500 transition-colors">{female.name}</button>
-              ) : 'Unknown'}
+                <BirdCompactInfo bird={female} cages={[]} onClick={() => onBirdRef(female.name)} className="py-1" />
+              ) : (
+                <div className="text-[10px] text-white/30 italic px-2 py-1 bg-black rounded-lg border border-white/5">No Female</div>
+              )}
             </div>
           </div>
-          <div className="h-6 sm:h-8 w-px bg-zinc-700 shrink-0" />
           <div className="flex items-center gap-4 px-2">
             <div className="flex flex-col items-center">
               <span className="text-[8px] text-white uppercase font-black">Eggs</span>
@@ -3189,14 +3244,12 @@ function BreedingRecordCard({ record, pair, male, female, birds, onEdit, onDelet
           <div className="space-y-4 mb-4">
             {record.offspringIds && record.offspringIds.length > 0 && (
               <div className="p-4 bg-black rounded-2xl border border-black-700">
-                <div className="text-[10px] font-black text-white uppercase tracking-widest mb-2">Tagged Offspring</div>
-                <div className="flex flex-wrap gap-2">
+                <div className="text-[10px] font-black text-white uppercase tracking-widest mb-4">Tagged Offspring ({record.offspringIds.length})</div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                   {record.offspringIds.map(id => {
                     const offspring = birds.find(b => b.id === id);
                     return offspring ? (
-                      <button key={id} onClick={(e) => { e.stopPropagation(); onBirdRef(offspring.name); }} className="transition-transform hover:scale-105">
-                        <Badge variant="info" className="text-[10px] hover:bg-sky-500/20 cursor-pointer">{offspring.name}</Badge>
-                      </button>
+                      <BirdCompactInfo key={id} bird={offspring} cages={[]} onClick={() => onBirdRef(offspring.name)} />
                     ) : null;
                   })}
                 </div>
@@ -3235,7 +3288,7 @@ function BreedingRecordCard({ record, pair, male, female, birds, onEdit, onDelet
   );
 }
 
-function BreedingRecordForm({ user, initialData, pairs, birds, onClose }: { user: FirebaseUser, initialData?: BreedingRecord, pairs: Pair[], birds: Bird[], onClose: () => void }) {
+function BreedingRecordForm({ user, initialData, pairs, birds, cages, onClose }: { user: FirebaseUser, initialData?: BreedingRecord, pairs: Pair[], birds: Bird[], cages: Cage[], onClose: () => void }) {
   const [formData, setFormData] = useState<Partial<BreedingRecord>>(initialData || { pairId: '', startDate: '', endDate: '', eggsLaid: 0, eggsHatched: 0, chicksWeaned: 0, offspringIds: [], notes: '' });
   const [isSaving, setIsSaving] = useState(false);
   const handleSubmit = (e: React.FormEvent) => {
@@ -3273,7 +3326,12 @@ function BreedingRecordForm({ user, initialData, pairs, birds, onClose }: { user
             ...pairs.map(p => {
               const male = birds.find(b => b.id === p.maleId);
               const female = birds.find(b => b.id === p.femaleId);
-              return { id: p.id, name: `${male?.name || 'Unknown'} × ${female?.name || 'Unknown'}` };
+              return { 
+                id: p.id, 
+                name: `${male?.name || 'Unknown'} × ${female?.name || 'Unknown'}`,
+                details: p.status,
+                subText: male?.species || ''
+              };
             })
           ]}
         />
@@ -3290,7 +3348,17 @@ function BreedingRecordForm({ user, initialData, pairs, birds, onClose }: { user
       <div className="space-y-1">
         <SearchableSelect 
           label="Tag Offspring"
-          options={birds.map(b => ({ id: b.id, name: b.name }))}
+          options={birds.map(b => {
+            const cage = cages.find(c => c.id === b.cageId);
+            const mutationsStr = b.mutations?.length ? `[${b.mutations.join(', ')}]` : '';
+            return {
+              id: b.id,
+              name: b.name,
+              details: cage?.name || 'Unassigned',
+              subText: `${b.species} ${mutationsStr}`,
+              bird: b
+            };
+          })}
           multi
           selectedValues={formData.offspringIds || []}
           onChange={(id) => {
@@ -3354,7 +3422,7 @@ function BreedingRecordForm({ user, initialData, pairs, birds, onClose }: { user
   );
 }
 
-function TransactionForm({ user, initialData, birds, pairs, contacts, currency, onClose }: { user: FirebaseUser, initialData?: Transaction, birds: Bird[], pairs: Pair[], contacts: Contact[], currency?: string, onClose: () => void }) {
+function TransactionForm({ user, initialData, birds, pairs, cages, contacts, currency, onClose }: { user: FirebaseUser, initialData?: Transaction, birds: Bird[], pairs: Pair[], cages: Cage[], contacts: Contact[], currency?: string, onClose: () => void }) {
   const symbol = getCurrencySymbol(currency);
   const [formData, setFormData] = useState<Partial<Transaction>>(initialData || {
     type: 'Expense',
@@ -3420,7 +3488,17 @@ function TransactionForm({ user, initialData, birds, pairs, contacts, currency, 
             onChange={(val) => setFormData({ ...formData, birdId: val })}
             options={[
               { id: '', name: 'None' },
-              ...birds.map(b => ({ id: b.id, name: b.name }))
+              ...birds.map(b => {
+                const cage = cages.find(c => c.id === b.cageId);
+                const mutationsStr = b.mutations?.length ? `[${b.mutations.join(', ')}]` : '';
+                return {
+                  id: b.id,
+                  name: b.name,
+                  details: cage?.name || 'Unassigned',
+                  subText: `${b.species} ${mutationsStr}`,
+                  bird: b
+                };
+              })
             ]}
           />
         </div>
@@ -3434,7 +3512,13 @@ function TransactionForm({ user, initialData, birds, pairs, contacts, currency, 
               ...pairs.map(p => {
                 const m = birds.find(b => b.id === p.maleId)?.name || 'Unknown';
                 const f = birds.find(b => b.id === p.femaleId)?.name || 'Unknown';
-                return { id: p.id, name: `${m} x ${f}` };
+                const species = birds.find(b => b.id === p.maleId)?.species || '';
+                return { 
+                  id: p.id, 
+                  name: `${m} x ${f}`,
+                  details: p.status,
+                  subText: species
+                };
               })
             ]}
           />
@@ -3534,7 +3618,7 @@ function ContactForm({ user, initialData, onClose }: { user: FirebaseUser, initi
   );
 }
 
-const getGoogleCalendarUrl = (task: Task) => {
+const getGoogleCalendarUrl = (task: Task, birds: Bird[], cages: Cage[]) => {
   const isAllDay = !task.reminderDate && !!task.dueDate;
   const baseDate = task.reminderDate ? new Date(task.reminderDate) : (task.dueDate ? new Date(task.dueDate) : new Date());
   
@@ -3545,13 +3629,37 @@ const getGoogleCalendarUrl = (task: Task) => {
   };
 
   const start = formatDate(baseDate, isAllDay);
-  const duration = isAllDay ? 24 * 60 * 60 * 1000 : 60 * 60 * 1000;
+  const duration = isAllDay ? 24 * 60 * 60 * 1000 : 15 * 60 * 1000; // Default to 15 min duration
   const end = formatDate(new Date(baseDate.getTime() + duration), isAllDay);
   
   const title = encodeURIComponent(task.title);
   let descriptionText = task.description || '';
+  
+  if (task.reminderLeadTime) {
+    descriptionText += `\n\n🔔 REMINDER REQUESTED: ${task.reminderLeadTime} minutes before.`;
+  }
+
+  const taggedBirds = birds.filter(b => task.birdIds?.includes(b.id));
+  if (taggedBirds.length > 0) {
+    descriptionText += '\n\nTagged Birds:\n' + taggedBirds.map(b => {
+      const cage = cages.find(c => c.id === b.cageId);
+      let info = `- ${b.name} (${b.species})`;
+      if (b.subSpecies) info += ` • ${b.subSpecies}`;
+      if (cage) info += ` [Cage: ${cage.name}]`;
+      if (b.mutations && b.mutations.length > 0) info += ` Mutations: ${b.mutations.join(', ')}`;
+      return info;
+    }).join('\n');
+  }
+
   if (task.subTasks && task.subTasks.length > 0) {
-    descriptionText += '\n\nSubtasks:\n' + task.subTasks.map(st => `${st.completed ? '✅' : '⭕'} ${st.title}`).join('\n');
+    descriptionText += '\n\nSubtasks:\n' + task.subTasks.map(st => {
+      let stLine = `${st.completed ? '✅' : '⭕'} ${st.title}`;
+      const stBirds = birds.filter(b => st.birdIds?.includes(b.id));
+      if (stBirds.length > 0) {
+        stLine += ` (@${stBirds.map(b => b.name).join(', ')})`;
+      }
+      return stLine;
+    }).join('\n');
   }
   descriptionText += '\n\n— Generated by Aviary Manager Pro —';
   const encodedDescription = encodeURIComponent(descriptionText);
@@ -3559,7 +3667,7 @@ const getGoogleCalendarUrl = (task: Task) => {
   return `https://www.google.com/calendar/render?action=TEMPLATE&text=${title}&details=${encodedDescription}&dates=${start}/${end}`;
 };
 
-function TaskCard({ task, birds, onBirdRef, onToggle, onEdit, onDelete, viewMode = 'grid-large' }: { task: Task, birds: Bird[], onBirdRef: (name: string) => void, onToggle: () => void, onEdit: () => void, onDelete: () => void, viewMode?: 'grid-large' | 'list' }) {
+function TaskCard({ task, birds, cages, onBirdRef, onToggle, onEdit, onDelete, viewMode = 'grid-large' }: { task: Task, birds: Bird[], cages: Cage[], onBirdRef: (name: string) => void, onToggle: () => void, onEdit: () => void, onDelete: () => void, viewMode?: 'grid-large' | 'list' }) {
   const [expanded, setExpanded] = useState(false);
   const effectiveViewMode = (viewMode === 'list' && expanded) ? 'grid-large' : viewMode;
   const completedSubtasks = task.subTasks.filter(s => s.completed).length;
@@ -3626,7 +3734,7 @@ function TaskCard({ task, birds, onBirdRef, onToggle, onEdit, onDelete, viewMode
               <span className="text-[9px] font-black uppercase tracking-widest">Edit</span>
             </button>
             <a 
-              href={getGoogleCalendarUrl(task)}
+              href={getGoogleCalendarUrl(task, birds, cages)}
               target="_blank"
               rel="noreferrer"
               onClick={(e) => e.stopPropagation()}
@@ -3651,7 +3759,29 @@ function TaskCard({ task, birds, onBirdRef, onToggle, onEdit, onDelete, viewMode
           </div>
         )}
 
-        {effectiveViewMode !== 'list' && task.description && <p className="text-xs sm:text-sm text-white font-medium leading-relaxed line-clamp-2 sm:line-clamp-none mt-2">{task.description}</p>}
+        {effectiveViewMode !== 'list' && (task.description || (task.birdIds && task.birdIds.length > 0)) && (
+          <div className="space-y-2 mt-2">
+            {task.description && <p className="text-xs sm:text-sm text-white font-medium leading-relaxed line-clamp-2 sm:line-clamp-none">{task.description}</p>}
+            
+            {task.birdIds && task.birdIds.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+                {task.birdIds.map(id => {
+                  const bird = birds.find(b => b.id === id);
+                  if (!bird) return null;
+                  return (
+                    <BirdCompactInfo 
+                      key={id} 
+                      bird={bird} 
+                      cages={cages} 
+                      onClick={() => onBirdRef(bird.name)}
+                      className="min-w-[120px]"
+                    />
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
 
         {effectiveViewMode !== 'list' && task.subTasks.length > 0 && (
           <div className="pt-3 sm:pt-4 border-t border-black-800">
@@ -3685,17 +3815,18 @@ function TaskCard({ task, birds, onBirdRef, onToggle, onEdit, onDelete, viewMode
                       <span className={cn('text-xs font-bold flex-1', sub.completed ? 'text-black-200 line-through' : 'text-black-50')}>
                         {sub.title}
                       </span>
-                      <div className="flex gap-1.5">
+                      <div className="flex flex-wrap gap-1.5 mt-2">
                         {sub.birdIds.map(id => {
                           const bird = birds.find(b => b.id === id);
+                          if (!bird) return null;
                           return (
-                            <button 
+                            <BirdCompactInfo 
                               key={id} 
-                              onClick={() => bird && onBirdRef(bird.name)}
-                              className="text-[8px] font-black uppercase tracking-tighter text-black-100 hover:text-gold-500"
-                            >
-                              @{bird?.name}
-                            </button>
+                              bird={bird} 
+                              cages={cages} 
+                              onClick={() => onBirdRef(bird.name)}
+                              className="w-auto min-w-[140px]"
+                            />
                           );
                         })}
                       </div>
@@ -3714,7 +3845,7 @@ function TaskCard({ task, birds, onBirdRef, onToggle, onEdit, onDelete, viewMode
               <span className="text-[9px] font-black uppercase tracking-widest hidden sm:inline">Edit</span>
             </button>
             <a 
-              href={getGoogleCalendarUrl(task)}
+              href={getGoogleCalendarUrl(task, birds, cages)}
               target="_blank"
               rel="noreferrer"
               onClick={(e) => e.stopPropagation()}
@@ -4543,15 +4674,18 @@ function PrintAndQRModal({ birds, pairs, cages, onClose }: { birds: Bird[], pair
                 const isSelected = selectedBirds.includes(bird.id);
                 return (
                   <div key={bird.id} className={cn("flex items-center gap-3 p-3 rounded-xl border transition-all cursor-pointer", isSelected ? "bg-gold-500/10 border-gold-500/50" : "bg-zinc-900/50 border-black-800")} onClick={() => toggleBird(bird.id)}>
-                    <div className={cn("w-5 h-5 rounded border flex items-center justify-center transition-colors", isSelected ? "bg-gold-500 border-gold-500 text-black" : "border-black-600")}>
+                    <div className={cn("w-5 h-5 rounded border border-black-600 flex items-center justify-center transition-colors shrink-0", isSelected ? "bg-gold-500 border-gold-500 text-black" : "")}>
                       {isSelected && <CheckSquare size={14} />}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="text-sm font-bold text-white truncate">{bird.name}</p>
-                        <Badge variant={bird.sex === 'Male' ? 'male' : bird.sex === 'Female' ? 'female' : 'neutral'} className="text-[8px] px-1 py-0">{bird.sex}</Badge>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-black text-white group-hover:text-gold-500 transition-colors uppercase tracking-tight">{bird.name}</span>
+                        <Badge variant={bird.sex === 'Male' ? 'male' : bird.sex === 'Female' ? 'female' : 'neutral'} className="text-[7px] py-0 px-1">{bird.sex}</Badge>
                       </div>
-                      <p className="text-[10px] text-black-200 uppercase tracking-widest truncate">{cage?.name || 'No Cage'} • {bird.species}</p>
+                      <div className="flex flex-wrap gap-x-2 items-center text-[9px] text-white/50">
+                        <span>{bird.species}{bird.subSpecies ? ` • ${bird.subSpecies}` : ''}</span>
+                        <span className="text-sky-400 font-bold uppercase">{cage?.name || 'No Cage'}</span>
+                      </div>
                     </div>
                   </div>
                 );
@@ -4995,7 +5129,10 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-1"><label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Name/ID</label><Input required value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} /></div>
+        <div className="space-y-1">
+          <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Ring Number / Name</label>
+          <Input required value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} placeholder="e.g. RING-2024-001" />
+        </div>
         <SearchableSelect 
           label="Species"
           options={speciesOptions}
@@ -5022,7 +5159,19 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
           placeholder={formData.species ? "Select Sub-Species" : "Select Species First"}
           disabled={!formData.species}
         />
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1"><label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Sex</label><Select value={formData.sex} onChange={e => setFormData({ ...formData, sex: e.target.value as any })}><option value="Unknown" className="bg-black text-white">Unknown</option><option value="Male" className="bg-black text-white">Male</option><option value="Female" className="bg-black text-white">Female</option></Select></div>
+        <SearchableSelect 
+          label="Cage"
+          value={formData.cageId || ''}
+          onChange={(val) => setFormData({ ...formData, cageId: val })}
+          options={[
+            { id: '', name: 'Unassigned' },
+            ...cages.map(c => ({ id: c.id, name: c.name }))
+          ]}
+        />
       </div>
       
       <div className="grid grid-cols-2 gap-4">
@@ -5093,37 +5242,47 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
       </div>
  
       <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-1">
-          <SearchableSelect 
-            label="Cage"
-            value={formData.cageId || ''}
-            onChange={(val) => setFormData({ ...formData, cageId: val })}
-            options={[
-              { id: '', name: 'Unassigned' },
-              ...cages.map(c => ({ id: c.id, name: c.name }))
-            ]}
-          />
-        </div>
         <div className="space-y-1"><label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Birth Date</label><Input type="date" value={formData.birthDate} onChange={e => setFormData({ ...formData, birthDate: e.target.value })} /></div>
+        <div className="flex-1 opacity-0 pointer-events-none"></div>
       </div>
  
       <div className="grid grid-cols-2 gap-4">
         <SearchableSelect 
           label="Father"
-          options={[{ id: '', name: 'Unknown' }, ...birds.filter(b => b.sex === 'Male' && b.id !== initialData?.id).map(b => {
-            const cage = cages.find(c => c.id === b.cageId);
-            return { id: b.id, name: cage ? `${b.name} (${cage.name})` : b.name };
-          })]}
+          options={[
+            { id: '', name: 'Unknown' }, 
+            ...birds.filter(b => b.sex === 'Male' && b.id !== initialData?.id).map(b => {
+              const cage = cages.find(c => c.id === b.cageId);
+              const mutationsStr = b.mutations?.length ? `[${b.mutations.join(', ')}]` : '';
+              return { 
+                id: b.id, 
+                name: b.name,
+                details: cage?.name || 'Unassigned',
+                subText: mutationsStr,
+                bird: b
+              };
+            })
+          ]}
           value={formData.fatherId}
           onChange={(id) => setFormData({ ...formData, fatherId: id })}
           placeholder="Unknown"
         />
         <SearchableSelect 
           label="Mother"
-          options={[{ id: '', name: 'Unknown' }, ...birds.filter(b => b.sex === 'Female' && b.id !== initialData?.id).map(b => {
-            const cage = cages.find(c => c.id === b.cageId);
-            return { id: b.id, name: cage ? `${b.name} (${cage.name})` : b.name };
-          })]}
+          options={[
+            { id: '', name: 'Unknown' }, 
+            ...birds.filter(b => b.sex === 'Female' && b.id !== initialData?.id).map(b => {
+              const cage = cages.find(c => c.id === b.cageId);
+              const mutationsStr = b.mutations?.length ? `[${b.mutations.join(', ')}]` : '';
+              return { 
+                id: b.id, 
+                name: b.name,
+                details: cage?.name || 'Unassigned',
+                subText: mutationsStr,
+                bird: b
+              };
+            })
+          ]}
           value={formData.motherId}
           onChange={(id) => setFormData({ ...formData, motherId: id })}
           placeholder="Unknown"
@@ -5133,10 +5292,20 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
       <div className="grid grid-cols-2 gap-4">
         <SearchableSelect 
           label="Mate"
-          options={[{ id: '', name: 'None' }, ...birds.filter(b => b.id !== initialData?.id && (formData.sex === 'Unknown' || b.sex !== formData.sex)).map(b => {
-            const cage = cages.find(c => c.id === b.cageId);
-            return { id: b.id, name: cage ? `${b.name} (${cage.name})` : b.name };
-          })]}
+          options={[
+            { id: '', name: 'None' }, 
+            ...birds.filter(b => b.id !== initialData?.id && (formData.sex === 'Unknown' || b.sex !== formData.sex)).map(b => {
+              const cage = cages.find(c => c.id === b.cageId);
+              const mutationsStr = b.mutations?.length ? `[${b.mutations.join(', ')}]` : '';
+              return { 
+                id: b.id, 
+                name: b.name,
+                details: cage?.name || 'Unassigned',
+                subText: mutationsStr,
+                bird: b
+              };
+            })
+          ]}
           value={formData.mateId}
           onChange={(id) => setFormData({ ...formData, mateId: id })}
           placeholder="None"
@@ -5145,7 +5314,14 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
           label="Offspring"
           options={birds.filter(b => b.id !== initialData?.id).map(b => {
             const cage = cages.find(c => c.id === b.cageId);
-            return { id: b.id, name: cage ? `${b.name} (${cage.name})` : b.name };
+            const mutationsStr = b.mutations?.length ? `[${b.mutations.join(', ')}]` : '';
+            return { 
+              id: b.id, 
+              name: b.name,
+              details: cage?.name || 'Unassigned',
+              subText: mutationsStr,
+              bird: b
+            };
           })}
           multi
           selectedValues={formData.offspringIds || []}
@@ -5374,7 +5550,7 @@ function CageForm({ user, initialData, onClose }: { user: FirebaseUser, initialD
   );
 }
 
-function PairForm({ user, initialData, birds, onClose }: { user: FirebaseUser, initialData?: Pair, birds: Bird[], onClose: () => void }) {
+function PairForm({ user, initialData, birds, cages, onClose }: { user: FirebaseUser, initialData?: Pair, birds: Bird[], cages: Cage[], onClose: () => void }) {
   const [formData, setFormData] = useState<Partial<Pair>>(initialData || { maleId: '', femaleId: '', status: 'Active', startDate: '', endDate: '' });
   const [isSaving, setIsSaving] = useState(false);
   const handleSubmit = (e: React.FormEvent) => {
@@ -5409,7 +5585,17 @@ function PairForm({ user, initialData, birds, onClose }: { user: FirebaseUser, i
           onChange={(val) => setFormData({ ...formData, maleId: val })}
           options={[
             { id: '', name: 'Select Male' },
-            ...birds.filter(b => b.sex === 'Male').map(b => ({ id: b.id, name: b.name }))
+            ...birds.filter(b => b.sex === 'Male').map(b => {
+              const cage = cages.find(c => c.id === b.cageId);
+              const mutationsStr = b.mutations?.length ? `[${b.mutations.join(', ')}]` : '';
+              return { 
+                id: b.id, 
+                name: b.name,
+                details: cage?.name || 'Unassigned',
+                subText: mutationsStr,
+                bird: b
+              };
+            })
           ]}
         />
         <SearchableSelect 
@@ -5418,7 +5604,17 @@ function PairForm({ user, initialData, birds, onClose }: { user: FirebaseUser, i
           onChange={(val) => setFormData({ ...formData, femaleId: val })}
           options={[
             { id: '', name: 'Select Female' },
-            ...birds.filter(b => b.sex === 'Female').map(b => ({ id: b.id, name: b.name }))
+            ...birds.filter(b => b.sex === 'Female').map(b => {
+              const cage = cages.find(c => c.id === b.cageId);
+              const mutationsStr = b.mutations?.length ? `[${b.mutations.join(', ')}]` : '';
+              return { 
+                id: b.id, 
+                name: b.name,
+                details: cage?.name || 'Unassigned',
+                subText: mutationsStr,
+                bird: b
+              };
+            })
           ]}
         />
       </div>
@@ -5506,127 +5702,81 @@ function TaskForm({ user, initialData, birds, cages, onClose }: { user: Firebase
         <div className="space-y-1"><label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Status</label><Select value={formData.status} onChange={e => setFormData({ ...formData, status: e.target.value as any })}><option value="Pending" className="bg-black text-white">Pending</option><option value="Completed" className="bg-black text-white">Completed</option></Select></div>
         <div className="space-y-1"><label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Due Date</label><Input type="date" value={formData.dueDate} onChange={e => setFormData({ ...formData, dueDate: e.target.value })} /></div>
       </div>
-      <div className="space-y-1">
-        <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Calendar & Reminder (Recommended)</label>
-        <Input type="datetime-local" value={formData.reminderDate || ''} onChange={e => setFormData({ ...formData, reminderDate: e.target.value })} />
-        <p className="text-[10px] text-white/50 ml-1">Set a date and time. Use the button below to sync this with your Google Calendar for reliable mobile notifications.</p>
-        
-        {formData.title && (formData.reminderDate || formData.dueDate) && (
-          <Button 
-            type="button" 
-            variant="secondary" 
-            className="w-full mt-2 py-3 text-[10px] font-black uppercase tracking-widest border-gold-500/30 hover:border-gold-500 group" 
-            onClick={() => window.open(getGoogleCalendarUrl(formData as Task), '_blank')}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="space-y-1">
+          <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Calendar & Reminder</label>
+          <Input type="datetime-local" value={formData.reminderDate || ''} onChange={e => setFormData({ ...formData, reminderDate: e.target.value })} />
+        </div>
+        <div className="space-y-1">
+          <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Reminder notification</label>
+          <Select 
+            value={formData.reminderLeadTime || 0} 
+            onChange={e => setFormData({ ...formData, reminderLeadTime: parseInt(e.target.value) })}
           >
-            <Calendar size={14} className="mr-2 text-gold-500 group-hover:scale-110 transition-transform" />
-            Add to Google Calendar
-          </Button>
-        )}
+            <option value={0} className="bg-black text-white text-xs">At time of event</option>
+            <option value={2} className="bg-black text-white text-xs">2 minutes before</option>
+            <option value={5} className="bg-black text-white text-xs">5 minutes before</option>
+            <option value={10} className="bg-black text-white text-xs">10 minutes before</option>
+            <option value={15} className="bg-black text-white text-xs">15 minutes before</option>
+            <option value={30} className="bg-black text-white text-xs">30 minutes before</option>
+            <option value={60} className="bg-black text-white text-xs">1 hour before</option>
+            <option value={1440} className="bg-black text-white text-xs">1 day before</option>
+          </Select>
+        </div>
       </div>
+      <p className="text-[10px] text-white/50 ml-1">Sync with your Google Calendar for reliable mobile notifications.</p>
+        
+      {formData.title && (formData.reminderDate || formData.dueDate) && (
+        <Button 
+          type="button" 
+          variant="secondary" 
+          className="w-full mt-2 py-3 text-[10px] font-black uppercase tracking-widest border-gold-500/30 hover:border-gold-500 group" 
+          onClick={() => window.open(getGoogleCalendarUrl(formData as Task, birds, cages), '_blank')}
+        >
+          <Calendar size={14} className="mr-2 text-gold-500 group-hover:scale-110 transition-transform" />
+          Add to Google Calendar
+        </Button>
+      )}
       <div className="space-y-2 relative">
         <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Tag Birds</label>
         
         {/* Selected Birds Chips */}
-        <div className="flex flex-wrap gap-2 mb-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2">
           {selectedBirdsData.map(b => (
-            <div key={b.id} className="flex items-center gap-2 px-3 py-1.5 bg-gold-500 text-black-950 rounded-xl shadow-lg shadow-gold-500/20 animate-in fade-in zoom-in duration-200">
-              <span className="text-[10px] font-black uppercase tracking-widest">{b.name}</span>
+            <div key={b.id} className="relative group">
+              <BirdCompactInfo bird={b} cages={cages} className="bg-zinc-900 border-black-700" />
               <button 
                 type="button" 
                 onClick={() => toggleBirdTag(b.id)}
-                className="hover:scale-110 transition-transform"
+                className="absolute top-2 right-2 text-white/30 hover:text-red-500 transition-colors z-10"
               >
-                <X size={12} className="stroke-[3px]" />
+                <X size={14} />
               </button>
             </div>
           ))}
-          {selectedBirdsData.length === 0 && !isBirdDropdownOpen && (
-            <span className="text-[10px] text-white/30 italic ml-1 leading-8">No birds tagged yet...</span>
+          {selectedBirdsData.length === 0 && (
+            <span className="text-[10px] text-white/30 italic ml-1 leading-8 col-span-2">No birds tagged yet...</span>
           )}
         </div>
 
-        {/* Search Input */}
-        <div className="relative">
-          <div className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30">
-            <Search size={14} />
-          </div>
-          <Input 
-            placeholder="Search birds by name or species..." 
-            value={birdSearch}
-            onChange={e => {
-              setBirdSearch(e.target.value);
-              setIsBirdDropdownOpen(true);
-            }}
-            onFocus={() => setIsBirdDropdownOpen(true)}
-            className="pl-10"
-          />
-          {isBirdDropdownOpen && (
-            <button 
-              type="button"
-              onClick={() => setIsBirdDropdownOpen(false)}
-              className="absolute right-4 top-1/2 -translate-y-1/2 text-white/30 hover:text-white"
-            >
-              <X size={14} />
-            </button>
-          )}
-        </div>
-
-        {/* Dropdown Results */}
-        <AnimatePresence>
-          {isBirdDropdownOpen && (
-            <motion.div 
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className="absolute z-50 left-0 right-0 top-full mt-2 bg-zinc-900 border border-black-700 rounded-2xl shadow-2xl overflow-hidden max-h-[200px] overflow-y-auto custom-scrollbar"
-            >
-              {filteredUnselectedBirds.length === 0 ? (
-                <div className="p-4 text-center text-xs text-white/30">
-                  {birdSearch ? 'No birds found matching your search' : 'All birds are already tagged'}
-                </div>
-              ) : (
-                <div className="p-2 space-y-1">
-                  {filteredUnselectedBirds.map(b => (
-                    <button
-                      key={b.id}
-                      type="button"
-                      onClick={() => {
-                        toggleBirdTag(b.id);
-                        setBirdSearch('');
-                        setIsBirdDropdownOpen(false);
-                      }}
-                      className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-gold-500/10 group transition-colors text-left border-b border-white/5 last:border-0"
-                    >
-                      <div className="flex flex-col gap-1">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-black text-white group-hover:text-gold-500 transition-colors">{b.name}</span>
-                          <Badge variant={b.sex === 'Male' ? 'male' : b.sex === 'Female' ? 'female' : 'neutral'} className="text-[7px] py-0 px-1">{b.sex}</Badge>
-                          {b.cageId && (
-                            <span className="text-[8px] font-bold text-sky-400 uppercase flex items-center gap-1">
-                              <Home size={8} /> {cages.find(c => c.id === b.cageId)?.name}
-                            </span>
-                          )}
-                        </div>
-                        <div className="flex flex-wrap gap-1 items-center">
-                          <span className="text-[9px] text-gold-500/80 font-bold uppercase tracking-tight">{b.species}</span>
-                          {b.subSpecies && <span className="text-[8px] text-white/40">•</span>}
-                          {b.subSpecies && <span className="text-[9px] text-white/60 font-medium">{b.subSpecies}</span>}
-                        </div>
-                        {(b.mutations?.length || b.splitMutations?.length) ? (
-                          <div className="flex flex-wrap gap-1 mt-0.5">
-                            {b.mutations?.slice(0, 2).map(m => <span key={m} className="text-[8px] px-1.5 py-0.5 bg-zinc-800 text-white/50 rounded-md font-bold uppercase">{m}</span>)}
-                            {b.splitMutations?.slice(0, 2).map(m => <span key={m} className="text-[8px] px-1.5 py-0.5 bg-zinc-800 text-gold-500/50 rounded-md font-bold uppercase italic">Split {m}</span>)}
-                          </div>
-                        ) : null}
-                      </div>
-                      <Plus size={14} className="text-white/30 group-hover:text-gold-500 transition-colors ml-2 shrink-0" />
-                    </button>
-                  ))}
-                </div>
-              )}
-            </motion.div>
-          )}
-        </AnimatePresence>
+        <SearchableSelect 
+          label=""
+          placeholder="Tag more birds..."
+          options={birds.map(b => {
+             const cage = cages.find(c => c.id === b.cageId);
+             const mutationsStr = b.mutations?.length ? `[${b.mutations.join(', ')}]` : '';
+             return {
+               id: b.id,
+               name: b.name,
+               details: cage?.name || 'Unassigned',
+               subText: `${b.species} ${mutationsStr}`,
+               bird: b
+             };
+          })}
+          multi
+          selectedValues={formData.birdIds || []}
+          onChange={(id) => toggleBirdTag(id)}
+        />
       </div>
       <div className="space-y-2">
         <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Subtasks</label>
