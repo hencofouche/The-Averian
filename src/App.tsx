@@ -443,6 +443,8 @@ function SubscriptionGate({ settings, onRenew, children }: { settings: UserSetti
   );
 }
 
+let globalIsTransitioningToOffline = false;
+
 // --- Main App ---
 
 export default function App() {
@@ -591,9 +593,13 @@ export default function App() {
       }, async (err: any) => {
         handleFirestoreError(err, OperationType.LIST, type);
         if (String(err).includes("Quota") || String(err).includes("quota")) {
-          if (!isOfflineForced) {
-            disableNetwork(db).catch(() => {});
-            setIsOfflineForced(true);
+          if (!isOfflineForced && !globalIsTransitioningToOffline) {
+            globalIsTransitioningToOffline = true;
+            disableNetwork(db).then(() => {
+              setIsOfflineForced(true);
+            }).catch(() => {
+              globalIsTransitioningToOffline = false;
+            });
           }
         }
       });
@@ -667,9 +673,13 @@ export default function App() {
     }, async (err: any) => {
       handleFirestoreError(err, OperationType.GET, 'userSettings');
       if (String(err).includes("Quota") || String(err).includes("quota")) {
-        if (!isOfflineForced) {
-          disableNetwork(db).catch(() => {});
-          setIsOfflineForced(true);
+        if (!isOfflineForced && !globalIsTransitioningToOffline) {
+          globalIsTransitioningToOffline = true;
+          disableNetwork(db).then(() => {
+            setIsOfflineForced(true);
+          }).catch(() => {
+            globalIsTransitioningToOffline = false;
+          });
         }
       }
     });
