@@ -587,12 +587,19 @@ export default function App() {
     if (!user) return;
 
     const setupListener = <T extends any>(q: any, setter: any, type: string) => {
-      return onSnapshot(q, (snapshot: any) => {
+      let cacheLoaded = false;
+      const unsub = onSnapshot(q, { includeMetadataChanges: true }, (snapshot: any) => {
         setter(snapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() } as T)));
         setIsSyncing(snapshot.metadata.hasPendingWrites);
       }, async (err: any) => {
         handleFirestoreError(err, OperationType.LIST, type);
         if (String(err).includes("Quota") || String(err).includes("quota")) {
+          // Attempt immediate cache load since listener died
+          try {
+            const cacheSnap = await getDocsFromCache(q);
+            setter(cacheSnap.docs.map((doc: any) => ({ id: doc.id, ...doc.data() } as T)));
+          } catch(e) {}
+
           if (!isOfflineForced && !globalIsTransitioningToOffline) {
             globalIsTransitioningToOffline = true;
             disableNetwork(db).then(() => {
@@ -603,6 +610,15 @@ export default function App() {
           }
         }
       });
+
+      // If we are offline, proactive fetch
+      if (isOfflineForced) {
+        getDocsFromCache(q).then((cacheSnap) => {
+          setter(cacheSnap.docs.map((doc: any) => ({ id: doc.id, ...doc.data() } as T)));
+        }).catch(() => {});
+      }
+
+      return unsub;
     };
 
     const qBirds = query(collection(db, 'birds'), where('uid', '==', user.uid));
@@ -629,7 +645,7 @@ export default function App() {
     const fixingSettings = new Set<string>();
 
     const docRef = doc(db, 'userSettings', user.uid);
-    const unsubSettings = onSnapshot(docRef, (docSnap: any) => {
+    const unsubSettings = onSnapshot(docRef, { includeMetadataChanges: true }, (docSnap: any) => {
       setIsSyncing(docSnap.metadata.hasPendingWrites);
       
       // If the snapshot is from cache and empty, don't overwrite server data with a trial yet.
@@ -667,12 +683,22 @@ export default function App() {
           currency: 'ZAR',
           account_expiry_date: trialExpiry.toISOString()
         };
-        setDoc(docRef, initialSettings);
-        setUserSettings(initialSettings);
+        // Don't auto-create trial if we know we're restricted by quota and offline
+        if (!isOfflineForced) {
+          setDoc(docRef, initialSettings);
+          setUserSettings(initialSettings);
+        }
       }
     }, async (err: any) => {
       handleFirestoreError(err, OperationType.GET, 'userSettings');
       if (String(err).includes("Quota") || String(err).includes("quota")) {
+        try {
+          const cacheSnap = await getDocFromCache(docRef);
+          if (cacheSnap.exists()) {
+            setUserSettings({ id: cacheSnap.id, ...cacheSnap.data() } as UserSettings);
+          }
+        } catch(e) {}
+
         if (!isOfflineForced && !globalIsTransitioningToOffline) {
           globalIsTransitioningToOffline = true;
           disableNetwork(db).then(() => {
@@ -683,6 +709,14 @@ export default function App() {
         }
       }
     });
+
+    if (isOfflineForced) {
+      getDocFromCache(docRef).then((cacheSnap) => {
+        if (cacheSnap.exists()) {
+          setUserSettings({ id: cacheSnap.id, ...cacheSnap.data() } as UserSettings);
+        }
+      }).catch(() => {});
+    }
 
     return () => {
       unsubBirds();
