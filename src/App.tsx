@@ -232,7 +232,8 @@ export const SearchableSelect = ({
   placeholder = "Search or select...",
   disabled = false,
   multi = false,
-  selectedValues = []
+  selectedValues = [],
+  cages = []
 }: { 
   label: string, 
   options: { id: string, name: string, details?: string, subText?: string, bird?: Bird }[], 
@@ -242,7 +243,8 @@ export const SearchableSelect = ({
   placeholder?: string,
   disabled?: boolean,
   multi?: boolean,
-  selectedValues?: string[]
+  selectedValues?: string[],
+  cages?: Cage[]
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState('');
@@ -257,7 +259,8 @@ export const SearchableSelect = ({
 
   const renderOptionContent = (opt: typeof options[0]) => {
     if (opt.bird) {
-      return <BirdCompactInfo bird={opt.bird} cages={options.filter(o => !!o.bird).map(o => ({ id: o.bird!.cageId || '', name: o.details || '' } as Cage))} className="border-0 bg-transparent p-0" />;
+      // Use the provided cages array if available, otherwise fallback to the bird's own cage info if we can find it
+      return <BirdCompactInfo bird={opt.bird} cages={cages} className="border-0 bg-transparent p-0" />;
     }
     
     if (opt.details || opt.subText) {
@@ -446,9 +449,8 @@ export default function App() {
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
-  const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
   const [isScanModalOpen, setIsScanModalOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'birds' | 'cages' | 'pairs' | 'breeding' | 'financials' | 'tasks' | 'settings' | 'genetics' | 'contacts' | 'stats'>('birds');
+  const [activeTab, setActiveTab] = useState<'birds' | 'cages' | 'pairs' | 'breeding' | 'financials' | 'tasks' | 'settings' | 'genetics' | 'contacts' | 'stats' | 'print'>('birds');
   const [statsFilter, setStatsFilter] = useState<{ birdId?: string, pairId?: string } | null>(null);
   const [activeSubTab, setActiveSubTab] = useState<'overview' | 'pairs' | 'contacts'>('overview');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -1230,7 +1232,7 @@ export default function App() {
           <NavItem active={activeTab === 'genetics'} onClick={() => handleNavigate('genetics', '', null, true)} icon={<Dna size={18} />} label="Genetics" count={0} />
           <NavItem active={activeTab === 'tasks'} onClick={() => handleNavigate('tasks', '', null, true)} icon={<CheckSquare size={18} />} label="Tasks & Reminders" count={tasks.length} />
           <NavItem active={activeTab === 'contacts'} onClick={() => handleNavigate('contacts', '', null, true)} icon={<Users size={18} />} label="Contacts" count={contacts.length} />
-          <NavItem active={false} onClick={() => setIsPrintModalOpen(true)} icon={<QrCode size={18} />} label="Print QR & Lists" count={0} />
+          <NavItem active={activeTab === 'print'} onClick={() => handleNavigate('print', '', null, true)} icon={<QrCode size={18} />} label="Print QR & Lists" count={0} />
           <NavItem active={activeTab === 'settings'} onClick={() => handleNavigate('settings', '', null, true)} icon={<Tag size={18} />} label="Settings" count={0} />
         </nav>
 
@@ -1297,13 +1299,14 @@ export default function App() {
                 <Menu size={24} />
               </button>
               <h2 className="text-xl font-black uppercase tracking-widest text-white">
-                {activeTab === 'tasks' ? 'Tasks & Reminders' : 
+                {activeTab === 'print' ? 'Print Center' : 
+                 activeTab === 'tasks' ? 'Tasks & Reminders' : 
                  activeTab === 'genetics' ? 'Genetics Engine' : 
                  activeTab === 'stats' ? 'Entity Stats' :
                  activeTab}
               </h2>
             </div>
-            {activeTab !== 'settings' && activeTab !== 'genetics' && activeTab !== 'stats' && (
+            {activeTab !== 'settings' && activeTab !== 'genetics' && activeTab !== 'stats' && activeTab !== 'print' && (
               <div className="flex gap-2 xl:hidden">
                 <Button onClick={() => setIsScanModalOpen(true)} className="py-3 px-4 text-sm font-bold bg-zinc-800 text-white hover:bg-zinc-700 hover:text-gold-500">
                   <Scan size={18} />
@@ -1326,7 +1329,7 @@ export default function App() {
                 Back to {navigationHistory.tab === 'birds' ? 'Flock' : navigationHistory.tab}
               </Button>
             )}
-            {activeTab !== 'settings' && activeTab !== 'genetics' && activeTab !== 'stats' && (
+            {activeTab !== 'settings' && activeTab !== 'genetics' && activeTab !== 'stats' && activeTab !== 'print' && (
               <div className="relative flex-1 xl:w-64">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-black-100" size={16} />
                 <Input 
@@ -1363,7 +1366,7 @@ export default function App() {
               </div>
             )}
             
-            {activeTab !== 'financials' && activeTab !== 'stats' && activeTab !== 'tasks' && activeTab !== 'settings' && activeTab !== 'genetics' && (
+            {activeTab !== 'financials' && activeTab !== 'stats' && activeTab !== 'tasks' && activeTab !== 'settings' && activeTab !== 'genetics' && activeTab !== 'print' && (
               <div className="flex items-center bg-black-900 rounded-lg p-1 border border-black-800 shrink-0">
                 <button 
                   onClick={() => setViewMode('grid-large')}
@@ -1380,7 +1383,7 @@ export default function App() {
               </div>
             )}
             
-            {activeTab !== 'settings' && activeTab !== 'genetics' && activeTab !== 'stats' && (
+            {activeTab !== 'settings' && activeTab !== 'genetics' && activeTab !== 'stats' && activeTab !== 'print' && (
               <div className="hidden xl:flex gap-2">
                 <Button onClick={() => setIsScanModalOpen(true)} className="py-3 px-4 text-sm font-bold uppercase tracking-widest bg-zinc-800 text-gold-500 border border-gold-500/20 hover:bg-zinc-700">
                   <Scan size={18} />
@@ -1402,7 +1405,7 @@ export default function App() {
           </div>
         </header>
 
-        <div className={cn("custom-scrollbar", activeTab === 'genetics' ? "p-0" : "p-4 md:p-8")}>
+        <div className={cn("custom-scrollbar", (activeTab === 'genetics' || activeTab === 'print') ? "p-0" : "p-4 md:p-8")}>
           <AnimatePresence mode="wait">
             <motion.div
               key={activeTab}
@@ -1592,6 +1595,10 @@ export default function App() {
                   <GeneticsCalculator userMutations={userSettings?.mutations || []} />
                 )}
 
+                {activeTab === 'print' && (
+                  <PrintView birds={birds} pairs={pairs} cages={cages} onBirdRef={handleBirdRef} />
+                )}
+
                 {activeTab === 'tasks' && (
                   taskViewMode === 'calendar' ? (
                     <div className="bg-black-950 border border-black-800 rounded-2xl overflow-hidden">
@@ -1741,14 +1748,6 @@ export default function App() {
         {activeTab === 'tasks' && <TaskForm user={user} initialData={editingItem} birds={birds} cages={cages} onClose={() => setIsModalOpen(false)} />}
         {activeTab === 'financials' && <TransactionForm user={user} initialData={editingItem} birds={birds} pairs={pairs} cages={cages} contacts={contacts} currency={userSettings?.currency} onClose={() => setIsModalOpen(false)} />}
         {activeTab === 'contacts' && <ContactForm user={user} initialData={editingItem} onClose={() => setIsModalOpen(false)} />}
-      </Modal>
-
-      <Modal
-        isOpen={isPrintModalOpen}
-        onClose={() => setIsPrintModalOpen(false)}
-        title="Print QR & List"
-      >
-        <PrintAndQRModal birds={birds} pairs={pairs} cages={cages} onClose={() => setIsPrintModalOpen(false)} />
       </Modal>
 
       <ScannerModal 
@@ -3361,6 +3360,7 @@ function BreedingRecordForm({ user, initialData, pairs, birds, cages, onClose }:
           })}
           multi
           selectedValues={formData.offspringIds || []}
+          cages={cages}
           onChange={(id) => {
             const current = formData.offspringIds || [];
             setFormData({ 
@@ -4552,11 +4552,9 @@ function SettingsView({ settings, onUpdate, allData, user, isSyncing, setDeleteC
   );
 }
 
-function PrintAndQRModal({ birds, pairs, cages, onClose }: { birds: Bird[], pairs: Pair[], cages: Cage[], onClose: () => void }) {
+function PrintView({ birds, pairs, cages, onBirdRef }: { birds: Bird[], pairs: Pair[], cages: Cage[], onBirdRef: (name: string) => void }) {
   const [printMode, setPrintMode] = useState<'list' | 'qr'>('list');
-  const [selectedBirds, setSelectedBirds] = useState<string[]>([]);
   const [isPrinting, setIsPrinting] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
   const [printEmpty, setPrintEmpty] = useState(false);
   const [qrType, setQrType] = useState<'bird' | 'pair' | 'cage'>('bird');
   const [qrSelections, setQrSelections] = useState<string[]>([]);
@@ -4571,22 +4569,35 @@ function PrintAndQRModal({ birds, pairs, cages, onClose }: { birds: Bird[], pair
     });
   }, [birds, cages]);
 
-  const filteredBirds = sortedBirds.filter(bird => {
-    const cage = cages.find(c => c.id === bird.cageId);
-    const cageName = cage?.name || 'No Cage';
-    const cageId = cage?.id || '';
-    const searchLower = searchQuery.toLowerCase();
-    return (
-      bird.name.toLowerCase().includes(searchLower) ||
-      bird.id.toLowerCase().includes(searchLower) ||
-      cageName.toLowerCase().includes(searchLower) ||
-      cageId.toLowerCase().includes(searchLower) ||
-      bird.species.toLowerCase().includes(searchLower) ||
-      bird.subSpecies?.toLowerCase().includes(searchLower) ||
-      (bird.mutations || []).some(m => m.toLowerCase().includes(searchLower)) ||
-      (bird.splitMutations || []).some(m => m.toLowerCase().includes(searchLower))
-    );
+  const birdOptions = birds.map(b => {
+    const cage = cages.find(c => c.id === b.cageId);
+    return { 
+      id: b.id, 
+      name: b.name, 
+      details: `${b.species}${b.subSpecies ? ` • ${b.subSpecies}` : ''}${cage ? ` - Cage: ${cage.name}` : ''}`, 
+      bird: b 
+    };
   });
+
+  const pairOptions = pairs.map(p => {
+    const male = birds.find(b => b.id === p.maleId);
+    const female = birds.find(b => b.id === p.femaleId);
+    const mName = male?.name || 'Unknown';
+    const fName = female?.name || 'Unknown';
+    const cageId = male?.cageId || female?.cageId;
+    const cage = cages.find(c => c.id === cageId);
+    return { 
+      id: p.id, 
+      name: `${mName} x ${fName}`, 
+      details: `${male?.species || ''}${cage ? ` - Cage: ${cage.name}` : ''}` 
+    };
+  });
+
+  const cageOptions = cages.map(c => ({ 
+    id: c.id, 
+    name: c.name, 
+    details: c.location || 'No location' 
+  }));
 
   const handlePrint = () => {
     setIsPrinting(true);
@@ -4594,27 +4605,22 @@ function PrintAndQRModal({ birds, pairs, cages, onClose }: { birds: Bird[], pair
       window.print();
       const cleanup = () => {
         setIsPrinting(false);
-        onClose();
         window.removeEventListener('afterprint', cleanup);
       };
       window.addEventListener('afterprint', cleanup);
     }, 800);
   };
 
-  const toggleAll = () => {
-    if (selectedBirds.length === filteredBirds.length) setSelectedBirds([]);
-    else setSelectedBirds(filteredBirds.map(b => b.id));
-  };
-  const toggleBird = (id: string) => setSelectedBirds(prev => prev.includes(id) ? prev.filter(bId => bId !== id) : [...prev, id]);
-
   const getQRData = (id: string) => {
      return JSON.stringify({ t: qrType === 'bird' ? 'b' : qrType === 'pair' ? 'p' : 'c', id });
   };
 
-  const toggleQrSelection = (id: string) => setQrSelections(prev => prev.includes(id) ? prev.filter(sid => sid !== id) : [...prev, id]);
+  const toggleSelection = (id: string) => setQrSelections(prev => prev.includes(id) ? prev.filter(sid => sid !== id) : [...prev, id]);
+
+  const currentOptions = qrType === 'bird' ? birdOptions : qrType === 'pair' ? pairOptions : cageOptions;
 
   return (
-    <>
+    <div className="w-full space-y-12 pb-24">
       <style>{`
         @media print {
           @page { size: A4 portrait; margin: 10mm; }
@@ -4649,181 +4655,185 @@ function PrintAndQRModal({ birds, pairs, cages, onClose }: { birds: Bird[], pair
         }
       `}</style>
       
-      <div className="flex bg-black-900 p-1 rounded-xl mb-4 text-xs font-bold w-full uppercase tracking-widest border border-black-800">
-        <button className={cn("flex-1 py-3 rounded-lg transition-colors", printMode === 'list' && "bg-gold-500 text-black")} onClick={() => setPrintMode('list')}>Table List</button>
-        <button className={cn("flex-1 py-3 rounded-lg transition-colors", printMode === 'qr' && "bg-gold-500 text-black")} onClick={() => setPrintMode('qr')}>QR Barcodes</button>
+      {/* Dynamic Header with Print Mode Switch */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 pb-6 border-b border-black-800">
+        <div>
+          <h1 className="text-3xl font-black text-white uppercase tracking-tighter">Print Center</h1>
+          <p className="text-black-100 text-xs font-bold uppercase tracking-widest mt-1">Configure your physical records & labels</p>
+        </div>
+        <div className="flex bg-black-900 border border-black-800 p-1 rounded-2xl w-full lg:w-[400px]">
+          <button 
+            className={cn("flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all", printMode === 'list' ? "bg-gold-500 text-black shadow-lg" : "text-black-100 hover:text-white")} 
+            onClick={() => setPrintMode('list')}
+          >
+            Data Sheets
+          </button>
+          <button 
+            className={cn("flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all", printMode === 'qr' ? "bg-gold-500 text-black shadow-lg" : "text-black-100 hover:text-white")} 
+            onClick={() => setPrintMode('qr')}
+          >
+            QR Labels
+          </button>
+        </div>
       </div>
 
-      {printMode === 'list' ? (
-        <div className="space-y-4">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-black-400" size={16} />
-              <input type="text" placeholder="Search birds or cages..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full pl-10 pr-4 py-2 bg-black-900/50 border border-black-700 rounded-xl text-sm focus:outline-none focus:border-gold-500" />
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-12 items-start">
+        {/* Left Column: Configuration */}
+        <div className="xl:col-span-5 space-y-8">
+          <section className="space-y-6">
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-gold-500 uppercase tracking-widest ml-1">Entity Selection Type</label>
+              <div className="flex bg-black p-1.5 rounded-2xl border border-black-800 shadow-xl">
+                <button onClick={() => { setQrType('bird'); setQrSelections([]); }} className={cn("flex-1 py-3 rounded-xl text-[10px] font-black uppercase transition-all tracking-widest", qrType === 'bird' ? "bg-zinc-800 text-white border border-white/5" : "text-black-100 hover:text-white")}>Birds</button>
+                <button onClick={() => { setQrType('pair'); setQrSelections([]); }} className={cn("flex-1 py-3 rounded-xl text-[10px] font-black uppercase transition-all tracking-widest", qrType === 'pair' ? "bg-zinc-800 text-white border border-white/5" : "text-black-100 hover:text-white")}>Pairs</button>
+                <button onClick={() => { setQrType('cage'); setQrSelections([]); }} className={cn("flex-1 py-3 rounded-xl text-[10px] font-black uppercase transition-all tracking-widest", qrType === 'cage' ? "bg-zinc-800 text-white border border-white/5" : "text-black-100 hover:text-white")}>Cages</button>
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              <Button onClick={() => setPrintEmpty(!printEmpty)} variant="secondary" className="py-2 px-4 text-[10px] whitespace-nowrap">Mode: {printEmpty ? 'Empty List' : 'Selection'}</Button>
-              {!printEmpty && <Button onClick={toggleAll} variant="secondary" className="py-2 px-4 text-[10px] whitespace-nowrap">{selectedBirds.length === filteredBirds.length ? 'Deselect All' : 'Select All'}</Button>}
-            </div>
-          </div>
 
-          {!printEmpty && (
-            <div className="max-h-[50vh] overflow-y-auto space-y-2 custom-scrollbar pr-2">
-              {filteredBirds.map(bird => {
-                const cage = cages.find(c => c.id === bird.cageId);
-                const isSelected = selectedBirds.includes(bird.id);
-                return (
-                  <div key={bird.id} className={cn("flex items-center gap-3 p-3 rounded-xl border transition-all cursor-pointer", isSelected ? "bg-gold-500/10 border-gold-500/50" : "bg-zinc-900/50 border-black-800")} onClick={() => toggleBird(bird.id)}>
-                    <div className={cn("w-5 h-5 rounded border border-black-600 flex items-center justify-center transition-colors shrink-0", isSelected ? "bg-gold-500 border-gold-500 text-black" : "")}>
-                      {isSelected && <CheckSquare size={14} />}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-black text-white group-hover:text-gold-500 transition-colors uppercase tracking-tight">{bird.name}</span>
-                        <Badge variant={bird.sex === 'Male' ? 'male' : bird.sex === 'Female' ? 'female' : 'neutral'} className="text-[7px] py-0 px-1">{bird.sex}</Badge>
-                      </div>
-                      <div className="flex flex-wrap gap-x-2 items-center text-[9px] text-white/50">
-                        <span>{bird.species}{bird.subSpecies ? ` • ${bird.subSpecies}` : ''}</span>
-                        <span className="text-sky-400 font-bold uppercase">{cage?.name || 'No Cage'}</span>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-              {filteredBirds.length === 0 && <p className="text-center py-8 text-black-400 text-sm">No birds found.</p>}
-            </div>
-          )}
-          {printEmpty && (
-            <div className="p-4 bg-zinc-900/50 border border-black-800 rounded-xl text-center space-y-2">
-              <Printer size={32} className="mx-auto text-gold-500/50" />
-              <p className="text-sm text-white font-medium">Empty List Mode</p>
-              <p className="text-xs text-black-400">This will print a blank table for manual entry.</p>
-            </div>
-          )}
-          <Button onClick={handlePrint} disabled={!printEmpty && selectedBirds.length === 0} className="w-full py-4 mt-4">
-            <Printer size={18} className="mr-2" /> Confirm & Print
+            <SearchableSelect 
+              label={`Bulk Select ${qrType}s`}
+              options={currentOptions}
+              multi
+              selectedValues={qrSelections}
+              onChange={(val) => toggleSelection(val)}
+              placeholder={`Search ${qrType}s...`}
+              cages={cages}
+            />
+
+            {printMode === 'list' && (
+              <div className="p-4 bg-zinc-900/30 border border-black-800 rounded-2xl flex items-center justify-between group">
+                <div className="space-y-0.5">
+                  <p className="text-white font-black uppercase text-[10px] tracking-widest">Blank Template Mode</p>
+                  <p className="text-black-300 text-[9px] uppercase font-bold tracking-tight">Print empty records for hand logs</p>
+                </div>
+                <button 
+                  onClick={() => setPrintEmpty(!printEmpty)}
+                  className={cn("w-12 h-6 rounded-full transition-all relative border border-white/10", printEmpty ? "bg-gold-500" : "bg-black-900")}
+                >
+                  <div className={cn("absolute top-1 w-4 h-4 rounded-full transition-all bg-white shadow-sm", printEmpty ? "right-1" : "left-1")} />
+                </button>
+              </div>
+            )}
+          </section>
+
+          <Button onClick={handlePrint} disabled={!printEmpty && qrSelections.length === 0} className="w-full py-6 text-base font-black uppercase border-b-4 border-gold-600 shadow-gold-500/10 shadow-2xl h-auto">
+            {printMode === 'qr' ? <QrCode size={20} /> : <Printer size={20} />}
+            Generate {printEmpty ? 'Blank Template' : `${qrSelections.length} Records`}
           </Button>
         </div>
-      ) : (
-        <div className="space-y-4">
-           <div className="flex items-center gap-2 mb-2 bg-black-900 border border-black-700 p-1 rounded-xl">
-             <button onClick={() => { setQrType('bird'); setQrSelections([]); }} className={cn("flex-1 py-3 rounded-lg text-xs font-bold uppercase transition-colors tracking-widest", qrType === 'bird' && "bg-zinc-700 text-gold-500")}>Bird</button>
-             <button onClick={() => { setQrType('pair'); setQrSelections([]); }} className={cn("flex-1 py-3 rounded-lg text-xs font-bold uppercase transition-colors tracking-widest", qrType === 'pair' && "bg-zinc-700 text-gold-500")}>Pair</button>
-             <button onClick={() => { setQrType('cage'); setQrSelections([]); }} className={cn("flex-1 py-3 rounded-lg text-xs font-bold uppercase transition-colors tracking-widest", qrType === 'cage' && "bg-zinc-700 text-gold-500")}>Cage</button>
-           </div>
-           
-           {qrType === 'bird' ? (
-             <SearchableSelect 
-               label="Select Birds"
-               options={birds.map(b => {
-                 const cage = cages.find(c => c.id === b.cageId);
-                 return { id: b.id, name: `${b.name} (${b.species})${cage ? ` - ${cage.name}` : ''}` };
-               })}
-               multi
-               selectedValues={qrSelections}
-               onChange={(val) => toggleQrSelection(val)}
-             />
-           ) : qrType === 'pair' ? (
-             <SearchableSelect 
-               label="Select Pairs"
-               options={pairs.map(p => {
-                 const male = birds.find(b => b.id === p.maleId);
-                 const female = birds.find(b => b.id === p.femaleId);
-                 const mName = male?.name || 'Unknown';
-                 const fName = female?.name || 'Unknown';
-                 const cageId = male?.cageId || female?.cageId;
-                 const cage = cages.find(c => c.id === cageId);
-                 return { id: p.id, name: `${mName} x ${fName}${cage ? ` - ${cage.name}` : ''}` };
-               })}
-               multi
-               selectedValues={qrSelections}
-               onChange={(val) => toggleQrSelection(val)}
-             />
-           ) : (
-             <SearchableSelect 
-               label="Select Cages"
-               options={cages.map(c => ({ id: c.id, name: c.name }))}
-               multi
-               selectedValues={qrSelections}
-               onChange={(val) => toggleQrSelection(val)}
-             />
-           )}
 
-           {qrSelections.length > 0 && (
-             <div className="max-h-48 overflow-y-auto space-y-2 custom-scrollbar p-2 bg-black/20 rounded-xl border border-black-800">
-                {qrSelections.map(id => (
-                  <div key={id} className="flex items-center justify-between p-2 bg-zinc-900 rounded-lg border border-black-700 group">
-                    <span className="text-xs text-white font-medium">
-                      {qrType === 'bird' ? birds.find(b=>b.id === id)?.name : 
-                       qrType === 'pair' ? `PAIR: ${id.slice(0,6)}` :
-                       cages.find(c=>c.id === id)?.name}
-                    </span>
-                    <button onClick={() => toggleQrSelection(id)} className="text-black-100 hover:text-red-500 transition-colors">
-                      <X size={14} />
-                    </button>
-                  </div>
-                ))}
-             </div>
-           )}
+        {/* Right Column: Preview / Selection List */}
+        <div className="xl:col-span-7 space-y-6">
+          <div className="flex items-center justify-between px-2">
+            <h4 className="text-[10px] font-black text-white uppercase tracking-widest flex items-center gap-2">
+              <CheckSquare size={14} className="text-gold-500" />
+              Active Selection ({qrSelections.length})
+            </h4>
+            {qrSelections.length > 0 && (
+              <button 
+                onClick={() => setQrSelections([])} 
+                className="text-[10px] font-black text-red-500 uppercase tracking-widest hover:bg-red-500/5 px-3 py-1.5 rounded-lg transition-colors border border-red-500/10"
+              >
+                Clear All
+              </button>
+            )}
+          </div>
 
-           <Button onClick={handlePrint} disabled={qrSelections.length === 0} className="w-full py-4 mt-4">
-             <QrCode size={18} className="mr-2" />
-             Confirm & Print {qrSelections.length} QR{qrSelections.length !== 1 ? 's' : ''}
-           </Button>
+          <div className="bg-black/20 border border-black-800 rounded-2xl min-h-[400px]">
+            {qrSelections.length === 0 && !printEmpty ? (
+              <div className="h-full flex flex-col items-center justify-center py-20 text-center opacity-40">
+                <Search size={48} className="mb-4 text-black-400" />
+                <p className="text-xs font-black uppercase tracking-[0.2em]">Select items from the list to preview</p>
+              </div>
+            ) : printEmpty ? (
+              <div className="p-8 text-center space-y-6">
+                <div className="w-20 h-20 bg-gold-500/10 border border-gold-500/20 rounded-full flex items-center justify-center mx-auto">
+                  <Printer size={32} className="text-gold-500" />
+                </div>
+                <div className="space-y-2">
+                   <p className="text-lg font-black text-white uppercase tracking-widest underline decoration-gold-500 underline-offset-8">Observation Sheet</p>
+                   <p className="text-[10px] text-black-100 font-bold uppercase max-w-sm mx-auto leading-relaxed">System will generate a high-fidelity blank table formatted for manual entry and pen-and-paper tracking.</p>
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-6">
+                {qrSelections.map(id => {
+                  const opt = currentOptions.find(o => o.id === id);
+                  return (
+                    <div key={id} className="flex items-center justify-between p-4 bg-zinc-900/40 rounded-2xl border border-black-700 hover:border-gold-500/30 transition-all group shadow-xl">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs text-white font-black uppercase tracking-tight truncate">{opt?.name || id}</p>
+                        {opt?.details && <p className="text-[9px] text-zinc-500 font-bold truncate mt-0.5">{opt.details}</p>}
+                      </div>
+                      <button onClick={() => toggleSelection(id)} className="ml-4 w-8 h-8 rounded-xl bg-red-500/10 text-red-500 flex items-center justify-center hover:bg-red-500 hover:text-white transition-all shadow-lg">
+                        <X size={14} />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
-      )}
+      </div>
 
       {/* Hidden Print Area rendered via Portal */}
       {isPrinting && createPortal(
-        <div id="print-area-portal" className="fixed inset-0 z-[9999] bg-white text-black p-10 overflow-y-auto w-full min-h-screen">
-          <button className="no-print fixed top-4 right-4 bg-red-500 text-white px-4 py-2 rounded-full font-bold shadow-lg z-[10000]" onClick={() => { setIsPrinting(false); onClose(); }}>Close Print View</button>
-          
+        <div id="print-area-portal" className="fixed inset-0 z-[9999] bg-white text-black p-10 overflow-y-auto w-full min-h-screen font-sans">
           {printMode === 'list' ? (
             <>
-              <div className="flex justify-between items-end border-b-4 border-black pb-6 mb-8">
+              <div className="flex justify-between items-end border-b-8 border-black pb-8 mb-10">
                 <div>
-                  <h1 className="text-4xl font-black uppercase tracking-tighter mb-2">Aviary Records</h1>
-                  <p className="text-sm font-black text-gray-600 uppercase tracking-[0.3em]">The Averian</p>
+                  <h1 className="text-6xl font-black uppercase tracking-tighter mb-4">Aviary Records</h1>
+                  <p className="text-lg font-black text-gray-500 uppercase tracking-[0.4em]">The Averian Ecosystem</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-sm font-bold text-gray-800 uppercase tracking-widest mb-1">Date: {new Date().toLocaleDateString()}</p>
-                  <p className="text-xs font-black uppercase tracking-widest text-gray-500">Total Birds: {printEmpty ? '___' : selectedBirds.length}</p>
+                  <p className="text-xl font-black text-gray-950 uppercase tracking-widest mb-2">Ref: {format(new Date(), 'yyyyMMdd-HHmm')}</p>
+                  <p className="text-sm font-bold text-gray-600 uppercase tracking-widest">Date Generated: {format(new Date(), 'PPPP')}</p>
                 </div>
               </div>
-              <table className="w-full border-2 border-black">
-                <thead><tr className="bg-gray-100 border-b-2 border-black">
-                  <th className="py-3 px-2 text-[10px] font-black uppercase tracking-widest text-left border-r border-black">Cage</th>
-                  <th className="py-3 px-2 text-[10px] font-black uppercase tracking-widest text-left border-r border-black">Bird ID / Ring</th>
-                  <th className="py-3 px-2 text-[10px] font-black uppercase tracking-widest text-left border-r border-black">Sex</th>
-                  <th className="py-3 px-2 text-[10px] font-black uppercase tracking-widest text-left border-r border-black">Species / Mutation</th>
-                  <th className="py-3 px-2 text-[10px] font-black uppercase tracking-widest text-left">Notes</th>
+              <table className="w-full border-4 border-black">
+                <thead><tr className="bg-gray-100 border-b-4 border-black">
+                  <th className="py-4 px-3 text-xs font-black uppercase tracking-widest text-left border-r-2 border-black">Cage</th>
+                  <th className="py-4 px-3 text-xs font-black uppercase tracking-widest text-left border-r-2 border-black">Name / ID</th>
+                  <th className="py-4 px-3 text-xs font-black uppercase tracking-widest text-left border-r-2 border-black">Sex</th>
+                  <th className="py-4 px-3 text-xs font-black uppercase tracking-widest text-left border-r-2 border-black">Genetics</th>
+                  <th className="py-4 px-3 text-xs font-black uppercase tracking-widest text-left">Internal Notes</th>
                 </tr></thead>
                 <tbody>
-                  {printEmpty ? Array.from({ length: 30 }).map((_, i) => (
-                    <tr key={i} className="border-b border-gray-300 h-12"><td className="border-r border-gray-300"></td><td className="border-r border-gray-300"></td><td className="border-r border-gray-300"></td><td className="border-r border-gray-300"></td><td></td></tr>
-                  )) : sortedBirds.filter(b => selectedBirds.includes(b.id)).map(bird => (
-                    <tr key={bird.id} className="border-b border-gray-300 h-12">
-                      <td className="py-2 px-2 border-r border-gray-300 text-xs font-black uppercase">{cages.find(c => c.id === bird.cageId)?.name || '-'}</td>
-                      <td className="py-2 px-2 border-r border-gray-300 text-xs font-bold">{bird.name}</td>
-                      <td className="py-2 px-2 border-r border-gray-300 text-xs font-black uppercase">{bird.sex}</td>
-                      <td className="py-2 px-2 border-r border-gray-300 text-xs">{bird.species} {bird.mutations?.join(', ')}</td>
-                      <td className="border-gray-300"></td>
+                  {printEmpty ? Array.from({ length: 25 }).map((_, i) => (
+                    <tr key={i} className="border-b border-gray-400 h-16"><td className="border-r-2 border-gray-400"></td><td className="border-r-2 border-gray-400"></td><td className="border-r-2 border-gray-400"></td><td className="border-r-2 border-gray-400"></td><td></td></tr>
+                  )) : sortedBirds.filter(b => qrSelections.includes(b.id)).map(bird => (
+                    <tr key={bird.id} className="border-b border-gray-400 h-16">
+                      <td className="py-3 px-3 border-r-2 border-gray-400 text-sm font-black uppercase tracking-tighter">{cages.find(c => c.id === bird.cageId)?.name || '-'}</td>
+                      <td className="py-3 px-3 border-r-2 border-gray-400 text-sm font-bold">{bird.name}</td>
+                      <td className="py-3 px-3 border-r-2 border-gray-400 text-xs font-black uppercase">{bird.sex}</td>
+                      <td className="py-3 px-3 border-r-2 border-gray-400 text-xs leading-relaxed font-medium">
+                        <span className="font-bold">{bird.species}</span>
+                        {bird.mutations && bird.mutations.length > 0 && <span className="block text-[10px] text-gray-500">{bird.mutations.join(' • ')}</span>}
+                      </td>
+                      <td></td>
                     </tr>
                   ))}
                 </tbody>
               </table>
+              <footer className="mt-12 text-center text-xs font-black uppercase tracking-widest text-gray-400 border-t pt-8">
+                 Generated via The Averian Aviary Management System
+              </footer>
             </>
           ) : (
             <div className="qr-print-container">
                {qrSelections.map(id => (
-                 <div key={id} className="qr-print-item">
-                    <QRCodeSVG value={getQRData(id)} size={140} level="H" />
-                    <p className="text-[10px] font-black uppercase text-center mt-3 leading-tight truncate w-full px-1">
-                       {qrType === 'bird' ? birds.find(b=>b.id === id)?.name : 
-                        qrType === 'pair' ? `PAIR: ${id.slice(0,6)}` :
-                        cages.find(c=>c.id === id)?.name}
-                    </p>
-                    <p className="text-[7px] font-black text-gray-400 border-t border-gray-100 pt-1 uppercase tracking-widest mt-1">The Averian</p>
+                 <div key={id} className="qr-print-item shadow-none border-2 border-dashed border-gray-200">
+                    <QRCodeSVG value={getQRData(id)} size={120} level="H" />
+                    <div className="w-full mt-4 space-y-1">
+                      <p className="text-[12px] font-black uppercase text-center leading-tight truncate">
+                         {qrType === 'bird' ? birds.find(b=>b.id === id)?.name : 
+                          qrType === 'pair' ? `PAIR: ${id.slice(0,8).toUpperCase()}` :
+                          cages.find(c=>c.id === id)?.name}
+                      </p>
+                      <p className="text-[8px] font-black text-gray-400 text-center uppercase tracking-[0.2em] pt-1 border-t border-gray-100">The Averian</p>
+                    </div>
                  </div>
                ))}
             </div>
@@ -4831,7 +4841,7 @@ function PrintAndQRModal({ birds, pairs, cages, onClose }: { birds: Bird[], pair
         </div>,
         document.body
       )}
-    </>
+    </div>
   );
 }
 
@@ -5266,6 +5276,7 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
           value={formData.fatherId}
           onChange={(id) => setFormData({ ...formData, fatherId: id })}
           placeholder="Unknown"
+          cages={cages}
         />
         <SearchableSelect 
           label="Mother"
@@ -5286,6 +5297,7 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
           value={formData.motherId}
           onChange={(id) => setFormData({ ...formData, motherId: id })}
           placeholder="Unknown"
+          cages={cages}
         />
       </div>
  
@@ -5309,6 +5321,7 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
           value={formData.mateId}
           onChange={(id) => setFormData({ ...formData, mateId: id })}
           placeholder="None"
+          cages={cages}
         />
         <SearchableSelect 
           label="Offspring"
@@ -5325,6 +5338,7 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
           })}
           multi
           selectedValues={formData.offspringIds || []}
+          cages={cages}
           onChange={(id) => {
             const current = formData.offspringIds || [];
             setFormData({ 
@@ -5597,6 +5611,7 @@ function PairForm({ user, initialData, birds, cages, onClose }: { user: Firebase
               };
             })
           ]}
+          cages={cages}
         />
         <SearchableSelect 
           label="Female"
@@ -5616,6 +5631,7 @@ function PairForm({ user, initialData, birds, cages, onClose }: { user: Firebase
               };
             })
           ]}
+          cages={cages}
         />
       </div>
       <div className="space-y-1"><label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Status</label><Select value={formData.status} onChange={e => setFormData({ ...formData, status: e.target.value as any })}><option value="Active" className="bg-black text-white">Active</option><option value="Inactive" className="bg-black text-white">Inactive</option></Select></div>
