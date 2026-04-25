@@ -27,7 +27,7 @@ import {
 } from 'firebase/auth';
 import { 
   collection, onSnapshot, query, where, addDoc, 
-  updateDoc, deleteDoc, doc, getDocs, orderBy, setDoc, getDocFromServer, writeBatch, getDocsFromCache, getDocFromCache
+  updateDoc, deleteDoc, doc, getDocs, orderBy, setDoc, getDocFromServer, writeBatch, limit
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { 
@@ -468,6 +468,15 @@ export default function App() {
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [userSettings, setUserSettings] = useState<UserSettings | null>(null);
   
+  // Pagination counts
+  const [birdsLimit, setBirdsLimit] = useState(100);
+  const [cagesLimit, setCagesLimit] = useState(50);
+  const [pairsLimit, setPairsLimit] = useState(50);
+  const [breedingLimit, setBreedingLimit] = useState(50);
+  const [transactionLimit, setTransactionLimit] = useState(50);
+  const [contactsLimit, setContactsLimit] = useState(100);
+  const [tasksLimit, setTasksLimit] = useState(50);
+  
   const [searchQuery, setSearchQuery] = useState('');
   const [navigationHistory, setNavigationHistory] = useState<{ tab: string, query: string } | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -583,67 +592,111 @@ export default function App() {
   useEffect(() => {
     if (!user) return;
 
-    const setupListener = <T extends any>(q: any, setter: any, type: string) => {
-      const unsub = onSnapshot(q, { includeMetadataChanges: true }, (snapshot: any) => {
-        setter(snapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() } as T)));
-        setIsSyncing(snapshot.metadata.hasPendingWrites);
-      }, async (err: any) => {
-        handleFirestoreError(err, OperationType.LIST, type);
-      });
-      return unsub;
-    };
+    // Use limits to prevent "The Bleed" (excessive reads on large collections)
+    const qBirds = query(collection(db, 'birds'), where('uid', '==', user.uid), limit(birdsLimit));
+    const unsubBirds = onSnapshot(qBirds, (snapshot) => {
+      setBirds(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Bird)));
+      setIsSyncing(snapshot.metadata.hasPendingWrites);
+    }, (err) => handleFirestoreError(err, OperationType.LIST, 'birds'));
 
-    const qBirds = query(collection(db, 'birds'), where('uid', '==', user.uid));
-    const unsubBirds = setupListener<Bird>(qBirds, setBirds, 'birds');
+    const qCages = query(collection(db, 'cages'), where('uid', '==', user.uid), limit(cagesLimit));
+    const unsubCages = onSnapshot(qCages, (snapshot) => {
+      setCages(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Cage)));
+      setIsSyncing(snapshot.metadata.hasPendingWrites);
+    }, (err) => handleFirestoreError(err, OperationType.LIST, 'cages'));
 
-    const qCages = query(collection(db, 'cages'), where('uid', '==', user.uid));
-    const unsubCages = setupListener<Cage>(qCages, setCages, 'cages');
+    const qPairs = query(collection(db, 'pairs'), where('uid', '==', user.uid), limit(pairsLimit));
+    const unsubPairs = onSnapshot(qPairs, (snapshot) => {
+      setPairs(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Pair)));
+      setIsSyncing(snapshot.metadata.hasPendingWrites);
+    }, (err) => handleFirestoreError(err, OperationType.LIST, 'pairs'));
 
-    const qPairs = query(collection(db, 'pairs'), where('uid', '==', user.uid));
-    const unsubPairs = setupListener<Pair>(qPairs, setPairs, 'pairs');
+    const qBreeding = query(
+      collection(db, 'breedingRecords'), 
+      where('uid', '==', user.uid), 
+      orderBy('startDate', 'desc'),
+      limit(breedingLimit)
+    );
+    const unsubBreeding = onSnapshot(qBreeding, (snapshot) => {
+      setBreedingRecords(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as BreedingRecord)));
+      setIsSyncing(snapshot.metadata.hasPendingWrites);
+    }, (err) => handleFirestoreError(err, OperationType.LIST, 'breedingRecords'));
 
-    const qBreeding = query(collection(db, 'breedingRecords'), where('uid', '==', user.uid));
-    const unsubBreeding = setupListener<BreedingRecord>(qBreeding, setBreedingRecords, 'breedingRecords');
+    const qTasks = query(collection(db, 'tasks'), where('uid', '==', user.uid), limit(tasksLimit));
+    const unsubTasks = onSnapshot(qTasks, (snapshot) => {
+      setTasks(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Task)));
+      setIsSyncing(snapshot.metadata.hasPendingWrites);
+    }, (err) => handleFirestoreError(err, OperationType.LIST, 'tasks'));
 
-    const qTasks = query(collection(db, 'tasks'), where('uid', '==', user.uid));
-    const unsubTasks = setupListener<Task>(qTasks, setTasks, 'tasks');
+    const qTransactions = query(
+      collection(db, 'transactions'), 
+      where('uid', '==', user.uid), 
+      orderBy('date', 'desc'), 
+      limit(transactionLimit)
+    );
+    const unsubTransactions = onSnapshot(qTransactions, (snapshot) => {
+      setTransactions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Transaction)));
+      setIsSyncing(snapshot.metadata.hasPendingWrites);
+    }, (err) => handleFirestoreError(err, OperationType.LIST, 'transactions'));
 
-    const qTransactions = query(collection(db, 'transactions'), where('uid', '==', user.uid), orderBy('date', 'desc'));
-    const unsubTransactions = setupListener<Transaction>(qTransactions, setTransactions, 'transactions');
-
-    const qContacts = query(collection(db, 'contacts'), where('uid', '==', user.uid), orderBy('name', 'asc'));
-    const unsubContacts = setupListener<Contact>(qContacts, setContacts, 'contacts');
+    const qContacts = query(collection(db, 'contacts'), where('uid', '==', user.uid), orderBy('name', 'asc'), limit(contactsLimit));
+    const unsubContacts = onSnapshot(qContacts, (snapshot) => {
+      setContacts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Contact)));
+      setIsSyncing(snapshot.metadata.hasPendingWrites);
+    }, (err) => handleFirestoreError(err, OperationType.LIST, 'contacts'));
 
     const fixingSettings = new Set<string>();
 
     const docRef = doc(db, 'userSettings', user.uid);
-    const unsubSettings = onSnapshot(docRef, { includeMetadataChanges: true }, (docSnap: any) => {
+    const unsubSettings = onSnapshot(docRef, (docSnap: any) => {
       setIsSyncing(docSnap.metadata.hasPendingWrites);
       
-      // If the snapshot is from cache and empty, don't overwrite server data with a trial yet.
-      // Wait for the server response.
       if (docSnap.metadata.fromCache && !docSnap.exists()) {
-        console.log("UserSettings not in cache, waiting for server...");
         return;
       }
 
       if (docSnap.exists()) {
         const data = docSnap.data() as UserSettings;
-        
-        // If we have pending writes, it means we just updated something locally.
-        // We should trust our local state for now to avoid flickering or overwriting with stale data.
         if (docSnap.metadata.hasPendingWrites) {
           setUserSettings({ id: docSnap.id, ...data });
           return;
         }
 
-        // If expiry date is missing for some reason, fix it with a trial
-        if (!data.account_expiry_date) { if (fixingSettings.has(user.uid)) { setUserSettings({ id: docSnap.id, ...data, account_expiry_date: new Date(Date.now() + 30*24*60*60*1000).toISOString() }); return; } fixingSettings.add(user.uid); const trialExpiry = new Date(); trialExpiry.setDate(trialExpiry.getDate() + 30); const updated = { species: [], subspecies: [], mutations: [], uid: user.uid, currency: 'ZAR', ...data, account_expiry_date: trialExpiry.toISOString() }; setDoc(docRef, updated, { merge: true }).catch(e => console.error('Failed to fix settings', e)); setUserSettings({ id: docSnap.id, ...updated }); } else { const expiry = new Date(data.account_expiry_date); const now = new Date(); const maxExpiry = new Date(); maxExpiry.setFullYear(maxExpiry.getFullYear() + 1); maxExpiry.setDate(maxExpiry.getDate() + 30); if (expiry > maxExpiry) { if (fixingSettings.has(user.uid + '_cap')) { setUserSettings({ id: docSnap.id, ...data, account_expiry_date: new Date(Date.now() + 365*24*60*60*1000).toISOString() }); return; } fixingSettings.add(user.uid + '_cap'); console.log('Subscription expiry excessively high, capping at 1 year.'); const cappedExpiry = new Date(); cappedExpiry.setFullYear(cappedExpiry.getFullYear() + 1); const updated = { species: [], subspecies: [], mutations: [], uid: user.uid, currency: 'ZAR', ...data, account_expiry_date: cappedExpiry.toISOString() }; setDoc(docRef, updated, { merge: true }).catch(e => console.error('Failed to cap settings', e)); setUserSettings({ id: docSnap.id, ...updated }); } else { setUserSettings({ id: docSnap.id, ...data }); } }
+        // Only update if critical fields are missing to avoid loops
+        if (!data.account_expiry_date) { 
+          if (fixingSettings.has(user.uid)) return;
+          fixingSettings.add(user.uid); 
+          const trialExpiry = new Date(); 
+          trialExpiry.setDate(trialExpiry.getDate() + 30); 
+          const updated = { 
+            species: data.species || [], 
+            subspecies: data.subspecies || [], 
+            mutations: data.mutations || [], 
+            uid: user.uid, 
+            currency: data.currency || 'ZAR', 
+            ...data, 
+            account_expiry_date: trialExpiry.toISOString() 
+          }; 
+          setDoc(docRef, updated, { merge: true }).catch(e => console.error('Failed to fix settings', e)); 
+          setUserSettings({ id: docSnap.id, ...updated }); 
+        } else { 
+          const expiry = new Date(data.account_expiry_date); 
+          const maxExpiry = new Date(); 
+          maxExpiry.setFullYear(maxExpiry.getFullYear() + 2); 
+          if (expiry > maxExpiry) { 
+            if (fixingSettings.has(user.uid + '_cap')) return;
+            fixingSettings.add(user.uid + '_cap'); 
+            const cappedExpiry = new Date(); 
+            cappedExpiry.setFullYear(cappedExpiry.getFullYear() + 1); 
+            const updated = { ...data, account_expiry_date: cappedExpiry.toISOString() }; 
+            setDoc(docRef, updated, { merge: true }).catch(e => console.error('Failed to cap settings', e)); 
+            setUserSettings({ id: docSnap.id, ...updated }); 
+          } else { 
+            setUserSettings({ id: docSnap.id, ...data }); 
+          } 
+        }
       } else {
-        // Only create initial settings if we are sure it doesn't exist on server
-        // and we are not just waiting for the server response.
         if (docSnap.metadata.fromCache) return;
-
         const trialExpiry = new Date();
         trialExpiry.setDate(trialExpiry.getDate() + 30);
         const initialSettings: UserSettings = {
@@ -658,9 +711,7 @@ export default function App() {
         setDoc(docRef, initialSettings);
         setUserSettings(initialSettings);
       }
-    }, async (err: any) => {
-      handleFirestoreError(err, OperationType.GET, 'userSettings');
-    });
+    }, (err) => handleFirestoreError(err, OperationType.GET, 'userSettings'));
 
     return () => {
       unsubBirds();
@@ -672,7 +723,7 @@ export default function App() {
       unsubContacts();
       unsubSettings();
     };
-  }, [user?.uid]);
+  }, [user, birdsLimit, cagesLimit, pairsLimit, breedingLimit, tasksLimit, transactionLimit, contactsLimit]);
 
   const filteredItems = useMemo(() => {
     const query = searchQuery.toLowerCase();
@@ -1425,139 +1476,216 @@ export default function App() {
                 "grid-cols-1 max-w-4xl mx-auto"
               )}>
                 {activeTab === 'birds' && (
-                  (filteredItems as Bird[]).length > 0 ? (
-                    (filteredItems as Bird[]).map(bird => (
-                      <BirdCard 
-                        key={bird.id} 
-                        bird={bird} 
-                        cage={cages.find(c => c.id === bird.cageId)}
-                        birds={birds}
-                        cages={cages}
-                        viewMode={viewMode}
-                        currency={userSettings?.currency}
-                        onBirdRef={handleBirdRef}
-                        onNavigate={handleNavigate}
-                        onEdit={() => { setEditingItem(bird); setIsModalOpen(true); }}
-                        onDelete={() => setDeleteConfirmation({ 
-                          title: 'Delete Bird', 
-                          message: `Are you sure you want to delete "${bird.name}"? This action cannot be undone.`,
-                          onConfirm: async () => {
-                            try { await deleteDoc(doc(db, 'birds', bird.id)); }
-                            catch (e) { handleFirestoreError(e, OperationType.DELETE, 'birds'); }
-                          }
-                        })}
-                      />
-                    ))
-                  ) : (
-                    <div className="col-span-full py-20 text-center bg-black-900/30 border border-dashed border-black-800 rounded-3xl">
-                      <BirdIcon size={48} className="mx-auto text-black-300 mb-4" />
-                      <p className="text-black-100 font-black uppercase tracking-widest">No birds found</p>
+                  <div className="col-span-full space-y-6">
+                    <div className={cn(
+                      "grid gap-4",
+                      viewMode === 'grid-large' ? "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5" : "grid-cols-1 max-w-4xl mx-auto"
+                    )}>
+                      {(filteredItems as Bird[]).length > 0 ? (
+                        (filteredItems as Bird[]).map(bird => (
+                          <BirdCard 
+                            key={bird.id} 
+                            bird={bird} 
+                            cage={cages.find(c => c.id === bird.cageId)}
+                            birds={birds}
+                            cages={cages}
+                            viewMode={viewMode}
+                            currency={userSettings?.currency}
+                            onBirdRef={handleBirdRef}
+                            onNavigate={handleNavigate}
+                            onEdit={() => { setEditingItem(bird); setIsModalOpen(true); }}
+                            onDelete={() => setDeleteConfirmation({ 
+                              title: 'Delete Bird', 
+                              message: `Are you sure you want to delete "${bird.name}"? This action cannot be undone.`,
+                              onConfirm: async () => {
+                                try { await deleteDoc(doc(db, 'birds', bird.id)); }
+                                catch (e) { handleFirestoreError(e, OperationType.DELETE, 'birds'); }
+                              }
+                            })}
+                          />
+                        ))
+                      ) : (
+                        <div className="col-span-full py-20 text-center bg-black-900/30 border border-dashed border-black-800 rounded-3xl">
+                          <BirdIcon size={48} className="mx-auto text-black-300 mb-4" />
+                          <p className="text-black-100 font-black uppercase tracking-widest">No birds found</p>
+                        </div>
+                      )}
                     </div>
-                  )
+                    {birds.length >= birdsLimit && (
+                      <div className="flex justify-center pt-4">
+                        <Button 
+                          variant="secondary" 
+                          onClick={() => setBirdsLimit(prev => prev + 50)}
+                        >
+                          Load More Birds
+                        </Button>
+                      </div>
+                    )}
+                  </div>
                 )}
 
                 {activeTab === 'cages' && (
-                  (filteredItems as Cage[]).length > 0 ? (
-                    (filteredItems as Cage[]).map(cage => (
-                      <CageCard 
-                        key={cage.id} 
-                        cage={cage} 
-                        birds={birds.filter(b => b.cageId === cage.id)}
-                        cages={cages}
-                        viewMode={viewMode}
-                        onBirdRef={handleBirdRef}
-                        onNavigate={handleNavigate}
-                        onEdit={() => { setEditingItem(cage); setIsModalOpen(true); }}
-                        onDelete={() => setDeleteConfirmation({ 
-                          title: 'Delete Cage', 
-                          message: `Are you sure you want to delete "${cage.name}"? This action cannot be undone.`,
-                          onConfirm: async () => {
-                            try { await deleteDoc(doc(db, 'cages', cage.id)); }
-                            catch (e) { handleFirestoreError(e, OperationType.DELETE, 'cages'); }
-                          }
-                        })}
-                      />
-                    ))
-                  ) : (
-                    <div className="col-span-full py-20 text-center bg-black-900/30 border border-dashed border-black-800 rounded-3xl">
-                      <Home size={48} className="mx-auto text-black-300 mb-4" />
-                      <p className="text-black-100 font-black uppercase tracking-widest">No cages found</p>
+                  <div className="col-span-full space-y-6">
+                    <div className={cn(
+                      "grid gap-4",
+                      viewMode === 'grid-large' ? "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5" : "grid-cols-1 max-w-4xl mx-auto"
+                    )}>
+                      {(filteredItems as Cage[]).length > 0 ? (
+                        (filteredItems as Cage[]).map(cage => (
+                          <CageCard 
+                            key={cage.id} 
+                            cage={cage} 
+                            birds={birds.filter(b => b.cageId === cage.id)}
+                            cages={cages}
+                            viewMode={viewMode}
+                            onBirdRef={handleBirdRef}
+                            onNavigate={handleNavigate}
+                            onEdit={() => { setEditingItem(cage); setIsModalOpen(true); }}
+                            onDelete={() => setDeleteConfirmation({ 
+                              title: 'Delete Cage', 
+                              message: `Are you sure you want to delete "${cage.name}"? This action cannot be undone.`,
+                              onConfirm: async () => {
+                                try { await deleteDoc(doc(db, 'cages', cage.id)); }
+                                catch (e) { handleFirestoreError(e, OperationType.DELETE, 'cages'); }
+                              }
+                            })}
+                          />
+                        ))
+                      ) : (
+                        <div className="col-span-full py-20 text-center bg-black-900/30 border border-dashed border-black-800 rounded-3xl">
+                          <Home size={48} className="mx-auto text-black-300 mb-4" />
+                          <p className="text-black-100 font-black uppercase tracking-widest">No cages found</p>
+                        </div>
+                      )}
                     </div>
-                  )
+                    {cages.length >= cagesLimit && (
+                      <div className="flex justify-center pt-4">
+                        <Button 
+                          variant="secondary" 
+                          onClick={() => setCagesLimit(prev => prev + 30)}
+                        >
+                          Load More Cages
+                        </Button>
+                      </div>
+                    )}
+                  </div>
                 )}
 
                 {activeTab === 'pairs' && (
-                  (filteredItems as Pair[]).length > 0 ? (
-                    (filteredItems as Pair[]).map(pair => (
-                      <PairCard key={pair.id} pair={pair} male={birds.find(b => b.id === pair.maleId)} female={birds.find(b => b.id === pair.femaleId)} cages={cages} birds={birds} currency={userSettings?.currency} viewMode={viewMode} onBirdRef={handleBirdRef} onNavigate={handleNavigate}
-                        onEdit={() => { setEditingItem(pair); setIsModalOpen(true); }}
-                        onDelete={() => setDeleteConfirmation({ 
-                          title: 'Delete Pair', 
-                          message: 'Are you sure you want to delete this breeding pair? This action cannot be undone.',
-                          onConfirm: async () => {
-                            try { await deleteDoc(doc(db, 'pairs', pair.id)); }
-                            catch (e) { handleFirestoreError(e, OperationType.DELETE, 'pairs'); }
-                          }
-                        })}
-                      />
-                    ))
-                  ) : (
-                    <div className="col-span-full py-20 text-center bg-black-900/30 border border-dashed border-black-800 rounded-3xl">
-                      <Heart size={48} className="mx-auto text-black-300 mb-4" />
-                      <p className="text-black-100 font-black uppercase tracking-widest">No pairs found</p>
+                  <div className="col-span-full space-y-6">
+                    <div className={cn(
+                      "grid gap-4",
+                      viewMode === 'grid-large' ? "grid-cols-1 md:grid-cols-2 max-w-5xl mx-auto" : "grid-cols-1 max-w-4xl mx-auto"
+                    )}>
+                      {(filteredItems as Pair[]).length > 0 ? (
+                        (filteredItems as Pair[]).map(pair => (
+                          <PairCard key={pair.id} pair={pair} male={birds.find(b => b.id === pair.maleId)} female={birds.find(b => b.id === pair.femaleId)} cages={cages} birds={birds} currency={userSettings?.currency} viewMode={viewMode} onBirdRef={handleBirdRef} onNavigate={handleNavigate}
+                            onEdit={() => { setEditingItem(pair); setIsModalOpen(true); }}
+                            onDelete={() => setDeleteConfirmation({ 
+                              title: 'Delete Pair', 
+                              message: 'Are you sure you want to delete this breeding pair? This action cannot be undone.',
+                              onConfirm: async () => {
+                                try { await deleteDoc(doc(db, 'pairs', pair.id)); }
+                                catch (e) { handleFirestoreError(e, OperationType.DELETE, 'pairs'); }
+                              }
+                            })}
+                          />
+                        ))
+                      ) : (
+                        <div className="col-span-full py-20 text-center bg-black-900/30 border border-dashed border-black-800 rounded-3xl">
+                          <Heart size={48} className="mx-auto text-black-300 mb-4" />
+                          <p className="text-black-100 font-black uppercase tracking-widest">No pairs found</p>
+                        </div>
+                      )}
                     </div>
-                  )
+                    {pairs.length >= pairsLimit && (
+                      <div className="flex justify-center pt-4">
+                        <Button 
+                          variant="secondary" 
+                          onClick={() => setPairsLimit(prev => prev + 30)}
+                        >
+                          Load More Pairs
+                        </Button>
+                      </div>
+                    )}
+                  </div>
                 )}
 
                 {activeTab === 'breeding' && (
-                  (filteredItems as BreedingRecord[]).length > 0 ? (
-                    (filteredItems as BreedingRecord[]).map(record => (
-                      <BreedingRecordCard 
-                        key={record.id} 
-                        record={record} 
-                        pair={pairs.find(p => p.id === record.pairId)}
-                        male={birds.find(b => b.id === pairs.find(p => p.id === record.pairId)?.maleId)}
-                        female={birds.find(b => b.id === pairs.find(p => p.id === record.pairId)?.femaleId)}
-                        birds={birds}
-                        onEdit={() => { setEditingItem(record); setIsModalOpen(true); }}
-                        onDelete={() => setDeleteConfirmation({ 
-                          title: 'Delete Breeding Record', 
-                          message: 'Are you sure you want to delete this breeding record? This action cannot be undone.',
-                          onConfirm: async () => {
-                            try { await deleteDoc(doc(db, 'breedingRecords', record.id)); }
-                            catch (e) { handleFirestoreError(e, OperationType.DELETE, 'breedingRecords'); }
-                          }
-                        })}
-                        onBirdRef={handleBirdRef}
-                        viewMode={viewMode}
-                      />
-                    ))
-                  ) : (
-                    <div className="col-span-full py-20 text-center bg-black-900/30 border border-dashed border-black-800 rounded-3xl">
-                      <Egg size={48} className="mx-auto text-black-300 mb-4" />
-                      <p className="text-black-100 font-black uppercase tracking-widest">No breeding records found</p>
+                  <div className="space-y-6">
+                    <div className={cn("grid gap-4 sm:gap-6", viewMode === 'grid-large' ? "grid-cols-1 md:grid-cols-2 xl:grid-cols-3" : "grid-cols-1")}>
+                      {(filteredItems as BreedingRecord[]).length > 0 ? (
+                        (filteredItems as BreedingRecord[]).map(record => (
+                          <BreedingRecordCard 
+                            key={record.id} 
+                            record={record} 
+                            pair={pairs.find(p => p.id === record.pairId)}
+                            male={birds.find(b => b.id === pairs.find(p => p.id === record.pairId)?.maleId)}
+                            female={birds.find(b => b.id === pairs.find(p => p.id === record.pairId)?.femaleId)}
+                            birds={birds}
+                            onEdit={() => { setEditingItem(record); setIsModalOpen(true); }}
+                            onDelete={() => setDeleteConfirmation({ 
+                              title: 'Delete Breeding Record', 
+                              message: 'Are you sure you want to delete this breeding record? This action cannot be undone.',
+                              onConfirm: async () => {
+                                try { await deleteDoc(doc(db, 'breedingRecords', record.id)); }
+                                catch (e) { handleFirestoreError(e, OperationType.DELETE, 'breedingRecords'); }
+                              }
+                            })}
+                            onBirdRef={handleBirdRef}
+                            viewMode={viewMode}
+                          />
+                        ))
+                      ) : (
+                        <div className="col-span-full py-20 text-center bg-black-900/30 border border-dashed border-black-800 rounded-3xl">
+                          <Egg size={48} className="mx-auto text-black-300 mb-4" />
+                          <p className="text-black-100 font-black uppercase tracking-widest">No breeding records found</p>
+                        </div>
+                      )}
                     </div>
-                  )
+                    {breedingRecords.length >= breedingLimit && (
+                      <div className="flex justify-center pt-4">
+                        <Button 
+                          variant="secondary" 
+                          onClick={() => setBreedingLimit(prev => prev + 20)}
+                        >
+                          Load More Breeding Records
+                        </Button>
+                      </div>
+                    )}
+                  </div>
                 )}
 
                 {activeTab === 'financials' && (
-                  <FinancialsView 
-                    transactions={filteredItems as Transaction[]} 
-                    birds={birds} 
-                    contacts={contacts}
-                    cages={cages}
-                    currency={userSettings?.currency}
-                    onBirdRef={handleBirdRef}
-                    onEditTransaction={(t) => { setEditingItem(t); setIsModalOpen(true); }}
-                    onDeleteTransaction={(id) => setDeleteConfirmation({
-                      title: 'Delete Transaction',
-                      message: 'Are you sure you want to delete this transaction? This action cannot be undone.',
-                      onConfirm: async () => {
-                        try { await deleteDoc(doc(db, 'transactions', id)); }
-                        catch (e) { handleFirestoreError(e, OperationType.DELETE, 'transactions'); }
-                      }
-                    })}
-                  />
+                  <div className="space-y-6">
+                    <FinancialsView 
+                      transactions={filteredItems as Transaction[]} 
+                      birds={birds} 
+                      contacts={contacts}
+                      cages={cages}
+                      currency={userSettings?.currency}
+                      onBirdRef={handleBirdRef}
+                      onEditTransaction={(t) => { setEditingItem(t); setIsModalOpen(true); }}
+                      onDeleteTransaction={(id) => setDeleteConfirmation({
+                        title: 'Delete Transaction',
+                        message: 'Are you sure you want to delete this transaction? This action cannot be undone.',
+                        onConfirm: async () => {
+                          try { await deleteDoc(doc(db, 'transactions', id)); }
+                          catch (e) { handleFirestoreError(e, OperationType.DELETE, 'transactions'); }
+                        }
+                      })}
+                    />
+                    {transactions.length >= transactionLimit && (
+                      <div className="flex justify-center pt-4">
+                        <Button 
+                          variant="secondary" 
+                          onClick={() => setTransactionLimit(prev => prev + 20)}
+                        >
+                          Load More Transactions
+                        </Button>
+                      </div>
+                    )}
+                  </div>
                 )}
 
                 {activeTab === 'stats' && statsFilter && (
@@ -1647,58 +1775,84 @@ export default function App() {
                       </div>
                     </div>
                   ) : (
-                  (filteredItems as Task[]).length > 0 ? (
-                    (filteredItems as Task[]).map(task => (
-                      <TaskCard 
-                        key={task.id} 
-                        task={task} 
-                        birds={birds}
-                        cages={cages}
-                        viewMode={viewMode}
-                        onBirdRef={handleBirdRef}
-                        onToggle={async () => {
-                          try {
-                            await updateDoc(doc(db, 'tasks', task.id), { 
-                              status: task.status === 'Completed' ? 'Pending' : 'Completed' 
-                            });
-                          } catch (e) { handleFirestoreError(e, OperationType.UPDATE, 'tasks'); }
-                        }}
-                        onEdit={() => { setEditingItem(task); setIsModalOpen(true); }}
-                        onDelete={() => setDeleteConfirmation({ 
-                          title: 'Delete Task', 
-                          message: `Are you sure you want to delete "${task.title}"? This action cannot be undone.`,
-                          onConfirm: async () => {
-                            try { await deleteDoc(doc(db, 'tasks', task.id)); }
-                            catch (e) { handleFirestoreError(e, OperationType.DELETE, 'tasks'); }
-                          }
-                        })}
-                      />
-                    ))
-                  ) : (
-                    <div className="col-span-full py-20 text-center bg-black-900/30 border border-dashed border-black-800 rounded-3xl">
-                      <CheckSquare size={48} className="mx-auto text-black-300 mb-4" />
-                      <p className="text-black-100 font-black uppercase tracking-widest">No tasks found</p>
+                    <div className="space-y-6">
+                      <div className="grid gap-4">
+                        {(filteredItems as Task[]).length > 0 ? (
+                          (filteredItems as Task[]).map(task => (
+                            <TaskCard 
+                              key={task.id} 
+                              task={task} 
+                              birds={birds}
+                              cages={cages}
+                              viewMode={viewMode}
+                              onBirdRef={handleBirdRef}
+                              onToggle={async () => {
+                                try {
+                                  await updateDoc(doc(db, 'tasks', task.id), { 
+                                    status: task.status === 'Completed' ? 'Pending' : 'Completed' 
+                                  });
+                                } catch (e) { handleFirestoreError(e, OperationType.UPDATE, 'tasks'); }
+                              }}
+                              onEdit={() => { setEditingItem(task); setIsModalOpen(true); }}
+                              onDelete={() => setDeleteConfirmation({ 
+                                title: 'Delete Task', 
+                                message: `Are you sure you want to delete "${task.title}"? This action cannot be undone.`,
+                                onConfirm: async () => {
+                                  try { await deleteDoc(doc(db, 'tasks', task.id)); }
+                                  catch (e) { handleFirestoreError(e, OperationType.DELETE, 'tasks'); }
+                                }
+                              })}
+                            />
+                          ))
+                        ) : (
+                          <div className="col-span-full py-20 text-center bg-black-900/30 border border-dashed border-black-800 rounded-3xl">
+                            <CheckSquare size={48} className="mx-auto text-black-300 mb-4" />
+                            <p className="text-black-100 font-black uppercase tracking-widest">No tasks found</p>
+                          </div>
+                        )}
+                      </div>
+                      {tasks.length >= tasksLimit && (
+                        <div className="flex justify-center pt-4">
+                          <Button 
+                            variant="secondary" 
+                            onClick={() => setTasksLimit(prev => prev + 30)}
+                          >
+                            Load More Tasks
+                          </Button>
+                        </div>
+                      )}
                     </div>
-                  )
                   )
                 )}
 
                 {activeTab === 'contacts' && (
-                  <ContactsView 
-                    contacts={contacts}
-                    transactions={transactions}
-                    viewMode={viewMode}
-                    onEdit={(c) => { setEditingItem(c); setIsModalOpen(true); }}
-                    onDelete={(id) => setDeleteConfirmation({
-                      title: 'Delete Contact',
-                      message: 'Are you sure you want to delete this contact? This action cannot be undone.',
-                      onConfirm: async () => {
-                        try { await deleteDoc(doc(db, 'contacts', id)); }
-                        catch (e) { handleFirestoreError(e, OperationType.DELETE, 'contacts'); }
-                      }
-                    })}
-                    symbol={getCurrencySymbol(userSettings?.currency)}
-                  />
+                  <div className="space-y-6">
+                    <ContactsView 
+                      contacts={contacts}
+                      transactions={transactions}
+                      viewMode={viewMode}
+                      onEdit={(c) => { setEditingItem(c); setIsModalOpen(true); }}
+                      onDelete={(id) => setDeleteConfirmation({
+                        title: 'Delete Contact',
+                        message: 'Are you sure you want to delete this contact? This action cannot be undone.',
+                        onConfirm: async () => {
+                          try { await deleteDoc(doc(db, 'contacts', id)); }
+                          catch (e) { handleFirestoreError(e, OperationType.DELETE, 'contacts'); }
+                        }
+                      })}
+                      symbol={getCurrencySymbol(userSettings?.currency)}
+                    />
+                    {contacts.length >= contactsLimit && (
+                      <div className="flex justify-center pt-4">
+                        <Button 
+                          variant="secondary" 
+                          onClick={() => setContactsLimit(prev => prev + 50)}
+                        >
+                          Load More Contacts
+                        </Button>
+                      </div>
+                    )}
+                  </div>
                 )}
 
                 {activeTab === 'settings' && userSettings && (
@@ -3323,7 +3477,7 @@ function BreedingRecordForm({ user, initialData, pairs, birds, cages, onClose }:
           onChange={(val) => setFormData({ ...formData, pairId: val })}
           options={[
             { id: '', name: 'Select Pair' },
-            ...pairs.filter(p => birds.some(b => b.id === p.maleId) || birds.some(b => b.id === p.femaleId)).map(p => {
+            ...pairs.filter(p => p.maleId || p.femaleId).map(p => {
               const male = birds.find(b => b.id === p.maleId);
               const female = birds.find(b => b.id === p.femaleId);
               return { 
@@ -3510,7 +3664,7 @@ function TransactionForm({ user, initialData, birds, pairs, cages, contacts, cur
             onChange={(val) => setFormData({ ...formData, pairId: val })}
             options={[
               { id: '', name: 'None' },
-              ...pairs.filter(p => birds.some(b => b.id === p.maleId) || birds.some(b => b.id === p.femaleId)).map(p => {
+              ...pairs.filter(p => p.maleId || p.femaleId).map(p => {
                 const m = birds.find(b => b.id === p.maleId)?.name || 'Empty';
                 const f = birds.find(b => b.id === p.femaleId)?.name || 'Empty';
                 const species = birds.find(b => b.id === p.maleId)?.species || '';
@@ -4580,7 +4734,7 @@ function PrintView({ birds, pairs, cages, onBirdRef }: { birds: Bird[], pairs: P
     };
   });
 
-  const pairOptions = pairs.filter(p => birds.some(b => b.id === p.maleId) || birds.some(b => b.id === p.femaleId)).map(p => {
+  const pairOptions = pairs.filter(p => p.maleId || p.femaleId).map(p => {
     const male = birds.find(b => b.id === p.maleId);
     const female = birds.find(b => b.id === p.femaleId);
     const mName = male?.name || 'Empty';

@@ -1,50 +1,30 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth';
-import 'firebase/firestore'; // Import side-effects for component registration
 import { 
   getFirestore, 
-  collection, 
   doc, 
-  getDoc, 
-  getDocs, 
-  setDoc, 
-  updateDoc, 
-  deleteDoc, 
-  onSnapshot, 
-  query, 
-  where, 
-  addDoc, 
-  getDocFromServer,
-  enableIndexedDbPersistence,
   initializeFirestore,
   persistentLocalCache,
-  persistentMultipleTabManager
+  persistentMultipleTabManager,
+  getDocFromServer
 } from 'firebase/firestore';
-import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { toast } from 'sonner';
+import { getStorage } from 'firebase/storage';
 import firebaseConfig from '../firebase-applet-config.json';
 import { OperationType, FirestoreErrorInfo } from './types';
 
-// Initialize Firebase
+// Initialize Firebase App
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
+// Configure Firestore with IndexedDB persistence (Modular v10+)
+// persistentLocalCache is preferred over enableIndexedDbPersistence for v10+
+export const db = initializeFirestore(app, {
+  localCache: persistentLocalCache({ 
+    tabManager: persistentMultipleTabManager() // Supports multiple tabs
+  })
+}, firebaseConfig.firestoreDatabaseId);
+
 export const auth = getAuth(app);
-
-// Use getFirestore to ensure backwards compatibility with older offline data.
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
-
-enableIndexedDbPersistence(db).catch((err) => {
-  if (err.code == 'failed-precondition') {
-    console.warn("Multiple tabs open, persistence can only be enabled in one tab at a time");
-  } else if (err.code == 'unimplemented') {
-    console.warn("The current browser does not support all of the features required to enable persistence");
-  } else {
-    console.warn("Persistence could not be enabled", err);
-  }
-});
-
 export const storage = getStorage(app);
-
 export const googleProvider = new GoogleAuthProvider();
 
 export const loginWithGoogle = async () => {
@@ -55,8 +35,6 @@ export const loginWithGoogle = async () => {
 export const logout = () => {
   return signOut(auth);
 };
-
-let hasShownQuotaToast = false;
 
 export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
   const errInfo: FirestoreErrorInfo = {
@@ -78,16 +56,6 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
     path
   };
   console.error('Firestore Error: ', JSON.stringify(errInfo));
-  
-  if ((operationType === OperationType.LIST || operationType === OperationType.GET) && errInfo.error.includes("Quota limit exceeded")) {
-    console.warn("Quota limit exceeded. Running from local cache.");
-    if (!hasShownQuotaToast) {
-      toast.error("Cloud limit reached. Running securely offline from device memory.", { id: 'quota-toast', duration: 4000 });
-      hasShownQuotaToast = true;
-    }
-    return;
-  }
-  
   throw new Error(JSON.stringify(errInfo));
 }
 
