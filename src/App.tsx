@@ -749,7 +749,7 @@ export default function App() {
           const cageA = cages.find(c => c.id === a.cageId)?.name || 'ZZZ';
           const cageB = cages.find(c => c.id === b.cageId)?.name || 'ZZZ';
           
-          if (cageA !== cageB) return cageA.localeCompare(cageB);
+          if (cageA !== cageB) return cageA.localeCompare(cageB, undefined, { numeric: true, sensitivity: 'base' });
           
           const sexOrder: Record<string, number> = { 'Male': 0, 'Female': 1, 'Unknown': 2 };
           const sexDiff = (sexOrder[a.sex] ?? 2) - (sexOrder[b.sex] ?? 2);
@@ -1470,7 +1470,7 @@ export default function App() {
                 "grid gap-4",
                 activeTab === 'tasks' ? "max-w-3xl mx-auto grid-cols-1" : 
                 activeTab === 'financials' || activeTab === 'stats' || activeTab === 'contacts' ? "grid-cols-1" :
-                activeTab === 'genetics' ? "grid-cols-1 w-full" :
+                activeTab === 'genetics' || activeTab === 'print' ? "grid-cols-1 w-full" :
                 activeTab === 'settings' ? "grid-cols-1 max-w-7xl mx-auto w-full" :
                 activeTab === 'pairs' && viewMode === 'grid-large' ? "grid-cols-1 md:grid-cols-2 max-w-5xl mx-auto" : viewMode === 'grid-large' ? "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5" :
                 "grid-cols-1 max-w-4xl mx-auto"
@@ -4718,9 +4718,11 @@ function PrintView({ birds, pairs, cages, onBirdRef }: { birds: Bird[], pairs: P
     return [...birds].sort((a, b) => {
       const cageA = cages.find(c => c.id === a.cageId)?.name || 'ZZZ';
       const cageB = cages.find(c => c.id === b.cageId)?.name || 'ZZZ';
-      if (cageA !== cageB) return cageA.localeCompare(cageB);
+      if (cageA !== cageB) return cageA.localeCompare(cageB, undefined, { numeric: true, sensitivity: 'base' });
       const sexOrder: Record<string, number> = { 'Male': 0, 'Female': 1, 'Unknown': 2 };
-      return (sexOrder[a.sex] ?? 2) - (sexOrder[b.sex] ?? 2);
+      const sexDiff = (sexOrder[a.sex] ?? 2) - (sexOrder[b.sex] ?? 2);
+      if (sexDiff !== 0) return sexDiff;
+      return a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' });
     });
   }, [birds, cages]);
 
@@ -4779,35 +4781,44 @@ function PrintView({ birds, pairs, cages, onBirdRef }: { birds: Bird[], pairs: P
   const currentOptions = qrType === 'bird' ? birdOptions : qrType === 'pair' ? pairOptions : cageOptions;
 
   return (
-    <div className="w-full space-y-12 pb-24">
+    <div className="w-full px-4 md:px-8 space-y-12 pb-24">
       <style>{`
         @media print {
-          @page { size: A4 portrait; margin: 10mm; }
-          body > #root { display: none !important; }
-          body > #print-area-portal {
-            display: block !important; visibility: visible !important;
-            position: static !important; width: 100% !important; height: auto !important;
-            background: white !important; color: black !important;
+          @page { size: auto; margin: 5mm; }
+          body > :not(#print-area-portal) { display: none !important; }
+          #print-area-portal {
+            display: block !important; 
+            visibility: visible !important;
+            position: absolute !important; 
+            left: 0 !important; 
+            top: 0 !important; 
+            width: 100% !important; 
+            height: auto !important;
+            background: white !important; 
+            color: black !important;
+            margin: 0 !important;
+            padding: 5mm !important;
+            z-index: 999999 !important;
           }
           #print-area-portal * { visibility: visible !important; color: black !important; border-color: #000 !important; }
           .no-print { display: none !important; }
-          table { width: 100% !important; border-collapse: collapse !important; }
-          th, td { border: 1px solid #000 !important; padding: 8px !important; }
+          table { width: 100% !important; border-collapse: collapse !important; table-layout: auto !important; font-size: 10pt !important; }
+          th, td { border: 1px solid #000 !important; padding: 4px !important; word-break: break-word !important; }
           .qr-print-container { 
-            display: flex !important; 
-            flex-wrap: wrap !important; 
-            gap: 10px !important; 
-            justify-content: center !important; 
+            display: grid !important;
+            grid-template-cols: repeat(auto-fill, minmax(4.5cm, 1fr)) !important;
+            gap: 5mm !important;
+            width: 100% !important;
           }
           .qr-print-item {
-            width: 5cm !important;
-            height: 5cm !important;
+            width: 100% !important;
+            min-height: 4.5cm !important;
             border: 1px solid #000 !important;
             display: flex !important;
             flex-direction: column !important;
             align-items: center !important;
             justify-content: center !important;
-            padding: 5mm !important;
+            padding: 2mm !important;
             page-break-inside: avoid !important;
             background: white !important;
           }
@@ -4941,15 +4952,8 @@ function PrintView({ birds, pairs, cages, onBirdRef }: { birds: Bird[], pairs: P
         <div id="print-area-portal" className="fixed inset-0 z-[9999] bg-white text-black p-10 overflow-y-auto w-full min-h-screen font-sans">
           {printMode === 'list' ? (
             <>
-              <div className="flex justify-between items-end border-b-8 border-black pb-8 mb-10">
-                <div>
-                  <h1 className="text-6xl font-black uppercase tracking-tighter mb-4">Aviary Records</h1>
-                  <p className="text-lg font-black text-gray-500 uppercase tracking-[0.4em]">The Averian Ecosystem</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-xl font-black text-gray-950 uppercase tracking-widest mb-2">Ref: {format(new Date(), 'yyyyMMdd-HHmm')}</p>
-                  <p className="text-sm font-bold text-gray-600 uppercase tracking-widest">Date Generated: {format(new Date(), 'PPPP')}</p>
-                </div>
+              <div className="flex justify-between items-center border-b-2 border-black pb-4 mb-8">
+                <p className="text-sm font-bold text-gray-800 uppercase tracking-widest">Date Generated: {format(new Date(), 'PPPP')}</p>
               </div>
               {qrType === 'bird' && (
                 <table className="w-full border-4 border-black">
@@ -4964,7 +4968,7 @@ function PrintView({ birds, pairs, cages, onBirdRef }: { birds: Bird[], pairs: P
                   </tr></thead>
                   <tbody>
                     {printEmpty ? Array.from({ length: 25 }).map((_, i) => (
-                      <tr key={i} className="border-b border-gray-400 h-16">
+                      <tr key={i} className="border-b border-gray-400 h-[8.5mm]">
                         <td className="border-r-2 border-gray-400"></td>
                         <td className="border-r-2 border-gray-400"></td>
                         <td className="border-r-2 border-gray-400"></td>
@@ -4974,16 +4978,16 @@ function PrintView({ birds, pairs, cages, onBirdRef }: { birds: Bird[], pairs: P
                         <td></td>
                       </tr>
                     )) : sortedBirds.filter(b => qrSelections.includes(b.id)).map(bird => (
-                      <tr key={bird.id} className="border-b border-gray-400 h-16">
-                        <td className="py-2 px-3 border-r-2 border-gray-400 text-[10px] font-black uppercase">{bird.name}</td>
-                        <td className="py-2 px-3 border-r-2 border-gray-400 text-[10px] font-bold uppercase">{bird.species}</td>
-                        <td className="py-2 px-3 border-r-2 border-gray-400 text-[10px] font-bold uppercase">{bird.subSpecies || '-'}</td>
-                        <td className="py-2 px-3 border-r-2 border-gray-400 text-[10px] font-black uppercase">{bird.sex}</td>
-                        <td className="py-2 px-3 border-r-2 border-gray-400 text-[10px] font-black uppercase tracking-tighter">{cages.find(c => c.id === bird.cageId)?.name || '-'}</td>
-                        <td className="py-2 px-3 border-r-2 border-gray-400 text-[9px] font-bold uppercase leading-tight">
+                      <tr key={bird.id} className="border-b border-gray-400 h-[8.5mm]">
+                        <td className="py-1 px-2 border-r-2 border-gray-400 text-[10px] font-black uppercase">{bird.name}</td>
+                        <td className="py-1 px-2 border-r-2 border-gray-400 text-[10px] font-bold uppercase">{bird.species}</td>
+                        <td className="py-1 px-2 border-r-2 border-gray-400 text-[10px] font-bold uppercase">{bird.subSpecies || '-'}</td>
+                        <td className="py-1 px-2 border-r-2 border-gray-400 text-[10px] font-black uppercase">{bird.sex}</td>
+                        <td className="py-1 px-2 border-r-2 border-gray-400 text-[10px] font-black uppercase tracking-tighter">{cages.find(c => c.id === bird.cageId)?.name || '-'}</td>
+                        <td className="py-1 px-2 border-r-2 border-gray-400 text-[9px] font-bold uppercase leading-tight">
                           {bird.mutations?.join(' • ') || '-'}
                         </td>
-                        <td className="py-2 px-3 text-[9px] font-bold uppercase italic text-gray-500 leading-tight">
+                        <td className="py-1 px-2 text-[9px] font-bold uppercase italic text-gray-500 leading-tight">
                           {bird.splitMutations?.join(' • ') || '-'}
                         </td>
                       </tr>
@@ -5017,7 +5021,7 @@ function PrintView({ birds, pairs, cages, onBirdRef }: { birds: Bird[], pairs: P
                   </thead>
                   <tbody>
                     {printEmpty ? Array.from({ length: 15 }).map((_, i) => (
-                      <tr key={i} className="border-b border-gray-400 h-24">
+                      <tr key={i} className="border-b border-gray-400 h-[14mm]">
                         <td className="border-r-2 border-gray-400"></td>
                         <td className="border-r-2 border-gray-400"></td>
                         <td className="border-r-2 border-gray-400"></td>
@@ -5038,20 +5042,20 @@ function PrintView({ birds, pairs, cages, onBirdRef }: { birds: Bird[], pairs: P
                       const fCage = cages.find(c => c.id === female?.cageId)?.name || '-';
 
                       return (
-                        <tr key={pair.id} className="border-b border-gray-400">
-                          <td className="py-4 px-3 border-r-2 border-gray-400 text-[10px] font-black uppercase bg-blue-50/10">{male?.name || '-'}</td>
-                          <td className="py-4 px-3 border-r-2 border-gray-400 text-[10px] font-bold uppercase bg-blue-50/10">{male?.species || '-'}</td>
-                          <td className="py-4 px-3 border-r-2 border-gray-400 text-[10px] font-bold uppercase bg-blue-50/10">{male?.subSpecies || '-'}</td>
-                          <td className="py-4 px-3 border-r-2 border-gray-400 text-[10px] font-black uppercase tracking-tighter bg-blue-50/10">{mCage}</td>
-                          <td className="py-4 px-3 border-r-2 border-gray-400 text-[9px] font-bold uppercase leading-tight bg-blue-50/10">{male?.mutations?.join(' • ') || '-'}</td>
-                          <td className="py-4 px-3 text-[9px] font-bold uppercase italic text-gray-500 leading-tight border-r-4 border-black bg-blue-50/10">{male?.splitMutations?.join(' • ') || '-'}</td>
+                        <tr key={pair.id} className="border-b border-gray-400 h-[14mm]">
+                          <td className="py-1 px-2 border-r-2 border-gray-400 text-[10px] font-black uppercase bg-blue-50/10">{male?.name || '-'}</td>
+                          <td className="py-1 px-2 border-r-2 border-gray-400 text-[10px] font-bold uppercase bg-blue-50/10">{male?.species || '-'}</td>
+                          <td className="py-1 px-2 border-r-2 border-gray-400 text-[10px] font-bold uppercase bg-blue-50/10">{male?.subSpecies || '-'}</td>
+                          <td className="py-1 px-2 border-r-2 border-gray-400 text-[10px] font-black uppercase tracking-tighter bg-blue-50/10">{mCage}</td>
+                          <td className="py-1 px-2 border-r-2 border-gray-400 text-[9px] font-bold uppercase leading-tight bg-blue-50/10">{male?.mutations?.join(' • ') || '-'}</td>
+                          <td className="py-1 px-2 text-[9px] font-bold uppercase italic text-gray-500 leading-tight border-r-4 border-black bg-blue-50/10">{male?.splitMutations?.join(' • ') || '-'}</td>
 
-                          <td className="py-4 px-3 border-r-2 border-gray-400 text-[10px] font-black uppercase bg-pink-50/10">{female?.name || '-'}</td>
-                          <td className="py-4 px-3 border-r-2 border-gray-400 text-[10px] font-bold uppercase bg-pink-50/10">{female?.species || '-'}</td>
-                          <td className="py-4 px-3 border-r-2 border-gray-400 text-[10px] font-bold uppercase bg-pink-50/10">{female?.subSpecies || '-'}</td>
-                          <td className="py-4 px-3 border-r-2 border-gray-400 text-[10px] font-black uppercase tracking-tighter bg-pink-50/10">{fCage}</td>
-                          <td className="py-4 px-3 border-r-2 border-gray-400 text-[9px] font-bold uppercase leading-tight bg-pink-50/10">{female?.mutations?.join(' • ') || '-'}</td>
-                          <td className="py-4 px-3 text-[9px] font-bold uppercase italic text-gray-500 leading-tight bg-pink-50/10">{female?.splitMutations?.join(' • ') || '-'}</td>
+                          <td className="py-1 px-2 border-r-2 border-gray-400 text-[10px] font-black uppercase bg-pink-50/10">{female?.name || '-'}</td>
+                          <td className="py-1 px-2 border-r-2 border-gray-400 text-[10px] font-bold uppercase bg-pink-50/10">{female?.species || '-'}</td>
+                          <td className="py-1 px-2 border-r-2 border-gray-400 text-[10px] font-bold uppercase bg-pink-50/10">{female?.subSpecies || '-'}</td>
+                          <td className="py-1 px-2 border-r-2 border-gray-400 text-[10px] font-black uppercase tracking-tighter bg-pink-50/10">{fCage}</td>
+                          <td className="py-1 px-2 border-r-2 border-gray-400 text-[9px] font-bold uppercase leading-tight bg-pink-50/10">{female?.mutations?.join(' • ') || '-'}</td>
+                          <td className="py-1 px-2 text-[9px] font-bold uppercase italic text-gray-500 leading-tight bg-pink-50/10">{female?.splitMutations?.join(' • ') || '-'}</td>
                         </tr>
                       );
                     })}
@@ -5068,16 +5072,16 @@ function PrintView({ birds, pairs, cages, onBirdRef }: { birds: Bird[], pairs: P
                   </tr></thead>
                   <tbody>
                     {printEmpty ? Array.from({ length: 30 }).map((_, i) => (
-                      <tr key={i} className="border-b border-gray-400 h-16">
+                      <tr key={i} className="border-b border-gray-400 h-[7.5mm]">
                         <td className="border-r-2 border-gray-400"></td>
                         <td className="border-r-2 border-gray-400"></td>
                         <td></td>
                       </tr>
                     )) : cages.filter(c => qrSelections.includes(c.id)).map(cage => (
-                      <tr key={cage.id} className="border-b border-gray-400 h-16">
-                        <td className="py-3 px-3 border-r-2 border-gray-400 text-[12px] font-black uppercase">{cage.name}</td>
-                        <td className="py-3 px-3 border-r-2 border-gray-400 text-[12px] font-bold uppercase">{cage.location || '-'}</td>
-                        <td className="py-3 px-3 text-[12px] font-bold uppercase text-gray-600">{cage.type}</td>
+                      <tr key={cage.id} className="border-b border-gray-400 h-[7.5mm]">
+                        <td className="py-1 px-2 border-r-2 border-gray-400 text-[11px] font-black uppercase">{cage.name}</td>
+                        <td className="py-1 px-2 border-r-2 border-gray-400 text-[11px] font-bold uppercase">{cage.location || '-'}</td>
+                        <td className="py-1 px-2 text-[11px] font-bold uppercase text-gray-600">{cage.type}</td>
                       </tr>
                     ))}
                   </tbody>
