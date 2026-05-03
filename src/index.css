@@ -33,6 +33,7 @@
   --color-destructive: var(--theme-delete-color, #ef4444);
   --color-male: var(--theme-male-color, #3b82f6);
   --color-female: var(--theme-female-color, #e11d48);
+  --color-secondary: var(--theme-secondary-color, #d4af37);
 }
 
 body {

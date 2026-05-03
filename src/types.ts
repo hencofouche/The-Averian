@@ -26,10 +26,10 @@ export interface UserSettings {
   textColor?: string; 
   backgroundColor?: string;
   cardColor?: string;
-  colored_sex_indicators?: boolean;
   maleColor?: string;
   femaleColor?: string;
   deleteColor?: string;
+  secondaryColor?: string;
 }
 
 export interface SharedItem {

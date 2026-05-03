@@ -171,28 +171,27 @@ const Textarea = ({ className, ...props }: React.TextareaHTMLAttributes<HTMLText
   />
 );
 
-const Badge = ({ children, className, variant = 'neutral', colored = true }: { children: React.ReactNode, className?: string, variant?: 'neutral' | 'success' | 'warning' | 'info' | 'destructive' | 'female' | 'male', colored?: boolean }) => {
+const Badge = ({ children, className, variant = 'neutral' }: { children: React.ReactNode, className?: string, variant?: 'neutral' | 'success' | 'warning' | 'info' | 'destructive' | 'female' | 'male' }) => {
   const variants = {
     neutral: 'bg-black text-white border border-black-700',
     success: 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30',
     warning: 'bg-amber-500/20 text-amber-400 border border-amber-500/30',
     info: 'bg-gold-500/20 text-gold-400 border border-gold-500/30',
     destructive: 'bg-rose-500/20 text-rose-400 border border-rose-500/30',
-    female: colored ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' : 'bg-black text-white border border-black-700',
-    male: colored ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' : 'bg-black text-white border border-black-700',
+    female: 'bg-black text-white border border-black-700',
+    male: 'bg-black text-white border border-black-700',
   };
 
   const customStyle: React.CSSProperties = {};
-  if (colored) {
-    if (variant === 'male') {
-      customStyle.backgroundColor = 'color-mix(in srgb, var(--theme-male-color, #3b82f6), transparent 80%)';
-      customStyle.color = 'var(--theme-male-color, #60a5fa)';
-      customStyle.borderColor = 'color-mix(in srgb, var(--theme-male-color, #3b82f6), transparent 70%)';
-    } else if (variant === 'female') {
-      customStyle.backgroundColor = 'color-mix(in srgb, var(--theme-female-color, #e11d48), transparent 80%)';
-      customStyle.color = 'var(--theme-female-color, #fb7185)';
-      customStyle.borderColor = 'color-mix(in srgb, var(--theme-female-color, #e11d48), transparent 70%)';
-    }
+  
+  if (variant === 'male') {
+    customStyle.backgroundColor = 'color-mix(in srgb, var(--theme-male-color, #3b82f6), transparent 80%)';
+    customStyle.color = 'var(--theme-male-color, #60a5fa)';
+    customStyle.borderColor = 'color-mix(in srgb, var(--theme-male-color, #3b82f6), transparent 70%)';
+  } else if (variant === 'female') {
+    customStyle.backgroundColor = 'color-mix(in srgb, var(--theme-female-color, #e11d48), transparent 80%)';
+    customStyle.color = 'var(--theme-female-color, #fb7185)';
+    customStyle.borderColor = 'color-mix(in srgb, var(--theme-female-color, #e11d48), transparent 70%)';
   }
 
   return (
@@ -205,19 +204,22 @@ const Badge = ({ children, className, variant = 'neutral', colored = true }: { c
   );
 };
 
-const PairCompactInfo = ({ pair, birds, cages, className, onClick, colored = true }: { pair: Pair, birds: Bird[], cages: Cage[], className?: string, onClick?: () => void, colored?: boolean }) => {
+const PairCompactInfo = ({ pair, birds, cages, className, onClick }: { pair: Pair, birds: Bird[], cages: Cage[], className?: string, onClick?: () => void }) => {
   const male = birds.find(b => b.id === pair.maleId);
   const female = birds.find(b => b.id === pair.femaleId);
   const cageId = male?.cageId || female?.cageId;
   const cage = cages.find(c => c.id === cageId);
 
-  const BirdMini = ({ bird, label, color }: { bird?: Bird, label: string, color: string }) => (
+  const BirdMini = ({ bird, label, isMale }: { bird?: Bird, label: string, isMale: boolean }) => (
     <div className="flex items-center gap-2 min-w-0">
-      <div className={cn(
-        "w-5 h-5 rounded-md flex items-center justify-center text-[10px] font-black shrink-0", 
-        !colored ? "bg-zinc-800 text-zinc-400 border border-zinc-700" :
-        color === 'blue' ? "bg-blue-500/20 text-blue-400 border border-blue-500/30" : "bg-rose-500/20 text-rose-400 border border-rose-500/30"
-      )}>
+      <div 
+        className="w-5 h-5 rounded-md flex items-center justify-center text-[10px] font-black shrink-0 border"
+        style={{
+          backgroundColor: isMale ? 'color-mix(in srgb, var(--theme-male-color, #3b82f6), transparent 80%)' : 'color-mix(in srgb, var(--theme-female-color, #e11d48), transparent 80%)',
+          color: isMale ? 'var(--theme-male-color, #60a5fa)' : 'var(--theme-female-color, #fb7185)',
+          borderColor: isMale ? 'color-mix(in srgb, var(--theme-male-color, #3b82f6), transparent 70%)' : 'color-mix(in srgb, var(--theme-female-color, #e11d48), transparent 70%)'
+        }}
+      >
         {label}
       </div>
       <div className="min-w-0 flex-1">
@@ -235,7 +237,7 @@ const PairCompactInfo = ({ pair, birds, cages, className, onClick, colored = tru
               <span key={m} className="text-[7px] px-1 bg-black/40 text-white/50 rounded-sm font-black uppercase border border-white/5">{m}</span>
             ))}
             {bird.splitMutations?.slice(0, 1).map(m => (
-              <span key={m} className="text-[7px] px-1 bg-black/40 text-gold-500/50 rounded-sm font-black uppercase italic border border-gold-500/5">/{m}</span>
+              <span key={m} className="text-[7px] px-1 bg-black/40 text-secondary/50 rounded-sm font-black uppercase italic border border-secondary/5">/{m}</span>
             ))}
           </div>
         )}
@@ -245,7 +247,7 @@ const PairCompactInfo = ({ pair, birds, cages, className, onClick, colored = tru
 
   return (
     <div 
-      className={cn("flex flex-col gap-2 p-3 bg-zinc-900/60 rounded-xl border border-white/10 transition-all text-left w-full min-w-0", onClick && "cursor-pointer hover:bg-gold-500/10 hover:border-gold-500/30", className)}
+      className={cn("flex flex-col gap-2 p-3 bg-zinc-900/60 rounded-xl border border-white/10 transition-all text-left w-full min-w-0", onClick && "cursor-pointer hover:bg-secondary/10 hover:border-secondary/30", className)}
       onClick={(e) => {
         if (onClick) {
           e.stopPropagation();
@@ -254,22 +256,22 @@ const PairCompactInfo = ({ pair, birds, cages, className, onClick, colored = tru
       }}
     >
       <div className="flex items-center justify-between gap-2 border-b border-white/5 pb-1.5 mb-0.5">
-        <span className="text-[9px] font-black text-gold-500 uppercase tracking-widest">Breeding Pair</span>
+        <span className="text-[9px] font-black text-secondary uppercase tracking-widest">Breeding Pair</span>
         {cage && (
-          <span className="text-[8px] font-bold text-sky-400/80 uppercase flex items-center gap-1 shrink-0 bg-sky-400/5 px-1.5 py-0.5 rounded-md border border-sky-400/10 truncate">
+          <span className="text-[8px] font-bold text-secondary/80 uppercase flex items-center gap-1 shrink-0 bg-secondary/5 px-1.5 py-0.5 rounded-md border border-secondary/10 truncate">
             <Home size={8} className="shrink-0" /> {cage.name}
           </span>
         )}
       </div>
       <div className="space-y-2">
-        <BirdMini bird={male} label="M" color="blue" />
-        <BirdMini bird={female} label="F" color="rose" />
+        <BirdMini bird={male} label="M" isMale={true} />
+        <BirdMini bird={female} label="F" isMale={false} />
       </div>
     </div>
   );
 };
 
-const BirdCompactInfo = ({ bird, cages, className, onClick, colored = true }: { bird: Bird, cages: Cage[], className?: string, onClick?: () => void, colored?: boolean }) => {
+const BirdCompactInfo = ({ bird, cages, className, onClick }: { bird: Bird, cages: Cage[], className?: string, onClick?: () => void }) => {
   const cage = cages.find(c => c.id === bird.cageId);
   return (
     <div 
@@ -282,22 +284,23 @@ const BirdCompactInfo = ({ bird, cages, className, onClick, colored = true }: { 
       }}
     >
       <div className="flex items-center justify-between gap-2 border-b border-white/5 pb-1.5 mb-0.5">
-        <span className="text-[9px] font-black text-sky-400 uppercase tracking-widest">Bird Profile</span>
+        <span className="text-[9px] font-black text-secondary uppercase tracking-widest">Bird Profile</span>
         {cage && (
-          <span className="text-[8px] font-bold text-sky-400/80 uppercase flex items-center gap-1 shrink-0 bg-sky-400/5 px-1.5 py-0.5 rounded-md border border-sky-400/10 truncate max-w-[120px]">
+          <span className="text-[8px] font-bold text-secondary/80 uppercase flex items-center gap-1 shrink-0 bg-secondary/5 px-1.5 py-0.5 rounded-md border border-secondary/10 truncate max-w-[120px]">
             <Home size={8} className="shrink-0" /> <span className="truncate">{cage.name}</span>
           </span>
         )}
       </div>
       
       <div className="flex items-center gap-2 min-w-0">
-        <div className={cn(
-          "w-5 h-5 rounded-md flex items-center justify-center text-[10px] font-black shrink-0",
-          !colored ? "bg-zinc-800 text-zinc-400 border border-zinc-700" :
-          bird.sex === 'Male' ? "bg-blue-500/20 text-blue-400 border border-blue-500/30" : 
-          bird.sex === 'Female' ? "bg-rose-500/20 text-rose-400 border border-rose-500/30" : 
-          "bg-zinc-500/20 text-zinc-400 border border-zinc-500/30"
-        )}>
+        <div 
+          className="w-5 h-5 rounded-md flex items-center justify-center text-[10px] font-black shrink-0 border"
+          style={{
+            backgroundColor: bird.sex === 'Male' ? 'color-mix(in srgb, var(--theme-male-color, #3b82f6), transparent 80%)' : bird.sex === 'Female' ? 'color-mix(in srgb, var(--theme-female-color, #e11d48), transparent 80%)' : 'rgba(255,255,255,0.05)',
+            color: bird.sex === 'Male' ? 'var(--theme-male-color, #60a5fa)' : bird.sex === 'Female' ? 'var(--theme-female-color, #fb7185)' : 'rgba(255,255,255,0.4)',
+            borderColor: bird.sex === 'Male' ? 'color-mix(in srgb, var(--theme-male-color, #3b82f6), transparent 70%)' : bird.sex === 'Female' ? 'color-mix(in srgb, var(--theme-female-color, #e11d48), transparent 70%)' : 'rgba(255,255,255,0.1)'
+          }}
+        >
           {bird.sex === 'Male' ? 'M' : bird.sex === 'Female' ? 'F' : '?'}
         </div>
         <div className="min-w-0 flex-1">
@@ -315,7 +318,7 @@ const BirdCompactInfo = ({ bird, cages, className, onClick, colored = true }: { 
                 </span>
               ))}
               {bird.splitMutations?.map(m => (
-                <span key={m} className="text-[7px] px-1 bg-black/40 text-gold-500/50 rounded-sm font-black uppercase italic border border-gold-500/5">
+                <span key={m} className="text-[7px] px-1 bg-black/40 text-secondary/50 rounded-sm font-black uppercase italic border border-secondary/5">
                   /{m}
                 </span>
               ))}
@@ -343,7 +346,7 @@ const PedigreeNode = ({ bird, roleLabel, generation, onBirdRef, cages, userSetti
         "max-w-[140px] sm:max-w-[220px]"
       )}>
         {roleLabel && (
-          <p className="absolute -top-2 left-1/2 -translate-x-1/2 text-[7px] sm:text-[9px] font-black uppercase tracking-widest text-gold-500/90 bg-black px-1.5 py-0.5 rounded-full z-20 border border-gold-500/30 whitespace-nowrap shadow-xl">
+          <p className="absolute -top-2 left-1/2 -translate-x-1/2 text-[7px] sm:text-[9px] font-black uppercase tracking-widest text-secondary/90 bg-black px-1.5 py-0.5 rounded-full z-20 border border-secondary/30 whitespace-nowrap shadow-xl">
             <span className="sm:hidden">{abbreviatedRole}</span>
             <span className="hidden sm:inline">{roleLabel}</span>
           </p>
@@ -352,8 +355,8 @@ const PedigreeNode = ({ bird, roleLabel, generation, onBirdRef, cages, userSetti
           <div 
             onClick={() => onBirdRef(bird.name)}
             className={cn(
-              "flex flex-row bg-zinc-900 border border-white/10 rounded-lg sm:rounded-2xl cursor-pointer hover:border-gold-500/50 transition-all shadow-2xl w-full group overflow-hidden h-full",
-              generation === 1 ? "border-gold-500/40 ring-4 ring-gold-500/5" : ""
+              "flex flex-row bg-zinc-900 border border-white/10 rounded-lg sm:rounded-2xl cursor-pointer hover:border-secondary/50 transition-all shadow-2xl w-full group overflow-hidden h-full",
+              generation === 1 ? "border-secondary/40 ring-4 ring-secondary/5" : ""
             )}
           >
             {bird.imageUrl ? (
@@ -373,7 +376,6 @@ const PedigreeNode = ({ bird, roleLabel, generation, onBirdRef, cages, userSetti
                    generation === 3 ? "text-[8px] sm:text-xs" : "text-[10px] sm:text-base"
                  )}>{bird.name}</span>
                  <Badge 
-                  colored={userSettings?.colored_sex_indicators}
                   variant={bird.sex === 'Male' ? 'male' : bird.sex === 'Female' ? 'female' : 'neutral'} 
                   className="text-[5px] sm:text-[7px] py-0 px-1 shrink-0 uppercase font-black"
                 >
@@ -383,7 +385,7 @@ const PedigreeNode = ({ bird, roleLabel, generation, onBirdRef, cages, userSetti
 
               <div className="text-left leading-tight">
                 <div className="flex flex-wrap items-center gap-x-1 gap-y-0.5 text-[6px] sm:text-[10px]">
-                  <span className="text-gold-500 font-bold uppercase truncate">
+                  <span className="text-secondary font-bold uppercase truncate">
                     {bird.species}{bird.subSpecies ? ` (${bird.subSpecies})` : ''}
                   </span>
                   {bird.ringNumber && <span className="text-white/40 font-mono tracking-tighter">#{bird.ringNumber}</span>}
@@ -392,7 +394,7 @@ const PedigreeNode = ({ bird, roleLabel, generation, onBirdRef, cages, userSetti
                 {bird.mutations && bird.mutations.length > 0 && (
                   <div className="flex flex-wrap gap-0.5 mt-0.5">
                     {bird.mutations.map(m => (
-                      <span key={m} className="text-[5px] sm:text-[8px] px-1 bg-emerald-500/10 text-emerald-400 font-black uppercase italic rounded border border-emerald-500/10 truncate">{m}</span>
+                      <span key={m} className="text-[5px] sm:text-[8px] px-1 bg-secondary/10 text-secondary font-black uppercase italic rounded border border-secondary/10 truncate">{m}</span>
                     ))}
                   </div>
                 )}
@@ -471,8 +473,7 @@ export const SearchableSelect = ({
   multi = false,
   selectedValues = [],
   cages = [],
-  birds = [],
-  colored = true
+  birds = []
 }: { 
   label: string, 
   options: { id: string, name: string, details?: string, subText?: string, bird?: Bird, pair?: Pair, cage?: Cage }[], 
@@ -484,8 +485,7 @@ export const SearchableSelect = ({
   multi?: boolean,
   selectedValues?: string[],
   cages?: Cage[],
-  birds?: Bird[],
-  colored?: boolean
+  birds?: Bird[]
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState('');
@@ -500,21 +500,21 @@ export const SearchableSelect = ({
 
   const renderOptionContent = (opt: typeof options[0]) => {
     if (opt.bird) {
-      return <BirdCompactInfo bird={opt.bird} cages={cages} className="border-0 bg-transparent p-0" colored={colored} />;
+      return <BirdCompactInfo bird={opt.bird} cages={cages} className="border-0 bg-transparent p-0" />;
     }
 
     if (opt.pair && birds) {
-      return <PairCompactInfo pair={opt.pair} birds={birds} cages={cages} className="border-0 bg-transparent p-0" colored={colored} />;
+      return <PairCompactInfo pair={opt.pair} birds={birds} cages={cages} className="border-0 bg-transparent p-0" />;
     }
 
     if (opt.cage) {
       return (
         <div className="flex flex-col gap-0.5 py-1">
           <div className="flex items-center gap-2">
-            <div className="w-5 h-5 rounded-md bg-gold-500/10 text-gold-500 border border-gold-500/20 flex items-center justify-center">
+            <div className="w-5 h-5 rounded-md bg-secondary/10 text-secondary border border-secondary/20 flex items-center justify-center">
               <Home size={10} />
             </div>
-            <span className="font-bold text-white group-hover:text-gold-500 transition-colors uppercase text-xs">{opt.name}</span>
+            <span className="font-bold text-white group-hover:text-secondary transition-colors uppercase text-xs">{opt.name}</span>
           </div>
           <span className="text-[10px] text-white/50 ml-7">{opt.details}</span>
         </div>
@@ -934,7 +934,6 @@ export default function App() {
             mutations: data.mutations || [], 
             uid: user.uid, 
             currency: data.currency || 'ZAR', 
-            colored_sex_indicators: data.colored_sex_indicators !== undefined ? data.colored_sex_indicators : true,
             ...data, 
             account_expiry_date: trialExpiry.toISOString() 
           }; 
@@ -1167,7 +1166,13 @@ export default function App() {
     } else {
       root.style.removeProperty('--theme-delete-color');
     }
-  }, [userSettings?.themeColor, userSettings?.textColor, userSettings?.backgroundColor, userSettings?.cardColor, userSettings?.maleColor, userSettings?.femaleColor, userSettings?.deleteColor]);
+
+    if (userSettings?.secondaryColor) {
+      root.style.setProperty('--theme-secondary-color', userSettings.secondaryColor);
+    } else {
+      root.style.removeProperty('--theme-secondary-color');
+    }
+  }, [userSettings?.themeColor, userSettings?.textColor, userSettings?.backgroundColor, userSettings?.cardColor, userSettings?.maleColor, userSettings?.femaleColor, userSettings?.deleteColor, userSettings?.secondaryColor]);
 
   const handleUpdateSettings = async (newSettings: UserSettings) => {
     if (!user) return;
@@ -1253,10 +1258,10 @@ export default function App() {
       <div className="min-h-screen flex flex-col items-center justify-center bg-black p-4">
         <div className="w-full max-w-md text-center space-y-8">
           <div className="space-y-2">
-            <div className="inline-flex items-center justify-center w-20 h-20 rounded-3xl bg-gold-500 text-black-950 mb-4 shadow-2xl shadow-gold-500/20">
+            <div className="inline-flex items-center justify-center w-20 h-20 rounded-3xl bg-secondary text-black-950 mb-4 shadow-2xl shadow-secondary/20">
               <BirdIcon size={40} />
             </div>
-            <h1 className="text-5xl font-black tracking-tighter text-white">THE AV<span className="text-gold-500">ERIAN</span></h1>
+            <h1 className="text-5xl font-black tracking-tighter text-white">THE AV<span className="text-secondary">ERIAN</span></h1>
             <p className="text-black-50 font-medium">By The Averian</p>
           </div>
           <Button 
@@ -1560,10 +1565,10 @@ export default function App() {
       )}>
         <div className="flex items-center justify-between px-1 mb-10 shrink-0">
           <div className="flex items-center gap-2.5">
-            <div className="p-1.5 w-8 h-8 flex items-center justify-center bg-gold-500 rounded-lg text-black-950 shadow-lg shadow-gold-500/20">
+            <div className="p-1.5 w-8 h-8 flex items-center justify-center bg-secondary rounded-lg text-black-950 shadow-lg shadow-secondary/20">
               <BirdIcon size={18} />
             </div>
-            <span className="font-black text-xl tracking-tighter text-white whitespace-nowrap">THE AV<span className="text-gold-500">ERIAN</span></span>
+            <span className="font-black text-xl tracking-tighter text-white whitespace-nowrap">THE AV<span className="text-secondary">ERIAN</span></span>
           </div>
           <button className="xl:hidden text-white/40 hover:text-white" onClick={() => setIsMobileMenuOpen(false)}>
             <X size={20} />
@@ -1597,13 +1602,13 @@ export default function App() {
             >
               <div className="flex items-center justify-between mb-1">
                 <div className="flex items-center gap-1.5">
-                  <div className={cn("w-1.5 h-1.5 rounded-full", isSyncing ? "bg-gold-500 animate-pulse" : "bg-emerald-500")} />
+                  <div className={cn("w-1.5 h-1.5 rounded-full", isSyncing ? "bg-secondary animate-pulse" : "bg-emerald-500")} />
                   <span className="text-[7px] font-black uppercase tracking-widest text-white/50">{isSyncing ? 'Syncing...' : 'Synced'}</span>
                 </div>
               </div>
               {userSettings && (
                 <p className="text-[8px] font-black text-white uppercase tracking-tighter truncate leading-none">
-                  <span className="text-gold-500">SUBSCRIPTION: </span>
+                  <span className="text-secondary">SUBSCRIPTION: </span>
                   {(() => {
                     const expiry = userSettings.account_expiry_date ? new Date(userSettings.account_expiry_date) : null;
                     if (!expiry || isNaN(expiry.getTime())) return 'TRIAL STATUS';
@@ -1694,13 +1699,13 @@ export default function App() {
               <div className="flex items-center bg-black-900 rounded-lg p-1 border border-black-800 shrink-0">
                 <button 
                   onClick={() => setTaskViewMode('list')}
-                  className={cn("p-1.5 rounded-md transition-colors", taskViewMode === 'list' ? "bg-zinc-700 text-gold-500" : "text-black-100 hover:text-white")}
+                  className={cn("p-1.5 rounded-md transition-colors", taskViewMode === 'list' ? "bg-zinc-700 text-secondary" : "text-black-100 hover:text-white")}
                 >
                   <ListIcon size={16} />
                 </button>
                 <button 
                   onClick={() => setTaskViewMode('calendar')}
-                  className={cn("p-1.5 rounded-md transition-colors", taskViewMode === 'calendar' ? "bg-zinc-700 text-gold-500" : "text-black-100 hover:text-white")}
+                  className={cn("p-1.5 rounded-md transition-colors", taskViewMode === 'calendar' ? "bg-zinc-700 text-secondary" : "text-black-100 hover:text-white")}
                 >
                   <Calendar size={16} />
                 </button>
@@ -1711,13 +1716,13 @@ export default function App() {
               <div className="flex items-center bg-black-900 rounded-lg p-1 border border-black-800 shrink-0">
                 <button 
                   onClick={() => setViewMode('grid-large')}
-                  className={cn("p-1.5 rounded-md transition-colors", viewMode === 'grid-large' ? "bg-zinc-700 text-gold-500" : "text-black-100 hover:text-white")}
+                  className={cn("p-1.5 rounded-md transition-colors", viewMode === 'grid-large' ? "bg-zinc-700 text-secondary" : "text-black-100 hover:text-white")}
                 >
                   <LayoutGrid size={16} />
                 </button>
                 <button 
                   onClick={() => setViewMode('list')}
-                  className={cn("p-1.5 rounded-md transition-colors", viewMode === 'list' ? "bg-zinc-700 text-gold-500" : "text-black-100 hover:text-white")}
+                  className={cn("p-1.5 rounded-md transition-colors", viewMode === 'list' ? "bg-zinc-700 text-secondary" : "text-black-100 hover:text-white")}
                 >
                   <ListIcon size={16} />
                 </button>
@@ -1726,7 +1731,7 @@ export default function App() {
             
             {activeTab !== 'settings' && activeTab !== 'genetics' && activeTab !== 'stats' && activeTab !== 'print' && (
               <div className="hidden xl:flex gap-2">
-                <Button onClick={() => setIsScanModalOpen(true)} className="py-3 px-4 text-sm font-bold uppercase tracking-widest bg-zinc-800 text-gold-500 border border-gold-500/20 hover:bg-zinc-700">
+                <Button onClick={() => setIsScanModalOpen(true)} className="py-3 px-4 text-sm font-bold uppercase tracking-widest bg-zinc-800 text-secondary border border-secondary/20 hover:bg-zinc-700">
                   <Scan size={18} />
                   <span className="ml-2">Scan</span>
                 </Button>
@@ -2259,12 +2264,12 @@ export default function App() {
 
 function NavItem({ active, onClick, icon, label, count }: { active: boolean, onClick: () => void, icon: React.ReactNode, label: string, count: number }) {
   return (
-    <button onClick={onClick} className={cn('w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-bold transition-all group', active ? 'bg-gold-500 text-black-950 shadow-lg shadow-gold-500/20' : 'text-black-50 hover:bg-black-900 hover:text-gold-500')}>
-      <span className={cn('transition-transform group-hover:scale-110', active ? 'text-black-950' : 'text-black-100 group-hover:text-gold-500')}>
+    <button onClick={onClick} className={cn('w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-bold transition-all group', active ? 'bg-secondary text-black-950 shadow-lg shadow-secondary/20' : 'text-black-50 hover:bg-black-900 hover:text-secondary')}>
+      <span className={cn('transition-transform group-hover:scale-110', active ? 'text-black-950' : 'text-black-100 group-hover:text-secondary')}>
         {icon}
       </span>
       <span className="flex-1 text-left uppercase tracking-widest text-[10px] truncate">{label}</span>
-      <span className={cn('text-[10px] px-2 py-0.5 rounded-lg font-black', active ? 'bg-black/20 text-black' : 'bg-zinc-800 text-white/50 group-hover:text-gold-500')}>{count}</span>
+      <span className={cn('text-[10px] px-2 py-0.5 rounded-lg font-black', active ? 'bg-black/20 text-black' : 'bg-zinc-800 text-white/50 group-hover:text-secondary')}>{count}</span>
     </button>
   );
 }
@@ -2730,7 +2735,6 @@ function BirdCard({ bird, cage, birds, cages, viewMode = 'grid-large', currency,
             <h3 className={cn("font-black text-white flex items-center gap-2 tracking-tight text-lg")}>
               <span className="truncate">{bird.name}</span>
               <Badge 
-                colored={userSettings?.colored_sex_indicators}
                 variant={bird.sex === 'Male' ? 'male' : bird.sex === 'Female' ? 'female' : 'neutral'} 
                 className="shrink-0"
               >
@@ -2769,20 +2773,20 @@ function BirdCard({ bird, cage, birds, cages, viewMode = 'grid-large', currency,
           <div className={cn(effectiveViewMode === 'list' ? "flex items-center gap-2" : "space-y-0.5")}>
             <p className="text-white uppercase tracking-widest font-black text-[8px]">Cage{effectiveViewMode === 'list' ? ':' : ''}</p>
             {cage ? (
-              <button onClick={(e) => { e.stopPropagation(); onNavigate('birds', cage.name); }} className="text-white font-bold flex items-center gap-1.5 hover:text-gold-500 transition-colors">
-                <Home size={10} className="text-gold-500" /> {cage.name}
+              <button onClick={(e) => { e.stopPropagation(); onNavigate('birds', cage.name); }} className="text-white font-bold flex items-center gap-1.5 hover:text-secondary transition-colors">
+                <Home size={10} className="text-secondary" /> {cage.name}
               </button>
             ) : (
-              <p className="text-white font-bold flex items-center gap-1.5"><Home size={10} className="text-gold-500" /> Unassigned</p>
+              <p className="text-white font-bold flex items-center gap-1.5"><Home size={10} className="text-secondary" /> Unassigned</p>
             )}
           </div>
           <div className={cn(effectiveViewMode === 'list' ? "flex items-center gap-2" : "space-y-0.5")}>
             <p className="text-white uppercase tracking-widest font-black text-[8px]">Born{effectiveViewMode === 'list' ? ':' : ''}</p>
-            <p className="text-white font-bold flex items-center gap-1.5"><Calendar size={10} className="text-gold-500" /> {bird.birthDate || 'Unknown'}</p>
+            <p className="text-white font-bold flex items-center gap-1.5"><Calendar size={10} className="text-secondary" /> {bird.birthDate || 'Unknown'}</p>
           </div>
           <div className={cn(effectiveViewMode === 'list' ? "flex items-center gap-2" : "space-y-0.5")}>
             <p className="text-white uppercase tracking-widest font-black text-[8px]">Value{effectiveViewMode === 'list' ? ':' : ''}</p>
-            <p className="text-emerald-500 font-bold flex items-center gap-1.5">{symbol}{bird.estimatedValue?.toFixed(2) || '0.00'}</p>
+            <p className="text-secondary font-bold flex items-center gap-1.5">{symbol}{bird.estimatedValue?.toFixed(2) || '0.00'}</p>
           </div>
           <div className={cn(effectiveViewMode === 'list' ? "flex items-center gap-2 flex-1" : "col-span-2 space-y-1.5 pt-1 w-full")}>
               <p className="text-white uppercase tracking-widest font-black text-[8px]">Mate{effectiveViewMode === 'list' ? ':' : ''}</p>
@@ -2813,21 +2817,21 @@ function BirdCard({ bird, cage, birds, cages, viewMode = 'grid-large', currency,
                 <div className="flex flex-wrap items-center gap-2 pt-2">
                   <button 
                     onClick={(e) => { e.stopPropagation(); onNavigate('stats', '', { birdId: bird.id }); }} 
-                    className="flex-1 p-2 bg-gold-500/10 border border-gold-500/20 rounded-lg text-[10px] text-gold-500 font-black uppercase tracking-widest hover:bg-gold-500/20 transition-colors flex items-center justify-center gap-2 min-w-[100px]"
+                    className="flex-1 p-2 bg-secondary/10 border border-secondary/20 rounded-lg text-[10px] text-secondary font-black uppercase tracking-widest hover:bg-secondary/20 transition-colors flex items-center justify-center gap-2 min-w-[100px]"
                   >
-                    <Egg size={12} className="text-gold-500" />
+                    <Egg size={12} className="text-secondary" />
                     Breeding
                   </button>
                   <button 
                     onClick={handleShare} 
-                    className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-zinc-700 hover:bg-zinc-600 text-white hover:text-gold-500 rounded-lg transition-all border border-black-700 min-w-[100px]"
+                    className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-zinc-700 hover:bg-zinc-600 text-white hover:text-secondary rounded-lg transition-all border border-black-700 min-w-[100px]"
                   >
                     <Share2 size={14} />
                     <span className="text-[9px] font-black uppercase tracking-widest">Share</span>
                   </button>
                   <button 
                     onClick={(e) => { e.stopPropagation(); setShowDocs(true); }} 
-                    className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-zinc-700 hover:bg-zinc-600 text-white hover:text-gold-500 rounded-lg transition-all border border-black-700 min-w-[100px]"
+                    className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-zinc-700 hover:bg-zinc-600 text-white hover:text-secondary rounded-lg transition-all border border-black-700 min-w-[100px]"
                   >
                     <FileText size={14} />
                     <span className="text-[9px] font-black uppercase tracking-widest">Docs</span>
@@ -2836,7 +2840,7 @@ function BirdCard({ bird, cage, birds, cages, viewMode = 'grid-large', currency,
                 <div className="flex flex-wrap items-center gap-2 pt-2">
                   <button 
                     onClick={(e) => { e.stopPropagation(); onNavigate('pedigree', bird.id); }} 
-                    className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 bg-gold-500/10 hover:bg-gold-500/20 text-gold-500 rounded-xl transition-all border border-gold-500/20 group/btn min-w-[80px]"
+                    className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 bg-secondary/10 hover:bg-secondary/20 text-secondary rounded-xl transition-all border border-secondary/20 group/btn min-w-[80px]"
                   >
                     <GitBranch size={16} className="group-hover/btn:scale-110 transition-transform" />
                     <span className="text-[10px] font-black uppercase tracking-widest whitespace-nowrap">Pedigree</span>
@@ -2961,7 +2965,7 @@ function CageCard({ cage, birds, cages, viewMode = 'grid-large', onBirdRef, onNa
             <div className={cn(
               "flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
             )}>
-              <button onClick={(e) => { e.stopPropagation(); onEdit(); }} className="p-1.5 text-white hover:text-gold-500 hover:bg-zinc-700 rounded-lg transition-colors">
+              <button onClick={(e) => { e.stopPropagation(); onEdit(); }} className="p-1.5 text-white hover:text-secondary hover:bg-zinc-700 rounded-lg transition-colors">
                 <Edit2 size={16} />
               </button>
               <button 
@@ -3073,7 +3077,6 @@ function PairCard({ pair, male, female, cages, birds, currency, onBirdRef, onNav
             )}
             <div className="absolute top-2 right-2">
               <Badge 
-                colored={userSettings?.colored_sex_indicators}
                 variant={sex === 'Male' ? 'male' : 'female'} 
                 className="text-[8px] px-1.5 py-0.5 shadow-lg backdrop-blur-md bg-black/40"
               >
@@ -3084,7 +3087,7 @@ function PairCard({ pair, male, female, cages, birds, currency, onBirdRef, onNav
 
           <div className="p-2.5 space-y-1 flex-1 flex flex-col justify-between">
             {bird ? (
-              <BirdCompactInfo bird={bird} cages={cages} className="border-0 bg-transparent p-0" colored={userSettings?.colored_sex_indicators} />
+              <BirdCompactInfo bird={bird} cages={cages} className="border-0 bg-transparent p-0" />
             ) : (
               <div className="flex-1 flex items-center justify-center">
                 <span className="text-[10px] text-white/20 font-black uppercase tracking-widest">Unknown</span>
@@ -3104,7 +3107,7 @@ function PairCard({ pair, male, female, cages, birds, currency, onBirdRef, onNav
         <div className="flex items-center gap-3 flex-1 min-w-0">
           <div className="flex-1 min-w-0 space-y-1.5">
             <div className="flex items-center gap-2 flex-wrap">
-              <Badge variant="male" colored={userSettings?.colored_sex_indicators} className="text-[8px] px-1 py-0 shrink-0">M</Badge>
+              <Badge variant="male" className="text-[8px] px-1 py-0 shrink-0">M</Badge>
               <span className="text-xs font-bold text-white truncate max-w-[120px]">{male?.name || 'Unknown'}</span>
               <span className="text-[9px] text-black-400 truncate uppercase tracking-widest">
                 {male?.species}{male?.subSpecies ? ` • ${male.subSpecies}` : ''}
@@ -3121,7 +3124,7 @@ function PairCard({ pair, male, female, cages, birds, currency, onBirdRef, onNav
               )}
             </div>
             <div className="flex items-center gap-2 flex-wrap">
-              <Badge variant="female" colored={userSettings?.colored_sex_indicators} className="text-[8px] px-1 py-0 shrink-0">F</Badge>
+              <Badge variant="female" className="text-[8px] px-1 py-0 shrink-0">F</Badge>
               <span className="text-xs font-bold text-white truncate max-w-[120px]">{female?.name || 'Unknown'}</span>
               <span className="text-[9px] text-black-400 truncate uppercase tracking-widest">
                 {female?.species}{female?.subSpecies ? ` • ${female.subSpecies}` : ''}
@@ -3776,7 +3779,7 @@ function TransactionCard({ transaction, bird, contact, cages, currency, onBirdRe
               </div>
             )}
             {contact && (
-              <Badge variant="warning" className="text-[7px] sm:text-[8px] bg-gold-500/10 text-gold-500 border-gold-500/20">{contact.name}</Badge>
+              <Badge variant="warning" className="text-[7px] sm:text-[8px] bg-secondary/10 text-secondary border-secondary/20">{contact.name}</Badge>
             )}
           </div>
           <p className="text-[10px] sm:text-[11px] text-white truncate font-medium">{transaction.description || 'No description'}</p>
@@ -3790,7 +3793,7 @@ function TransactionCard({ transaction, bird, contact, cages, currency, onBirdRe
       </div>
 
       <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-black-800/50">
-        <button onClick={onEdit} className="flex-1 flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 bg-zinc-700 hover:bg-zinc-600 text-white hover:text-gold-500 rounded-lg transition-all border border-black-700 min-w-0">
+        <button onClick={onEdit} className="flex-1 flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 bg-zinc-700 hover:bg-zinc-600 text-white hover:text-secondary rounded-lg transition-all border border-black-700 min-w-0">
           <Edit2 size={14} />
           <span className="text-[9px] font-black uppercase tracking-widest hidden sm:inline">Edit</span>
         </button>
@@ -3832,7 +3835,7 @@ function BreedingRecordCard({ record, pair, male, female, birds, onEdit, onDelet
              </div>
           </div>
           <div className="flex items-center gap-1 opacity-70 hover:opacity-100 transition-opacity">
-              <button onClick={(e) => { e.stopPropagation(); onEdit(); }} className="p-2 text-white/70 hover:text-gold-500 hover:bg-zinc-800 rounded-lg transition-colors">
+              <button onClick={(e) => { e.stopPropagation(); onEdit(); }} className="p-2 text-white/70 hover:text-secondary hover:bg-zinc-800 rounded-lg transition-colors">
                 <Edit2 size={16} />
               </button>
               <button 
@@ -4764,6 +4767,10 @@ function ThemeColorPicker({ label, color, defaultColor, onChange }: { label: str
     else if (label === 'Text Color') targetVar = '--theme-text-color';
     else if (label === 'Background Color') targetVar = '--theme-bg-color';
     else if (label === 'Card Color') targetVar = '--theme-card-color';
+    else if (label === 'Male Color') targetVar = '--theme-male-color';
+    else if (label === 'Female Color') targetVar = '--theme-female-color';
+    else if (label === 'Delete Color') targetVar = '--theme-delete-color';
+    else if (label === 'Alt Accent Color') targetVar = '--theme-secondary-color';
 
     if (targetVar) {
       if (label === 'Accent Color') {
@@ -4783,6 +4790,10 @@ function ThemeColorPicker({ label, color, defaultColor, onChange }: { label: str
     else if (label === 'Text Color') targetVar = '--theme-text-color';
     else if (label === 'Background Color') targetVar = '--theme-bg-color';
     else if (label === 'Card Color') targetVar = '--theme-card-color';
+    else if (label === 'Male Color') targetVar = '--theme-male-color';
+    else if (label === 'Female Color') targetVar = '--theme-female-color';
+    else if (label === 'Delete Color') targetVar = '--theme-delete-color';
+    else if (label === 'Alt Accent Color') targetVar = '--theme-secondary-color';
 
     if (targetVar) {
       const origColor = color || defaultColor;
@@ -5128,27 +5139,15 @@ function SettingsView({ settings, onUpdate, allData, user, isSyncing, setDeleteC
                     defaultColor="#ef4444"
                     onChange={(hex) => onUpdate({ ...settings, deleteColor: hex })}
                   />
+                  <ThemeColorPicker 
+                    label="Alt Accent Color"
+                    color={settings.secondaryColor} 
+                    defaultColor="#d4af37"
+                    onChange={(hex) => onUpdate({ ...settings, secondaryColor: hex })}
+                  />
                 </div>
 
                 <div className="pt-4 border-t border-black-800">
-                  <div className="flex items-center justify-between p-4 bg-black rounded-2xl border border-black-700">
-                    <div className="space-y-0.5">
-                      <h4 className="text-xs font-black uppercase tracking-widest text-white">Colored Sex Indicators</h4>
-                      <p className="text-[10px] font-bold text-white/40 uppercase tracking-tighter">Enable blue/rose colors for Male/Female in the app UI</p>
-                    </div>
-                    <button 
-                      onClick={() => onUpdate({ ...settings, colored_sex_indicators: !settings.colored_sex_indicators })}
-                      className={cn(
-                        "w-12 h-6 rounded-full transition-all relative",
-                        settings.colored_sex_indicators ? "bg-gold-500" : "bg-zinc-800"
-                      )}
-                    >
-                      <div className={cn(
-                        "absolute top-1 w-4 h-4 rounded-full bg-white transition-all shadow-md",
-                        settings.colored_sex_indicators ? "right-1" : "left-1"
-                      )} />
-                    </button>
-                  </div>
                 </div>
               </div>
             </motion.div>
@@ -5164,7 +5163,7 @@ function SettingsView({ settings, onUpdate, allData, user, isSyncing, setDeleteC
             >
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-black uppercase tracking-widest text-gold-500">Manage Species</h3>
+                  <h3 className="text-lg font-black uppercase tracking-widest text-secondary">Manage Species</h3>
                   <Badge variant="info">{settings.species?.length || 0} Total</Badge>
                 </div>
                 <div className="flex gap-2">
@@ -5178,7 +5177,7 @@ function SettingsView({ settings, onUpdate, allData, user, isSyncing, setDeleteC
                       <div className="flex items-center gap-2">
                         <button 
                           onClick={() => setEditingItem({ type: 'species', id: s.id, name: s.name })} 
-                          className="text-gold-500 hover:text-white p-2 bg-zinc-800 hover:bg-gold-500 rounded-xl transition-all border border-gold-500/20"
+                          className="text-secondary hover:text-white p-2 bg-zinc-800 hover:bg-secondary rounded-xl transition-all border border-secondary/20"
                           title="Edit"
                         >
                           <Edit2 size={16} />
@@ -5242,7 +5241,7 @@ function SettingsView({ settings, onUpdate, allData, user, isSyncing, setDeleteC
                             <div key={ss.id} className="p-3 bg-black border border-black-700 rounded-xl flex items-center justify-between group">
                               <span className="text-sm font-bold text-white">{ss.name}</span>
                               <div className="flex items-center gap-1">
-                                <button onClick={() => setEditingItem({ type: 'subspecies', id: ss.id, name: ss.name })} className="text-black-200 hover:text-gold-500 p-1.5 bg-zinc-800 rounded-lg transition-all"><Edit2 size={14} /></button>
+                                <button onClick={() => setEditingItem({ type: 'subspecies', id: ss.id, name: ss.name })} className="text-black-200 hover:text-secondary p-1.5 bg-zinc-800 rounded-lg transition-all"><Edit2 size={14} /></button>
                                 <button 
                                   onClick={() => removeSubSpecies(ss.id, ss.name)} 
                                   className="p-1.5 rounded-lg transition-all"
@@ -5289,7 +5288,7 @@ function SettingsView({ settings, onUpdate, allData, user, isSyncing, setDeleteC
                     <div key={m.id} className="p-3 bg-black border border-black-700 rounded-xl flex items-center justify-between group">
                       <span className="text-sm font-bold text-white">{m.name}</span>
                       <div className="flex items-center gap-1">
-                        <button onClick={() => setEditingItem({ type: 'mutation', id: m.id, name: m.name })} className="text-black-200 hover:text-gold-500 p-1.5 bg-zinc-800 rounded-lg transition-all"><Edit2 size={14} /></button>
+                        <button onClick={() => setEditingItem({ type: 'mutation', id: m.id, name: m.name })} className="text-black-200 hover:text-secondary p-1.5 bg-zinc-800 rounded-lg transition-all"><Edit2 size={14} /></button>
                         <button 
                           onClick={() => removeMutation(m.id, m.name)} 
                           className="p-1.5 rounded-lg transition-all"
@@ -5711,7 +5710,7 @@ function PrintView({ birds, pairs, cages, onBirdRef }: { birds: Bird[], pairs: P
                         </button>
                       </div>
                       {opt && 'bird' in opt && opt.bird ? (
-                        <BirdCompactInfo bird={opt.bird as Bird} cages={cages} className="bg-zinc-900/40 border-black-700 hover:border-gold-500/30 shadow-xl" />
+                        <BirdCompactInfo bird={opt.bird as Bird} cages={cages} className="bg-zinc-900/40 border-black-700 hover:border-secondary/30 shadow-xl" />
                       ) : opt && 'pair' in opt && opt.pair ? (
                         <PairCompactInfo pair={opt.pair as Pair} birds={birds} cages={cages} className="bg-zinc-900/40 border-black-700 hover:border-gold-500/30 shadow-xl" />
                       ) : opt && 'cage' in opt && opt.cage ? (
