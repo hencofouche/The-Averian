@@ -83,7 +83,18 @@ export function ContactsView({
                   <button onClick={() => onEdit(contact)} className="p-2 text-white/50 hover:text-white bg-black/40 border border-white/5 rounded-xl transition-all active:scale-95">
                     <Edit2 size={14} />
                   </button>
-                  <button onClick={() => onDelete(contact.id)} className="p-2 text-rose-500/50 hover:text-rose-500 bg-rose-500/10 border border-rose-500/20 rounded-xl transition-all active:scale-95">
+                  <button 
+                    onClick={() => onDelete(contact.id)} 
+                    className="p-2 rounded-xl transition-all active:scale-95"
+                    style={{
+                      backgroundColor: 'color-mix(in srgb, var(--theme-delete-color, #ef4444), transparent 90%)',
+                      color: 'color-mix(in srgb, var(--theme-delete-color, #ef4444), transparent 50%)',
+                      borderColor: 'color-mix(in srgb, var(--theme-delete-color, #ef4444), transparent 80%)',
+                      borderWidth: '1px'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.color = 'var(--theme-delete-color, #ef4444)'}
+                    onMouseLeave={(e) => e.currentTarget.style.color = 'color-mix(in srgb, var(--theme-delete-color, #ef4444), transparent 50%)'}
+                  >
                     <Trash2 size={14} />
                   </button>
                 </div>
@@ -117,7 +128,18 @@ export function ContactsView({
                 </div>
                 <div className="flex gap-1 shrink-0">
                   <button onClick={() => onEdit(contact)} className="p-2 text-white/30 hover:text-white bg-black/20 rounded-lg transition-all active:scale-90"><Edit2 size={14} /></button>
-                  <button onClick={() => onDelete(contact.id)} className="p-2 text-rose-500/30 hover:text-rose-500 bg-rose-500/5 rounded-lg transition-all active:scale-90"><Trash2 size={14} /></button>
+                  <button 
+                    onClick={() => onDelete(contact.id)} 
+                    className="p-2 rounded-lg transition-all active:scale-90"
+                    style={{
+                      backgroundColor: 'color-mix(in srgb, var(--theme-delete-color, #ef4444), transparent 95%)',
+                      color: 'color-mix(in srgb, var(--theme-delete-color, #ef4444), transparent 70%)'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.color = 'var(--theme-delete-color, #ef4444)'}
+                    onMouseLeave={(e) => e.currentTarget.style.color = 'color-mix(in srgb, var(--theme-delete-color, #ef4444), transparent 70%)'}
+                  >
+                    <Trash2 size={14} />
+                  </button>
                 </div>
               </div>
 

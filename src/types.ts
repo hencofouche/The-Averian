@@ -14,11 +14,17 @@ export interface Mutation {
   name: string;
 }
 
+export interface CustomStatus {
+  id: string;
+  name: string;
+}
+
 export interface UserSettings {
   id: string;
   species: Species[];
   subspecies: SubSpecies[];
   mutations: Mutation[];
+  statuses?: CustomStatus[];
   uid: string;
   currency?: string;
   account_expiry_date?: string; // ISO date string
