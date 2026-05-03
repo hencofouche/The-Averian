@@ -6569,28 +6569,28 @@ function PrintView({ birds, pairs, cages, onBirdRef }: { birds: Bird[], pairs: P
                                 <div className="flex flex-col h-full justify-center w-full">
                                   <div className="flex items-center justify-between gap-1 w-full flex-1">
                                     {/* Male Column */}
-                                    <div className="flex-1 flex flex-col min-w-0 border-r border-black/5 pr-1 justify-center space-y-0.5">
-                                      <p style={{ fontSize: `${8 * scale}pt` }} className="font-black uppercase text-black truncate leading-tight">
+                                    <div className="flex-1 flex flex-col min-w-0 border-r border-black/5 pr-1 justify-center space-y-0.5 overflow-hidden">
+                                      <p style={{ fontSize: `${7.5 * scale}pt` }} className="font-black uppercase text-black truncate leading-none">
                                         {pMale?.name || 'M?'} <span className="text-blue-600">({pMale?.sex?.charAt(0) || 'M'})</span>
                                       </p>
-                                      <p style={{ fontSize: `${6 * scale}pt` }} className="font-bold text-gray-500 truncate leading-tight uppercase">
+                                      <p style={{ fontSize: `${5.5 * scale}pt` }} className="font-bold text-gray-500 truncate leading-none uppercase">
                                         {pMale?.species || '-'} {pMale?.subSpecies && `( ${pMale.subSpecies} )`}
                                       </p>
-                                      <p style={{ fontSize: `${5 * scale}pt` }} className="font-black text-black/70 truncate leading-none uppercase tracking-tighter">
+                                      <p style={{ fontSize: `${4.5 * scale}pt` }} className="font-black text-black/70 truncate leading-none uppercase tracking-tighter">
                                         {pMale?.mutations?.join(', ') || 'Normal'} 
                                         {pMale?.splitMutations?.length ? ` ( Split ${pMale.splitMutations.join(', ')} )` : ''}
                                       </p>
                                     </div>
 
                                     {/* Female Column */}
-                                    <div className="flex-1 flex flex-col min-w-0 pl-1 justify-center space-y-0.5 text-right">
-                                      <p style={{ fontSize: `${8 * scale}pt` }} className="font-black uppercase text-black truncate leading-tight">
+                                    <div className="flex-1 flex flex-col min-w-0 pl-1 justify-center space-y-0.5 text-right overflow-hidden">
+                                      <p style={{ fontSize: `${7.5 * scale}pt` }} className="font-black uppercase text-black truncate leading-none">
                                         {pFemale?.name || 'F?'} <span className="text-pink-600">({pFemale?.sex?.charAt(0) || 'F'})</span>
                                       </p>
-                                      <p style={{ fontSize: `${6 * scale}pt` }} className="font-bold text-gray-500 truncate leading-tight uppercase">
+                                      <p style={{ fontSize: `${5.5 * scale}pt` }} className="font-bold text-gray-500 truncate leading-none uppercase">
                                         {pFemale?.species || '-'} {pFemale?.subSpecies && `( ${pFemale.subSpecies} )`}
                                       </p>
-                                      <p style={{ fontSize: `${5 * scale}pt` }} className="font-black text-black/70 truncate leading-none uppercase tracking-tighter">
+                                      <p style={{ fontSize: `${4.5 * scale}pt` }} className="font-black text-black/70 truncate leading-none uppercase tracking-tighter">
                                         {pFemale?.mutations?.join(', ') || 'Normal'} 
                                         {pFemale?.splitMutations?.length ? ` ( Split ${pFemale.splitMutations.join(', ')} )` : ''}
                                       </p>
@@ -7019,19 +7019,6 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
       </div>
 
       <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-1"><label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Sex</label><Select value={formData.sex} onChange={e => setFormData({ ...formData, sex: e.target.value as any })}><option value="Unknown" className="bg-black text-white">Unknown</option><option value="Male" className="bg-black text-white">Male</option><option value="Female" className="bg-black text-white">Female</option></Select></div>
-        <SearchableSelect 
-          label="Cage"
-          value={formData.cageId || ''}
-          onChange={(val) => setFormData({ ...formData, cageId: val })}
-          options={[
-            { id: '', name: 'Unassigned' },
-            ...cages.map(c => ({ id: c.id, name: c.name }))
-          ]}
-        />
-      </div>
-      
-      <div className="grid grid-cols-2 gap-4">
         <SearchableSelect 
           label="Mutations"
           options={mutationOptions}
@@ -7064,6 +7051,28 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
           onAdd={onAddMutation}
           placeholder="Select Split Mutations"
         />
+      </div>
+
+      <div className="grid grid-cols-12 gap-4">
+        <div className="col-span-4 space-y-1">
+          <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Sex</label>
+          <Select value={formData.sex} onChange={e => setFormData({ ...formData, sex: e.target.value as any })}>
+            <option value="Unknown" className="bg-black text-white">Unknown</option>
+            <option value="Male" className="bg-black text-white">Male</option>
+            <option value="Female" className="bg-black text-white">Female</option>
+          </Select>
+        </div>
+        <div className="col-span-8">
+          <SearchableSelect 
+            label="Cage"
+            value={formData.cageId || ''}
+            onChange={(val) => setFormData({ ...formData, cageId: val })}
+            options={[
+              { id: '', name: 'Unassigned' },
+              ...cages.map(c => ({ id: c.id, name: c.name }))
+            ]}
+          />
+        </div>
       </div>
 
       <div className="space-y-1">
