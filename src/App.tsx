@@ -6560,39 +6560,48 @@ function PrintView({ birds, pairs, cages, onBirdRef }: { birds: Bird[], pairs: P
                           {(qrType === 'bird' || qrType === 'pair') && (() => {
                             const cardBird = qrType === 'bird' ? bird : null;
                             const scale = Math.min(qrWidth, qrHeight) / 50;
+                            const badgeFontSize = 4.5 * scale;
                             
                             if (qrType === 'pair' && pair) {
                               const pMale = birds.find(b => b.id === pair.maleId);
                               const pFemale = birds.find(b => b.id === pair.femaleId);
                               return (
                                 <div className="flex flex-col h-full justify-center w-full">
-                                  <div className="flex items-start justify-between gap-1 w-full">
+                                  <div className="flex items-start justify-between gap-1 w-full flex-1">
                                     {/* Male Column */}
-                                    <div className="flex-1 flex flex-col min-w-0 border-r border-black/5 pr-1">
-                                      <p style={{ fontSize: `${7 * scale}pt` }} className="font-black uppercase text-black truncate leading-tight">
-                                        <span className="text-blue-600 mr-0.5">M</span> {pMale?.name || 'M?'} 
-                                        <span className="text-gray-400 font-medium ml-1 lowercase">
-                                          {pMale?.species} {pMale?.subSpecies}
-                                        </span>
+                                    <div className="flex-1 flex flex-col min-w-0 border-r border-black/5 pr-1 justify-center space-y-0.5">
+                                      <p style={{ fontSize: `${7.5 * scale}pt` }} className="font-black uppercase text-black truncate leading-tight">
+                                        {pMale?.name || 'M?'} <span className="text-blue-600">({pMale?.sex?.charAt(0) || 'M'})</span>
                                       </p>
-                                      <p style={{ fontSize: `${5.5 * scale}pt` }} className="font-bold text-gray-500 truncate leading-tight uppercase tracking-tighter mt-0.5">
-                                        {pMale?.mutations?.join(', ') || 'Normal'}
-                                        {pMale?.splitMutations?.length ? ` / Sp: ${pMale.splitMutations.join(', ')}` : ''}
+                                      <p style={{ fontSize: `${5.5 * scale}pt` }} className="font-bold text-gray-500 truncate leading-tight uppercase">
+                                        {pMale?.species || '-'} {pMale?.subSpecies && `(${pMale.subSpecies})`}
                                       </p>
+                                      <div className="flex flex-wrap gap-0.5 mt-0.5 overflow-hidden">
+                                        {pMale?.mutations?.slice(0, 2).map(m => (
+                                          <span key={m} style={{ fontSize: `${badgeFontSize}pt`, padding: `${0.2 * scale}mm ${0.4 * scale}mm` }} className="border border-black/20 rounded-sm font-black text-black/70 leading-none uppercase shrink-0">{m}</span>
+                                        ))}
+                                        {pMale?.splitMutations?.slice(0, 1).map(m => (
+                                          <span key={m} style={{ fontSize: `${badgeFontSize}pt`, padding: `${0.2 * scale}mm ${0.4 * scale}mm` }} className="border border-secondary/30 rounded-sm font-black text-secondary italic leading-none uppercase shrink-0">Split {m}</span>
+                                        ))}
+                                      </div>
                                     </div>
 
                                     {/* Female Column */}
-                                    <div className="flex-1 flex flex-col min-w-0 pl-1">
-                                      <p style={{ fontSize: `${7 * scale}pt` }} className="font-black uppercase text-black truncate leading-tight">
-                                        <span className="text-pink-600 mr-0.5">F</span> {pFemale?.name || 'F?'} 
-                                        <span className="text-gray-400 font-medium ml-1 lowercase">
-                                          {pFemale?.species} {pFemale?.subSpecies}
-                                        </span>
+                                    <div className="flex-1 flex flex-col min-w-0 pl-1 justify-center space-y-0.5">
+                                      <p style={{ fontSize: `${7.5 * scale}pt` }} className="font-black uppercase text-black truncate leading-tight">
+                                        {pFemale?.name || 'F?'} <span className="text-pink-600">({pFemale?.sex?.charAt(0) || 'F'})</span>
                                       </p>
-                                      <p style={{ fontSize: `${5.5 * scale}pt` }} className="font-bold text-gray-500 truncate leading-tight uppercase tracking-tighter mt-0.5">
-                                        {pFemale?.mutations?.join(', ') || 'Normal'}
-                                        {pFemale?.splitMutations?.length ? ` / Sp: ${pFemale.splitMutations.join(', ')}` : ''}
+                                      <p style={{ fontSize: `${5.5 * scale}pt` }} className="font-bold text-gray-500 truncate leading-tight uppercase">
+                                        {pFemale?.species || '-'} {pFemale?.subSpecies && `(${pFemale.subSpecies})`}
                                       </p>
+                                      <div className="flex flex-wrap gap-0.5 mt-0.5 overflow-hidden">
+                                        {pFemale?.mutations?.slice(0, 2).map(m => (
+                                          <span key={m} style={{ fontSize: `${badgeFontSize}pt`, padding: `${0.2 * scale}mm ${0.4 * scale}mm` }} className="border border-black/20 rounded-sm font-black text-black/70 leading-none uppercase shrink-0">{m}</span>
+                                        ))}
+                                        {pFemale?.splitMutations?.slice(0, 1).map(m => (
+                                          <span key={m} style={{ fontSize: `${badgeFontSize}pt`, padding: `${0.2 * scale}mm ${0.4 * scale}mm` }} className="border border-secondary/30 rounded-sm font-black text-secondary italic leading-none uppercase shrink-0">Split {m}</span>
+                                        ))}
+                                      </div>
                                     </div>
                                   </div>
                                 </div>
@@ -6600,23 +6609,21 @@ function PrintView({ birds, pairs, cages, onBirdRef }: { birds: Bird[], pairs: P
                             }
 
                             return (
-                              <div className="flex flex-col h-full justify-center w-full px-1">
-                                <p style={{ fontSize: `${9 * scale}pt` }} className="font-black uppercase text-black truncate leading-tight text-center">
-                                  <span className={cn(
-                                    "mr-1",
-                                    cardBird?.sex === 'Male' ? "text-blue-600" : cardBird?.sex === 'Female' ? "text-pink-600" : "text-gray-400"
-                                  )}>
-                                    {cardBird?.sex === 'Male' ? 'M' : cardBird?.sex === 'Female' ? 'F' : '?'}
-                                  </span>
-                                  {cardBird?.name || 'Bird'}
-                                  <span className="text-gray-400 font-medium ml-1 lowercase">
-                                    {cardBird?.species} {cardBird?.subSpecies}
-                                  </span>
+                              <div className="flex flex-col h-full justify-center w-full px-1 space-y-0.5 text-center">
+                                <p style={{ fontSize: `${9.5 * scale}pt` }} className="font-black uppercase text-black truncate leading-tight">
+                                  {cardBird?.name || 'Bird'} <span className={cn(cardBird?.sex === 'Male' ? "text-blue-600" : cardBird?.sex === 'Female' ? "text-pink-600" : "text-gray-400")}>({cardBird?.sex || '?'})</span>
                                 </p>
-                                <p style={{ fontSize: `${7 * scale}pt` }} className="font-bold text-gray-500 truncate leading-tight uppercase tracking-tighter mt-1 text-center">
-                                  {cardBird?.mutations?.join(', ') || 'Normal'}
-                                  {cardBird?.splitMutations?.length ? ` / Split ${cardBird.splitMutations.join(', ')}` : ''}
+                                <p style={{ fontSize: `${7.5 * scale}pt` }} className="font-bold text-gray-500 truncate leading-tight uppercase">
+                                  {cardBird?.species || '-'} {cardBird?.subSpecies && `(${cardBird.subSpecies})`}
                                 </p>
+                                <div className="flex flex-wrap gap-1 justify-center mt-1 overflow-hidden">
+                                  {cardBird?.mutations?.map(m => (
+                                    <span key={m} style={{ fontSize: `${badgeFontSize * 1.2}pt`, padding: `${0.3 * scale}mm ${0.6 * scale}mm` }} className="border-2 border-black/10 rounded font-black text-black uppercase shrink-0">{m}</span>
+                                  ))}
+                                  {cardBird?.splitMutations?.map(m => (
+                                    <span key={m} style={{ fontSize: `${badgeFontSize * 1.2}pt`, padding: `${0.3 * scale}mm ${0.6 * scale}mm` }} className="border-2 border-secondary/20 rounded font-black text-secondary italic uppercase shrink-0">Split {m}</span>
+                                  ))}
+                                </div>
                               </div>
                             );
                           })()}
