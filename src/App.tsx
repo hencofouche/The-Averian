@@ -5934,7 +5934,6 @@ function PrintView({ birds, pairs, cages, onBirdRef }: { birds: Bird[], pairs: P
   // Custom QR scaling
   const [qrWidth, setQrWidth] = useState(50); // mm
   const [qrHeight, setQrHeight] = useState(50); // mm
-  const [qrLayout, setQrLayout] = useState<'vertical' | 'horizontal'>('vertical');
   const [isThermal, setIsThermal] = useState(false);
 
   const sortedBirds = useMemo(() => {
@@ -6054,7 +6053,7 @@ function PrintView({ birds, pairs, cages, onBirdRef }: { birds: Bird[], pairs: P
             min-height: ${qrHeight}mm !important;
             border: ${isThermal ? 'none' : '2px solid black'} !important;
             display: flex !important;
-            flex-direction: ${qrLayout === 'horizontal' ? 'row' : 'column'} !important;
+            flex-direction: ${qrWidth > qrHeight ? 'row' : 'column'} !important;
             align-items: center !important;
             justify-content: center !important;
             padding: 2mm !important;
@@ -6157,14 +6156,6 @@ function PrintView({ birds, pairs, cages, onBirdRef }: { birds: Bird[], pairs: P
                       />
                       <span className="px-2 text-[8px] font-black text-white/20">MM</span>
                     </div>
-                  </div>
-                </div>
-                
-                <div className="flex items-center justify-between pt-2 border-t border-white/5">
-                  <span className="text-[10px] font-black text-white/50 uppercase tracking-widest">Layout</span>
-                  <div className="flex bg-black p-1 rounded-lg border border-black-800">
-                    <button onClick={() => setQrLayout('vertical')} className={cn("px-3 py-1.5 rounded-md text-[9px] font-black uppercase transition-all tracking-widest", qrLayout === 'vertical' ? "bg-zinc-800 text-white border border-white/5" : "text-black-100 hover:text-white")}>Vertical</button>
-                    <button onClick={() => setQrLayout('horizontal')} className={cn("px-3 py-1.5 rounded-md text-[9px] font-black uppercase transition-all tracking-widest", qrLayout === 'horizontal' ? "bg-zinc-800 text-white border border-white/5" : "text-black-100 hover:text-white")}>Horizontal</button>
                   </div>
                 </div>
               </div>
@@ -6394,13 +6385,13 @@ function PrintView({ birds, pairs, cages, onBirdRef }: { birds: Bird[], pairs: P
               {qrType === 'bird' && (
                 <table className="w-full border-4 border-black">
                   <thead><tr className="bg-gray-100 border-b-4 border-black">
-                    <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black">Ring / Name</th>
-                    <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black">Species</th>
-                    <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black">Sub</th>
-                    <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black">Sex</th>
-                    <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black">Cage</th>
-                    <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black">Mutation</th>
-                    <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left">Split</th>
+                    <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black w-[8%]">Cage</th>
+                    <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black w-[8%]">Sex</th>
+                    <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black w-[18%]">ID / Ring</th>
+                    <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black w-[18%]">Species</th>
+                    <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black w-[16%]">Sub-Species</th>
+                    <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black w-[16%]">Mutation</th>
+                    <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left w-[16%]">Split</th>
                   </tr></thead>
                   <tbody>
                     {printEmpty ? Array.from({ length: 26 }).map((_, i) => (
@@ -6413,57 +6404,39 @@ function PrintView({ birds, pairs, cages, onBirdRef }: { birds: Bird[], pairs: P
                         <td className="border-r-2 border-gray-400"></td>
                         <td></td>
                       </tr>
-                    )) : sortedBirds.filter(b => qrSelections.includes(b.id)).map(bird => (
-                      <tr key={bird.id} className="border-b border-gray-400 h-[9.5mm]">
-                        <td className="py-1 px-2 border-r-2 border-gray-400 text-[10px] font-black uppercase">{bird.name}</td>
-                        <td className="py-1 px-2 border-r-2 border-gray-400 text-[10px] font-bold uppercase">{bird.species}</td>
-                        <td className="py-1 px-2 border-r-2 border-gray-400 text-[10px] font-bold uppercase">{bird.subSpecies || '-'}</td>
-                        <td className="py-1 px-2 border-r-2 border-gray-400 text-[10px] font-black uppercase">{bird.sex}</td>
-                        <td className="py-1 px-2 border-r-2 border-gray-400 text-[10px] font-black uppercase tracking-tighter">{cages.find(c => c.id === bird.cageId)?.name || '-'}</td>
-                        <td className="py-1 px-2 border-r-2 border-gray-400 text-[9px] font-bold uppercase leading-tight">
-                          {bird.mutations?.join(' • ') || '-'}
-                        </td>
-                        <td className="py-1 px-2 text-[9px] font-bold uppercase italic text-gray-500 leading-tight">
-                          {bird.splitMutations?.join(' • ') || '-'}
-                        </td>
-                      </tr>
-                    ))}
+                    )) : sortedBirds.filter(b => qrSelections.includes(b.id)).map(bird => {
+                      const birdCage = cages.find(c => c.id === bird.cageId);
+                      return (
+                        <tr key={bird.id} className="border-b border-gray-400 h-[9.5mm]">
+                          <td className="py-1 px-2 border-r-2 border-gray-400 text-[10px] font-black uppercase">{birdCage?.name || '-'}</td>
+                          <td className="py-1 px-2 border-r-2 border-gray-400 text-[10px] font-black uppercase text-center">{bird.sex?.charAt(0) || '?'}</td>
+                          <td className="py-1 px-2 border-r-2 border-gray-400 text-[10px] font-black uppercase italic">{bird.name}</td>
+                          <td className="py-1 px-2 border-r-2 border-gray-400 text-[10px] font-bold uppercase">{bird.species || '-'}</td>
+                          <td className="py-1 px-2 border-r-2 border-gray-400 text-[10px] font-bold uppercase">{bird.subSpecies || '-'}</td>
+                          <td className="py-1 px-2 border-r-2 border-gray-400 text-[9px] font-bold uppercase leading-tight">{bird.mutations?.join(' • ') || 'Normal'}</td>
+                          <td className="py-1 px-2 text-[9px] font-bold uppercase italic text-gray-500 leading-tight">{bird.splitMutations?.join(' • ') || '-'}</td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               )}
 
               {qrType === 'pair' && (
                 <table className="w-full border-4 border-black">
-                  <thead>
-                    <tr className="bg-gray-100 border-b-4 border-black">
-                      <th colSpan={6} className="py-4 px-3 text-[14px] font-black uppercase tracking-widest text-center border-r-4 border-black bg-blue-50/50 text-blue-900 border-r-4 border-black">Male (M)</th>
-                      <th colSpan={6} className="py-4 px-3 text-[14px] font-black uppercase tracking-widest text-center bg-pink-50/50 text-pink-900">Female (F)</th>
-                    </tr>
-                    <tr className="bg-gray-100 border-b-4 border-black">
-                      <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black">Ring / Name</th>
-                      <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black">Species</th>
-                      <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black">Sub</th>
-                      <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black">Cage</th>
-                      <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black">Mutation</th>
-                      <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-4 border-black">Split</th>
-                      
-                      <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black">Ring / Name</th>
-                      <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black">Species</th>
-                      <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black">Sub</th>
-                      <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black">Cage</th>
-                      <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black">Mutation</th>
-                      <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left">Split</th>
-                    </tr>
-                  </thead>
+                  <thead><tr className="bg-gray-100 border-b-4 border-black">
+                    <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black w-[8%]">Cage</th>
+                    <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black w-[8%]">Sex</th>
+                    <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black w-[18%]">ID / Ring</th>
+                    <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black w-[18%]">Species</th>
+                    <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black w-[16%]">Sub-Species</th>
+                    <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black w-[16%]">Mutation</th>
+                    <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left w-[16%]">Split</th>
+                  </tr></thead>
                   <tbody>
                     {printEmpty ? Array.from({ length: 15 }).map((_, i) => (
-                      <tr key={i} className="border-b border-gray-400 h-[14mm]">
-                        <td className="border-r-2 border-gray-400"></td>
-                        <td className="border-r-2 border-gray-400"></td>
-                        <td className="border-r-2 border-gray-400"></td>
-                        <td className="border-r-2 border-gray-400"></td>
-                        <td className="border-r-2 border-gray-400"></td>
-                        <td className="border-r-4 border-black"></td>
+                      <tr key={i} className="border-b border-gray-400 h-[19mm]">
+                        <td className="border-r-2 border-gray-400 h-[9.5mm]"></td>
                         <td className="border-r-2 border-gray-400"></td>
                         <td className="border-r-2 border-gray-400"></td>
                         <td className="border-r-2 border-gray-400"></td>
@@ -6476,23 +6449,27 @@ function PrintView({ birds, pairs, cages, onBirdRef }: { birds: Bird[], pairs: P
                       const female = birds.find(b => b.id === pair.femaleId);
                       const mCage = cages.find(c => c.id === male?.cageId)?.name || '-';
                       const fCage = cages.find(c => c.id === female?.cageId)?.name || '-';
-
                       return (
-                        <tr key={pair.id} className="border-b border-gray-400 h-[14mm]">
-                          <td className="py-1 px-2 border-r-2 border-gray-400 text-[10px] font-black uppercase bg-blue-50/10">{male?.name || '-'}</td>
-                          <td className="py-1 px-2 border-r-2 border-gray-400 text-[10px] font-bold uppercase bg-blue-50/10">{male?.species || '-'}</td>
-                          <td className="py-1 px-2 border-r-2 border-gray-400 text-[10px] font-bold uppercase bg-blue-50/10">{male?.subSpecies || '-'}</td>
-                          <td className="py-1 px-2 border-r-2 border-gray-400 text-[10px] font-black uppercase tracking-tighter bg-blue-50/10">{mCage}</td>
-                          <td className="py-1 px-2 border-r-2 border-gray-400 text-[9px] font-bold uppercase leading-tight bg-blue-50/10">{male?.mutations?.join(' • ') || '-'}</td>
-                          <td className="py-1 px-2 text-[9px] font-bold uppercase italic text-gray-500 leading-tight border-r-4 border-black bg-blue-50/10">{male?.splitMutations?.join(' • ') || '-'}</td>
-
-                          <td className="py-1 px-2 border-r-2 border-gray-400 text-[10px] font-black uppercase bg-pink-50/10">{female?.name || '-'}</td>
-                          <td className="py-1 px-2 border-r-2 border-gray-400 text-[10px] font-bold uppercase bg-pink-50/10">{female?.species || '-'}</td>
-                          <td className="py-1 px-2 border-r-2 border-gray-400 text-[10px] font-bold uppercase bg-pink-50/10">{female?.subSpecies || '-'}</td>
-                          <td className="py-1 px-2 border-r-2 border-gray-400 text-[10px] font-black uppercase tracking-tighter bg-pink-50/10">{fCage}</td>
-                          <td className="py-1 px-2 border-r-2 border-gray-400 text-[9px] font-bold uppercase leading-tight bg-pink-50/10">{female?.mutations?.join(' • ') || '-'}</td>
-                          <td className="py-1 px-2 text-[9px] font-bold uppercase italic text-gray-500 leading-tight bg-pink-50/10">{female?.splitMutations?.join(' • ') || '-'}</td>
-                        </tr>
+                        <React.Fragment key={pair.id}>
+                          <tr className="border-b border-gray-300 h-[9.5mm] bg-blue-50/10">
+                            <td className="py-1 px-2 border-r-2 border-gray-400 text-[10px] font-black uppercase">{mCage}</td>
+                            <td className="py-1 px-2 border-r-2 border-gray-400 text-[10px] font-black uppercase text-center text-blue-800">♂</td>
+                            <td className="py-1 px-2 border-r-2 border-gray-400 text-[10px] font-black uppercase italic">{male?.name || 'M?'}</td>
+                            <td className="py-1 px-2 border-r-2 border-gray-400 text-[10px] font-bold uppercase">{male?.species || '-'}</td>
+                            <td className="py-1 px-2 border-r-2 border-gray-400 text-[10px] font-bold uppercase">{male?.subSpecies || '-'}</td>
+                            <td className="py-1 px-2 border-r-2 border-gray-400 text-[9px] font-bold uppercase leading-tight">{male?.mutations?.join(' • ') || 'Normal'}</td>
+                            <td className="py-1 px-2 text-[9px] font-bold uppercase italic text-gray-500 leading-tight">{male?.splitMutations?.join(' • ') || '-'}</td>
+                          </tr>
+                          <tr className="border-b-2 border-black h-[9.5mm] bg-pink-50/10">
+                            <td className="py-1 px-2 border-r-2 border-gray-400 text-[10px] font-black uppercase">{fCage}</td>
+                            <td className="py-1 px-2 border-r-2 border-gray-400 text-[10px] font-black uppercase text-center text-pink-800">♀</td>
+                            <td className="py-1 px-2 border-r-2 border-gray-400 text-[10px] font-black uppercase italic">{female?.name || 'F?'}</td>
+                            <td className="py-1 px-2 border-r-2 border-gray-400 text-[10px] font-bold uppercase">{female?.species || '-'}</td>
+                            <td className="py-1 px-2 border-r-2 border-gray-400 text-[10px] font-bold uppercase">{female?.subSpecies || '-'}</td>
+                            <td className="py-1 px-2 border-r-2 border-gray-400 text-[9px] font-bold uppercase leading-tight">{female?.mutations?.join(' • ') || 'Normal'}</td>
+                            <td className="py-1 px-2 text-[9px] font-bold uppercase italic text-gray-500 leading-tight">{female?.splitMutations?.join(' • ') || '-'}</td>
+                          </tr>
+                        </React.Fragment>
                       );
                     })}
                   </tbody>
@@ -6536,12 +6513,11 @@ function PrintView({ birds, pairs, cages, onBirdRef }: { birds: Bird[], pairs: P
 
                  return (
                     <div key={id} className={cn(
-                      "qr-print-item bg-white p-[1.5mm] rounded border border-black/10",
-                      qrLayout === 'horizontal' ? "flex-row" : "flex-col"
+                      "qr-print-item bg-white p-[1.5mm] rounded border border-black/10"
                     )}>
                         <div className={cn(
                           "flex flex-col items-center justify-center shrink-0 overflow-hidden",
-                          qrLayout === 'horizontal' ? "w-[40%] h-full pr-1" : "w-full h-[60%] pb-1"
+                          qrWidth > qrHeight ? "w-[40%] h-full pr-1" : "w-full h-[60%] pb-1"
                         )}>
                           <QRCodeSVG 
                             value={getQRData(id)} 
@@ -6555,7 +6531,7 @@ function PrintView({ birds, pairs, cages, onBirdRef }: { birds: Bird[], pairs: P
                         
                         <div className={cn(
                           "flex flex-col text-left overflow-hidden bg-white px-1 justify-center border-black/10",
-                          qrLayout === 'horizontal' ? "flex-1 h-full border-l pl-2" : "w-full h-[40%] border-t pt-1.5"
+                          qrWidth > qrHeight ? "flex-1 h-full border-l pl-2" : "w-full h-[40%] border-t pt-1.5"
                         )}>
                           {(qrType === 'bird' || qrType === 'pair') && (() => {
                             const cardBird = qrType === 'bird' ? bird : null;
@@ -7018,43 +6994,8 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
         />
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        <SearchableSelect 
-          label="Mutations"
-          options={mutationOptions}
-          multi
-          selectedValues={formData.mutations?.map(m => mutationOptions.find(o => o.name === m)?.id || m) || []}
-          onChange={(id) => {
-            const name = mutationOptions.find(o => o.id === id)?.name || '';
-            const current = formData.mutations || [];
-            setFormData({ 
-              ...formData, 
-              mutations: current.includes(name) ? current.filter(m => m !== name) : [...current, name] 
-            });
-          }}
-          onAdd={onAddMutation}
-          placeholder="Select Mutations"
-        />
-        <SearchableSelect 
-          label="Split Mutations"
-          options={mutationOptions}
-          multi
-          selectedValues={formData.splitMutations?.map(m => mutationOptions.find(o => o.name === m)?.id || m) || []}
-          onChange={(id) => {
-            const name = mutationOptions.find(o => o.id === id)?.name || '';
-            const current = formData.splitMutations || [];
-            setFormData({ 
-              ...formData, 
-              splitMutations: current.includes(name) ? current.filter(m => m !== name) : [...current, name] 
-            });
-          }}
-          onAdd={onAddMutation}
-          placeholder="Select Split Mutations"
-        />
-      </div>
-
       <div className="grid grid-cols-12 gap-4">
-        <div className="col-span-4 space-y-1">
+        <div className="col-span-3 space-y-1">
           <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Sex</label>
           <Select value={formData.sex} onChange={e => setFormData({ ...formData, sex: e.target.value as any })}>
             <option value="Unknown" className="bg-black text-white">Unknown</option>
@@ -7062,7 +7003,7 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
             <option value="Female" className="bg-black text-white">Female</option>
           </Select>
         </div>
-        <div className="col-span-8">
+        <div className="col-span-3">
           <SearchableSelect 
             label="Cage"
             value={formData.cageId || ''}
@@ -7071,6 +7012,83 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
               { id: '', name: 'Unassigned' },
               ...cages.map(c => ({ id: c.id, name: c.name }))
             ]}
+          />
+        </div>
+        <div className="col-span-6 space-y-1">
+          <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Ring / Name</label>
+          <Input 
+            value={formData.name}
+            onChange={e => setFormData({ ...formData, name: e.target.value.toUpperCase() })}
+            placeholder="E.G. RING-123"
+          />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-12 gap-4">
+        <div className="col-span-6">
+          <SearchableSelect 
+            label="Species"
+            options={speciesOptions}
+            value={selectedSpecies?.id}
+            onChange={(id) => {
+              const name = speciesOptions.find(o => o.id === id)?.name || '';
+              setFormData({ ...formData, species: name, subSpecies: '' });
+            }}
+            onAdd={onAddSpecies}
+            placeholder="Select Species"
+          />
+        </div>
+        <div className="col-span-6">
+          <SearchableSelect 
+            label="Sub-Species"
+            options={subSpeciesOptions}
+            value={subSpeciesOptions.find(o => o.name === formData.subSpecies)?.id}
+            onChange={(id) => {
+              const name = subSpeciesOptions.find(o => o.id === id)?.name || '';
+              setFormData({ ...formData, subSpecies: name });
+            }}
+            onAdd={(n) => selectedSpecies && onAddSubSpecies(n, selectedSpecies.id)}
+            placeholder="Select Sub-Species"
+            disabled={!formData.species}
+          />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-12 gap-4">
+        <div className="col-span-6">
+          <SearchableSelect 
+            label="Mutations"
+            options={mutationOptions}
+            multi
+            selectedValues={formData.mutations?.map(m => mutationOptions.find(o => o.name === m)?.id || m) || []}
+            onChange={(id) => {
+              const name = mutationOptions.find(o => o.id === id)?.name || '';
+              const current = formData.mutations || [];
+              setFormData({ 
+                ...formData, 
+                mutations: current.includes(name) ? current.filter(m => m !== name) : [...current, name] 
+              });
+            }}
+            onAdd={onAddMutation}
+            placeholder="Select Mutations"
+          />
+        </div>
+        <div className="col-span-6">
+          <SearchableSelect 
+            label="Split Mutations"
+            options={mutationOptions}
+            multi
+            selectedValues={formData.splitMutations?.map(m => mutationOptions.find(o => o.name === m)?.id || m) || []}
+            onChange={(id) => {
+              const name = mutationOptions.find(o => o.id === id)?.name || '';
+              const current = formData.splitMutations || [];
+              setFormData({ 
+                ...formData, 
+                splitMutations: current.includes(name) ? current.filter(m => m !== name) : [...current, name] 
+              });
+            }}
+            onAdd={onAddMutation}
+            placeholder="Select Split Mutations"
           />
         </div>
       </div>
