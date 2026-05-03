@@ -140,6 +140,8 @@ export interface BreedingRecord {
   eggs?: Egg[];
   offspringIds?: string[];
   notes?: string;
+  incubationDays?: number;
+  ringingDays?: number;
   uid: string;
 }
 

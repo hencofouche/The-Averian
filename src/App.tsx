@@ -48,6 +48,16 @@ const getCurrencySymbol = (currency?: string) => {
   }
 };
 
+const generateGoogleCalendarUrl = (text: string, date: string, details: string = '') => {
+  if (!date) return '';
+  const startDate = new Date(date);
+  const endDate = new Date(startDate.getTime() + 30 * 60 * 1000); // 30 mins later
+  
+  const formatDate = (d: Date) => d.toISOString().replace(/-|:|\.\d\d\d/g, "");
+  
+  return `https://www.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(text)}&dates=${formatDate(startDate)}/${formatDate(endDate)}&details=${encodeURIComponent(details)}`;
+};
+
 const compressAndUploadImage = async (file: File, path: string): Promise<string> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -176,14 +186,29 @@ const Badge = ({ children, className, variant = 'neutral' }: { children: React.R
     neutral: 'bg-black text-white border border-black-700',
     success: 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30',
     warning: 'bg-amber-500/20 text-amber-400 border border-amber-500/30',
-    info: 'bg-gold-500/20 text-gold-400 border border-gold-500/30',
-    destructive: 'bg-rose-500/20 text-rose-400 border border-rose-500/30',
+    info: 'bg-secondary/20 text-secondary border border-secondary/30',
+    destructive: 'bg-red-500/20 text-red-400 border border-red-500/30',
     female: 'bg-black text-white border border-black-700',
     male: 'bg-black text-white border border-black-700',
   };
 
   const customStyle: React.CSSProperties = {};
   
+  if (variant === 'destructive') {
+    return (
+      <span 
+        className={cn("px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest border shadow-inner", className)}
+        style={{
+          backgroundColor: 'color-mix(in srgb, var(--theme-delete-color, #ef4444), transparent 80%)',
+          color: 'var(--theme-delete-color, #ef4444)',
+          borderColor: 'color-mix(in srgb, var(--theme-delete-color, #ef4444), transparent 70%)'
+        }}
+      >
+        {children}
+      </span>
+    );
+  }
+
   if (variant === 'male') {
     customStyle.backgroundColor = 'color-mix(in srgb, var(--theme-male-color, #3b82f6), transparent 80%)';
     customStyle.color = 'var(--theme-male-color, #60a5fa)';
@@ -1628,7 +1653,13 @@ export default function App() {
               <div className="flex-1 min-w-0">
                 <p className="text-[9px] text-white/70 truncate uppercase font-bold tracking-tight">{user.email?.split('@')[0]}</p>
               </div>
-              <button onClick={logout} className="p-1 text-white/30 hover:text-red-500 transition-colors">
+              <button 
+                onClick={logout} 
+                className="p-1 text-white/30 transition-colors"
+                style={{ '--hover-color': 'var(--theme-delete-color, #ef4444)' } as any}
+                onMouseEnter={(e) => e.currentTarget.style.color = 'var(--theme-delete-color, #ef4444)'}
+                onMouseLeave={(e) => e.currentTarget.style.color = 'rgba(255,255,255,0.3)'}
+              >
                 <LogOut size={12} />
               </button>
             </div>
@@ -3056,11 +3087,15 @@ function PairCard({ pair, male, female, cages, birds, currency, onBirdRef, onNav
 
     const BirdInfo = ({ bird, sex }: { bird?: Bird, sex: 'Male' | 'Female' }) => {
       return (
-        <div className={cn(
-          "flex-1 min-w-0 rounded-2xl border transition-all relative overflow-hidden flex flex-col bg-black/20",
-          sex === 'Male' ? "border-info-500/20" : "border-rose-500/20",
-          !bird && "opacity-50 grayscale"
-        )}>
+        <div 
+          className={cn(
+            "flex-1 min-w-0 rounded-2xl border transition-all relative overflow-hidden flex flex-col bg-black/20",
+            !bird && "opacity-50 grayscale"
+          )}
+          style={{
+            borderColor: sex === 'Male' ? 'color-mix(in srgb, var(--theme-male-color, #3b82f6), transparent 80%)' : 'color-mix(in srgb, var(--theme-female-color, #e11d48), transparent 80%)'
+          }}
+        >
           {/* Bird Image */}
           <div className="h-24 sm:h-28 w-full relative bg-black/40 overflow-hidden">
             {bird?.imageUrl ? (
@@ -3195,8 +3230,8 @@ function PairCard({ pair, male, female, cages, birds, currency, onBirdRef, onNav
                   size={14} 
                   className={cn(pair.status === 'Active' ? 'animate-pulse' : '')} 
                   style={{ 
-                    color: pair.status === 'Active' ? (userSettings?.themeColor || '#d4af37') : '#3f3f46',
-                    fill: pair.status === 'Active' ? (userSettings?.themeColor || '#d4af37') : 'transparent'
+                    color: pair.status === 'Active' ? (userSettings?.themeColor || 'var(--theme-accent-color, #d4af37)') : '#3f3f46',
+                    fill: pair.status === 'Active' ? (userSettings?.themeColor || 'var(--theme-accent-color, #d4af37)') : 'transparent'
                   }}
                 />
              </div>
@@ -3208,16 +3243,23 @@ function PairCard({ pair, male, female, cages, birds, currency, onBirdRef, onNav
         <div className="space-y-3 shrink-0">
           <div className="flex items-center justify-between text-[8px] text-white/30 uppercase tracking-widest font-black pt-2 border-t border-black-800/30">
             <div className="flex items-center gap-1.5">
-              <Calendar size={10} className="text-gold-500/50" />
+              <Calendar size={10} className="text-secondary/50" />
               <span>{pair.startDate || 'N/A'}</span>
             </div>
-            {pair.endDate && <span className="text-rose-500/60">Ended: {pair.endDate}</span>}
+            {pair.endDate && (
+              <span 
+                className="font-bold opacity-60"
+                style={{ color: 'var(--theme-delete-color, #ef4444)' }}
+              >
+                Ended: {pair.endDate}
+              </span>
+            )}
           </div>
 
           <div className="grid grid-cols-3 gap-1.5">
             <button 
               onClick={(e) => { e.stopPropagation(); onNavigate('stats', '', { pairId: pair.id }); }} 
-              className="flex flex-col items-center justify-center py-2 bg-gold-500/5 hover:bg-gold-500/10 text-gold-500 rounded-xl border border-gold-500/10 transition-all active:scale-95"
+              className="flex flex-col items-center justify-center py-2 bg-secondary/5 hover:bg-secondary/10 text-secondary rounded-xl border border-secondary/10 transition-all active:scale-95"
               title="Breeding"
             >
               <Egg size={14} />
@@ -3233,7 +3275,12 @@ function PairCard({ pair, male, female, cages, birds, currency, onBirdRef, onNav
             </button>
             <button 
               onClick={(e) => { e.stopPropagation(); onDelete(); }} 
-              className="flex flex-col items-center justify-center py-2 bg-rose-500/5 hover:bg-rose-500/10 text-rose-500 rounded-xl border border-rose-500/10 transition-all active:scale-95"
+              className="flex flex-col items-center justify-center py-2 rounded-xl transition-all active:scale-95 border"
+              style={{
+                backgroundColor: 'color-mix(in srgb, var(--theme-delete-color, #ef4444), transparent 95%)',
+                color: 'var(--theme-delete-color, #ef4444)',
+                borderColor: 'color-mix(in srgb, var(--theme-delete-color, #ef4444), transparent 80%)'
+              }}
               title="Delete"
             >
               <Trash2 size={14} />
@@ -3335,7 +3382,7 @@ function FinancialsView({
         <Card className="p-4 sm:p-5 bg-zinc-800 border-black-700 flex flex-col justify-between min-w-0">
           <div className="flex items-center justify-between mb-3 sm:mb-4">
             <p className="text-[8px] sm:text-[10px] font-black text-white uppercase tracking-widest mr-2">Net Profit</p>
-            <TrendingUp size={16} className={stats.netProfit >= 0 ? 'text-emerald-400 shrink-0' : 'text-rose-400 shrink-0'} />
+            <TrendingUp size={16} className="shrink-0" style={{ color: stats.netProfit >= 0 ? '#34d399' : 'var(--theme-delete-color, #ef4444)' }} />
           </div>
           <div>
             <p className="text-lg sm:text-xl md:text-2xl font-black text-white tracking-tighter break-all">{symbol}{stats.netProfit.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
@@ -3354,10 +3401,10 @@ function FinancialsView({
         <Card className="p-4 sm:p-5 bg-zinc-800 border-black-700 flex flex-col justify-between min-w-0">
           <div className="flex items-center justify-between mb-3 sm:mb-4">
             <p className="text-[8px] sm:text-[10px] font-black text-white uppercase tracking-widest mr-2">Total Expenses</p>
-            <ArrowDownRight size={16} className="text-rose-400 shrink-0" />
+            <ArrowDownRight size={16} className="shrink-0" style={{ color: 'var(--theme-delete-color, #ef4444)' }} />
           </div>
           <div>
-            <p className="text-lg sm:text-xl md:text-2xl font-black text-rose-500 tracking-tighter break-all">{symbol}{stats.totalExpenses.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+            <p className="text-lg sm:text-xl md:text-2xl font-black tracking-tighter break-all" style={{ color: 'var(--theme-delete-color, #ef4444)' }}>{symbol}{stats.totalExpenses.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
           </div>
         </Card>
       </div>
@@ -3759,11 +3806,19 @@ function TransactionCard({ transaction, bird, contact, cages, currency, onBirdRe
       "p-3 sm:p-4 flex flex-col gap-3 sm:gap-4 group border-black-800 hover:border-gold-500/50 transition-colors relative"
     )}>
       <div className="flex items-center gap-3 sm:gap-4">
-        <div className={cn(
-          "rounded-xl sm:rounded-2xl flex items-center justify-center shrink-0 shadow-inner",
-          "w-10 h-10 sm:w-12 sm:h-12",
-          transaction.type === 'Income' ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20" : "bg-rose-500/10 text-rose-500 border border-rose-500/20"
-        )}>
+        <div 
+          className={cn(
+            "rounded-xl sm:rounded-2xl flex items-center justify-center shrink-0 shadow-inner",
+            "w-10 h-10 sm:w-12 sm:h-12",
+            transaction.type === 'Income' ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20" : ""
+          )}
+          style={transaction.type === 'Expense' ? {
+            backgroundColor: 'color-mix(in srgb, var(--theme-delete-color, #ef4444), transparent 90%)',
+            color: 'var(--theme-delete-color, #ef4444)',
+            borderColor: 'color-mix(in srgb, var(--theme-delete-color, #ef4444), transparent 80%)',
+            borderWidth: '1px'
+          } : {}}
+        >
           {transaction.type === 'Income' ? <TrendingUp size={20} /> : <TrendingDown size={20} />}
         </div>
         <div className="flex-1 min-w-0">
@@ -3785,7 +3840,10 @@ function TransactionCard({ transaction, bird, contact, cages, currency, onBirdRe
           <p className="text-[10px] sm:text-[11px] text-white truncate font-medium">{transaction.description || 'No description'}</p>
         </div>
         <div className={cn("shrink-0 text-right")}>
-                <p className={cn("font-black tracking-tighter truncate", "text-base sm:text-lg", transaction.type === 'Income' ? "text-emerald-500" : "text-rose-500")}>
+                <p 
+                  className={cn("font-black tracking-tighter truncate", "text-base sm:text-lg")}
+                  style={{ color: transaction.type === 'Income' ? '#10b981' : 'var(--theme-delete-color, #ef4444)' }}
+                >
                   {transaction.type === 'Income' ? '+' : '-'}{symbol}{transaction.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                 </p>
           <p className="text-[8px] sm:text-[9px] text-white font-bold uppercase tracking-widest">{transaction.date}</p>
@@ -3892,19 +3950,73 @@ function BreedingRecordCard({ record, pair, male, female, birds, onEdit, onDelet
 
             {/* Expanded Egg Log */}
             {isExpanded && record.eggs && record.eggs.length > 0 && (
-              <div className="space-y-2 pt-2 animate-in slide-in-from-top-2">
-                 {record.eggs.map((egg, index) => (
-                   <div key={egg.id} className="flex items-center justify-between p-3 bg-black rounded-lg border border-zinc-800">
-                      <div className="flex items-center gap-3">
-                         <div className="text-xs font-mono text-white/50">#{index + 1}</div>
-                         <div className="text-xs text-white">{egg.laidDate || 'Unknown'}</div>
-                      </div>
-                      <span className={cn(
-                        "text-[9px] font-bold uppercase tracking-widest px-2 py-1 rounded-full",
-                        egg.status === 'Hatched' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-zinc-800 text-white/60'
-                      )}>{egg.status}</span>
-                   </div>
-                 ))}
+              <div className="space-y-3 pt-2 animate-in slide-in-from-top-2">
+                 {record.eggs.map((egg, index) => {
+                   const expectedHatchDate = egg.laidDate ? format(addDays(parseISO(egg.laidDate), record.incubationDays || 21), 'yyyy-MM-dd') : null;
+                   const ringingDate = egg.actualHatchDate ? format(addDays(parseISO(egg.actualHatchDate), record.ringingDays || 7), 'yyyy-MM-dd') : null;
+
+                   return (
+                     <div key={egg.id} className="p-3 bg-black rounded-xl border border-zinc-800 space-y-3">
+                        <div className="flex items-center justify-between">
+                           <div className="flex items-center gap-3">
+                              <div className="text-xs font-mono text-white/50">#{index + 1}</div>
+                              <div className="flex flex-col">
+                                <span className="text-[8px] text-white/30 uppercase font-black tracking-widest leading-none mb-1">Laid Date</span>
+                                <span className="text-[11px] text-white font-bold">{egg.laidDate || 'Unknown'}</span>
+                              </div>
+                           </div>
+                           <Badge 
+                             variant={egg.status === 'Hatched' || egg.status === 'Weaned' ? 'success' : (egg.status === 'Laid' || egg.status === 'Fertile' ? 'info' : 'neutral')}
+                             className="text-[8px] font-black py-0 px-1.5"
+                           >
+                             {egg.status}
+                           </Badge>
+                        </div>
+
+                        {(egg.status === 'Laid' || egg.status === 'Fertile') && expectedHatchDate && (
+                          <div className="flex items-center justify-between p-2 bg-gold-500/5 rounded-lg border border-gold-500/10">
+                             <div className="flex flex-col">
+                                <div className="flex items-center gap-1.5">
+                                  <Egg size={10} className="text-secondary" />
+                                  <span className="text-[8px] text-secondary uppercase font-black tracking-widest">Expected Hatch</span>
+                                </div>
+                                <span className="text-[11px] text-white font-mono ml-4">{expectedHatchDate}</span>
+                             </div>
+                             <a 
+                               href={generateGoogleCalendarUrl(`Egg #${index + 1} Hatching`, expectedHatchDate, `Hatching reminder for Pair: ${male?.name || 'Empty'} x ${female?.name || 'Empty'}`)}
+                               target="_blank"
+                               rel="noopener noreferrer"
+                               className="p-1.5 bg-secondary/10 text-secondary hover:bg-secondary/20 rounded-md transition-colors"
+                               title="Add to Google Calendar"
+                             >
+                               <Bell size={12} />
+                             </a>
+                          </div>
+                        )}
+
+                        {egg.status === 'Hatched' && ringingDate && (
+                          <div className="flex items-center justify-between p-2 bg-emerald-500/5 rounded-lg border border-emerald-500/10">
+                             <div className="flex flex-col">
+                                <div className="flex items-center gap-1.5">
+                                  <Activity size={10} className="text-emerald-400" />
+                                  <span className="text-[8px] text-emerald-400 uppercase font-black tracking-widest">Ringing Reminder</span>
+                                </div>
+                                <span className="text-[11px] text-white font-mono ml-4">{ringingDate}</span>
+                             </div>
+                             <a 
+                               href={generateGoogleCalendarUrl(`Egg #${index + 1} Ringing`, ringingDate, `Reminder to ring the bird from Pair: ${male?.name || 'Empty'} x ${female?.name || 'Empty'}`)}
+                               target="_blank"
+                               rel="noopener noreferrer"
+                               className="p-1.5 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 rounded-md transition-colors"
+                               title="Add to Google Calendar"
+                             >
+                               <Bell size={12} />
+                             </a>
+                          </div>
+                        )}
+                     </div>
+                   );
+                 })}
               </div>
             )}
         </div>
@@ -3913,7 +4025,30 @@ function BreedingRecordCard({ record, pair, male, female, birds, onEdit, onDelet
 }
 
 function BreedingRecordForm({ user, initialData, pairs, birds, cages, onClose }: { user: FirebaseUser, initialData?: BreedingRecord, pairs: Pair[], birds: Bird[], cages: Cage[], onClose: () => void }) {
-  const [formData, setFormData] = useState<Partial<BreedingRecord>>(initialData || { pairId: '', startDate: format(new Date(), 'yyyy-MM-dd'), endDate: '', eggsLaid: 0, eggsHatched: 0, chicksWeaned: 0, offspringIds: [], notes: '', eggs: [] });
+  const [formData, setFormData] = useState<Partial<BreedingRecord>>(initialData || { 
+    pairId: '', 
+    startDate: format(new Date(), 'yyyy-MM-dd'), 
+    endDate: '', 
+    eggsLaid: 0, 
+    eggsHatched: 0, 
+    chicksWeaned: 0, 
+    offspringIds: [], 
+    notes: '', 
+    eggs: [],
+    incubationDays: 21,
+    ringingDays: 7
+  });
+
+  // Ensure incubationDays and ringingDays have defaults if not set in initialData
+  useEffect(() => {
+    if (initialData) {
+      setFormData(prev => ({
+        ...prev,
+        incubationDays: initialData.incubationDays ?? 21,
+        ringingDays: initialData.ringingDays ?? 7
+      }));
+    }
+  }, [initialData]);
   const [isSaving, setIsSaving] = useState(false);
   
   const handleAddEgg = () => {
@@ -4025,6 +4160,27 @@ function BreedingRecordForm({ user, initialData, pairs, birds, cages, onClose }:
         </div>
       </div>
       
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-1">
+          <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Incubation (Days)</label>
+          <Input 
+            type="number" 
+            min="1" 
+            value={formData.incubationDays} 
+            onChange={e => setFormData({ ...formData, incubationDays: parseInt(e.target.value) || 0 })} 
+          />
+        </div>
+        <div className="space-y-1">
+          <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Ringing Age (Days)</label>
+          <Input 
+            type="number" 
+            min="1" 
+            value={formData.ringingDays} 
+            onChange={e => setFormData({ ...formData, ringingDays: parseInt(e.target.value) || 0 })} 
+          />
+        </div>
+      </div>
+      
       <div className="grid grid-cols-3 gap-4 pb-2 border-b border-black-800">
         <div className="space-y-1">
           <label className="text-[10px] font-black text-white/50 uppercase tracking-widest ml-1">Laid</label>
@@ -4070,11 +4226,17 @@ function BreedingRecordForm({ user, initialData, pairs, birds, cages, onClose }:
                       <option value="Died">Died</option>
                       <option value="Weaned">Weaned</option>
                     </select>
-                    <button type="button" onClick={() => {
+                    <button 
+                      type="button" 
+                      onClick={() => {
                         const newEggs = [...(formData.eggs || [])];
                         newEggs.splice(index, 1);
                         setFormData({ ...formData, eggs: newEggs, eggsLaid: newEggs.length });
-                    }} className="text-white/30 hover:text-red-500 transition-colors">
+                      }} 
+                      className="text-white/30 transition-colors"
+                      onMouseEnter={(e) => e.currentTarget.style.color = 'var(--theme-delete-color, #ef4444)'}
+                      onMouseLeave={(e) => e.currentTarget.style.color = 'rgba(255,255,255,0.3)'}
+                    >
                       <Trash2 size={14} />
                     </button>
                   </div>
@@ -4517,7 +4679,10 @@ function TaskCard({ task, birds, cages, onBirdRef, onToggle, onEdit, onDelete, v
 
             {effectiveViewMode === 'list' && (
               <div className="flex items-center gap-4 shrink-0">
-                <Badge variant={task.priority === 'High' ? 'destructive' : task.priority === 'Medium' ? 'warning' : 'neutral'} className="text-[8px] uppercase tracking-widest font-black">
+                <Badge 
+                  variant={task.priority === 'High' ? 'destructive' : task.priority === 'Medium' ? 'warning' : 'neutral'} 
+                  className="text-[8px] uppercase tracking-widest font-black"
+                >
                   {task.priority}
                 </Badge>
               </div>
@@ -4541,7 +4706,15 @@ function TaskCard({ task, birds, cages, onBirdRef, onToggle, onEdit, onDelete, v
               <Calendar size={14} />
               <span className="text-[9px] font-black uppercase tracking-widest">Add to Calendar</span>
             </a>
-            <button onClick={(e) => { e.stopPropagation(); onDelete(); }} className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-lg transition-all border border-red-500/20">
+            <button 
+              onClick={(e) => { e.stopPropagation(); onDelete(); }} 
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all border"
+              style={{
+                backgroundColor: 'color-mix(in srgb, var(--theme-delete-color, #ef4444), transparent 90%)',
+                color: 'var(--theme-delete-color, #ef4444)',
+                borderColor: 'color-mix(in srgb, var(--theme-delete-color, #ef4444), transparent 80%)'
+              }}
+            >
               <Trash2 size={14} />
               <span className="text-[9px] font-black uppercase tracking-widest">Delete</span>
             </button>
@@ -5672,7 +5845,12 @@ function PrintView({ birds, pairs, cages, onBirdRef }: { birds: Bird[], pairs: P
             {qrSelections.length > 0 && (
               <button 
                 onClick={() => setQrSelections([])} 
-                className="text-[10px] font-black text-red-500 uppercase tracking-widest hover:bg-red-500/5 px-3 py-1.5 rounded-lg transition-colors border border-red-500/10"
+                className="text-[10px] font-black uppercase tracking-widest hover:bg-opacity-10 px-3 py-1.5 rounded-lg transition-colors border"
+                style={{
+                  color: 'var(--theme-delete-color, #ef4444)',
+                  backgroundColor: 'color-mix(in srgb, var(--theme-delete-color, #ef4444), transparent 95%)',
+                  borderColor: 'color-mix(in srgb, var(--theme-delete-color, #ef4444), transparent 80%)'
+                }}
               >
                 Clear All
               </button>
@@ -5704,7 +5882,12 @@ function PrintView({ birds, pairs, cages, onBirdRef }: { birds: Bird[], pairs: P
                       <div className="absolute top-4 right-4 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button 
                           onClick={() => toggleSelection(id)} 
-                          className="w-8 h-8 rounded-xl bg-red-500/20 text-red-500 flex items-center justify-center hover:bg-red-500 hover:text-white transition-all shadow-lg backdrop-blur-sm border border-red-500/20"
+                          className="w-8 h-8 rounded-xl flex items-center justify-center transition-all shadow-lg backdrop-blur-sm border"
+                          style={{
+                            backgroundColor: 'color-mix(in srgb, var(--theme-delete-color, #ef4444), transparent 80%)',
+                            color: 'var(--theme-delete-color, #ef4444)',
+                            borderColor: 'color-mix(in srgb, var(--theme-delete-color, #ef4444), transparent 70%)'
+                          }}
                         >
                           <X size={14} />
                         </button>
@@ -5729,7 +5912,14 @@ function PrintView({ birds, pairs, cages, onBirdRef }: { birds: Bird[], pairs: P
                             <p className="text-xs text-white font-black uppercase tracking-tight truncate">{opt?.name || id}</p>
                             {opt?.details && <p className="text-[9px] text-zinc-500 font-bold truncate mt-0.5">{opt.details}</p>}
                           </div>
-                          <button onClick={() => toggleSelection(id)} className="ml-4 w-8 h-8 rounded-xl bg-red-500/10 text-red-500 flex items-center justify-center hover:bg-red-500 hover:text-white transition-all shadow-lg">
+                          <button 
+                            onClick={() => toggleSelection(id)} 
+                            className="ml-4 w-8 h-8 rounded-xl flex items-center justify-center transition-all shadow-lg"
+                            style={{
+                              backgroundColor: 'color-mix(in srgb, var(--theme-delete-color, #ef4444), transparent 90%)',
+                              color: 'var(--theme-delete-color, #ef4444)'
+                            }}
+                          >
                             <X size={14} />
                           </button>
                         </div>
@@ -6728,7 +6918,9 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
                 <button 
                   type="button" 
                   onClick={() => setFormData(prev => ({ ...prev, documents: prev.documents?.filter(d => d.id !== doc.id) }))}
-                  className="p-2 hover:bg-red-500/10 rounded-lg text-white hover:text-red-500 transition-colors"
+                  className="p-2 rounded-lg text-white transition-colors"
+                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'color-mix(in srgb, var(--theme-delete-color, #ef4444), transparent 90%)', e.currentTarget.style.color = 'var(--theme-delete-color, #ef4444)')}
+                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '', e.currentTarget.style.color = 'white')}
                 >
                   <Trash2 size={14} />
                 </button>
@@ -7099,7 +7291,9 @@ function TaskForm({ user, initialData, birds, cages, onClose }: { user: Firebase
               <button 
                 type="button" 
                 onClick={() => toggleBirdTag(b.id)}
-                className="absolute top-2 right-2 text-white/30 hover:text-red-500 transition-colors z-10"
+                className="absolute top-2 right-2 text-white/30 transition-colors z-10"
+                onMouseEnter={(e) => e.currentTarget.style.color = 'var(--theme-delete-color, #ef4444)'}
+                onMouseLeave={(e) => e.currentTarget.style.color = 'rgba(255,255,255,0.3)'}
               >
                 <X size={14} />
               </button>
@@ -7139,7 +7333,13 @@ function TaskForm({ user, initialData, birds, cages, onClose }: { user: Firebase
           {formData.subTasks?.map((sub, idx) => (
             <div key={idx} className="flex items-center justify-between p-3 bg-black rounded-2xl border border-black-700">
               <span className="text-xs font-bold text-white">{sub.title}</span>
-              <button type="button" onClick={() => setFormData({ ...formData, subTasks: formData.subTasks?.filter((_, i) => i !== idx) })} className="text-white hover:text-red-500 transition-colors">
+              <button 
+                type="button" 
+                onClick={() => setFormData({ ...formData, subTasks: formData.subTasks?.filter((_, i) => i !== idx) })} 
+                className="text-white transition-colors"
+                onMouseEnter={(e) => e.currentTarget.style.color = 'var(--theme-delete-color, #ef4444)'}
+                onMouseLeave={(e) => e.currentTarget.style.color = 'white'}
+              >
                 <Trash2 size={16} />
               </button>
             </div>
