@@ -5926,6 +5926,7 @@ function SettingsView({ settings, onUpdate, allData, user, isSyncing, setDeleteC
 
 function PrintView({ birds, pairs, cages, onBirdRef }: { birds: Bird[], pairs: Pair[], cages: Cage[], onBirdRef: (name: string) => void }) {
   const [printMode, setPrintMode] = useState<'list' | 'qr' | 'certificate'>('list');
+  const [printLayout, setPrintLayout] = useState<'vertical' | 'horizontal'>('vertical');
   const [isPrinting, setIsPrinting] = useState(false);
   const [printEmpty, setPrintEmpty] = useState(false);
   const [qrType, setQrType] = useState<'bird' | 'pair' | 'cage'>('bird');
@@ -5990,14 +5991,21 @@ function PrintView({ birds, pairs, cages, onBirdRef }: { birds: Bird[], pairs: P
 
   const handlePrint = () => {
     setIsPrinting(true);
+    // Increased timeout to ensure all components and graphics (QR codes) are fully rendered
     setTimeout(() => {
       window.print();
-      const cleanup = () => {
+    }, 1500);
+
+    const cleanup = () => {
+      setTimeout(() => {
         setIsPrinting(false);
         window.removeEventListener('afterprint', cleanup);
-      };
-      window.addEventListener('afterprint', cleanup);
-    }, 800);
+        window.removeEventListener('focus', cleanup);
+      }, 500);
+    };
+    
+    window.addEventListener('afterprint', cleanup);
+    window.addEventListener('focus', cleanup, { once: true });
   };
 
   const getQRData = (id: string) => {
@@ -6013,7 +6021,7 @@ function PrintView({ birds, pairs, cages, onBirdRef }: { birds: Bird[], pairs: P
       <style>{`
         @media print {
           @page { 
-            size: ${isThermal && printMode === 'qr' ? `${qrWidth}mm ${qrHeight}mm` : 'A4'}; 
+            size: ${isThermal && printMode === 'qr' ? `${qrWidth}mm ${qrHeight}mm` : (printMode === 'certificate' || printMode === 'list') && printLayout === 'horizontal' ? 'A4 landscape' : 'A4 portrait'}; 
             margin: 0; 
           }
           body { -webkit-print-color-adjust: exact; background: #fff !important; }
@@ -6021,11 +6029,8 @@ function PrintView({ birds, pairs, cages, onBirdRef }: { birds: Bird[], pairs: P
           #print-area-portal {
             display: block !important; 
             visibility: visible !important;
-            position: absolute !important; 
-            left: 0 !important; 
-            top: 0 !important; 
-            width: ${isThermal && printMode === 'qr' ? `${qrWidth}mm` : '210mm'} !important; 
-            min-height: ${isThermal && printMode === 'qr' ? `${qrHeight}mm` : '297mm'} !important;
+            position: relative !important; 
+            width: ${isThermal && printMode === 'qr' ? `${qrWidth}mm` : '100%'} !important; 
             background: white !important; 
             color: black !important;
             margin: 0 !important;
@@ -6117,6 +6122,16 @@ function PrintView({ birds, pairs, cages, onBirdRef }: { birds: Bird[], pairs: P
               cages={cages}
               birds={birds}
             />
+
+            {(printMode === 'certificate' || printMode === 'list') && (
+              <div className="p-4 bg-zinc-900/30 border border-black-800 rounded-2xl flex items-center justify-between">
+                <span className="text-[10px] font-black text-gold-500 uppercase tracking-widest">Page Layout</span>
+                <div className="flex bg-black p-1 rounded-lg border border-black-800">
+                  <button onClick={() => setPrintLayout('vertical')} className={cn("px-3 py-1.5 rounded-md text-[9px] font-black uppercase transition-all tracking-widest", printLayout === 'vertical' ? "bg-zinc-800 text-white border border-white/5" : "text-black-100 hover:text-white")}>Vertical</button>
+                  <button onClick={() => setPrintLayout('horizontal')} className={cn("px-3 py-1.5 rounded-md text-[9px] font-black uppercase transition-all tracking-widest", printLayout === 'horizontal' ? "bg-zinc-800 text-white border border-white/5" : "text-black-100 hover:text-white")}>Horizontal</button>
+                </div>
+              </div>
+            )}
 
             {printMode === 'qr' && (
               <div className="space-y-4 p-4 bg-zinc-900/30 border border-black-800 rounded-2xl">
@@ -6283,11 +6298,14 @@ function PrintView({ birds, pairs, cages, onBirdRef }: { birds: Bird[], pairs: P
 
       {/* Hidden Print Area rendered via Portal */}
       {isPrinting && createPortal(
-        <div id="print-area-portal" className="fixed inset-0 z-[9999] bg-white text-black p-10 overflow-y-auto w-full min-h-screen font-sans">
+        <div id="print-area-portal" className="bg-white text-black p-10 font-sans">
           {printMode === 'certificate' ? (
-            <div className="flex flex-col">
+            <div className={cn("flex", printLayout === 'horizontal' ? "flex-row flex-wrap gap-4" : "flex-col")}>
               {birds.filter(b => qrSelections.includes(b.id)).map(bird => (
-                <div key={bird.id} className="min-h-[27cm] border-8 border-double border-gray-300 p-12 flex flex-col relative page-break-after-always">
+                <div key={bird.id} className={cn(
+                  "border-8 border-double border-gray-300 p-8 flex flex-col relative page-break-after-always",
+                  printLayout === 'horizontal' ? "w-[27cm] h-[19cm] min-h-[19cm]" : "w-full min-h-[27cm]"
+                )}>
                   <div className="absolute inset-0 bg-white opacity-50 pointer-events-none" />
                   <div className="relative z-10 flex flex-col h-full items-center text-center">
                     <h1 className="text-4xl font-serif font-bold uppercase tracking-widest text-gray-900 border-b-2 border-gray-400 pb-6 mb-8 w-full">Pedigree Certificate</h1>
@@ -6385,13 +6403,13 @@ function PrintView({ birds, pairs, cages, onBirdRef }: { birds: Bird[], pairs: P
               {qrType === 'bird' && (
                 <table className="w-full border-4 border-black">
                   <thead><tr className="bg-gray-100 border-b-4 border-black">
-                    <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black w-[8%]">Cage</th>
-                    <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black w-[8%]">Sex</th>
+                    <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black w-[5%]">Cage</th>
+                    <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black w-[5%]">Sex</th>
                     <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black w-[18%]">ID / Ring</th>
                     <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black w-[18%]">Species</th>
-                    <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black w-[16%]">Sub-Species</th>
-                    <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black w-[16%]">Mutation</th>
-                    <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left w-[16%]">Split</th>
+                    <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black w-[18%]">Sub-Species</th>
+                    <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black w-[18%]">Mutation</th>
+                    <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left w-[18%]">Split</th>
                   </tr></thead>
                   <tbody>
                     {printEmpty ? Array.from({ length: 26 }).map((_, i) => (
@@ -6425,13 +6443,13 @@ function PrintView({ birds, pairs, cages, onBirdRef }: { birds: Bird[], pairs: P
               {qrType === 'pair' && (
                 <table className="w-full border-4 border-black">
                   <thead><tr className="bg-gray-100 border-b-4 border-black">
-                    <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black w-[8%]">Cage</th>
-                    <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black w-[8%]">Sex</th>
+                    <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black w-[5%]">Cage</th>
+                    <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black w-[5%]">Sex</th>
                     <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black w-[18%]">ID / Ring</th>
                     <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black w-[18%]">Species</th>
-                    <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black w-[16%]">Sub-Species</th>
-                    <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black w-[16%]">Mutation</th>
-                    <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left w-[16%]">Split</th>
+                    <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black w-[18%]">Sub-Species</th>
+                    <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black w-[18%]">Mutation</th>
+                    <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left w-[18%]">Split</th>
                   </tr></thead>
                   <tbody>
                     {printEmpty ? Array.from({ length: 15 }).map((_, i) => (
