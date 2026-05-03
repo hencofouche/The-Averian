@@ -6564,54 +6564,75 @@ function PrintView({ birds, pairs, cages, onBirdRef }: { birds: Bird[], pairs: P
                               const pMale = birds.find(b => b.id === pair.maleId);
                               const pFemale = birds.find(b => b.id === pair.femaleId);
                               return (
-                                <div className="flex flex-col h-full justify-center space-y-0.5">
-                                  <p className="text-[7pt] font-black uppercase text-black leading-none truncate">PAIR: {pair.id.slice(0, 8)}</p>
-                                  <div className="border-t border-black/5 mt-1 pt-1 space-y-1">
-                                    <div className="flex flex-col">
-                                      <span className="text-[4pt] font-black uppercase text-gray-400 leading-none">M (♂)</span>
-                                      <span className="text-[6.5pt] font-bold uppercase truncate leading-tight text-black flex items-center gap-1">
-                                        {pMale?.name || 'M?'}
-                                        <span className="text-[5pt] font-mono font-medium text-gray-500">[{pMale?.ringNumber || 'No ID'}]</span>
-                                      </span>
+                                <div className="flex flex-col h-full justify-center space-y-1 py-1">
+                                  <p className="text-[8.5pt] font-black uppercase text-black leading-none truncate mb-1 border-b border-black/10 pb-1">PAIR: {pair.id.slice(0, 8)}</p>
+                                  
+                                  {/* Male Info */}
+                                  <div className="flex flex-col border-l-2 border-blue-500/30 pl-1.5 space-y-0.5">
+                                    <div className="flex items-center justify-between">
+                                      <span className="text-[7.5pt] font-black uppercase text-black truncate flex-1">{pMale?.name || 'M?'}</span>
+                                      <span className="text-[5.5pt] font-black bg-blue-50 text-blue-600 px-1 rounded-sm ml-1">♂</span>
                                     </div>
-                                    <div className="flex flex-col">
-                                      <span className="text-[4pt] font-black uppercase text-gray-400 leading-none">F (♀)</span>
-                                      <span className="text-[6.5pt] font-bold uppercase truncate leading-tight text-black flex items-center gap-1">
-                                        {pFemale?.name || 'F?'}
-                                        <span className="text-[5pt] font-mono font-medium text-gray-500">[{pFemale?.ringNumber || 'No ID'}]</span>
-                                      </span>
+                                    <p className="text-[5.5pt] font-bold text-gray-500 truncate leading-none italic">{pMale?.species || '-'} {pMale?.subSpecies && `(${pMale.subSpecies})`}</p>
+                                    <p className="text-[4.5pt] font-black text-black/40 truncate leading-none uppercase tracking-tighter">
+                                      {pMale?.mutations?.join(', ') || 'Normal'} 
+                                      {pMale?.splitMutations?.length ? ` • Split ${pMale.splitMutations.join(', ')}` : ''}
+                                    </p>
+                                  </div>
+
+                                  {/* Female Info */}
+                                  <div className="flex flex-col border-l-2 border-pink-500/30 pl-1.5 space-y-0.5">
+                                    <div className="flex items-center justify-between">
+                                      <span className="text-[7.5pt] font-black uppercase text-black truncate flex-1">{pFemale?.name || 'F?'}</span>
+                                      <span className="text-[5.5pt] font-black bg-pink-50 text-pink-600 px-1 rounded-sm ml-1">♀</span>
                                     </div>
+                                    <p className="text-[5.5pt] font-bold text-gray-500 truncate leading-none italic">{pFemale?.species || '-'} {pFemale?.subSpecies && `(${pFemale.subSpecies})`}</p>
+                                    <p className="text-[4.5pt] font-black text-black/40 truncate leading-none uppercase tracking-tighter">
+                                      {pFemale?.mutations?.join(', ') || 'Normal'} 
+                                      {pFemale?.splitMutations?.length ? ` • Split ${pFemale.splitMutations.join(', ')}` : ''}
+                                    </p>
                                   </div>
                                 </div>
                               );
                             }
 
                             return (
-                              <div className="flex flex-col h-full justify-center py-0.5 space-y-0.5">
-                                <div className="flex items-center justify-between gap-1 overflow-hidden">
-                                  <p className="text-[8.5pt] font-black uppercase truncate leading-none text-black flex-1">{cardBird?.name || 'Bird'}</p>
+                              <div className="flex flex-col h-full justify-center py-1 space-y-1">
+                                <div className="flex items-center justify-between gap-1 overflow-hidden border-b border-black/10 pb-1 mb-0.5">
+                                  <p className="text-[9.5pt] font-black uppercase truncate leading-none text-black flex-1">{cardBird?.name || 'Bird'}</p>
                                   <span className={cn(
-                                    "text-[6pt] font-black px-1 rounded-sm ring-1 ring-inset",
+                                    "text-[6.5pt] font-black px-1.5 py-0.5 rounded-sm ring-1 ring-inset",
                                     cardBird?.sex === 'Male' ? "bg-blue-50 text-blue-600 ring-blue-100" : cardBird?.sex === 'Female' ? "bg-pink-50 text-pink-600 ring-pink-100" : "bg-gray-50 text-gray-600 ring-gray-100"
                                   )}>
-                                    {cardBird?.sex?.charAt(0) || '?'}
+                                    {cardBird?.sex === 'Male' ? '♂ M' : cardBird?.sex === 'Female' ? '♀ F' : '?'}
                                   </span>
                                 </div>
-                                <p className="text-[6.5pt] font-mono font-black text-gray-400 truncate leading-none uppercase tracking-tighter">ID: {cardBird?.ringNumber || cardBird?.name || 'No ID'}</p>
                                 
-                                <div className="grid grid-cols-1 gap-0.5 mt-1 pt-1 border-t border-black/5">
-                                  <p className="text-[5.5pt] font-bold text-gray-600 truncate leading-none uppercase tracking-wide">
-                                    {cardBird?.species || '-'}
-                                    {cardBird?.subSpecies && <span className="text-gray-300 mx-0.5">•</span>}
-                                    {cardBird?.subSpecies && <span className="text-gray-400 italic lowercase">{cardBird.subSpecies}</span>}
-                                  </p>
-                                  <div className="flex flex-wrap gap-0.5 overflow-hidden max-h-[14pt]">
-                                    {cardBird?.mutations?.slice(0, 2).map((m: string) => (
-                                      <span key={m} className="text-[5pt] font-black text-black/60 bg-gray-100 px-0.5 rounded-sm truncate uppercase">{m}</span>
-                                    ))}
-                                    {cardBird?.splitMutations?.slice(0, 1).map((m: string) => (
-                                      <span key={m} className="text-[5pt] font-black text-secondary italic bg-secondary/10 px-0.5 rounded-sm truncate uppercase">Split {m}</span>
-                                    ))}
+                                <div className="space-y-1.5">
+                                  <div className="flex flex-col">
+                                    <span className="text-[4.5pt] font-black uppercase text-gray-400 leading-none">Species / Sub-Species</span>
+                                    <p className="text-[7pt] font-bold text-gray-900 truncate leading-tight uppercase tracking-tight">
+                                      {cardBird?.species || '-'}
+                                      {cardBird?.subSpecies && <span className="text-gray-300 mx-0.5">•</span>}
+                                      {cardBird?.subSpecies && <span className="text-gray-400 italic lowercase font-medium">{cardBird.subSpecies}</span>}
+                                    </p>
+                                  </div>
+
+                                  <div className="grid grid-cols-2 gap-2">
+                                    <div className="flex flex-col">
+                                      <span className="text-[4.5pt] font-black uppercase text-gray-400 leading-none">Mutations</span>
+                                      <p className="text-[6pt] font-black text-black/80 truncate leading-tight uppercase tracking-tighter">
+                                        {cardBird?.mutations?.join(', ') || 'Normal'}
+                                      </p>
+                                    </div>
+                                    {cardBird?.splitMutations?.length ? (
+                                      <div className="flex flex-col">
+                                        <span className="text-[4.5pt] font-black uppercase text-secondary leading-none">Splits</span>
+                                        <p className="text-[6pt] font-black text-secondary italic truncate leading-tight uppercase tracking-tighter">
+                                          {cardBird.splitMutations.join(', ')}
+                                        </p>
+                                      </div>
+                                    ) : null}
                                   </div>
                                 </div>
                               </div>
@@ -6989,15 +7010,9 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-1">
-          <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Bird Name</label>
-          <Input required value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} placeholder="e.g. Bluey" />
-        </div>
-        <div className="space-y-1">
-          <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Ring ID / Number</label>
-          <Input value={formData.ringNumber} onChange={e => setFormData({ ...formData, ringNumber: e.target.value })} placeholder="e.g. RING-2024-001" />
-        </div>
+      <div className="space-y-1">
+        <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">ID / Number</label>
+        <Input required value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} placeholder="e.g. RING-2024-001" />
       </div>
 
       <div className="grid grid-cols-2 gap-4">
