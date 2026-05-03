@@ -6559,22 +6559,23 @@ function PrintView({ birds, pairs, cages, onBirdRef }: { birds: Bird[], pairs: P
                         )}>
                           {(qrType === 'bird' || qrType === 'pair') && (() => {
                             const cardBird = qrType === 'bird' ? bird : null;
+                            const scale = Math.min(qrWidth, qrHeight) / 50;
                             
                             if (qrType === 'pair' && pair) {
                               const pMale = birds.find(b => b.id === pair.maleId);
                               const pFemale = birds.find(b => b.id === pair.femaleId);
                               return (
                                 <div className="flex flex-col h-full justify-center w-full">
-                                  <div className="flex items-start justify-between gap-2 w-full">
+                                  <div className="flex items-start justify-between gap-1 w-full">
                                     {/* Male Column */}
                                     <div className="flex-1 flex flex-col min-w-0 border-r border-black/5 pr-1">
-                                      <p className="text-[6.5pt] font-black uppercase text-black truncate leading-tight">
+                                      <p style={{ fontSize: `${7 * scale}pt` }} className="font-black uppercase text-black truncate leading-tight">
                                         <span className="text-blue-600 mr-0.5">M</span> {pMale?.name || 'M?'} 
                                         <span className="text-gray-400 font-medium ml-1 lowercase">
                                           {pMale?.species} {pMale?.subSpecies}
                                         </span>
                                       </p>
-                                      <p className="text-[5pt] font-bold text-gray-500 truncate leading-tight uppercase tracking-tighter mt-0.5">
+                                      <p style={{ fontSize: `${5.5 * scale}pt` }} className="font-bold text-gray-500 truncate leading-tight uppercase tracking-tighter mt-0.5">
                                         {pMale?.mutations?.join(', ') || 'Normal'}
                                         {pMale?.splitMutations?.length ? ` / Sp: ${pMale.splitMutations.join(', ')}` : ''}
                                       </p>
@@ -6582,26 +6583,25 @@ function PrintView({ birds, pairs, cages, onBirdRef }: { birds: Bird[], pairs: P
 
                                     {/* Female Column */}
                                     <div className="flex-1 flex flex-col min-w-0 pl-1">
-                                      <p className="text-[6.5pt] font-black uppercase text-black truncate leading-tight">
+                                      <p style={{ fontSize: `${7 * scale}pt` }} className="font-black uppercase text-black truncate leading-tight">
                                         <span className="text-pink-600 mr-0.5">F</span> {pFemale?.name || 'F?'} 
                                         <span className="text-gray-400 font-medium ml-1 lowercase">
                                           {pFemale?.species} {pFemale?.subSpecies}
                                         </span>
                                       </p>
-                                      <p className="text-[5pt] font-bold text-gray-500 truncate leading-tight uppercase tracking-tighter mt-0.5">
+                                      <p style={{ fontSize: `${5.5 * scale}pt` }} className="font-bold text-gray-500 truncate leading-tight uppercase tracking-tighter mt-0.5">
                                         {pFemale?.mutations?.join(', ') || 'Normal'}
                                         {pFemale?.splitMutations?.length ? ` / Sp: ${pFemale.splitMutations.join(', ')}` : ''}
                                       </p>
                                     </div>
                                   </div>
-                                  <p className="text-[4pt] font-bold text-gray-300 uppercase text-center truncate tracking-widest mt-1 pt-1 border-t border-black/5">PAIR: {pair.id.slice(0, 8)}</p>
                                 </div>
                               );
                             }
 
                             return (
                               <div className="flex flex-col h-full justify-center w-full px-1">
-                                <p className="text-[8.5pt] font-black uppercase text-black truncate leading-tight text-center">
+                                <p style={{ fontSize: `${9 * scale}pt` }} className="font-black uppercase text-black truncate leading-tight text-center">
                                   <span className={cn(
                                     "mr-1",
                                     cardBird?.sex === 'Male' ? "text-blue-600" : cardBird?.sex === 'Female' ? "text-pink-600" : "text-gray-400"
@@ -6613,7 +6613,7 @@ function PrintView({ birds, pairs, cages, onBirdRef }: { birds: Bird[], pairs: P
                                     {cardBird?.species} {cardBird?.subSpecies}
                                   </span>
                                 </p>
-                                <p className="text-[6.5pt] font-bold text-gray-500 truncate leading-tight uppercase tracking-tighter mt-1 text-center">
+                                <p style={{ fontSize: `${7 * scale}pt` }} className="font-bold text-gray-500 truncate leading-tight uppercase tracking-tighter mt-1 text-center">
                                   {cardBird?.mutations?.join(', ') || 'Normal'}
                                   {cardBird?.splitMutations?.length ? ` / Split ${cardBird.splitMutations.join(', ')}` : ''}
                                 </p>
@@ -6623,10 +6623,10 @@ function PrintView({ birds, pairs, cages, onBirdRef }: { birds: Bird[], pairs: P
 
                           {qrType === 'cage' && cage && (
                             <div className="flex flex-col items-center justify-center h-full text-center space-y-1">
-                              <p className="text-[12pt] font-black uppercase leading-none tracking-tighter text-black">{cage.name}</p>
+                              <p style={{ fontSize: `${Math.max(8, 14 * (Math.min(qrWidth, qrHeight) / 50))}pt` }} className="font-black uppercase leading-none tracking-tighter text-black">{cage.name}</p>
                               <div className="flex flex-col items-center gap-0.5">
-                                <p className="text-[6pt] font-black text-gray-400 uppercase tracking-widest truncate">{cage.location || 'Aviary'}</p>
-                                <p className="text-[5pt] font-bold text-gray-300 uppercase italic tracking-tighter">{cage.type}</p>
+                                <p style={{ fontSize: `${Math.max(5, 7 * (Math.min(qrWidth, qrHeight) / 50))}pt` }} className="font-black text-gray-400 uppercase tracking-widest truncate">{cage.location || 'Aviary'}</p>
+                                <p style={{ fontSize: `${Math.max(4, 6 * (Math.min(qrWidth, qrHeight) / 50))}pt` }} className="font-bold text-gray-300 uppercase italic tracking-tighter">{cage.type}</p>
                               </div>
                             </div>
                           )}
