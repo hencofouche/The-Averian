@@ -965,6 +965,15 @@ export default function App() {
           fixingSettings.add(user.uid); 
           const trialExpiry = new Date(); 
           trialExpiry.setDate(trialExpiry.getDate() + 30); 
+          const defaultStatuses = ['Sold', 'Deceased'];
+          const existingStatusNames = (data.statuses || []).map(s => s.name);
+          const missingDefaults = defaultStatuses.filter(name => !existingStatusNames.includes(name));
+          
+          const updatedStatuses = [
+            ...(data.statuses || []),
+            ...missingDefaults.map(name => ({ id: crypto.randomUUID(), name }))
+          ];
+
           const updated = { 
             species: data.species || [], 
             subspecies: data.subspecies || [], 
@@ -972,6 +981,7 @@ export default function App() {
             uid: user.uid, 
             currency: data.currency || 'ZAR', 
             ...data, 
+            statuses: updatedStatuses,
             account_expiry_date: trialExpiry.toISOString() 
           }; 
           setDoc(docRef, updated, { merge: true }).catch(e => console.error('Failed to fix settings', e)); 
@@ -988,9 +998,21 @@ export default function App() {
             const updated = { ...data, account_expiry_date: cappedExpiry.toISOString() }; 
             setDoc(docRef, updated, { merge: true }).catch(e => console.error('Failed to cap settings', e)); 
             setUserSettings({ id: docSnap.id, ...updated }); 
-          } else { 
-            setUserSettings({ id: docSnap.id, ...data }); 
-          } 
+          } else {
+            const defaultStatuses = ['Sold', 'Deceased'];
+            const existingStatusNames = (data.statuses || []).map(s => s.name);
+            const missingDefaults = defaultStatuses.filter(name => !existingStatusNames.includes(name));
+
+            if (missingDefaults.length > 0) {
+              const updatedStatuses = [
+                ...(data.statuses || []),
+                ...missingDefaults.map(name => ({ id: crypto.randomUUID(), name }))
+              ];
+              setUserSettings({ id: docSnap.id, ...data, statuses: updatedStatuses });
+            } else {
+              setUserSettings({ id: docSnap.id, ...data });
+            }
+          }
         }
       } else {
         if (docSnap.metadata.fromCache) return;
@@ -3165,18 +3187,9 @@ function BirdCard({ bird, cage, birds, cages, viewMode = 'grid-large', currency,
           )}
         </div>
 
-        {effectiveViewMode !== 'list' && (bird.notes || (bird.statuses && bird.statuses.length > 0)) && (
+        {effectiveViewMode !== 'list' && bird.notes && (
           <div className="pt-3 border-t border-black-800/50 space-y-2">
-            {bird.statuses && bird.statuses.length > 0 && (
-              <div className="flex flex-wrap gap-1">
-                {bird.statuses.map(status => (
-                  <span key={status} className="px-1.5 py-0.5 rounded-sm bg-zinc-700 text-gold-500 text-[9px] font-bold uppercase tracking-wider border border-black-700">
-                    {status}
-                  </span>
-                ))}
-              </div>
-            )}
-            {bird.notes && <p className="text-[11px] text-white leading-relaxed line-clamp-2 italic">"{bird.notes}"</p>}
+            <p className="text-[11px] text-white leading-relaxed line-clamp-2 italic">"{bird.notes}"</p>
           </div>
         )}
       </div>
@@ -5456,7 +5469,7 @@ function SettingsView({ settings, onUpdate, allData, user, isSyncing, setDeleteC
   const removeStatus = (id: string, name: string) => {
     setDeleteConfirmation({
       title: 'Delete Status',
-      message: `Are you sure you want to delete custom status "${name}"?`,
+      message: `Are you sure you want to delete status "${name}"?`,
       onConfirm: () => {
         onUpdate({ ...settings, statuses: settings.statuses?.filter(s => s.id !== id) || [] });
         toast.success('Status removed');
@@ -6041,7 +6054,7 @@ function PrintView({ birds, pairs, cages, onBirdRef }: { birds: Bird[], pairs: P
             min-height: ${qrHeight}mm !important;
             border: ${isThermal ? 'none' : '2px solid black'} !important;
             display: flex !important;
-            flex-direction: column !important;
+            flex-direction: ${qrLayout === 'horizontal' ? 'row' : 'column'} !important;
             align-items: center !important;
             justify-content: center !important;
             padding: 2mm !important;
@@ -6522,98 +6535,100 @@ function PrintView({ birds, pairs, cages, onBirdRef }: { birds: Bird[], pairs: P
                  const cage = cages.find(c => c.id === id);
 
                  return (
-                   <div key={id} className="qr-print-item justify-center">
-                       <div className={cn("flex-1 flex w-full min-h-0 overflow-hidden", qrLayout === 'horizontal' ? "flex-row items-center gap-1.5" : "flex-col items-center justify-between")}>
-                         <div className={cn("flex flex-col items-center justify-center shrink-0 w-full h-full", qrLayout === 'horizontal' ? "w-[45%]" : "h-[75%]")}>
-                           <QRCodeSVG 
-                             value={getQRData(id)} 
-                             size={256} 
-                             level="H" 
-                             bgColor="#ffffff"
-                             fgColor="#000000"
-                             style={{ width: '100%', height: '100%', maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
-                           />
-                         </div>
-                         
-                         <div className={cn("flex flex-col text-left overflow-hidden bg-white w-full h-full", qrLayout === 'horizontal' ? "w-[55%] justify-center ml-[1mm]" : "h-[25%] mt-[0.5mm] justify-end")}>
-                           {(qrType === 'bird' || qrType === 'pair') && (() => {
-                             const cardBird = qrType === 'bird' ? bird : null;
-                             
-                             if (qrType === 'pair' && pair) {
-                               const pMale = birds.find(b => b.id === pair.maleId);
-                               const pFemale = birds.find(b => b.id === pair.femaleId);
-                               return (
-                                 <div className="flex flex-col h-full justify-between gap-0.5">
-                                   <div className="flex flex-col border-b-[1.5px] border-black pb-[0.5mm] mb-[0.5mm] shrink-0">
-                                     <p className="text-[6pt] font-black uppercase truncate leading-none text-black">♂ {pMale?.name || 'Unknown'}</p>
-                                     <p className="text-[6pt] font-black uppercase truncate leading-none text-black mt-[0.5mm]">♀ {pFemale?.name || 'Unknown'}</p>
-                                   </div>
-                                   <div className="grid grid-cols-2 gap-x-[1.5mm] gap-y-[0.5mm] shrink-0 max-h-full overflow-hidden">
-                                     <div className="flex flex-col border-b-[1.5px] border-black pb-[0.5mm]">
-                                       <span className="text-[4pt] font-black uppercase text-black leading-none mt-[0.5mm]">♂ Species</span>
-                                       <span className="text-[5pt] font-bold uppercase truncate leading-tight text-black">{pMale?.species || '\u00A0'}</span>
-                                     </div>
-                                     <div className="flex flex-col border-b-[1.5px] border-black pb-[0.5mm]">
-                                       <span className="text-[4pt] font-black uppercase text-black leading-none mt-[0.5mm]">♀ Species</span>
-                                       <span className="text-[5pt] font-bold uppercase truncate leading-tight text-black">{pFemale?.species || '\u00A0'}</span>
-                                     </div>
-                                     <div className="flex flex-col border-b-[1.5px] border-black pb-[0.5mm] col-span-2">
-                                       <span className="text-[4pt] font-black uppercase text-black leading-none mt-[0.5mm]">Started</span>
-                                       <span className="text-[5pt] font-bold uppercase truncate leading-tight text-black">{pair.startDate || '\u00A0'}</span>
-                                     </div>
-                                   </div>
-                                 </div>
-                               );
-                             }
+                    <div key={id} className={cn(
+                      "qr-print-item bg-white p-[1.5mm] rounded border border-black/10",
+                      qrLayout === 'horizontal' ? "flex-row" : "flex-col"
+                    )}>
+                        <div className={cn(
+                          "flex flex-col items-center justify-center shrink-0 overflow-hidden",
+                          qrLayout === 'horizontal' ? "w-[40%] h-full pr-1" : "w-full h-[60%] pb-1"
+                        )}>
+                          <QRCodeSVG 
+                            value={getQRData(id)} 
+                            size={512} 
+                            level="H" 
+                            bgColor="#ffffff"
+                            fgColor="#000000"
+                            style={{ width: '100%', height: '100%', maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
+                          />
+                        </div>
+                        
+                        <div className={cn(
+                          "flex flex-col text-left overflow-hidden bg-white px-1 justify-center border-black/10",
+                          qrLayout === 'horizontal' ? "flex-1 h-full border-l pl-2" : "w-full h-[40%] border-t pt-1.5"
+                        )}>
+                          {(qrType === 'bird' || qrType === 'pair') && (() => {
+                            const cardBird = qrType === 'bird' ? bird : null;
+                            
+                            if (qrType === 'pair' && pair) {
+                              const pMale = birds.find(b => b.id === pair.maleId);
+                              const pFemale = birds.find(b => b.id === pair.femaleId);
+                              return (
+                                <div className="flex flex-col h-full justify-center space-y-0.5">
+                                  <p className="text-[7pt] font-black uppercase text-black leading-none truncate">PAIR: {pair.id.slice(0, 8)}</p>
+                                  <div className="border-t border-black/5 mt-1 pt-1 space-y-1">
+                                    <div className="flex flex-col">
+                                      <span className="text-[4pt] font-black uppercase text-gray-400 leading-none">M (♂)</span>
+                                      <span className="text-[6.5pt] font-bold uppercase truncate leading-tight text-black flex items-center gap-1">
+                                        {pMale?.name || 'M?'}
+                                        <span className="text-[5pt] font-mono font-medium text-gray-500">[{pMale?.ringNumber || 'No ID'}]</span>
+                                      </span>
+                                    </div>
+                                    <div className="flex flex-col">
+                                      <span className="text-[4pt] font-black uppercase text-gray-400 leading-none">F (♀)</span>
+                                      <span className="text-[6.5pt] font-bold uppercase truncate leading-tight text-black flex items-center gap-1">
+                                        {pFemale?.name || 'F?'}
+                                        <span className="text-[5pt] font-mono font-medium text-gray-500">[{pFemale?.ringNumber || 'No ID'}]</span>
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            }
 
-                             return (
-                               <div className="flex flex-col h-full justify-between gap-0.5">
-                                 {/* Top row: Name/Ring and Sex */}
-                                 <div className="flex justify-between items-end border-b-[1.5px] border-black pb-[0.5mm] mb-[0.5mm] shrink-0">
-                                   <div className="min-w-0 flex-1 pr-1 flex flex-col justify-end">
-                                     <p className="text-[7.5pt] font-black uppercase truncate leading-none text-black">{cardBird?.name || (qrType === 'pair' && pair ? pair.id.slice(0, 8) : '')}</p>
-                                     <p className="text-[5.5pt] font-mono font-bold text-gray-700 truncate leading-none mt-[0.5mm]">{cardBird?.ringNumber ? `#${cardBird.ringNumber}` : '\u00A0'}</p>
-                                   </div>
-                                   <div className="flex gap-[1mm] pb-[0.5mm] shrink-0">
-                                     <div className="flex items-center gap-[0.5mm]"><span className="text-[5.5pt] font-black leading-none text-black">M</span><div className={cn("w-[2.5mm] h-[2.5mm] border-[0.7px] border-black", cardBird?.sex === 'Male' && "bg-black")}/></div>
-                                     <div className="flex items-center gap-[0.5mm]"><span className="text-[5.5pt] font-black leading-none text-black">F</span><div className={cn("w-[2.5mm] h-[2.5mm] border-[0.7px] border-black", cardBird?.sex === 'Female' && "bg-black")}/></div>
-                                     <div className="flex items-center gap-[0.5mm]"><span className="text-[5.5pt] font-black leading-none text-black">NS</span><div className={cn("w-[2.5mm] h-[2.5mm] border-[0.7px] border-black", cardBird?.sex === 'Unknown' && "bg-black")}/></div>
-                                   </div>
-                                 </div>
-                                 
-                                 <div className="grid grid-cols-2 gap-x-[1.5mm] gap-y-[0.5mm] shrink-0 max-h-full overflow-hidden">
-                                   <div className="flex flex-col border-b-[1.5px] border-black pb-[0.5mm]">
-                                     <span className="text-[4pt] font-black uppercase text-black leading-none mt-[0.5mm]">Species</span>
-                                     <span className="text-[5.5pt] font-bold uppercase truncate leading-tight text-black">{cardBird?.species || '\u00A0'}</span>
-                                   </div>
-                                   <div className="flex flex-col border-b-[1.5px] border-black pb-[0.5mm]">
-                                     <span className="text-[4pt] font-black uppercase text-black leading-none mt-[0.5mm]">Sub Species</span>
-                                     <span className="text-[5.5pt] font-bold uppercase truncate leading-tight text-black">{cardBird?.subSpecies || '\u00A0'}</span>
-                                   </div>
-                                   <div className="flex flex-col border-b-[1.5px] border-black pb-[0.5mm]">
-                                     <span className="text-[4pt] font-black uppercase text-black leading-none mt-[0.5mm]">Mutation</span>
-                                     <span className="text-[5.5pt] font-bold uppercase truncate leading-tight text-black">{cardBird?.mutations?.join(', ') || '\u00A0'}</span>
-                                   </div>
-                                   <div className="flex flex-col border-b-[1.5px] border-black pb-[0.5mm]">
-                                     <span className="text-[4pt] font-black uppercase text-black leading-none mt-[0.5mm]">Split Mutation</span>
-                                     <span className="text-[5.5pt] font-bold uppercase truncate leading-tight text-black">{cardBird?.splitMutations?.join(', ') || '\u00A0'}</span>
-                                   </div>
-                                 </div>
-                               </div>
-                             );
-                           })()}
+                            return (
+                              <div className="flex flex-col h-full justify-center py-0.5 space-y-0.5">
+                                <div className="flex items-center justify-between gap-1 overflow-hidden">
+                                  <p className="text-[8.5pt] font-black uppercase truncate leading-none text-black flex-1">{cardBird?.name || 'Bird'}</p>
+                                  <span className={cn(
+                                    "text-[6pt] font-black px-1 rounded-sm ring-1 ring-inset",
+                                    cardBird?.sex === 'Male' ? "bg-blue-50 text-blue-600 ring-blue-100" : cardBird?.sex === 'Female' ? "bg-pink-50 text-pink-600 ring-pink-100" : "bg-gray-50 text-gray-600 ring-gray-100"
+                                  )}>
+                                    {cardBird?.sex?.charAt(0) || '?'}
+                                  </span>
+                                </div>
+                                <p className="text-[6.5pt] font-mono font-black text-gray-400 truncate leading-none uppercase tracking-tighter">ID: {cardBird?.ringNumber || cardBird?.name || 'No ID'}</p>
+                                
+                                <div className="grid grid-cols-1 gap-0.5 mt-1 pt-1 border-t border-black/5">
+                                  <p className="text-[5.5pt] font-bold text-gray-600 truncate leading-none uppercase tracking-wide">
+                                    {cardBird?.species || '-'}
+                                    {cardBird?.subSpecies && <span className="text-gray-300 mx-0.5">•</span>}
+                                    {cardBird?.subSpecies && <span className="text-gray-400 italic lowercase">{cardBird.subSpecies}</span>}
+                                  </p>
+                                  <div className="flex flex-wrap gap-0.5 overflow-hidden max-h-[14pt]">
+                                    {cardBird?.mutations?.slice(0, 2).map((m: string) => (
+                                      <span key={m} className="text-[5pt] font-black text-black/60 bg-gray-100 px-0.5 rounded-sm truncate uppercase">{m}</span>
+                                    ))}
+                                    {cardBird?.splitMutations?.slice(0, 1).map((m: string) => (
+                                      <span key={m} className="text-[5pt] font-black text-secondary italic bg-secondary/10 px-0.5 rounded-sm truncate uppercase">Split {m}</span>
+                                    ))}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })()}
 
-   
-                           {qrType === 'cage' && cage && (
-                             <div className="flex flex-col items-center justify-center h-full text-center">
-                               <p className="text-[14pt] font-black uppercase leading-none tracking-tighter text-black">{cage.name}</p>
-                               <p className="text-[7pt] font-black text-gray-700 uppercase tracking-widest truncate mt-[1mm]">{cage.location || 'Aviary'}</p>
-                               <p className="text-[6pt] text-gray-500 uppercase font-bold mt-[0.5mm]">{cage.type}</p>
-                             </div>
-                           )}
-                         </div>
-                       </div>
-                     </div>
+                          {qrType === 'cage' && cage && (
+                            <div className="flex flex-col items-center justify-center h-full text-center space-y-1">
+                              <p className="text-[12pt] font-black uppercase leading-none tracking-tighter text-black">{cage.name}</p>
+                              <div className="flex flex-col items-center gap-0.5">
+                                <p className="text-[6pt] font-black text-gray-400 uppercase tracking-widest truncate">{cage.location || 'Aviary'}</p>
+                                <p className="text-[5pt] font-bold text-gray-300 uppercase italic tracking-tighter">{cage.type}</p>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
                  );
                })}
             </div>
@@ -6780,15 +6795,18 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
     mutations: [],
     splitMutations: [],
     statuses: [],
-    imageUrl: '' 
+    imageUrl: '',
+    ringNumber: ''
   });
   const [addToExpenses, setAddToExpenses] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [recordSale, setRecordSale] = useState(true);
+  const [salePrice, setSalePrice] = useState(formData.estimatedValue || 0);
+  const [buyerId, setBuyerId] = useState('');
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [isUploadingDoc, setIsUploadingDoc] = useState(false);
   const [docType, setDocType] = useState('General');
-  const [newStatus, setNewStatus] = useState('');
 
   const handleDocUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -6829,6 +6847,8 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
     .map(ss => ({ id: ss.id, name: ss.name })) || [];
   const mutationOptions = userSettings?.mutations.map(m => ({ id: m.id, name: m.name })) || [];
   const statusOptions = userSettings?.statuses?.map(s => ({ id: s.id, name: s.name })) || [];
+  const isPreviouslySold = initialData?.statuses?.some(s => s === 'Sold');
+  const isCurrentlySold = formData.statuses?.some(s => s === 'Sold');
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -6934,6 +6954,20 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
             uid: user.uid
           });
         }
+
+        if (recordSale && isCurrentlySold && !isPreviouslySold && salePrice > 0) {
+          const transRef = doc(collection(db, 'transactions'));
+          batch.set(transRef, {
+            type: 'Income',
+            category: 'Bird Sale',
+            amount: salePrice,
+            date: format(new Date(), 'yyyy-MM-dd'),
+            description: `Sale of bird: ${formData.name}`,
+            birdId: birdId,
+            contactId: buyerId || '',
+            uid: user.uid
+          });
+        }
         
         // Fire and forget commit to support seamless offline UX
         batch.commit().catch(err => {
@@ -6957,9 +6991,16 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1">
-          <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Ring Number / Name</label>
-          <Input required value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} placeholder="e.g. RING-2024-001" />
+          <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Bird Name</label>
+          <Input required value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} placeholder="e.g. Bluey" />
         </div>
+        <div className="space-y-1">
+          <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Ring ID / Number</label>
+          <Input value={formData.ringNumber} onChange={e => setFormData({ ...formData, ringNumber: e.target.value })} placeholder="e.g. RING-2024-001" />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
         <SearchableSelect 
           label="Species"
           options={speciesOptions}
@@ -6971,9 +7012,6 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
           onAdd={onAddSpecies}
           placeholder="Select Species"
         />
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
         <SearchableSelect 
           label="Sub-Species"
           options={subSpeciesOptions}
@@ -7054,6 +7092,38 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
           placeholder="Select or add statuses"
         />
       </div>
+
+      {isCurrentlySold && !isPreviouslySold && (
+        <div className="p-4 bg-gold-500/10 border border-gold-500/20 rounded-2xl space-y-3">
+          <div className="flex items-center gap-2 text-gold-500">
+            <DollarSign size={18} />
+            <h4 className="text-xs font-black uppercase tracking-widest">Record Sale as Income?</h4>
+          </div>
+          <p className="text-[10px] text-white/60">This bird is marked as Sold. Would you like to record the transaction for profit tracking?</p>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <label className="text-[9px] font-bold text-white/40 uppercase tracking-tighter">Sale Price ({symbol})</label>
+              <Input type="number" value={salePrice} onChange={e => setSalePrice(parseFloat(e.target.value) || 0)} />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[9px] font-bold text-white/40 uppercase tracking-tighter">Buyer</label>
+              <Select value={buyerId} onChange={e => setBuyerId(e.target.value)}>
+                <option value="" className="bg-black text-white">Unknown / None</option>
+                {contacts.map(c => <option key={c.id} value={c.id} className="bg-black text-white">{c.name}</option>)}
+              </Select>
+            </div>
+          </div>
+          <label className="flex items-center gap-2 cursor-pointer group">
+            <input 
+              type="checkbox" 
+              checked={recordSale} 
+              onChange={e => setRecordSale(e.target.checked)}
+              className="w-4 h-4 rounded border-black-700 bg-black text-gold-500 focus:ring-gold-500/20"
+            />
+            <span className="text-[10px] font-bold text-white/60 group-hover:text-white transition-colors">Record as Sales Income</span>
+          </label>
+        </div>
+      )}
       
       <div className="space-y-1">
         <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Image</label>
@@ -7223,34 +7293,6 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
           Add Purchase to Expenses
         </label>
       </div>
-
-      <div className="space-y-2">
-        <label className="text-[10px] font-black text-black-100 uppercase tracking-widest ml-1">Statuses</label>
-          <div className="flex gap-2">
-            <Input 
-              placeholder="Add status (e.g., Sold, Sick)..." 
-              value={newStatus} 
-              onChange={e => setNewStatus(e.target.value)}
-              onKeyDown={e => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  if (newStatus.trim()) {
-                    setFormData({ ...formData, statuses: [...(formData.statuses || []), newStatus.trim()] });
-                    setNewStatus('');
-                  }
-                }
-              }}
-            />
-          </div>
-          <div className="flex flex-wrap gap-1">
-            {formData.statuses?.map((s, i) => (
-              <Badge key={i} className="flex items-center gap-1 bg-zinc-700 border-black-700 text-gold-500">
-                {s}
-                <button type="button" onClick={() => setFormData({ ...formData, statuses: formData.statuses?.filter((_, idx) => idx !== i) })} className="hover:text-white"><X size={10} /></button>
-              </Badge>
-            ))}
-          </div>
-        </div>
 
       <div className="space-y-1">
         <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Notes</label>
