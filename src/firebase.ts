@@ -1,27 +1,21 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth';
-import { 
-  getFirestore, 
-  doc, 
-  initializeFirestore,
-  persistentLocalCache,
-  persistentMultipleTabManager,
-  getDocFromServer
-} from 'firebase/firestore';
+import { getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager, doc, getDocFromServer } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import firebaseConfig from '../firebase-applet-config.json';
 import { OperationType, FirestoreErrorInfo } from './types';
 
-// Initialize Firebase App
-const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+export const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
-// Configure Firestore with IndexedDB persistence (Modular v10+)
-// persistentLocalCache is preferred over enableIndexedDbPersistence for v10+
-export const db = initializeFirestore(app, {
-  localCache: persistentLocalCache({ 
-    tabManager: persistentMultipleTabManager() // Supports multiple tabs
-  })
-}, firebaseConfig.firestoreDatabaseId);
+let dbInstance;
+try {
+  dbInstance = initializeFirestore(app, {
+    localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
+  }, firebaseConfig.firestoreDatabaseId);
+} catch (error) {
+  dbInstance = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+}
+export const db = dbInstance;
 
 export const auth = getAuth(app);
 export const storage = getStorage(app);
@@ -61,7 +55,9 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
 
 export async function testConnection() {
   try {
-    await getDocFromServer(doc(db, 'test', 'connection'));
+    if (db) {
+      await getDocFromServer(doc(db, 'test', 'connection'));
+    }
   } catch (error) {
     if (error instanceof Error && error.message.includes('the client is offline')) {
       console.error("Please check your Firebase configuration.");
@@ -69,4 +65,3 @@ export async function testConnection() {
   }
 }
 
-testConnection();

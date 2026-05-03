@@ -31,7 +31,7 @@ import {
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { 
-  Bird, Cage, Pair, Task, Transaction, OperationType, BreedingRecord, UserSettings, Species, SubSpecies, Mutation, SharedItem, Contact, BirdDocument
+  Bird, Cage, Pair, Task, Transaction, OperationType, BreedingRecord, UserSettings, Species, SubSpecies, Mutation, SharedItem, Contact, BirdDocument, Egg as EggType
 } from './types';
 import { cn, generateColorPalette } from './lib/utils';
 import ColorWheel from '@uiw/react-color-wheel';
@@ -147,7 +147,7 @@ const Input = ({ className, id, name, ...props }: React.InputHTMLAttributes<HTML
 const Select = ({ className, children, id, name, ...props }: React.SelectHTMLAttributes<HTMLSelectElement>) => { const generatedId = React.useId(); return ( <select id={id || generatedId} name={name || id || generatedId} className={cn('w-full px-4 py-3 bg-black border border-black-700 text-white rounded-2xl focus:outline-none focus:ring-2 focus:ring-gold-500/20 focus:border-gold-500 transition-all appearance-none text-sm font-medium', className)} {...props} > {children} </select> ); };
 
 const Card = ({ children, className, ...props }: { children: React.ReactNode, className?: string } & React.HTMLAttributes<HTMLDivElement>) => (
-  <div className={cn('bg-black-950 border border-black-700 rounded-2xl overflow-hidden shadow-2xl', className)} {...props}>
+  <div className={cn('bg-black-950 border border-black-700 rounded-2xl overflow-hidden shadow-2xl w-full', className)} {...props}>
     {children}
   </div>
 );
@@ -183,7 +183,7 @@ const BirdCompactInfo = ({ bird, cages, className, onClick }: { bird: Bird, cage
   const cage = cages.find(c => c.id === bird.cageId);
   return (
     <div 
-      className={cn("flex flex-col gap-1.5 p-2.5 bg-zinc-900/60 rounded-xl border border-white/10 transition-all text-left w-full", onClick && "cursor-pointer hover:bg-gold-500/10 hover:border-gold-500/30", className)}
+      className={cn("flex flex-col gap-1.5 p-2.5 bg-zinc-900/60 rounded-xl border border-white/10 transition-all text-left w-full min-w-0", onClick && "cursor-pointer hover:bg-gold-500/10 hover:border-gold-500/30", className)}
       onClick={(e) => {
         if (onClick) {
           e.stopPropagation();
@@ -191,19 +191,19 @@ const BirdCompactInfo = ({ bird, cages, className, onClick }: { bird: Bird, cage
         }
       }}
     >
-      <div className="flex items-center gap-2">
-        <span className="text-xs font-black text-white uppercase tracking-tight truncate">{bird.name}</span>
+      <div className="flex items-center gap-2 min-w-0">
+        <span className="text-xs font-black text-white uppercase tracking-tight truncate flex-1 min-w-0">{bird.name}</span>
         <Badge variant={bird.sex === 'Male' ? 'male' : bird.sex === 'Female' ? 'female' : 'neutral'} className="text-[7px] py-0 px-1 shrink-0">{bird.sex}</Badge>
         {cage && (
-          <span className="text-[8px] font-bold text-sky-400/80 uppercase flex items-center gap-1 shrink-0 ml-auto bg-sky-400/5 px-1.5 py-0.5 rounded-md border border-sky-400/10">
-            <Home size={8} /> {cage.name}
+          <span className="text-[8px] font-bold text-sky-400/80 uppercase flex items-center gap-1 shrink-0 ml-auto bg-sky-400/5 px-1.5 py-0.5 rounded-md border border-sky-400/10 truncate max-w-[80px]">
+            <Home size={8} className="shrink-0" /> <span className="truncate">{cage.name}</span>
           </span>
         )}
       </div>
-      <div className="flex flex-wrap gap-x-2 items-center text-[10px]">
-        <span className="text-gold-500 font-black uppercase tracking-tight">{bird.species}</span>
-        {bird.subSpecies && <span className="text-white/20">•</span>}
-        {bird.subSpecies && <span className="text-white/50 font-bold uppercase tracking-tighter text-[9px]">{bird.subSpecies}</span>}
+      <div className="flex flex-wrap gap-x-2 items-center text-[10px] min-w-0">
+        <span className="text-gold-500 font-black uppercase tracking-tight truncate max-w-full">{bird.species}</span>
+        {bird.subSpecies && <span className="text-white/20 shrink-0">•</span>}
+        {bird.subSpecies && <span className="text-white/50 font-bold uppercase tracking-tighter text-[9px] truncate max-w-full">{bird.subSpecies}</span>}
       </div>
       {(bird.mutations?.length || bird.splitMutations?.length) ? (
         <div className="flex flex-wrap gap-1 mt-0.5">
@@ -222,6 +222,132 @@ const BirdCompactInfo = ({ bird, cages, className, onClick }: { bird: Bird, cage
     </div>
   );
 };
+
+const PedigreeNode = ({ bird, roleLabel, generation, onBirdRef, cages }: { bird?: Bird, roleLabel?: string, generation: number, onBirdRef: (name: string) => void, cages: Cage[] }) => {
+  const abbreviatedRole = roleLabel?.includes('Grandsire') ? 'GS' : 
+                         roleLabel?.includes('Granddam') ? 'GD' : 
+                         roleLabel?.[0];
+
+  const cage = bird ? cages.find(c => c.id === bird.cageId) : null;
+
+  return (
+    <div className="flex flex-col items-center w-full min-w-0">
+      <div className={cn(
+        "relative z-10 transition-all duration-300 w-full",
+        generation === 1 ? "max-w-[210px] sm:max-w-[310px]" : 
+        generation === 2 ? "max-w-[170px] sm:max-w-[260px]" : 
+        "max-w-[140px] sm:max-w-[220px]"
+      )}>
+        {roleLabel && (
+          <p className="absolute -top-2 left-1/2 -translate-x-1/2 text-[7px] sm:text-[9px] font-black uppercase tracking-widest text-gold-500/90 bg-black px-1.5 py-0.5 rounded-full z-20 border border-gold-500/30 whitespace-nowrap shadow-xl">
+            <span className="sm:hidden">{abbreviatedRole}</span>
+            <span className="hidden sm:inline">{roleLabel}</span>
+          </p>
+        )}
+        {bird ? (
+          <div 
+            onClick={() => onBirdRef(bird.name)}
+            className={cn(
+              "flex flex-row bg-zinc-900 border border-white/10 rounded-lg sm:rounded-2xl cursor-pointer hover:border-gold-500/50 transition-all shadow-2xl w-full group overflow-hidden h-full",
+              generation === 1 ? "border-gold-500/40 ring-4 ring-gold-500/5" : ""
+            )}
+          >
+            {bird.imageUrl ? (
+              <div className="w-10 sm:w-20 shrink-0 relative border-r border-white/5">
+                <img src={bird.imageUrl} alt={bird.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+              </div>
+            ) : (
+              <div className="w-10 sm:w-20 shrink-0 bg-zinc-800 flex items-center justify-center border-r border-white/5">
+                <BirdIcon size={24} className="text-white/10" />
+              </div>
+            )}
+            
+            <div className="flex-1 p-2 sm:p-3 min-w-0 flex flex-col justify-center gap-0.5 sm:gap-1">
+              <div className="flex items-center justify-between gap-1 min-w-0">
+                 <span className={cn(
+                   "font-black text-white uppercase truncate",
+                   generation === 3 ? "text-[8px] sm:text-xs" : "text-[10px] sm:text-base"
+                 )}>{bird.name}</span>
+                 <Badge variant={bird.sex === 'Male' ? 'male' : bird.sex === 'Female' ? 'female' : 'neutral'} className="text-[5px] sm:text-[7px] py-0 px-1 shrink-0 uppercase font-black">{bird.sex?.[0] || '?'}</Badge>
+              </div>
+
+              <div className="text-left leading-tight">
+                <div className="flex flex-wrap items-center gap-x-1 gap-y-0.5 text-[6px] sm:text-[10px]">
+                  <span className="text-gold-500 font-bold uppercase truncate">{bird.species}</span>
+                  {bird.subSpecies && <span className="text-white/30 truncate">({bird.subSpecies})</span>}
+                  {bird.ringNumber && <span className="text-white/40 font-mono tracking-tighter">#{bird.ringNumber}</span>}
+                </div>
+                
+                {bird.mutations && bird.mutations.length > 0 && (
+                  <div className="flex flex-wrap gap-0.5 mt-0.5">
+                    {bird.mutations.map(m => (
+                      <span key={m} className="text-[5px] sm:text-[8px] px-1 bg-emerald-500/10 text-emerald-400 font-black uppercase italic rounded border border-emerald-500/10 truncate">{m}</span>
+                    ))}
+                  </div>
+                )}
+
+                {bird.splitMutations && bird.splitMutations.length > 0 && (
+                  <div className="flex flex-wrap gap-0.5 mt-0.5">
+                    {bird.splitMutations.map(m => (
+                      <span key={m} className="text-[5px] sm:text-[8px] px-1 bg-sky-500/10 text-sky-400 font-black uppercase italic rounded border border-sky-500/10 truncate">/ {m}</span>
+                    ))}
+                  </div>
+                )}
+                
+                <div className="flex flex-col gap-0.5 mt-1 pt-1 border-t border-white/5">
+                  <div className="flex items-center justify-between gap-1 text-[5px] sm:text-[9px]">
+                    <div className="flex items-center gap-0.5 truncate">
+                      <div className={cn("w-1 h-1 rounded-full shrink-0", bird.statuses?.includes('Active') ? 'bg-emerald-500' : 'bg-zinc-500')} />
+                      <span className="text-white/50 uppercase font-black tracking-tighter truncate">{bird.statuses?.[0] || 'ACTIVE'}</span>
+                    </div>
+                    {bird.birthDate && <span className="text-white/30 uppercase font-bold text-[4px] sm:text-[8px]">{bird.birthDate}</span>}
+                  </div>
+                  {cage && <span className="text-[5px] sm:text-[8px] text-white/20 italic truncate font-bold text-right leading-none">CAGE: {cage.name}</span>}
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="p-3 sm:p-6 bg-black/20 border border-white/5 rounded-lg sm:rounded-2xl border-dashed text-center opacity-30 flex flex-col items-center justify-center min-h-[50px] sm:min-h-[100px]">
+             <p className="text-[7px] sm:text-[10px] font-black uppercase tracking-widest text-white/30 truncate px-2">UNKNOWN</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const VerticalPedigreeNode = ({ birdId, birds, cages, onBirdRef, generation = 1, maxGenerations = 3, roleLabel }: { birdId?: string, birds: Bird[], cages: Cage[], onBirdRef: (name: string) => void, generation?: number, maxGenerations?: number, roleLabel?: string }) => {
+  const bird = birds.find(b => b.id === birdId);
+
+  if (generation > maxGenerations) return null;
+
+  return (
+    <div className="flex flex-col items-center">
+      <PedigreeNode bird={bird} roleLabel={roleLabel} generation={generation} onBirdRef={onBirdRef} cages={cages} />
+
+      {generation < maxGenerations && (
+        <>
+          <div className="w-[1px] h-3 sm:h-8 bg-white/20 print:bg-black/20 mt-1 sm:mt-2"></div>
+          <div className="flex flex-row gap-1 sm:gap-8 relative">
+             <div className="absolute top-0 left-1/4 right-1/4 h-[1px] bg-white/20 print:bg-black/20 pointer-events-none"></div>
+             
+             <div className="flex flex-col items-center relative pt-2 sm:pt-8 flex-1">
+                <div className="absolute top-0 left-1/2 w-[1px] h-3 sm:h-8 bg-white/20 print:bg-black/20 -translate-x-1/2 pointer-events-none"></div>
+                <VerticalPedigreeNode birdId={bird?.fatherId} birds={birds} cages={cages} onBirdRef={onBirdRef} generation={generation + 1} maxGenerations={maxGenerations} roleLabel={generation === 1 ? 'Sire' : 'Grandsire'} />
+             </div>
+             
+             <div className="flex flex-col items-center relative pt-2 sm:pt-8 flex-1">
+                <div className="absolute top-0 left-1/2 w-[1px] h-3 sm:h-8 bg-white/20 print:bg-black/20 -translate-x-1/2 pointer-events-none"></div>
+                <VerticalPedigreeNode birdId={bird?.motherId} birds={birds} cages={cages} onBirdRef={onBirdRef} generation={generation + 1} maxGenerations={maxGenerations} roleLabel={generation === 1 ? 'Dam' : 'Granddam'} />
+             </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
+
 
 export const SearchableSelect = ({ 
   label, 
@@ -450,7 +576,7 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [isScanModalOpen, setIsScanModalOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'birds' | 'cages' | 'pairs' | 'breeding' | 'financials' | 'tasks' | 'settings' | 'genetics' | 'contacts' | 'stats' | 'print'>('birds');
+  const [activeTab, setActiveTab] = useState<'birds' | 'cages' | 'pairs' | 'breeding' | 'financials' | 'tasks' | 'settings' | 'genetics' | 'contacts' | 'stats' | 'print' | 'pedigree' | 'subscription'>('birds');
   const [statsFilter, setStatsFilter] = useState<{ birdId?: string, pairId?: string } | null>(null);
   const [activeSubTab, setActiveSubTab] = useState<'overview' | 'pairs' | 'contacts'>('overview');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -478,7 +604,7 @@ export default function App() {
   const [tasksLimit, setTasksLimit] = useState(50);
   
   const [searchQuery, setSearchQuery] = useState('');
-  const [navigationHistory, setNavigationHistory] = useState<{ tab: string, query: string } | null>(null);
+  const [navigationHistory, setNavigationHistory] = useState<{ tab: string, query: string, filter: any } | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<any>(null);
   const [deleteConfirmation, setDeleteConfirmation] = useState<{ title: string, message: string, onConfirm: () => Promise<void> | void } | null>(null);
@@ -614,11 +740,12 @@ export default function App() {
     const qBreeding = query(
       collection(db, 'breedingRecords'), 
       where('uid', '==', user.uid), 
-      orderBy('startDate', 'desc'),
       limit(breedingLimit)
     );
     const unsubBreeding = onSnapshot(qBreeding, (snapshot) => {
-      setBreedingRecords(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as BreedingRecord)));
+      const records = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as BreedingRecord));
+      records.sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime());
+      setBreedingRecords(records);
       setIsSyncing(snapshot.metadata.hasPendingWrites);
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'breedingRecords'));
 
@@ -631,11 +758,12 @@ export default function App() {
     const qTransactions = query(
       collection(db, 'transactions'), 
       where('uid', '==', user.uid), 
-      orderBy('date', 'desc'), 
       limit(transactionLimit)
     );
     const unsubTransactions = onSnapshot(qTransactions, (snapshot) => {
-      setTransactions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Transaction)));
+      const records = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Transaction));
+      records.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      setTransactions(records);
       setIsSyncing(snapshot.metadata.hasPendingWrites);
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'transactions'));
 
@@ -841,7 +969,7 @@ export default function App() {
       default:
         return [];
     }
-  }, [activeTab, birds, cages, pairs, tasks, transactions, contacts, searchQuery]);
+  }, [activeTab, birds, cages, pairs, breedingRecords, tasks, transactions, contacts, searchQuery]);
 
   const handleLogin = async () => {
     if (isLoggingIn) return;
@@ -1002,8 +1130,12 @@ export default function App() {
   const handleNavigate = (tab: any, query: string = '', filter: { birdId?: string, pairId?: string } | null = null, isDirectNav: boolean = false) => {
     if (isDirectNav) {
       setNavigationHistory(null);
-    } else if (activeTab !== tab || searchQuery !== query) {
-      setNavigationHistory({ tab: activeTab, query: searchQuery });
+    } else {
+      // Save current state to history if it's different
+      const isPedigreeChange = tab === 'pedigree' && activeTab === 'pedigree' && searchQuery !== query;
+      if (activeTab !== tab || isPedigreeChange || searchQuery !== query) {
+        setNavigationHistory({ tab: activeTab, query: searchQuery, filter: statsFilter });
+      }
     }
     setActiveTab(tab);
     setSearchQuery(query);
@@ -1013,10 +1145,22 @@ export default function App() {
 
   const handleGoBack = () => {
     if (navigationHistory) {
-      const { tab, query } = navigationHistory;
+      const { tab, query, filter } = navigationHistory;
       setActiveTab(tab as any);
       setSearchQuery(query);
+      setStatsFilter(filter);
       setNavigationHistory(null);
+    } else {
+      handleNavigate('birds', '', null, true);
+    }
+  };
+
+  const handleBirdPedigreeRef = (birdName: string) => {
+    const b = birds.find(birds => birds.name.toLowerCase() === birdName.toLowerCase());
+    if (b) {
+      handleNavigate('pedigree', '', { birdId: b.id });
+    } else {
+      handleNavigate('birds', birdName);
     }
   };
 
@@ -1263,88 +1407,77 @@ export default function App() {
         "fixed inset-y-0 left-0 z-50 w-64 bg-black border-r border-black-800 p-4 flex flex-col transition-transform duration-300 ease-in-out xl:sticky xl:top-0 xl:h-screen xl:translate-x-0",
         isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
       )}>
-        <div className="flex items-center justify-between px-2 mb-10">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-gold-500 rounded-xl text-black-950 shadow-lg shadow-gold-500/20">
-              <BirdIcon size={24} />
+        <div className="flex items-center justify-between px-2 mb-6">
+          <div className="flex items-center gap-2">
+            <div className="p-1 w-6 h-6 flex items-center justify-center bg-gold-500 rounded text-black-950 shadow-lg shadow-gold-500/20">
+              <BirdIcon size={14} />
             </div>
-            <span className="font-black text-2xl tracking-tighter text-white">THE AV<span className="text-gold-500">ERIAN</span></span>
+            <span className="font-black text-lg tracking-tighter text-white whitespace-nowrap">THE AV<span className="text-gold-500">ERIAN</span></span>
           </div>
-          <button className="md:hidden text-black-50 hover:text-white" onClick={() => setIsMobileMenuOpen(false)}>
-            <X size={24} />
+          <button className="xl:hidden text-black-50 hover:text-white" onClick={() => setIsMobileMenuOpen(false)}>
+            <X size={20} />
           </button>
         </div>
 
-        <nav className="flex-1 space-y-2 overflow-y-auto custom-scrollbar">
-          <NavItem active={activeTab === 'birds'} onClick={() => handleNavigate('birds', '', null, true)} icon={<BirdIcon size={18} />} label="Birds" count={birds.length} />
-          <NavItem active={activeTab === 'cages'} onClick={() => handleNavigate('cages', '', null, true)} icon={<Home size={18} />} label="Cages" count={cages.length} />
-          <NavItem active={activeTab === 'pairs'} onClick={() => handleNavigate('pairs', '', null, true)} icon={<Heart size={18} />} label="Pairs" count={pairs.filter(p => birds.some(b => b.id === p.maleId) || birds.some(b => b.id === p.femaleId)).length} />
-          <NavItem active={activeTab === 'breeding'} onClick={() => handleNavigate('breeding', '', null, true)} icon={<Egg size={18} />} label="Breeding" count={breedingRecords.length} />
-          <NavItem active={activeTab === 'financials'} onClick={() => handleNavigate('financials', '', null, true)} icon={<DollarSign size={18} />} label="Financials" count={transactions.length} />
-          <NavItem active={activeTab === 'genetics'} onClick={() => handleNavigate('genetics', '', null, true)} icon={<Dna size={18} />} label="Genetics" count={0} />
-          <NavItem active={activeTab === 'tasks'} onClick={() => handleNavigate('tasks', '', null, true)} icon={<CheckSquare size={18} />} label="Tasks & Reminders" count={tasks.length} />
-          <NavItem active={activeTab === 'contacts'} onClick={() => handleNavigate('contacts', '', null, true)} icon={<Users size={18} />} label="Contacts" count={contacts.length} />
-          <NavItem active={activeTab === 'print'} onClick={() => handleNavigate('print', '', null, true)} icon={<QrCode size={18} />} label="Print QR & Lists" count={0} />
-          <NavItem active={activeTab === 'settings'} onClick={() => handleNavigate('settings', '', null, true)} icon={<Tag size={18} />} label="Settings" count={0} />
+        <nav className="flex-1 space-y-1 overflow-y-auto custom-scrollbar pr-1">
+          <NavItem active={activeTab === 'birds'} onClick={() => handleNavigate('birds', '', null, true)} icon={<BirdIcon size={16} />} label="Birds" count={birds.length} />
+          <NavItem active={activeTab === 'cages'} onClick={() => handleNavigate('cages', '', null, true)} icon={<Home size={16} />} label="Cages" count={cages.length} />
+          <NavItem active={activeTab === 'pairs'} onClick={() => handleNavigate('pairs', '', null, true)} icon={<Heart size={16} />} label="Pairs" count={pairs.filter(p => birds.some(b => b.id === p.maleId) || birds.some(b => b.id === p.femaleId)).length} />
+          <NavItem active={activeTab === 'breeding'} onClick={() => handleNavigate('breeding', '', null, true)} icon={<Egg size={16} />} label="Breeding" count={breedingRecords.length} />
+          <NavItem active={activeTab === 'financials'} onClick={() => handleNavigate('financials', '', null, true)} icon={<DollarSign size={16} />} label="Financials" count={transactions.length} />
+          <NavItem active={activeTab === 'genetics'} onClick={() => handleNavigate('genetics', '', null, true)} icon={<Dna size={16} />} label="Genetics" count={0} />
+          <NavItem active={activeTab === 'tasks'} onClick={() => handleNavigate('tasks', '', null, true)} icon={<CheckSquare size={16} />} label="Tasks" count={tasks.length} />
+          <NavItem active={activeTab === 'contacts'} onClick={() => handleNavigate('contacts', '', null, true)} icon={<Users size={16} />} label="Contacts" count={contacts.length} />
+          <NavItem active={activeTab === 'print'} onClick={() => handleNavigate('print', '', null, true)} icon={<QrCode size={16} />} label="Print" count={0} />
+          <NavItem active={activeTab === 'settings'} onClick={() => handleNavigate('settings', '', null, true)} icon={<Tag size={16} />} label="Settings" count={0} />
         </nav>
 
-        <div className="mt-auto pt-6 border-t border-black-800 shrink-0">
-          <div className="px-2 mb-4 flex items-center justify-between">
-            <span className="text-[9px] font-black uppercase tracking-widest text-black-200">Cloud Sync</span>
-            <div className="flex items-center gap-2">
-              <span className="text-[8px] font-black uppercase tracking-widest text-black-100">{isSyncing ? 'Syncing...' : 'Synced'}</span>
-              <div className={cn("w-1.5 h-1.5 rounded-full", isSyncing ? "bg-gold-500 animate-pulse" : "bg-emerald-500")} />
-            </div>
-          </div>
-          {userSettings && (
-            <div className="px-2 mb-4">
-              <div className={cn(
-                "p-3 rounded-2xl border flex flex-col gap-1",
-                (userSettings.account_expiry_date && new Date(userSettings.account_expiry_date) < new Date())
-                  ? "bg-red-500/10 border-red-500/20"
-                  : "bg-gold-500/10 border-gold-500/20"
-              )}>
-                <div className="flex items-center justify-between">
-                  <span className="text-[9px] font-black uppercase tracking-widest text-black-100">Status</span>
-                  <div className={cn(
-                    "w-1.5 h-1.5 rounded-full animate-pulse",
-                    (userSettings.account_expiry_date && new Date(userSettings.account_expiry_date) < new Date())
-                      ? "bg-red-500"
-                      : "bg-emerald-500"
-                  )} />
+        <div className="mt-auto pt-3 border-t border-white/5 space-y-2">
+          {/* Combined Status and User Info */}
+          <div className="space-y-1.5">
+            <div 
+              onClick={() => handleNavigate('subscription', '', null, true)}
+              className="px-2 py-1.5 rounded-lg bg-zinc-900/50 border border-white/5 cursor-pointer hover:bg-zinc-800 transition-colors"
+            >
+              <div className="flex items-center justify-between mb-1">
+                <div className="flex items-center gap-1.5">
+                  <div className={cn("w-1.5 h-1.5 rounded-full", isSyncing ? "bg-gold-500 animate-pulse" : "bg-emerald-500")} />
+                  <span className="text-[7px] font-black uppercase tracking-widest text-white/50">{isSyncing ? 'Syncing...' : 'Synced'}</span>
                 </div>
-                <p className="text-[11px] font-black text-white uppercase tracking-tighter">
+              </div>
+              {userSettings && (
+                <p className="text-[8px] font-black text-white uppercase tracking-tighter truncate leading-none">
+                  <span className="text-gold-500">SUBSCRIPTION: </span>
                   {(() => {
                     const expiry = userSettings.account_expiry_date ? new Date(userSettings.account_expiry_date) : null;
-                    if (!expiry || isNaN(expiry.getTime())) return 'No Subscription';
-                    if (new Date() > expiry) return 'Expired';
+                    if (!expiry || isNaN(expiry.getTime())) return 'TRIAL STATUS';
+                    if (new Date() > expiry) return 'EXPIRED';
                     const diff = expiry.getTime() - new Date().getTime();
                     const days = Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
-                    return days === 0 ? 'Last Day' : `${days} Days Left`;
+                    return `${days}D ACTIVE`;
                   })()}
                 </p>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2 px-2 py-1.5 bg-zinc-900/30 rounded-lg border border-white/5 group">
+              <div className="w-6 h-6 rounded-full bg-zinc-700 border border-white/10 flex items-center justify-center text-white overflow-hidden shrink-0">
+                {user.photoURL ? <img src={user.photoURL} alt="" referrerPolicy="no-referrer" className="w-full h-full object-cover" /> : <User size={12} />}
               </div>
-            </div>
-          )}
-          <div className="flex items-center gap-3 px-2 mb-6">
-            <div className="w-10 h-10 rounded-full bg-zinc-700 border border-black-700 flex items-center justify-center text-white overflow-hidden shadow-inner shrink-0">
-              {user.photoURL ? <img src={user.photoURL} alt="" referrerPolicy="no-referrer" /> : <User size={18} />}
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-bold text-white truncate">{user.displayName}</p>
-              <p className="text-[10px] text-black-100 truncate uppercase tracking-widest">{user.email}</p>
+              <div className="flex-1 min-w-0">
+                <p className="text-[9px] text-white/70 truncate uppercase font-bold tracking-tight">{user.email?.split('@')[0]}</p>
+              </div>
+              <button onClick={logout} className="p-1 text-white/30 hover:text-red-500 transition-colors">
+                <LogOut size={12} />
+              </button>
             </div>
           </div>
-          <Button variant="ghost" onClick={logout} className="w-full justify-start text-black-100 hover:text-red-500 hover:bg-red-500/10">
-            <LogOut size={16} />
-            Logout
-          </Button>
         </div>
       </aside>
 
       {/* Main Content */}
       <main className="flex-grow flex flex-col min-w-0 bg-black w-full">
-        <header className="shrink-0 bg-black/80 backdrop-blur-md border-b border-black-800 px-4 xl:px-6 py-4 flex flex-col xl:flex-row xl:items-center justify-between sticky top-0 z-10 gap-4">
+        <header className={cn("shrink-0 bg-black/80 backdrop-blur-md border-b border-black-800 px-4 xl:px-6 py-4 flex flex-col xl:flex-row xl:items-center justify-between sticky top-0 z-10 gap-4", activeTab === 'pedigree' && "hidden")}>
           <div className="flex items-center justify-between w-full xl:w-auto">
             <div className="flex items-center gap-3">
               <button className="xl:hidden p-2 -ml-2 text-black-50 hover:text-white" onClick={() => setIsMobileMenuOpen(true)}>
@@ -1457,7 +1590,7 @@ export default function App() {
           </div>
         </header>
 
-        <div className={cn("custom-scrollbar", (activeTab === 'genetics' || activeTab === 'print') ? "p-0" : "p-4 md:p-8")}>
+        <div className={cn("custom-scrollbar", (activeTab === 'genetics' || activeTab === 'print' || activeTab === 'pedigree') ? "p-0" : "p-4 md:p-8")}>
           <AnimatePresence mode="wait">
             <motion.div
               key={activeTab}
@@ -1468,18 +1601,18 @@ export default function App() {
             >
               <div className={cn(
                 "grid gap-4",
-                activeTab === 'tasks' ? "max-w-3xl mx-auto grid-cols-1" : 
-                activeTab === 'financials' || activeTab === 'stats' || activeTab === 'contacts' ? "grid-cols-1" :
-                activeTab === 'genetics' || activeTab === 'print' ? "grid-cols-1 w-full" :
+                activeTab === 'tasks' ? "max-w-4xl mx-auto w-full grid-cols-1" : 
+                activeTab === 'financials' || activeTab === 'stats' || activeTab === 'contacts' || activeTab === 'breeding' ? "grid-cols-1 w-full max-w-7xl mx-auto" :
+                activeTab === 'genetics' || activeTab === 'print' || activeTab === 'pedigree' ? "grid-cols-1 w-full" :
                 activeTab === 'settings' ? "grid-cols-1 max-w-7xl mx-auto w-full" :
-                activeTab === 'pairs' && viewMode === 'grid-large' ? "grid-cols-1 md:grid-cols-2 max-w-5xl mx-auto" : viewMode === 'grid-large' ? "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5" :
-                "grid-cols-1 max-w-4xl mx-auto"
+                activeTab === 'pairs' && viewMode === 'grid-large' ? "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 w-full" : viewMode === 'grid-large' ? "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 w-full" :
+                "grid-cols-1 max-w-7xl mx-auto w-full"
               )}>
                 {activeTab === 'birds' && (
-                  <div className="col-span-full space-y-6">
+                  <div className="col-span-full space-y-6 w-full">
                     <div className={cn(
-                      "grid gap-4",
-                      viewMode === 'grid-large' ? "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5" : "grid-cols-1 max-w-4xl mx-auto"
+                      "grid gap-4 w-full",
+                      viewMode === 'grid-large' ? "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5" : "grid-cols-1 max-w-7xl mx-auto"
                     )}>
                       {(filteredItems as Bird[]).length > 0 ? (
                         (filteredItems as Bird[]).map(bird => (
@@ -1613,12 +1746,13 @@ export default function App() {
 
                 {activeTab === 'breeding' && (
                   <div className="space-y-6">
-                    <div className={cn("grid gap-4 sm:gap-6", viewMode === 'grid-large' ? "grid-cols-1 md:grid-cols-2 xl:grid-cols-3" : "grid-cols-1")}>
+                    <div className={cn("grid gap-4 sm:gap-6 w-full", viewMode === 'grid-large' ? "grid-cols-1 md:grid-cols-2 xl:grid-cols-3" : "grid-cols-1")}>
                       {(filteredItems as BreedingRecord[]).length > 0 ? (
                         (filteredItems as BreedingRecord[]).map(record => (
                           <BreedingRecordCard 
                             key={record.id} 
                             record={record} 
+                            viewMode={viewMode}
                             pair={pairs.find(p => p.id === record.pairId)}
                             male={birds.find(b => b.id === pairs.find(p => p.id === record.pairId)?.maleId)}
                             female={birds.find(b => b.id === pairs.find(p => p.id === record.pairId)?.femaleId)}
@@ -1633,7 +1767,6 @@ export default function App() {
                               }
                             })}
                             onBirdRef={handleBirdRef}
-                            viewMode={viewMode}
                           />
                         ))
                       ) : (
@@ -1726,6 +1859,16 @@ export default function App() {
 
                 {activeTab === 'print' && (
                   <PrintView birds={birds} pairs={pairs} cages={cages} onBirdRef={handleBirdRef} />
+                )}
+
+                {activeTab === 'pedigree' && (
+                  <PedigreeFullView 
+                    birdId={searchQuery} 
+                    birds={birds} 
+                    cages={cages} 
+                    onBirdRef={handleBirdPedigreeRef} 
+                    onBack={handleGoBack} 
+                  />
                 )}
 
                 {activeTab === 'tasks' && (
@@ -1863,7 +2006,14 @@ export default function App() {
                     user={user}
                     isSyncing={isSyncing}
                     setDeleteConfirmation={setDeleteConfirmation}
-                    onRenew={handleRenew}
+                  />
+                )}
+
+                {activeTab === 'subscription' && userSettings && (
+                  <SubscriptionView 
+                    settings={userSettings} 
+                    onRenew={handleRenew} 
+                    onBack={handleGoBack}
                   />
                 )}
               </div>
@@ -1951,11 +2101,11 @@ export default function App() {
 
 function NavItem({ active, onClick, icon, label, count }: { active: boolean, onClick: () => void, icon: React.ReactNode, label: string, count: number }) {
   return (
-    <button onClick={onClick} className={cn('w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold transition-all group', active ? 'bg-gold-500 text-black-950 shadow-lg shadow-gold-500/20' : 'text-black-50 hover:bg-black-900 hover:text-gold-500')}>
+    <button onClick={onClick} className={cn('w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-bold transition-all group', active ? 'bg-gold-500 text-black-950 shadow-lg shadow-gold-500/20' : 'text-black-50 hover:bg-black-900 hover:text-gold-500')}>
       <span className={cn('transition-transform group-hover:scale-110', active ? 'text-black-950' : 'text-black-100 group-hover:text-gold-500')}>
         {icon}
       </span>
-      <span className="flex-1 text-left uppercase tracking-widest text-[11px]">{label}</span>
+      <span className="flex-1 text-left uppercase tracking-widest text-[10px] truncate">{label}</span>
       <span className={cn('text-[10px] px-2 py-0.5 rounded-lg font-black', active ? 'bg-black/20 text-black' : 'bg-zinc-800 text-white/50 group-hover:text-gold-500')}>{count}</span>
     </button>
   );
@@ -2151,8 +2301,134 @@ function ShareBirdModal({ bird, mother, father, mate, offspring, cages, cageName
   );
 }
 
+function PedigreeFullView({ birdId, birds, cages, onBirdRef, onBack }: { birdId: string, birds: Bird[], cages: Cage[], onBirdRef: (name: string) => void, onBack: () => void }) {
+  const bird = birds.find(b => b.id === birdId);
+  const [containerWidth, setContainerWidth] = useState(0);
+  const [contentWidth, setContentWidth] = useState(1200);
+  const containerRef = React.useRef<HTMLDivElement>(null);
+  const contentRef = React.useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const observer = new ResizeObserver((entries) => {
+      for (let entry of entries) {
+        setContainerWidth(entry.contentRect.width);
+      }
+    });
+    observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (!contentRef.current) return;
+    const observer = new ResizeObserver((entries) => {
+      for (let entry of entries) {
+        // Use scrollWidth to get the full natural width of the unscaled content
+        const width = contentRef.current?.scrollWidth || entry.contentRect.width;
+        if (width > 0) setContentWidth(width);
+      }
+    });
+    observer.observe(contentRef.current);
+    return () => observer.disconnect();
+  }, []);
+
+  if (!bird) return <div className="p-4 sm:p-8 text-center text-white/50">Bird not found</div>;
+  
+  const offspring = birds.filter(b => b.fatherId === bird.id || b.motherId === bird.id);
+  
+  // Calculate scale based on real content width vs screen width
+  const padding = window.innerWidth < 640 ? 20 : 64;
+  const scaleValue = containerWidth > 0 ? (containerWidth - padding) / contentWidth : 1;
+  const finalScale = Math.max(0.1, Math.min(2, scaleValue));
+
+  return (
+    <div className="flex-1 flex flex-col pt-safe px-safe min-h-screen bg-black overflow-hidden select-none">
+      <div className="flex justify-between items-center p-4 sm:p-5 border-b border-white/5 shrink-0 bg-black/95 backdrop-blur-xl z-50 shadow-2xl">
+         <div className="flex items-center gap-3">
+            <button onClick={onBack} className="h-9 w-9 flex items-center justify-center bg-zinc-900 border border-white/5 hover:bg-zinc-800 text-white rounded-xl transition-all shadow-lg active:scale-95">
+               <ArrowLeft size={18} />
+            </button>
+            <div>
+               <h2 className="text-lg sm:text-xl font-black uppercase tracking-widest text-white leading-none">FAMILY TREE</h2>
+               <p className="text-gold-500 font-bold uppercase tracking-widest text-[9px] sm:text-xs mt-1 flex items-center gap-1.5 opacity-80">
+                 <div className="w-1.5 h-1.5 rounded-full bg-gold-500" />
+                 {bird.name}
+               </p>
+            </div>
+         </div>
+         <div className="flex items-center gap-2">
+           <button onClick={() => window.print()} className="h-9 w-9 flex items-center justify-center bg-zinc-900 border border-white/5 hover:bg-gold-500 hover:text-black hover:border-gold-500 text-white rounded-xl transition-all shadow-lg active:scale-95">
+              <Printer size={16} />
+           </button>
+         </div>
+      </div>
+
+      <div id="pedigree-print-area" className="flex-1 overflow-x-hidden overflow-y-auto custom-scrollbar flex flex-col items-center print:p-0 print:bg-white print:text-black bg-[#050505] pt-12 sm:pt-20">
+         <div className="w-full max-w-full pb-32 print:pb-0 flex flex-col items-center">
+            {/* Dynamic Scaling Container */}
+            <div ref={containerRef} className="w-full flex flex-col items-center overflow-visible px-4 sm:px-12">
+               <div className="flex justify-center origin-top transition-transform duration-500 ease-out" style={{ 
+                 transform: `scale(${finalScale})`,
+                 width: contentWidth,
+                 marginBottom: `calc(${contentWidth * 0.8}px * (1 - ${finalScale}) * -1)`
+               }}>
+                  <div ref={contentRef} className="w-max flex justify-center">
+                    <VerticalPedigreeNode 
+                       birdId={bird.id} 
+                       birds={birds} 
+                       cages={cages} 
+                       onBirdRef={onBirdRef} 
+                       maxGenerations={3} 
+                       roleLabel="Focus Bird" 
+                    />
+                  </div>
+               </div>
+            </div>
+           
+           {offspring.length > 0 && (
+             <div className="mt-16 pt-8 border-t border-black-800 text-center flex flex-col items-center print:mt-8 print:pt-4 print:border-black/10">
+                <p className="text-[10px] text-white/50 print:text-black/50 uppercase tracking-widest font-black mb-6">Direct Offspring ({offspring.length})</p>
+                <div className="flex flex-wrap justify-center gap-4 max-w-4xl">
+                  {offspring.map(o => (
+                     <div key={o.id} className="w-[180px]">
+                        <BirdCompactInfo bird={o} cages={cages} onClick={() => onBirdRef(o.name)} />
+                     </div>
+                  ))}
+                </div>
+             </div>
+           )}
+         </div>
+      </div>
+      
+      <style>{`
+        @media print {
+           body * {
+              visibility: hidden;
+           }
+           .fixed, nav { display: none !important; }
+           #pedigree-print-area, #pedigree-print-area * {
+              visibility: visible;
+           }
+           #pedigree-print-area {
+              position: absolute;
+              left: 0;
+              top: 0;
+              width: 100%;
+              background: white !important;
+              color: black !important;
+              padding: 0 !important;
+              overflow: visible !important;
+           }
+           .print\\:bg-white { background: white !important; }
+           .print\\:text-black { color: black !important; }
+           ::-webkit-scrollbar { display: none; }
+        }
+      `}</style>
+    </div>
+  );
+}
+
 function BirdCard({ bird, cage, birds, cages, viewMode = 'grid-large', currency, onBirdRef, onNavigate, onEdit, onDelete }: { bird: Bird, cage?: Cage, birds: Bird[], cages: Cage[], viewMode?: 'grid-large' | 'list', currency?: string, onBirdRef: (name: string) => void, onNavigate: (tab: string, query?: string, filter?: any) => void, onEdit: () => void, onDelete: () => void }) {
-  const [showTree, setShowTree] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [fullscreenImage, setFullscreenImage] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
@@ -2349,7 +2625,7 @@ function BirdCard({ bird, cage, birds, cages, viewMode = 'grid-large', currency,
                 </div>
                 <div className="flex flex-wrap items-center gap-2 pt-2">
                   <button 
-                    onClick={(e) => { e.stopPropagation(); setShowTree(!showTree); }} 
+                    onClick={(e) => { e.stopPropagation(); onNavigate('pedigree', bird.id); }} 
                     className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 bg-gold-500/10 hover:bg-gold-500/20 text-gold-500 rounded-xl transition-all border border-gold-500/20 group/btn min-w-[80px]"
                   >
                     <GitBranch size={16} className="group-hover/btn:scale-110 transition-transform" />
@@ -2390,39 +2666,6 @@ function BirdCard({ bird, cage, birds, cages, viewMode = 'grid-large', currency,
             </button>
           )}
         </div>
-
-        {effectiveViewMode !== 'list' && showTree && (
-          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="pt-4 border-t border-black-800 space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2 w-full">
-                <p className="text-[9px] text-white uppercase tracking-widest font-black">Father</p>
-                {father ? (
-                  <BirdCompactInfo bird={father} cages={cages} onClick={() => onBirdRef(father.name)} />
-                ) : (
-                  <p className="text-[10px] text-white/30 italic px-2">Unknown</p>
-                )}
-              </div>
-              <div className="space-y-2 w-full">
-                <p className="text-[9px] text-white uppercase tracking-widest font-black">Mother</p>
-                {mother ? (
-                  <BirdCompactInfo bird={mother} cages={cages} onClick={() => onBirdRef(mother.name)} />
-                ) : (
-                  <p className="text-[10px] text-white/30 italic px-2">Unknown</p>
-                )}
-              </div>
-            </div>
-            {offspring.length > 0 && (
-              <div className="space-y-2">
-                <p className="text-[9px] text-white uppercase tracking-widest font-black">Offspring ({offspring.length})</p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {offspring.map(o => (
-                    <BirdCompactInfo key={o.id} bird={o} cages={cages} onClick={() => onBirdRef(o.name)} />
-                  ))}
-                </div>
-              </div>
-            )}
-          </motion.div>
-        )}
 
         {effectiveViewMode !== 'list' && (bird.notes || (bird.statuses && bird.statuses.length > 0)) && (
           <div className="pt-3 border-t border-black-800/50 space-y-2">
@@ -2846,33 +3089,33 @@ function FinancialsView({
   return (
     <div className="space-y-6 max-w-6xl mx-auto">
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4">
-        <Card className="p-4 sm:p-5 bg-zinc-800 border-black-700 flex flex-col justify-between">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+        <Card className="p-4 sm:p-5 bg-zinc-800 border-black-700 flex flex-col justify-between min-w-0">
           <div className="flex items-center justify-between mb-3 sm:mb-4">
-            <p className="text-[8px] sm:text-[10px] font-black text-white uppercase tracking-widest">Net Profit</p>
-            <TrendingUp size={16} className={stats.netProfit >= 0 ? 'text-emerald-400' : 'text-rose-400'} />
+            <p className="text-[8px] sm:text-[10px] font-black text-white uppercase tracking-widest mr-2">Net Profit</p>
+            <TrendingUp size={16} className={stats.netProfit >= 0 ? 'text-emerald-400 shrink-0' : 'text-rose-400 shrink-0'} />
           </div>
           <div>
-            <p className="text-xl sm:text-2xl font-black text-white tracking-tight">{symbol}{stats.netProfit.toFixed(2)}</p>
+            <p className="text-lg sm:text-xl md:text-2xl font-black text-white tracking-tighter break-all">{symbol}{stats.netProfit.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
             <p className="text-[8px] sm:text-[9px] text-white/50 mt-1 font-bold uppercase tracking-tighter">Overall Performance</p>
           </div>
         </Card>
-        <Card className="p-4 sm:p-5 bg-zinc-800 border-black-700 flex flex-col justify-between">
+        <Card className="p-4 sm:p-5 bg-zinc-800 border-black-700 flex flex-col justify-between min-w-0">
           <div className="flex items-center justify-between mb-3 sm:mb-4">
-            <p className="text-[8px] sm:text-[10px] font-black text-white uppercase tracking-widest">Total Income</p>
-            <ArrowUpRight size={16} className="text-emerald-400" />
+            <p className="text-[8px] sm:text-[10px] font-black text-white uppercase tracking-widest mr-2">Total Income</p>
+            <ArrowUpRight size={16} className="text-emerald-400 shrink-0" />
           </div>
           <div>
-            <p className="text-xl sm:text-2xl font-black text-emerald-500 tracking-tight">{symbol}{stats.totalIncome.toFixed(2)}</p>
+            <p className="text-lg sm:text-xl md:text-2xl font-black text-emerald-500 tracking-tighter break-all">{symbol}{stats.totalIncome.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
           </div>
         </Card>
-        <Card className="p-4 sm:p-5 bg-zinc-800 border-black-700 flex flex-col justify-between">
+        <Card className="p-4 sm:p-5 bg-zinc-800 border-black-700 flex flex-col justify-between min-w-0">
           <div className="flex items-center justify-between mb-3 sm:mb-4">
-            <p className="text-[8px] sm:text-[10px] font-black text-white uppercase tracking-widest">Total Expenses</p>
-            <ArrowDownRight size={16} className="text-rose-400" />
+            <p className="text-[8px] sm:text-[10px] font-black text-white uppercase tracking-widest mr-2">Total Expenses</p>
+            <ArrowDownRight size={16} className="text-rose-400 shrink-0" />
           </div>
           <div>
-            <p className="text-xl sm:text-2xl font-black text-rose-500 tracking-tight">{symbol}{stats.totalExpenses.toFixed(2)}</p>
+            <p className="text-lg sm:text-xl md:text-2xl font-black text-rose-500 tracking-tighter break-all">{symbol}{stats.totalExpenses.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
           </div>
         </Card>
       </div>
@@ -3076,7 +3319,7 @@ function EntityStatsView({
   }, [filteredTransactions, filteredBreedingRecords, birds, filter]);
 
   return (
-    <div className="space-y-6 max-w-6xl mx-auto">
+    <div className="space-y-6 max-w-6xl mx-auto px-1 sm:px-0">
       <div className="bg-gold-500/10 border border-gold-500/20 p-4 rounded-2xl flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="p-2 bg-gold-500 rounded-lg text-black">
@@ -3111,42 +3354,43 @@ function EntityStatsView({
 
       {activeTab === 'roi' && (
         <div className="space-y-6">
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-            <Card className="p-4 sm:p-5 bg-zinc-800 border-black-700 flex flex-col justify-between">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 overflow-x-hidden">
+            <Card className="p-4 sm:p-5 bg-zinc-800 border-black-700 flex flex-col justify-between min-w-0">
               <div className="flex items-center justify-between mb-3 sm:mb-4">
-                <p className="text-[8px] sm:text-[10px] font-black text-white uppercase tracking-widest">Net Profit</p>
-                <TrendingUp size={16} className={stats.netProfit >= 0 ? 'text-emerald-400' : 'text-rose-400'} />
+                <p className="text-[8px] sm:text-[10px] font-black text-white uppercase tracking-widest mr-2">Net Profit</p>
+                <TrendingUp size={16} className={stats.netProfit >= 0 ? 'text-emerald-400 shrink-0' : 'text-rose-400 shrink-0'} />
               </div>
-              <div>
-                <p className="text-xl sm:text-2xl font-black text-white tracking-tight">{symbol}{stats.netProfit.toFixed(2)}</p>
+              <div className="min-w-0">
+                <p className="text-lg xl:text-xl font-black text-white tracking-tighter break-all">{symbol}{stats.netProfit.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
                 <p className="text-[8px] sm:text-[9px] text-white/50 mt-1 font-bold uppercase tracking-tighter">ROI Performance</p>
               </div>
             </Card>
-            <Card className="p-4 sm:p-5 bg-zinc-800 border-black-700 flex flex-col justify-between">
+            <Card className="p-4 sm:p-5 bg-zinc-800 border-black-700 flex flex-col justify-between min-w-0">
               <div className="flex items-center justify-between mb-3 sm:mb-4">
-                <p className="text-[8px] sm:text-[10px] font-black text-white uppercase tracking-widest">Total Income</p>
-                <ArrowUpRight size={16} className="text-emerald-400" />
+                <p className="text-[8px] sm:text-[10px] font-black text-white uppercase tracking-widest mr-2">Total Income</p>
+                <ArrowUpRight size={16} className="text-emerald-400 shrink-0" />
               </div>
-              <div>
-                <p className="text-xl sm:text-2xl font-black text-emerald-500 tracking-tight">{symbol}{stats.totalIncome.toFixed(2)}</p>
+              <div className="min-w-0">
+                <p className="text-lg xl:text-xl font-black text-emerald-500 tracking-tighter break-all">{symbol}{stats.totalIncome.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
               </div>
             </Card>
-            <Card className="p-4 sm:p-5 bg-zinc-800 border-black-700 flex flex-col justify-between">
+            <Card className="p-4 sm:p-5 bg-zinc-800 border-black-700 flex flex-col justify-between min-w-0">
               <div className="flex items-center justify-between mb-3 sm:mb-4">
-                <p className="text-[8px] sm:text-[10px] font-black text-white uppercase tracking-widest">Total Expenses</p>
-                <ArrowDownRight size={16} className="text-rose-400" />
+                <p className="text-[8px] sm:text-[10px] font-black text-white uppercase tracking-widest mr-2">Total Expenses</p>
+                <ArrowDownRight size={16} className="text-rose-400 shrink-0" />
               </div>
-              <div>
-                <p className="text-xl sm:text-2xl font-black text-rose-500 tracking-tight">{symbol}{stats.totalExpenses.toFixed(2)}</p>
+              <div className="min-w-0">
+                <p className="text-lg xl:text-xl font-black text-rose-500 tracking-tighter break-all">{symbol}{stats.totalExpenses.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
               </div>
             </Card>
-            <Card className="p-4 sm:p-5 bg-zinc-800 border-black-700 flex flex-col justify-between">
+            <Card className="p-4 sm:p-5 bg-zinc-800 border-black-700 flex flex-col justify-between min-w-0">
               <div className="flex items-center justify-between mb-3 sm:mb-4">
-                <p className="text-[8px] sm:text-[10px] font-black text-white uppercase tracking-widest">Inventory Value</p>
-                <Activity size={16} className="text-sky-400" />
+                <p className="text-[8px] sm:text-[10px] font-black text-white uppercase tracking-widest mr-2">Inventory Value</p>
+                <Activity size={16} className="text-sky-400 shrink-0" />
               </div>
-              <div>
-                <p className="text-xl sm:text-2xl font-black text-sky-500 tracking-tight">{symbol}{stats.inventoryValue.toFixed(2)}</p>
+              <div className="min-w-0">
+                <p className="text-lg xl:text-xl font-black text-sky-500 tracking-tighter break-all mb-1">{symbol}{stats.inventoryValue.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                <p className="text-[7px] text-white/40 font-bold uppercase tracking-widest leading-tight">Est. {symbol}{stats.totalBirdValue.toFixed(0)} - Cost {symbol}{stats.totalBirdCost.toFixed(0)}</p>
               </div>
             </Card>
           </div>
@@ -3237,7 +3481,7 @@ function EntityStatsView({
                 />
               </div>
             </div>
-            <div className="grid gap-3">
+            <div className="grid gap-3 min-w-0">
               {filteredBreedingRecords.map(r => (
                 <BreedingRecordCard 
                   key={r.id}
@@ -3299,9 +3543,9 @@ function TransactionCard({ transaction, bird, contact, cages, currency, onBirdRe
           <p className="text-[10px] sm:text-[11px] text-white truncate font-medium">{transaction.description || 'No description'}</p>
         </div>
         <div className={cn("shrink-0 text-right")}>
-          <p className={cn("font-black tracking-tighter", "text-base sm:text-lg", transaction.type === 'Income' ? "text-emerald-500" : "text-rose-500")}>
-            {transaction.type === 'Income' ? '+' : '-'}{symbol}{transaction.amount.toFixed(2)}
-          </p>
+                <p className={cn("font-black tracking-tighter truncate", "text-base sm:text-lg", transaction.type === 'Income' ? "text-emerald-500" : "text-rose-500")}>
+                  {transaction.type === 'Income' ? '+' : '-'}{symbol}{transaction.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                </p>
           <p className="text-[8px] sm:text-[9px] text-white font-bold uppercase tracking-widest">{transaction.date}</p>
         </div>
       </div>
@@ -3325,126 +3569,133 @@ function BreedingRecordCard({ record, pair, male, female, birds, onEdit, onDelet
   const effectiveViewMode = (viewMode === 'list' && isExpanded) ? 'grid-large' : viewMode;
 
   return (
-    <Card 
-      onClick={() => viewMode === 'list' && setIsExpanded(!isExpanded)}
-      className={cn(
-        "group transition-all duration-300 overflow-hidden", 
-        effectiveViewMode === 'list' ? "flex flex-row items-center p-4 gap-4 cursor-pointer hover:bg-black-900/50" : "cursor-default"
-      )}
-    >
-      <div className={cn("space-y-4 relative w-full", effectiveViewMode === 'list' ? "flex-1 flex flex-col space-y-3" : "p-4 sm:p-5")}>
-        <div className={cn("flex items-start justify-between gap-2", effectiveViewMode === 'list' ? "w-full" : "relative")}>
-          <div className="space-y-1 min-w-0 flex-1">
-            <div className="flex items-center gap-2">
-              <Egg size={18} className="text-gold-500 shrink-0" />
-              <h3 className={cn("font-black text-white tracking-tight truncate", "text-lg")}>Breeding Record</h3>
-            </div>
-            <div className="flex items-center gap-2 text-[9px] sm:text-[10px] font-medium text-white uppercase tracking-widest">
-              <Calendar size={12} className="shrink-0" />
-              <span className="truncate">{record.startDate} {record.endDate ? `- ${record.endDate}` : '(Ongoing)'}</span>
-            </div>
+    <div className="bg-zinc-950 border border-zinc-800 rounded-2xl overflow-hidden shadow-lg transition-all duration-300 hover:border-zinc-700">
+        {/* Header */}
+        <div className="p-4 sm:p-5 flex items-center justify-between border-b border-zinc-800">
+          <div className="flex items-center gap-3">
+             <div className="p-2 bg-gold-500/10 rounded-xl">
+               <Egg size={20} className="text-gold-500" />
+             </div>
+             <div>
+                <h3 className="font-black text-white text-base tracking-tight">Breeding Record</h3>
+                <div className="flex items-center gap-2 text-[10px] font-medium text-white/50 uppercase tracking-widest">
+                  <Calendar size={10} />
+                  <span>{record.startDate} - {record.endDate || 'Ongoing'}</span>
+                </div>
+             </div>
           </div>
-          
-          {effectiveViewMode !== 'list' && (
-            <div className={cn(
-              "flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
-            )}>
-              <button onClick={(e) => { e.stopPropagation(); onEdit(); }} className="p-1.5 text-white hover:text-gold-500 hover:bg-zinc-700 rounded-lg transition-colors">
+          <div className="flex items-center gap-1 opacity-70 hover:opacity-100 transition-opacity">
+              <button onClick={(e) => { e.stopPropagation(); onEdit(); }} className="p-2 text-white/70 hover:text-gold-500 hover:bg-zinc-800 rounded-lg transition-colors">
                 <Edit2 size={16} />
               </button>
-              <button onClick={(e) => { e.stopPropagation(); onDelete(); }} className="p-1.5 text-white hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors">
+              <button onClick={(e) => { e.stopPropagation(); onDelete(); }} className="p-2 text-white/70 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors">
                 <Trash2 size={16} />
               </button>
-            </div>
-          )}
-        </div>
-
-        <div className={cn(
-          "flex items-center justify-between gap-2 sm:gap-4 p-3 sm:p-4 bg-black rounded-xl border border-black-700",
-          effectiveViewMode === 'list' ? "flex-1 py-2" : ""
-        )}>
-          <div className="flex flex-col gap-2 min-w-0 flex-1 px-2 border-r border-black-800 pr-4">
-            <p className="text-[8px] sm:text-[9px] text-white uppercase tracking-widest font-black shrink-0">Parent Birds:</p>
-            <div className="grid grid-cols-2 gap-2 w-full">
-              {male ? (
-                <BirdCompactInfo bird={male} cages={[]} onClick={() => onBirdRef(male.name)} className="py-1" />
-              ) : (
-                <div className="text-[10px] text-white/30 italic px-2 py-1 bg-black rounded-lg border border-white/5">No Male</div>
-              )}
-              {female ? (
-                <BirdCompactInfo bird={female} cages={[]} onClick={() => onBirdRef(female.name)} className="py-1" />
-              ) : (
-                <div className="text-[10px] text-white/30 italic px-2 py-1 bg-black rounded-lg border border-white/5">No Female</div>
-              )}
-            </div>
-          </div>
-          <div className="flex items-center gap-4 px-2">
-            <div className="flex flex-col items-center">
-              <span className="text-[8px] text-white uppercase font-black">Eggs</span>
-              <span className="text-xs font-black text-white">{record.eggsLaid}</span>
-            </div>
-            <div className="flex flex-col items-center">
-              <span className="text-[8px] text-white uppercase font-black">Hatch</span>
-              <span className="text-xs font-black text-white">{record.eggsHatched}</span>
-            </div>
-            <div className="flex flex-col items-center">
-              <span className="text-[8px] text-white uppercase font-black">Wean</span>
-              <span className="text-xs font-black text-white">{record.chicksWeaned}</span>
-            </div>
           </div>
         </div>
 
-        {effectiveViewMode !== 'list' && (
-          <div className="space-y-4 mb-4">
-            {record.offspringIds && record.offspringIds.length > 0 && (
-              <div className="p-4 bg-black rounded-2xl border border-black-700">
-                <div className="text-[10px] font-black text-white uppercase tracking-widest mb-4">Tagged Offspring ({record.offspringIds.length})</div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-                  {record.offspringIds.map(id => {
-                    const offspring = birds.find(b => b.id === id);
-                    return offspring ? (
-                      <BirdCompactInfo key={id} bird={offspring} cages={[]} onClick={() => onBirdRef(offspring.name)} />
-                    ) : null;
-                  })}
-                </div>
-              </div>
+        {/* Content */}
+        <div className="p-4 sm:p-5 space-y-4">
+            {/* Parents */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+               <div>
+                  <p className="text-[9px] text-white/40 uppercase tracking-widest font-black mb-1.5">Sire (Male)</p>
+                  {male ? <BirdCompactInfo bird={male} cages={[]} onClick={() => onBirdRef(male.name)} /> : <div className="text-xs text-white/20 italic p-2 bg-black rounded-lg border border-white/5">N/A</div>}
+               </div>
+               <div>
+                  <p className="text-[9px] text-white/40 uppercase tracking-widest font-black mb-1.5">Dam (Female)</p>
+                  {female ? <BirdCompactInfo bird={female} cages={[]} onClick={() => onBirdRef(female.name)} /> : <div className="text-xs text-white/20 italic p-2 bg-black rounded-lg border border-white/5">N/A</div>}
+               </div>
+            </div>
+
+            {/* Stats */}
+            <div className="grid grid-cols-3 gap-2 bg-black p-3 rounded-xl border border-zinc-800">
+               {[
+                 { label: 'Eggs', value: record.eggsLaid },
+                 { label: 'Hatch', value: record.eggsHatched },
+                 { label: 'Wean', value: record.chicksWeaned }
+               ].map(stat => (
+                 <div key={stat.label} className="flex flex-col items-center">
+                   <span className="text-[9px] text-white/40 uppercase tracking-widest font-bold">{stat.label}</span>
+                   <span className="text-lg font-black text-white">{stat.value}</span>
+                 </div>
+               ))}
+            </div>
+
+            {/* Egg Log Button */}
+            {record.eggs && record.eggs.length > 0 && (
+              <button 
+                onClick={() => setIsExpanded(!isExpanded)}
+                className="w-full flex items-center justify-between p-3 bg-zinc-900 rounded-xl border border-zinc-800 hover:border-zinc-600 transition-colors"
+              >
+                  <span className="text-xs font-bold text-white">Egg Log ({record.eggs.length})</span>
+                  {isExpanded ? <ChevronUp size={16} className="text-white/50" /> : <ChevronDown size={16} className="text-white/50" />}
+              </button>
             )}
 
-            {record.notes && (
-              <div className="p-4 bg-black rounded-2xl border border-black-700">
-                <div className="text-[10px] font-black text-white uppercase tracking-widest mb-2">Notes</div>
-                <p className="text-sm text-white leading-relaxed">{record.notes}</p>
+            {/* Expanded Egg Log */}
+            {isExpanded && record.eggs && record.eggs.length > 0 && (
+              <div className="space-y-2 pt-2 animate-in slide-in-from-top-2">
+                 {record.eggs.map((egg, index) => (
+                   <div key={egg.id} className="flex items-center justify-between p-3 bg-black rounded-lg border border-zinc-800">
+                      <div className="flex items-center gap-3">
+                         <div className="text-xs font-mono text-white/50">#{index + 1}</div>
+                         <div className="text-xs text-white">{egg.laidDate || 'Unknown'}</div>
+                      </div>
+                      <span className={cn(
+                        "text-[9px] font-bold uppercase tracking-widest px-2 py-1 rounded-full",
+                        egg.status === 'Hatched' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-zinc-800 text-white/60'
+                      )}>{egg.status}</span>
+                   </div>
+                 ))}
               </div>
             )}
-          </div>
-        )}
-
-        <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-black-800/50">
-          <button onClick={(e) => { e.stopPropagation(); onEdit(); }} className="flex-1 flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-2 bg-zinc-700 hover:bg-zinc-600 text-white hover:text-gold-500 rounded-lg transition-all border border-black-700 min-w-0">
-            <Edit2 size={14} className="shrink-0" />
-            <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-widest truncate hidden sm:inline">Edit</span>
-          </button>
-          <button onClick={(e) => { e.stopPropagation(); onDelete(); }} className="flex-1 flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-lg transition-all border border-red-500/20 min-w-0">
-            <Trash2 size={14} className="shrink-0" />
-            <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-widest truncate hidden sm:inline">Delete</span>
-          </button>
-          {viewMode === 'list' && (
-            <button 
-              onClick={(e) => { e.stopPropagation(); setIsExpanded(!isExpanded); }}
-              className="p-2 bg-zinc-700 hover:bg-zinc-600 text-white hover:text-gold-500 rounded-lg transition-all border border-black-700 shrink-0"
-            >
-              {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-            </button>
-          )}
         </div>
-      </div>
-    </Card>
+    </div>
   );
 }
 
 function BreedingRecordForm({ user, initialData, pairs, birds, cages, onClose }: { user: FirebaseUser, initialData?: BreedingRecord, pairs: Pair[], birds: Bird[], cages: Cage[], onClose: () => void }) {
-  const [formData, setFormData] = useState<Partial<BreedingRecord>>(initialData || { pairId: '', startDate: '', endDate: '', eggsLaid: 0, eggsHatched: 0, chicksWeaned: 0, offspringIds: [], notes: '' });
+  const [formData, setFormData] = useState<Partial<BreedingRecord>>(initialData || { pairId: '', startDate: format(new Date(), 'yyyy-MM-dd'), endDate: '', eggsLaid: 0, eggsHatched: 0, chicksWeaned: 0, offspringIds: [], notes: '', eggs: [] });
   const [isSaving, setIsSaving] = useState(false);
+  
+  const handleAddEgg = () => {
+    const currentEggs = formData.eggs || [];
+    const laidDate = new Date().toISOString().split('T')[0];
+    
+    const newEggs = [...currentEggs, {
+      id: Math.random().toString(36).substring(7),
+      status: 'Laid' as const,
+      laidDate: laidDate
+    }];
+    
+    setFormData({
+      ...formData,
+      eggs: newEggs,
+      eggsLaid: newEggs.length,
+      eggsHatched: newEggs.filter(e => ['Hatched', 'Died', 'Weaned'].includes(e.status)).length,
+      chicksWeaned: newEggs.filter(e => e.status === 'Weaned').length
+    });
+  };
+
+  const updateEgg = (index: number, updates: Partial<EggType>) => {
+    const newEggs = [...(formData.eggs || [])];
+    newEggs[index] = { ...newEggs[index], ...updates };
+    
+    // Auto calculate eggs stats based on statuses if user modifies array
+    let laid = formData.eggsLaid || 0;
+    let hatched = formData.eggsHatched || 0;
+    let weaned = formData.chicksWeaned || 0;
+    
+    // Check if we want to auto-sync. It might be better to just let user manually override or compute it.
+    // For simplicity we will compute it if they add eggs.
+    laid = newEggs.length;
+    hatched = newEggs.filter(e => ['Hatched', 'Died', 'Weaned'].includes(e.status)).length;
+    weaned = newEggs.filter(e => e.status === 'Weaned').length;
+
+    setFormData({ ...formData, eggs: newEggs, eggsLaid: laid, eggsHatched: hatched, chicksWeaned: weaned });
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.pairId) {
@@ -3454,20 +3705,32 @@ function BreedingRecordForm({ user, initialData, pairs, birds, cages, onClose }:
     if (isSaving) return;
     setIsSaving(true);
     
-    const savePromise = async () => {
+    const processSave = () => {
       try {
-        const data = { ...formData, uid: user.uid };
-        if (initialData?.id) { await updateDoc(doc(db, 'breedingRecords', initialData.id), data); } 
+        const eggsArr = formData.eggs || [];
+        const data = { 
+          ...formData, 
+          uid: user.uid,
+          eggsLaid: eggsArr.length,
+          eggsHatched: eggsArr.filter(e => ['Hatched', 'Died', 'Weaned'].includes(e.status)).length,
+          chicksWeaned: eggsArr.filter(e => e.status === 'Weaned').length
+        };
+        
+        if (initialData?.id) { 
+          updateDoc(doc(db, 'breedingRecords', initialData.id), data).catch(err => handleFirestoreError(err, OperationType.UPDATE, 'breedingRecords')); 
+        } 
         else { 
           const docRef = doc(collection(db, 'breedingRecords'));
-          await setDoc(docRef, data); 
+          setDoc(docRef, data).catch(err => handleFirestoreError(err, OperationType.CREATE, 'breedingRecords')); 
         }
+        toast.success(`Breeding record ${initialData ? 'updated' : 'added'}!`);
+        onClose();
       } catch (err) { handleFirestoreError(err, initialData ? OperationType.UPDATE : OperationType.CREATE, 'breedingRecords'); }
     };
 
-    savePromise();
-    onClose();
+    processSave();
   };
+
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="space-y-1">
@@ -3490,18 +3753,165 @@ function BreedingRecordForm({ user, initialData, pairs, birds, cages, onClose }:
           ]}
         />
       </div>
+      
       <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-1"><label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Start Date</label><Input type="date" required value={formData.startDate} onChange={e => setFormData({ ...formData, startDate: e.target.value })} /></div>
-        <div className="space-y-1"><label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">End Date</label><Input type="date" value={formData.endDate} onChange={e => setFormData({ ...formData, endDate: e.target.value })} /></div>
+        <div className="space-y-1">
+          <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Start Date</label>
+          <Input type="date" required value={formData.startDate} onChange={e => setFormData({ ...formData, startDate: e.target.value })} />
+        </div>
+        <div className="space-y-1">
+          <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">End Date</label>
+          <Input type="date" value={formData.endDate} onChange={e => setFormData({ ...formData, endDate: e.target.value })} />
+        </div>
       </div>
-      <div className="grid grid-cols-3 gap-4">
-        <div className="space-y-1"><label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Eggs Laid</label><Input type="number" min="0" required value={formData.eggsLaid} onChange={e => setFormData({ ...formData, eggsLaid: parseInt(e.target.value) || 0 })} /></div>
-        <div className="space-y-1"><label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Hatched</label><Input type="number" min="0" required value={formData.eggsHatched} onChange={e => setFormData({ ...formData, eggsHatched: parseInt(e.target.value) || 0 })} /></div>
-        <div className="space-y-1"><label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Weaned</label><Input type="number" min="0" required value={formData.chicksWeaned} onChange={e => setFormData({ ...formData, chicksWeaned: parseInt(e.target.value) || 0 })} /></div>
+      
+      <div className="grid grid-cols-3 gap-4 pb-2 border-b border-black-800">
+        <div className="space-y-1">
+          <label className="text-[10px] font-black text-white/50 uppercase tracking-widest ml-1">Laid</label>
+          <div className="h-10 px-3 bg-white/5 border border-white/10 rounded-xl flex items-center text-white font-bold text-sm">{formData.eggs?.length || 0}</div>
+        </div>
+        <div className="space-y-1">
+          <label className="text-[10px] font-black text-white/50 uppercase tracking-widest ml-1">Hatched</label>
+          <div className="h-10 px-3 bg-white/5 border border-white/10 rounded-xl flex items-center text-white font-bold text-sm">{formData.eggs?.filter(e => ['Hatched', 'Died', 'Weaned'].includes(e.status)).length || 0}</div>
+        </div>
+        <div className="space-y-1">
+          <label className="text-[10px] font-black text-white/50 uppercase tracking-widest ml-1">Weaned</label>
+          <div className="h-10 px-3 bg-white/5 border border-white/10 rounded-xl flex items-center text-white font-bold text-sm">{formData.eggs?.filter(e => e.status === 'Weaned').length || 0}</div>
+        </div>
       </div>
+      
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Eggs & Offspring</label>
+          <Button type="button" onClick={handleAddEgg} variant="secondary" className="h-6 text-xs px-3 bg-zinc-700 hover:bg-zinc-600 rounded">
+            + Add Egg
+          </Button>
+        </div>
+        
+        {formData.eggs && formData.eggs.length > 0 && (
+          <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1 custom-scrollbar">
+            {formData.eggs.map((egg, index) => ({ egg, originalIndex: index }))
+              .sort((a, b) => new Date(b.egg.laidDate || 0).getTime() - new Date(a.egg.laidDate || 0).getTime())
+              .map(({ egg, originalIndex: index }) => (
+              <div key={egg.id} className="p-3 bg-black border border-black-700 rounded-xl space-y-2">
+                <div className="flex justify-between items-center bg-black-900 -mx-3 -mt-3 p-2 rounded-t-xl border-b border-black-800">
+                  <span className="text-xs font-black text-white">Egg {index + 1}</span>
+                  <div className="flex items-center gap-2">
+                    <select 
+                      value={egg.status} 
+                      onChange={e => updateEgg(index, { status: e.target.value as any })} 
+                      className="bg-black border border-black-700 text-xs font-bold uppercase tracking-widest rounded px-2 py-1 text-white focus:outline-none focus:border-gold-500"
+                    >
+                      <option value="Laid">Laid</option>
+                      <option value="Fertile">Fertile</option>
+                      <option value="Infertile / Clear">Infertile / Clear</option>
+                      <option value="Dead In Shell">Dead In Shell</option>
+                      <option value="Hatched">Hatched</option>
+                      <option value="Died">Died</option>
+                      <option value="Weaned">Weaned</option>
+                    </select>
+                    <button type="button" onClick={() => {
+                        const newEggs = [...(formData.eggs || [])];
+                        newEggs.splice(index, 1);
+                        setFormData({ ...formData, eggs: newEggs, eggsLaid: newEggs.length });
+                    }} className="text-white/30 hover:text-red-500 transition-colors">
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-3 pt-1">
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-bold text-white/50 uppercase tracking-widest">Laid Date</label>
+                    <Input 
+                      type="date" 
+                      value={egg.laidDate || ''} 
+                      onChange={e => updateEgg(index, { laidDate: e.target.value })} 
+                      className="h-8 text-xs font-mono" 
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-bold text-white/50 uppercase tracking-widest">Hatch Date</label>
+                    <Input 
+                      type="date" 
+                      value={egg.actualHatchDate || ''} 
+                      onChange={e => updateEgg(index, { actualHatchDate: e.target.value, status: e.target.value && egg.status === 'Laid' ? 'Hatched' : egg.status })} 
+                      className="h-8 text-xs font-mono border-l-2 border-emerald-500/50" 
+                    />
+                  </div>
+                </div>
+                
+                {(egg.status === 'Hatched' || egg.status === 'Died' || egg.status === 'Weaned') && (
+                  <div className="pt-1">
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-bold text-white/50 uppercase tracking-widest">Notes</label>
+                      <Input 
+                        placeholder="Info..." 
+                        value={egg.notes || ''} 
+                        onChange={e => updateEgg(index, { notes: e.target.value })} 
+                        className="h-8 text-xs" 
+                      />
+                    </div>
+                  </div>
+                )}
+                
+                {egg.status === 'Weaned' && !egg.birdId && (
+                  <div className="pt-2 mt-1 border-t border-black-800">
+                     <Button type="button" variant="secondary" className="w-full h-8 text-[10px]" onClick={async () => {
+                        const loadingToast = toast.loading('Promoting to Bird...');
+                        try {
+                           const parentPair = pairs.find(p => p.id === formData.pairId);
+                           const mother = birds.find(b => b.id === parentPair?.femaleId);
+                           const father = birds.find(b => b.id === parentPair?.maleId);
+                           
+                           const data: any = {
+                              name: `Offspring (Egg ${index + 1})`,
+                              species: mother?.species || father?.species || 'Unknown',
+                              subSpecies: mother?.subSpecies || father?.subSpecies || '',
+                              sex: 'Unknown',
+                              birthDate: egg.actualHatchDate || new Date().toISOString().split('T')[0],
+                              motherId: mother?.id || '',
+                              fatherId: father?.id || '',
+                              cageId: parentPair?.cageId || mother?.cageId || father?.cageId || '',
+                              uid: user.uid,
+                              notes: `Promoted from Egg ${index + 1} of Pair ${parentPair?.id || formData.pairId}`
+                           };
+                           
+                           const docRef = doc(collection(db, 'birds'));
+                           await setDoc(docRef, data);
+                           
+                           // Tag offspring
+                           const currentOffs = formData.offspringIds || [];
+                           updateEgg(index, { birdId: docRef.id });
+                           setFormData({ ...formData, offspringIds: [...currentOffs, docRef.id] });
+                           
+                           toast.success('Successfully promoted to a new Bird profile!');
+                        } catch (err) {
+                           console.error(err);
+                           toast.error('Failed to promote to bird.');
+                        } finally {
+                           toast.dismiss(loadingToast);
+                        }
+                     }}>
+                        Promote to New Bird Profile
+                     </Button>
+                  </div>
+                )}
+                
+                {egg.birdId && (
+                  <div className="text-[9px] font-black text-emerald-500 uppercase tracking-widest text-center py-1 mt-1 bg-emerald-500/10 rounded">
+                    Promoted to Bird
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       <div className="space-y-1">
         <SearchableSelect 
-          label="Tag Offspring"
+          label="Tag Existing Offspring"
           options={birds.map(b => {
             const cage = cages.find(c => c.id === b.cageId);
             const mutationsStr = b.mutations?.length ? `[${b.mutations.join(', ')}]` : '';
@@ -3526,47 +3936,13 @@ function BreedingRecordForm({ user, initialData, pairs, birds, cages, onClose }:
           placeholder="Select Offspring"
         />
       </div>
+      
       <div className="space-y-1">
-        <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Notes</label>
-        <textarea name="breedingNotes" id="breedingNotes" className="w-full px-4 py-3 bg-black border border-black-700 rounded-2xl focus:outline-none focus:ring-2 focus:ring-gold-500/20 focus:border-gold-500 text-white transition-all min-h-[80px] text-sm font-medium placeholder:text-white/30" placeholder="Breeding notes..."
+        <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Clutch Notes</label>
+        <textarea name="breedingNotes" id="breedingNotes" className="w-full px-4 py-3 bg-black border border-black-700 rounded-2xl focus:outline-none focus:ring-2 focus:ring-gold-500/20 focus:border-gold-500 text-white transition-all min-h-[80px] text-sm font-medium placeholder:text-white/30" placeholder="General breeding notes..."
           value={formData.notes} 
           onChange={e => setFormData({ ...formData, notes: e.target.value })} 
         />
-      </div>
-      
-      <div className="pt-2 pb-2 border-t border-black-800">
-        <p className="text-[10px] font-black text-black-200 uppercase tracking-widest mb-2">Quick Actions</p>
-        <Button 
-          type="button" 
-          variant="secondary" 
-          className="w-full text-xs py-2"
-          onClick={async () => {
-             const hatchDate = new Date(formData.startDate || new Date());
-             hatchDate.setDate(hatchDate.getDate() + 21);
-             const formattedDate = hatchDate.toISOString().split('T')[0];
-             
-             const newNotes = formData.notes ? `${formData.notes}\n[Reminder: Expected Hatch on ${formattedDate}]` : `[Reminder: Expected Hatch on ${formattedDate}]`;
-             setFormData({ ...formData, notes: newNotes });
-             
-             try {
-               await addDoc(collection(db, 'tasks'), {
-                 title: `Hatch Expected: ${pairs.find(p => p.id === formData.pairId)?.id || 'Selected Pair'}`,
-                 description: `Expected hatch date for breeding record.`,
-                 dueDate: formattedDate,
-                 reminderDate: new Date(hatchDate.getTime() - 24*60*60*1000).toISOString(),
-                 status: 'Pending',
-                 uid: user.uid,
-                 createdAt: new Date().toISOString()
-               });
-               toast.success('Hatch reminder task created for ' + formattedDate);
-             } catch (e) {
-               toast.error('Failed to create task');
-             }
-          }}
-        >
-          <Bell size={14} />
-          Add 21-Day Hatch Reminder
-        </Button>
       </div>
 
       <Button type="submit" className="w-full py-4 text-sm uppercase tracking-widest font-black" disabled={isSaving}>
@@ -3596,19 +3972,24 @@ function TransactionForm({ user, initialData, birds, pairs, cages, contacts, cur
     if (isSaving) return;
     setIsSaving(true);
     
-    const savePromise = async () => {
+    const processSave = () => {
       try {
         const data = { ...formData, uid: user.uid };
-        if (initialData?.id) { await updateDoc(doc(db, 'transactions', initialData.id), data); } 
+        if (initialData?.id) { 
+          updateDoc(doc(db, 'transactions', initialData.id), data).catch(err => handleFirestoreError(err, OperationType.UPDATE, 'transactions')); 
+        } 
         else { 
           const docRef = doc(collection(db, 'transactions'));
-          await setDoc(docRef, data); 
+          setDoc(docRef, data).catch(err => handleFirestoreError(err, OperationType.CREATE, 'transactions')); 
         }
-      } catch (err) { handleFirestoreError(err, initialData ? OperationType.UPDATE : OperationType.CREATE, 'transactions'); }
+        toast.success(`Transaction ${initialData ? 'updated' : 'added'}!`);
+        onClose();
+      } catch (err) { 
+        handleFirestoreError(err, initialData ? OperationType.UPDATE : OperationType.CREATE, 'transactions'); 
+      }
     };
 
-    savePromise();
-    onClose();
+    processSave();
   };
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
@@ -3718,19 +4099,21 @@ function ContactForm({ user, initialData, onClose }: { user: FirebaseUser, initi
     if (isSaving) return;
     setIsSaving(true);
     
-    const savePromise = async () => {
+    const processSave = () => {
       try {
         const data = { ...formData, uid: user.uid };
-        if (initialData?.id) { await updateDoc(doc(db, 'contacts', initialData.id), data); } 
-        else { 
+        if (initialData?.id) { 
+          updateDoc(doc(db, 'contacts', initialData.id), data).catch(err => handleFirestoreError(err, OperationType.UPDATE, 'contacts')); 
+        } else { 
           const docRef = doc(collection(db, 'contacts'));
-          await setDoc(docRef, data); 
+          setDoc(docRef, data).catch(err => handleFirestoreError(err, OperationType.CREATE, 'contacts')); 
         }
+        toast.success(`Contact ${initialData ? 'updated' : 'added'}!`);
+        onClose();
       } catch (err) { handleFirestoreError(err, initialData ? OperationType.UPDATE : OperationType.CREATE, 'contacts'); }
     };
 
-    savePromise();
-    onClose();
+    processSave();
   };
 
   return (
@@ -4022,7 +4405,7 @@ function TaskCard({ task, birds, cages, onBirdRef, onToggle, onEdit, onDelete, v
 
 // --- Subscription View ---
 
-function SubscriptionView({ settings, onRenew }: { settings: UserSettings, onRenew: () => void }) {
+function SubscriptionView({ settings, onRenew, onBack }: { settings: UserSettings, onRenew: () => void, onBack: () => void }) {
   const expiryDate = settings.account_expiry_date ? new Date(settings.account_expiry_date) : null;
   const now = new Date();
   const isValidDate = expiryDate && !isNaN(expiryDate.getTime());
@@ -4056,7 +4439,12 @@ function SubscriptionView({ settings, onRenew }: { settings: UserSettings, onRen
 
   return (
     <div className="max-w-7xl mx-auto p-4 sm:p-6 space-y-6">
-      <h2 className="text-2xl font-black uppercase tracking-widest text-gold-500 mb-6">Subscription Status</h2>
+      <div className="flex items-center gap-4 mb-6">
+        <button onClick={onBack} className="p-3 bg-zinc-800 border border-black-700 rounded-xl text-white hover:bg-zinc-700 transition-colors">
+          <ArrowLeft size={20} />
+        </button>
+        <h2 className="text-2xl font-black uppercase tracking-widest text-gold-500">Subscription Center</h2>
+      </div>
       
       <Card className="p-6 sm:p-8 bg-black-900 border-black-800 flex flex-col md:flex-row items-center justify-between gap-6">
         <div className="flex items-center gap-6">
@@ -4260,8 +4648,8 @@ function ThemeColorPicker({ label, color, defaultColor, onChange }: { label: str
 
 // --- Settings View ---
 
-function SettingsView({ settings, onUpdate, allData, user, isSyncing, setDeleteConfirmation, onRenew }: { settings: UserSettings, onUpdate: (s: UserSettings) => void, allData: any, user: FirebaseUser | null, isSyncing: boolean, setDeleteConfirmation: (data: any) => void, onRenew: () => void }) {
-  const [activeSection, setActiveSection] = useState<'general' | 'species' | 'subspecies' | 'mutations' | 'data' | 'subscription' | null>('general');
+function SettingsView({ settings, onUpdate, allData, user, isSyncing, setDeleteConfirmation }: { settings: UserSettings, onUpdate: (s: UserSettings) => void, allData: any, user: FirebaseUser | null, isSyncing: boolean, setDeleteConfirmation: (data: any) => void }) {
+  const [activeSection, setActiveSection] = useState<'general' | 'species' | 'subspecies' | 'mutations' | 'data' | null>('general');
   const [newSpecies, setNewSpecies] = useState('');
   const [newMutation, setNewMutation] = useState('');
   const [newSubSpecies, setNewSubSpecies] = useState('');
@@ -4408,29 +4796,11 @@ function SettingsView({ settings, onUpdate, allData, user, isSyncing, setDeleteC
           active={activeSection === 'data'} 
           onClick={() => setActiveSection('data')} 
         />
-        <SettingRow 
-          icon={CreditCard} 
-          title="Subscription" 
-          description="Manage Plan" 
-          active={activeSection === 'subscription'} 
-          onClick={() => setActiveSection('subscription')} 
-        />
       </div>
 
       {/* Content Area */}
       <div className="flex-1 bg-black-900/50 border border-black-800 rounded-3xl p-6 lg:p-8 overflow-y-auto custom-scrollbar">
         <AnimatePresence mode="wait">
-          {activeSection === 'subscription' && (
-            <motion.div 
-              key="subscription"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-            >
-              <SubscriptionView settings={settings} onRenew={onRenew} />
-            </motion.div>
-          )}
-
           {activeSection === 'general' && (
             <motion.div 
               key="general"
@@ -4708,11 +5078,16 @@ function SettingsView({ settings, onUpdate, allData, user, isSyncing, setDeleteC
 }
 
 function PrintView({ birds, pairs, cages, onBirdRef }: { birds: Bird[], pairs: Pair[], cages: Cage[], onBirdRef: (name: string) => void }) {
-  const [printMode, setPrintMode] = useState<'list' | 'qr'>('list');
+  const [printMode, setPrintMode] = useState<'list' | 'qr' | 'certificate'>('list');
   const [isPrinting, setIsPrinting] = useState(false);
   const [printEmpty, setPrintEmpty] = useState(false);
   const [qrType, setQrType] = useState<'bird' | 'pair' | 'cage'>('bird');
   const [qrSelections, setQrSelections] = useState<string[]>([]);
+  
+  // Custom QR scaling
+  const [qrWidth, setQrWidth] = useState(50); // mm
+  const [qrHeight, setQrHeight] = useState(50); // mm
+  const [isThermal, setIsThermal] = useState(false);
 
   const sortedBirds = useMemo(() => {
     return [...birds].sort((a, b) => {
@@ -4725,6 +5100,10 @@ function PrintView({ birds, pairs, cages, onBirdRef }: { birds: Bird[], pairs: P
       return a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' });
     });
   }, [birds, cages]);
+
+  const sortedCages = useMemo(() => {
+    return [...cages].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
+  }, [cages]);
 
   const birdOptions = birds.map(b => {
     const cage = cages.find(c => c.id === b.cageId);
@@ -4784,7 +5163,11 @@ function PrintView({ birds, pairs, cages, onBirdRef }: { birds: Bird[], pairs: P
     <div className="w-full px-4 md:px-8 space-y-12 pb-24">
       <style>{`
         @media print {
-          @page { size: auto; margin: 5mm; }
+          @page { 
+            size: ${isThermal && printMode === 'qr' ? `${qrWidth}mm ${qrHeight}mm` : 'A4'}; 
+            margin: 0; 
+          }
+          body { -webkit-print-color-adjust: exact; background: #fff !important; }
           body > :not(#print-area-portal) { display: none !important; }
           #print-area-portal {
             display: block !important; 
@@ -4792,35 +5175,44 @@ function PrintView({ birds, pairs, cages, onBirdRef }: { birds: Bird[], pairs: P
             position: absolute !important; 
             left: 0 !important; 
             top: 0 !important; 
-            width: 100% !important; 
-            height: auto !important;
+            width: ${isThermal && printMode === 'qr' ? `${qrWidth}mm` : '210mm'} !important; 
+            min-height: ${isThermal && printMode === 'qr' ? `${qrHeight}mm` : '297mm'} !important;
             background: white !important; 
             color: black !important;
             margin: 0 !important;
-            padding: 5mm !important;
+            padding: 0 !important;
             z-index: 999999 !important;
+            box-sizing: border-box !important;
           }
           #print-area-portal * { visibility: visible !important; color: black !important; border-color: #000 !important; }
           .no-print { display: none !important; }
-          table { width: 100% !important; border-collapse: collapse !important; table-layout: auto !important; font-size: 10pt !important; }
-          th, td { border: 1px solid #000 !important; padding: 4px !important; word-break: break-word !important; }
+          table { width: 100% !important; border-collapse: collapse !important; table-layout: fixed !important; font-size: 8.5pt !important; }
+          th, td { border: 1px solid #000 !important; padding: 6px 4px !important; word-break: break-all !important; height: auto !important; }
+          th { background-color: #f3f4f6 !important; -webkit-print-color-adjust: exact; }
           .qr-print-container { 
-            display: grid !important;
-            grid-template-cols: repeat(auto-fill, minmax(4.5cm, 1fr)) !important;
-            gap: 5mm !important;
+            display: ${isThermal && printMode === 'qr' ? 'flex' : 'grid'} !important;
+            flex-direction: column !important;
+            grid-template-cols: ${isThermal ? 'none' : `repeat(auto-fill, ${qrWidth}mm)`} !important;
+            gap: ${isThermal ? '0' : '2mm'} !important;
             width: 100% !important;
+            justify-content: flex-start !important;
+            align-items: center !important;
           }
           .qr-print-item {
-            width: 100% !important;
-            min-height: 4.5cm !important;
-            border: 1px solid #000 !important;
+            width: ${qrWidth}mm !important;
+            height: ${qrHeight}mm !important;
+            min-height: ${qrHeight}mm !important;
+            border: ${isThermal ? 'none' : '1px solid #ddd'} !important;
             display: flex !important;
             flex-direction: column !important;
             align-items: center !important;
             justify-content: center !important;
             padding: 2mm !important;
             page-break-inside: avoid !important;
+            page-break-after: always !important;
             background: white !important;
+            overflow: hidden !important;
+            box-sizing: border-box !important;
           }
         }
       `}</style>
@@ -4831,7 +5223,7 @@ function PrintView({ birds, pairs, cages, onBirdRef }: { birds: Bird[], pairs: P
           <h1 className="text-3xl font-black text-white uppercase tracking-tighter">Print Center</h1>
           <p className="text-black-100 text-xs font-bold uppercase tracking-widest mt-1">Configure your physical records & labels</p>
         </div>
-        <div className="flex bg-black-900 border border-black-800 p-1 rounded-2xl w-full lg:w-[400px]">
+        <div className="flex bg-black-900 border border-black-800 p-1 rounded-2xl w-full lg:w-[450px]">
           <button 
             className={cn("flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all", printMode === 'list' ? "bg-gold-500 text-black shadow-lg" : "text-black-100 hover:text-white")} 
             onClick={() => setPrintMode('list')}
@@ -4843,6 +5235,12 @@ function PrintView({ birds, pairs, cages, onBirdRef }: { birds: Bird[], pairs: P
             onClick={() => setPrintMode('qr')}
           >
             QR Labels
+          </button>
+          <button 
+            className={cn("flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all", printMode === 'certificate' ? "bg-gold-500 text-black shadow-lg" : "text-black-100 hover:text-white")} 
+            onClick={() => setPrintMode('certificate')}
+          >
+            Certificates
           </button>
         </div>
       </div>
@@ -4869,6 +5267,49 @@ function PrintView({ birds, pairs, cages, onBirdRef }: { birds: Bird[], pairs: P
               placeholder={`Search ${qrType}s...`}
               cages={cages}
             />
+
+            {printMode === 'qr' && (
+              <div className="space-y-4 p-4 bg-zinc-900/30 border border-black-800 rounded-2xl">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-black text-gold-500 uppercase tracking-widest">QR Dimensions (mm)</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[9px] text-white/50 uppercase font-black">Thermal Mode</span>
+                    <button 
+                      onClick={() => setIsThermal(!isThermal)}
+                      className={cn("w-10 h-5 rounded-full transition-all relative border border-white/10", isThermal ? "bg-gold-500" : "bg-black-900")}
+                    >
+                      <div className={cn("absolute top-0.5 w-3.5 h-3.5 rounded-full transition-all bg-white shadow-sm", isThermal ? "right-1" : "left-1")} />
+                    </button>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-[8px] font-bold text-white/40 uppercase">Width</label>
+                    <div className="flex items-center bg-black border border-white/5 rounded-lg overflow-hidden">
+                      <input 
+                        type="number" 
+                        value={qrWidth} 
+                        onChange={(e) => setQrWidth(Number(e.target.value))}
+                        className="w-full bg-transparent p-2 text-xs text-white font-mono focus:outline-none"
+                      />
+                      <span className="px-2 text-[8px] font-black text-white/20">MM</span>
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[8px] font-bold text-white/40 uppercase">Height</label>
+                    <div className="flex items-center bg-black border border-white/5 rounded-lg overflow-hidden">
+                      <input 
+                        type="number" 
+                        value={qrHeight} 
+                        onChange={(e) => setQrHeight(Number(e.target.value))}
+                        className="w-full bg-transparent p-2 text-xs text-white font-mono focus:outline-none"
+                      />
+                      <span className="px-2 text-[8px] font-black text-white/20">MM</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {printMode === 'list' && (
               <div className="p-4 bg-zinc-900/30 border border-black-800 rounded-2xl flex items-center justify-between group">
@@ -4950,7 +5391,100 @@ function PrintView({ birds, pairs, cages, onBirdRef }: { birds: Bird[], pairs: P
       {/* Hidden Print Area rendered via Portal */}
       {isPrinting && createPortal(
         <div id="print-area-portal" className="fixed inset-0 z-[9999] bg-white text-black p-10 overflow-y-auto w-full min-h-screen font-sans">
-          {printMode === 'list' ? (
+          {printMode === 'certificate' ? (
+            <div className="flex flex-col">
+              {birds.filter(b => qrSelections.includes(b.id)).map(bird => (
+                <div key={bird.id} className="min-h-[27cm] border-8 border-double border-gray-300 p-12 flex flex-col relative page-break-after-always">
+                  <div className="absolute inset-0 bg-white opacity-50 pointer-events-none" />
+                  <div className="relative z-10 flex flex-col h-full items-center text-center">
+                    <h1 className="text-4xl font-serif font-bold uppercase tracking-widest text-gray-900 border-b-2 border-gray-400 pb-6 mb-8 w-full">Pedigree Certificate</h1>
+                    
+                    <div className="w-full flex justify-between items-start mb-12 text-left">
+                      <div className="space-y-4">
+                         <div className="space-y-1">
+                            <p className="text-xs font-bold text-gray-500 uppercase tracking-widest">Bird Name / Ring No.</p>
+                            <p className="text-2xl font-black">{bird.name}</p>
+                         </div>
+                         <div className="space-y-1">
+                            <p className="text-xs font-bold text-gray-500 uppercase tracking-widest">Species</p>
+                            <p className="text-lg font-bold">{bird.species} {bird.subSpecies}</p>
+                         </div>
+                      </div>
+                      <div className="text-right space-y-4">
+                        <div className="space-y-1">
+                            <p className="text-xs font-bold text-gray-500 uppercase tracking-widest">Hatch Date</p>
+                            <p className="text-lg">{bird.birthDate || 'Unknown'}</p>
+                         </div>
+                         <div className="space-y-1">
+                            <p className="text-xs font-bold text-gray-500 uppercase tracking-widest">Sex</p>
+                            <p className="text-lg">{bird.sex}</p>
+                         </div>
+                      </div>
+                    </div>
+
+                    <div className="w-full space-y-4 text-left border-t border-b border-gray-300 py-6 mb-12">
+                      <p className="text-sm font-bold text-gray-500 uppercase tracking-widest">Mutations & Genetics</p>
+                      <p className="text-xl">{bird.mutations?.join(' • ') || 'Normal / Wild Type'} {bird.splitMutations?.length ? ` split for ${bird.splitMutations.join(', ')}` : ''}</p>
+                    </div>
+
+                    <div className="flex-1 w-full flex flex-col justify-center">
+                      <div className="grid grid-cols-3 gap-8 h-[12cm]">
+                        {/* Selected Bird */}
+                        <div className="col-span-1 border-r border-gray-300 flex flex-col justify-center pr-8 h-full">
+                           <div className="p-4 border border-gray-400 rounded-lg bg-gray-50">
+                             <p className="text-[10px] uppercase font-bold text-gray-500 mb-2">Subject</p>
+                             <p className="font-black text-lg">{bird.name}</p>
+                           </div>
+                        </div>
+
+                        {/* Parents */}
+                        <div className="col-span-1 border-r border-gray-300 flex flex-col justify-around pr-8 h-full">
+                           <div className="p-4 border border-gray-400 rounded-lg">
+                             <p className="text-[10px] uppercase font-bold text-gray-500 mb-2">Sire (Father)</p>
+                             <p className="font-bold">{birds.find(b => b.id === bird.fatherId)?.name || 'Unknown'}</p>
+                           </div>
+                           <div className="p-4 border border-gray-400 rounded-lg">
+                             <p className="text-[10px] uppercase font-bold text-gray-500 mb-2">Dam (Mother)</p>
+                             <p className="font-bold">{birds.find(b => b.id === bird.motherId)?.name || 'Unknown'}</p>
+                           </div>
+                        </div>
+
+                        {/* Grandparents */}
+                        <div className="col-span-1 flex flex-col justify-between h-full py-4">
+                           <div className="p-3 border border-gray-300 rounded-lg bg-gray-50 h-1/5 flex flex-col justify-center">
+                             <p className="text-[9px] uppercase font-bold text-gray-500 mb-1">Paternal Grandsire</p>
+                             <p className="text-sm font-bold">{birds.find(b => b.id === birds.find(f => f.id === bird.fatherId)?.fatherId)?.name || 'Unknown'}</p>
+                           </div>
+                           <div className="p-3 border border-gray-300 rounded-lg bg-gray-50 h-1/5 flex flex-col justify-center">
+                             <p className="text-[9px] uppercase font-bold text-gray-500 mb-1">Paternal Granddam</p>
+                             <p className="text-sm font-bold">{birds.find(b => b.id === birds.find(f => f.id === bird.fatherId)?.motherId)?.name || 'Unknown'}</p>
+                           </div>
+                           <div className="p-3 border border-gray-300 rounded-lg bg-gray-50 h-1/5 flex flex-col justify-center">
+                             <p className="text-[9px] uppercase font-bold text-gray-500 mb-1">Maternal Grandsire</p>
+                             <p className="text-sm font-bold">{birds.find(b => b.id === birds.find(m => m.id === bird.motherId)?.fatherId)?.name || 'Unknown'}</p>
+                           </div>
+                           <div className="p-3 border border-gray-300 rounded-lg bg-gray-50 h-1/5 flex flex-col justify-center">
+                             <p className="text-[9px] uppercase font-bold text-gray-500 mb-1">Maternal Granddam</p>
+                             <p className="text-sm font-bold">{birds.find(b => b.id === birds.find(m => m.id === bird.motherId)?.motherId)?.name || 'Unknown'}</p>
+                           </div>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="w-full mt-auto pt-8 border-t-2 border-gray-400 flex justify-between items-end text-left">
+                       <div className="space-y-4">
+                         <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Breeder Signature</p>
+                         <div className="w-48 border-b border-gray-400 h-8"></div>
+                       </div>
+                       <div className="text-right">
+                         <QRCodeSVG value={getQRData(bird.id)} size={64} level="M" />
+                       </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : printMode === 'list' ? (
             <>
               <div className="flex justify-between items-center border-b-2 border-black pb-4 mb-8">
                 <p className="text-sm font-bold text-gray-800 uppercase tracking-widest">Date Generated: {format(new Date(), 'PPPP')}</p>
@@ -4967,8 +5501,8 @@ function PrintView({ birds, pairs, cages, onBirdRef }: { birds: Bird[], pairs: P
                     <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left">Split</th>
                   </tr></thead>
                   <tbody>
-                    {printEmpty ? Array.from({ length: 25 }).map((_, i) => (
-                      <tr key={i} className="border-b border-gray-400 h-[8.5mm]">
+                    {printEmpty ? Array.from({ length: 26 }).map((_, i) => (
+                      <tr key={i} className="border-b border-gray-400 h-[9.5mm]">
                         <td className="border-r-2 border-gray-400"></td>
                         <td className="border-r-2 border-gray-400"></td>
                         <td className="border-r-2 border-gray-400"></td>
@@ -4978,7 +5512,7 @@ function PrintView({ birds, pairs, cages, onBirdRef }: { birds: Bird[], pairs: P
                         <td></td>
                       </tr>
                     )) : sortedBirds.filter(b => qrSelections.includes(b.id)).map(bird => (
-                      <tr key={bird.id} className="border-b border-gray-400 h-[8.5mm]">
+                      <tr key={bird.id} className="border-b border-gray-400 h-[9.5mm]">
                         <td className="py-1 px-2 border-r-2 border-gray-400 text-[10px] font-black uppercase">{bird.name}</td>
                         <td className="py-1 px-2 border-r-2 border-gray-400 text-[10px] font-bold uppercase">{bird.species}</td>
                         <td className="py-1 px-2 border-r-2 border-gray-400 text-[10px] font-bold uppercase">{bird.subSpecies || '-'}</td>
@@ -5071,14 +5605,14 @@ function PrintView({ birds, pairs, cages, onBirdRef }: { birds: Bird[], pairs: P
                     <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left">Type</th>
                   </tr></thead>
                   <tbody>
-                    {printEmpty ? Array.from({ length: 30 }).map((_, i) => (
-                      <tr key={i} className="border-b border-gray-400 h-[7.5mm]">
+                    {printEmpty ? Array.from({ length: 26 }).map((_, i) => (
+                      <tr key={i} className="border-b border-gray-400 h-[9.5mm]">
                         <td className="border-r-2 border-gray-400"></td>
                         <td className="border-r-2 border-gray-400"></td>
                         <td></td>
                       </tr>
-                    )) : cages.filter(c => qrSelections.includes(c.id)).map(cage => (
-                      <tr key={cage.id} className="border-b border-gray-400 h-[7.5mm]">
+                    )) : sortedCages.filter(c => qrSelections.includes(c.id)).map(cage => (
+                      <tr key={cage.id} className="border-b border-gray-400 h-[9.5mm]">
                         <td className="py-1 px-2 border-r-2 border-gray-400 text-[11px] font-black uppercase">{cage.name}</td>
                         <td className="py-1 px-2 border-r-2 border-gray-400 text-[11px] font-bold uppercase">{cage.location || '-'}</td>
                         <td className="py-1 px-2 text-[11px] font-bold uppercase text-gray-600">{cage.type}</td>
@@ -5099,77 +5633,56 @@ function PrintView({ birds, pairs, cages, onBirdRef }: { birds: Bird[], pairs: P
                  const cage = cages.find(c => c.id === id);
 
                  return (
-                   <div key={id} className="qr-print-item shadow-none border-2 border-dashed border-gray-200 min-h-[220px] flex flex-col items-center justify-center p-4">
-                      <QRCodeSVG value={getQRData(id)} size={110} level="H" />
-                      <div className="w-full mt-4 space-y-1.5 text-center px-1">
-                        {qrType === 'bird' && bird && (
-                          <>
-                            <p className="text-[14px] font-black uppercase leading-tight truncate w-full">{bird.name}</p>
-                            <p className="text-[10px] font-bold text-gray-600 uppercase tracking-tight truncate w-full">
-                              {bird.species} {bird.subSpecies ? `• ${bird.subSpecies}` : ''}
-                            </p>
-                            <div className="flex flex-wrap items-center justify-center gap-1.5 pt-0.5">
-                              <span className="text-[8px] font-black uppercase border border-black px-1.5 py-0.5 rounded-sm shrink-0">{bird.sex}</span>
-                              {bird.mutations && bird.mutations.length > 0 && (
-                                <span className="text-[8px] font-bold text-gray-500 truncate uppercase">
-                                  {bird.mutations.join(' • ')}
-                                </span>
-                              )}
-                              {bird.splitMutations && bird.splitMutations.length > 0 && (
-                                <span className="text-[8px] font-bold text-gray-400 truncate uppercase italic">
-                                  / {bird.splitMutations.join(' • ')}
-                                </span>
-                              )}
-                            </div>
-                          </>
-                        )}
-                        
-                        {qrType === 'pair' && pair && (() => {
-                          const male = birds.find(b => b.id === pair.maleId);
-                          const female = birds.find(b => b.id === pair.femaleId);
-                          
-                          const BirdLabelInfo = ({ b, sym }: { b?: Bird, sym: string }) => {
-                            if (!b) return <p className="text-[9px] font-black text-gray-400 uppercase text-center">{sym} EMPTY</p>;
-                            return (
-                              <div className="space-y-0.5 text-center w-full">
-                                <p className="text-[11px] font-black text-gray-800 uppercase truncate">{sym} {b.name}</p>
-                                <p className="text-[8px] font-bold text-gray-500 uppercase tracking-tight truncate">
-                                  {b.species} {b.subSpecies ? `• ${b.subSpecies}` : ''}
-                                </p>
-                                <div className="flex flex-wrap items-center justify-center gap-1 overflow-hidden">
-                                  {b.mutations && b.mutations.length > 0 && (
-                                    <span className="text-[7px] font-bold text-gray-500 uppercase">{b.mutations.slice(0, 3).join('•')}</span>
-                                  )}
-                                  {b.splitMutations && b.splitMutations.length > 0 && (
-                                    <span className="text-[7px] font-bold text-gray-400 uppercase italic">/{b.splitMutations.slice(0, 3).join('•')}</span>
-                                  )}
-                                </div>
-                              </div>
-                            );
-                          };
+                   <div key={id} className="qr-print-item shadow-none border-2 border-dashed border-gray-200 flex flex-col items-center justify-center">
+                       <div className="flex-1 flex flex-col items-center justify-center w-full min-h-0 overflow-hidden px-1">
+                         <QRCodeSVG 
+                           value={getQRData(id)} 
+                           size={256} 
+                           level="H" 
+                           style={{ width: 'auto', height: '45%', maxWidth: '90%', flexShrink: 0 }}
+                         />
+                         
+                         <div className="w-full mt-2 space-y-0.5 text-center overflow-hidden">
+                           {qrType === 'bird' && bird && (
+                             <>
+                               <p className="text-[10pt] font-black uppercase leading-tight truncate w-full">{bird.name}</p>
+                               <p className="text-[7pt] font-bold text-gray-600 uppercase tracking-tight truncate w-full">
+                                 {bird.species}
+                               </p>
+                               <div className="flex items-center justify-center gap-1.5 mt-0.5 whitespace-nowrap">
+                                 <span className="text-[6pt] font-black uppercase border border-black border-opacity-20 px-1 py-0.5 rounded-sm shrink-0">{bird.sex?.[0] || '?'}</span>
+                                 {bird.ringNumber && <span className="text-[6pt] font-mono font-bold text-gray-400">#{bird.ringNumber}</span>}
+                               </div>
+                             </>
+                           )}
+                           
+                           {qrType === 'pair' && pair && (() => {
+                             const male = birds.find(b => b.id === pair.maleId);
+                             const female = birds.find(b => b.id === pair.femaleId);
+                             
+                             return (
+                               <div className="w-full space-y-1">
+                                 <p className="text-[8pt] font-black text-gray-900 uppercase truncate leading-none">♂ {male?.name || '-'}</p>
+                                 <p className="text-[8pt] font-black text-gray-900 uppercase truncate leading-none">♀ {female?.name || '-'}</p>
+                                 <p className="text-[6pt] font-bold text-gray-400 uppercase truncate">{male?.species || '-'}</p>
+                               </div>
+                             );
+                           })()}
+   
+                           {qrType === 'cage' && cage && (
+                             <>
+                               <p className="text-[14pt] font-black uppercase leading-none tracking-tighter">{cage.name}</p>
+                               <p className="text-[7pt] font-black text-gray-400 uppercase tracking-widest truncate">{cage.location || 'Aviary'}</p>
+                               <p className="text-[6pt] text-gray-300 uppercase font-bold">{cage.type}</p>
+                             </>
+                           )}
+                         </div>
+                       </div>
 
-                          return (
-                            <div className="w-full space-y-2 border-y border-gray-100 py-1.5">
-                              <BirdLabelInfo b={male} sym="♂" />
-                              <div className="border-t border-gray-50 scale-x-50 mx-auto" />
-                              <BirdLabelInfo b={female} sym="♀" />
-                            </div>
-                          );
-                        })()}
-
-                        {qrType === 'cage' && cage && (
-                          <>
-                            <p className="text-[18px] font-black uppercase leading-none tracking-tighter">{cage.name}</p>
-                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{cage.location || 'SYSTEM CAGE'}</p>
-                            <p className="text-[8px] font-bold text-zinc-300 uppercase">{cage.type}</p>
-                          </>
-                        )}
-
-                        <div className="pt-2">
-                          <p className="text-[7px] font-black text-gray-300 text-center uppercase tracking-[0.4em] border-t border-gray-50 pt-2">The Averian System</p>
-                        </div>
-                      </div>
-                   </div>
+                       <div className="w-full mt-auto pt-1 border-t border-gray-100 flex items-center justify-center opacity-30">
+                          <p className="text-[5pt] font-black uppercase tracking-[0.2em] whitespace-nowrap">THE AVERIAN SYSTEM</p>
+                       </div>
+                    </div>
                  );
                })}
             </div>
@@ -5338,7 +5851,7 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
     statuses: [],
     imageUrl: '' 
   });
-  const [addToExpenses, setAddToExpenses] = useState(false);
+  const [addToExpenses, setAddToExpenses] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -5410,49 +5923,56 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
     if (isUploading || isSaving) return;
     setIsSaving(true);
     
-    const savePromise = async () => {
+    const processSave = async () => {
       try {
         const data = { ...formData, uid: user.uid };
-        let birdId = initialData?.id;
+        const batch = writeBatch(db);
         
-        if (birdId) { 
-          await updateDoc(doc(db, 'birds', birdId), data); 
+        let birdRef;
+        let birdId;
+        
+        if (initialData?.id) { 
+          birdRef = doc(db, 'birds', initialData.id);
+          birdId = initialData.id;
         } else { 
-          const docRef = doc(collection(db, 'birds'));
-          birdId = docRef.id;
-          await setDoc(docRef, data);
+          birdRef = doc(collection(db, 'birds'));
+          birdId = birdRef.id;
         }
+        
+        batch.set(birdRef, data, { merge: true });
 
         // Auto-pairing logic
-        if (formData.mateId && birdId && formData.sex !== 'Unknown') {
+        if (formData.mateId && birdId) {
           const mateId = formData.mateId;
           const mateBird = birds.find(b => b.id === mateId);
           
-          if (mateBird && mateBird.sex !== 'Unknown' && mateBird.sex !== formData.sex) {
+          if (mateBird) {
             // Update mate's record to point back to this bird
-            await updateDoc(doc(db, 'birds', mateId), { mateId: birdId });
+            const mateRef = doc(db, 'birds', mateId);
+            batch.update(mateRef, { mateId: birdId });
 
             // Create or update Pair document
             const existingPair = pairs.find(p => (p.maleId === birdId && p.femaleId === mateId) || (p.maleId === mateId && p.femaleId === birdId));
 
+            // Determine roles based on available sex info, defaulting to current bird as male if both unknown
+            const isMale = formData.sex === 'Male' || (formData.sex === 'Unknown' && mateBird.sex !== 'Male');
+            
             const pairData = {
-              maleId: formData.sex === 'Male' ? birdId : mateId,
-              femaleId: formData.sex === 'Female' ? birdId : mateId,
+              maleId: isMale ? birdId : mateId,
+              femaleId: isMale ? mateId : birdId,
               status: 'Active',
               startDate: format(new Date(), 'yyyy-MM-dd'),
               uid: user.uid
             };
 
-            if (existingPair) {
-              await updateDoc(doc(db, 'pairs', existingPair.id), pairData as any);
-            } else {
-              await addDoc(collection(db, 'pairs'), pairData);
-            }
+            const pairRef = existingPair ? doc(db, 'pairs', existingPair.id) : doc(collection(db, 'pairs'));
+            batch.set(pairRef, pairData, { merge: true });
           }
         }
 
         if (addToExpenses && formData.purchasePrice && formData.purchasePrice > 0) {
-          await addDoc(collection(db, 'transactions'), {
+          const transRef = doc(collection(db, 'transactions'));
+          batch.set(transRef, {
             type: 'Expense',
             category: 'Bird Purchase',
             amount: formData.purchasePrice,
@@ -5463,13 +5983,23 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
             uid: user.uid
           });
         }
+        
+        // Fire and forget commit to support seamless offline UX
+        batch.commit().catch(err => {
+          console.error("Batch commit error:", err);
+          handleFirestoreError(err, initialData ? OperationType.UPDATE : OperationType.CREATE, 'birds');
+        });
+        
+        toast.success(`Successfully ${initialData ? 'updated' : 'added'} bird!`);
+        setIsSaving(false);
+        onClose();
       } catch (err) { 
-        handleFirestoreError(err, initialData ? OperationType.UPDATE : OperationType.CREATE, 'birds'); 
+         setIsSaving(false);
+         handleFirestoreError(err, initialData ? OperationType.UPDATE : OperationType.CREATE, 'birds'); 
       }
     };
 
-    savePromise();
-    onClose();
+    processSave();
   };
 
   return (
@@ -5642,7 +6172,7 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
           label="Mate"
           options={[
             { id: '', name: 'None' }, 
-            ...birds.filter(b => b.id !== initialData?.id && (formData.sex === 'Unknown' || b.sex !== formData.sex)).map(b => {
+            ...birds.filter(b => b.id !== initialData?.id).map(b => {
               const cage = cages.find(c => c.id === b.cageId);
               const mutationsStr = b.mutations?.length ? `[${b.mutations.join(', ')}]` : '';
               return { 
@@ -5855,7 +6385,7 @@ function CageForm({ user, initialData, cages, onClose }: { user: FirebaseUser, i
     setIsSaving(true);
     setError(null);
     
-    const savePromise = async () => {
+    const processSave = () => {
       try {
         if (isMultiMode && !initialData) {
           const start = parseInt(multiStart);
@@ -5883,28 +6413,30 @@ function CageForm({ user, initialData, cages, onClose }: { user: FirebaseUser, i
             throw new Error('All specified cages already exist');
           }
 
-          await batch.commit();
+          batch.commit().catch(err => handleFirestoreError(err, OperationType.CREATE, 'cages'));
         } else {
           if (cages.some(c => c.id !== initialData?.id && c.name.toLowerCase() === formData.name?.toLowerCase())) {
             throw new Error(`Cage "${formData.name}" already exists`);
           }
 
           const data = { ...formData, uid: user.uid };
-          if (initialData?.id) { await updateDoc(doc(db, 'cages', initialData.id), data); } 
+          if (initialData?.id) { 
+            updateDoc(doc(db, 'cages', initialData.id), data).catch(err => handleFirestoreError(err, OperationType.UPDATE, 'cages')); 
+          } 
           else { 
             const docRef = doc(collection(db, 'cages'));
-            await setDoc(docRef, data); 
+            setDoc(docRef, data).catch(err => handleFirestoreError(err, OperationType.CREATE, 'cages')); 
           }
         }
+        toast.success(isMultiMode && !initialData ? 'Bulk cages created!' : `Cage ${initialData ? 'updated' : 'added'}!`);
         onClose();
       } catch (err) { 
         setError(err instanceof Error ? err.message : 'Action failed');
-      } finally {
         setIsSaving(false);
       }
     };
 
-    savePromise();
+    processSave();
   };
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
@@ -5983,30 +6515,35 @@ function PairForm({ user, initialData, birds, cages, onClose }: { user: Firebase
     if (isSaving) return;
     setIsSaving(true);
     
-    const savePromise = async () => {
+    const processSave = () => {
       try {
         const data = { ...formData, uid: user.uid };
-        if (initialData?.id) { await updateDoc(doc(db, 'pairs', initialData.id), data); } 
+        if (initialData?.id) { 
+          updateDoc(doc(db, 'pairs', initialData.id), data).catch(err => handleFirestoreError(err, OperationType.UPDATE, 'pairs')); 
+        } 
         else { 
           const docRef = doc(collection(db, 'pairs'));
-          await setDoc(docRef, data); 
+          setDoc(docRef, data).catch(err => handleFirestoreError(err, OperationType.CREATE, 'pairs')); 
         }
-      } catch (err) { handleFirestoreError(err, initialData ? OperationType.UPDATE : OperationType.CREATE, 'pairs'); }
+        toast.success(`Pair ${initialData ? 'updated' : 'added'}!`);
+        onClose();
+      } catch (err) { 
+        handleFirestoreError(err, initialData ? OperationType.UPDATE : OperationType.CREATE, 'pairs'); 
+      }
     };
 
-    savePromise();
-    onClose();
+    processSave();
   };
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="grid grid-cols-2 gap-4">
         <SearchableSelect 
-          label="Male"
+          label="Male / Bird 1"
           value={formData.maleId || ''}
           onChange={(val) => setFormData({ ...formData, maleId: val })}
           options={[
-            { id: '', name: 'Select Male' },
-            ...birds.filter(b => b.sex === 'Male').map(b => {
+            { id: '', name: 'Select Bird 1' },
+            ...birds.filter(b => b.sex === 'Male' || b.sex === 'Unknown').map(b => {
               const cage = cages.find(c => c.id === b.cageId);
               const mutationsStr = b.mutations?.length ? `[${b.mutations.join(', ')}]` : '';
               return { 
@@ -6021,12 +6558,12 @@ function PairForm({ user, initialData, birds, cages, onClose }: { user: Firebase
           cages={cages}
         />
         <SearchableSelect 
-          label="Female"
+          label="Female / Bird 2"
           value={formData.femaleId || ''}
           onChange={(val) => setFormData({ ...formData, femaleId: val })}
           options={[
-            { id: '', name: 'Select Female' },
-            ...birds.filter(b => b.sex === 'Female').map(b => {
+            { id: '', name: 'Select Bird 2' },
+            ...birds.filter(b => b.sex === 'Female' || b.sex === 'Unknown').map(b => {
               const cage = cages.find(c => c.id === b.cageId);
               const mutationsStr = b.mutations?.length ? `[${b.mutations.join(', ')}]` : '';
               return { 
@@ -6074,29 +6611,28 @@ function TaskForm({ user, initialData, birds, cages, onClose }: { user: Firebase
     if (isSaving) return;
     setIsSaving(true);
     
-    const savePromise = async () => {
+    const processSave = () => {
       try {
         const data = { ...formData, uid: user.uid };
-        let promise;
         if (initialData?.id) { 
-          promise = updateDoc(doc(db, 'tasks', initialData.id), data); 
+          updateDoc(doc(db, 'tasks', initialData.id), data).catch(err => {
+            handleFirestoreError(err, OperationType.UPDATE, 'tasks');
+            toast.error('Failed to update task');
+          });
+          toast.success('Task updated locally');
         } else { 
           const docRef = doc(collection(db, 'tasks'));
-          promise = setDoc(docRef, data); 
+          setDoc(docRef, data).catch(err => {
+            handleFirestoreError(err, OperationType.CREATE, 'tasks');
+            toast.error('Failed to create task');
+          });
+          toast.success('Task created locally');
         }
-
-        toast.promise(promise, {
-          loading: initialData ? 'Updating task...' : 'Creating task...',
-          success: initialData ? 'Task updated!' : 'Task created!',
-          error: (err) => `Error: ${err.message}`
-        });
-
-        await promise;
+        onClose();
       } catch (err) { handleFirestoreError(err, initialData ? OperationType.UPDATE : OperationType.CREATE, 'tasks'); }
     };
 
-    savePromise();
-    onClose();
+    processSave();
   };
   const addSubTask = () => {
     if (!newSubTask.trim()) return;

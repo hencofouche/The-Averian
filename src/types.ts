@@ -62,6 +62,7 @@ export interface Bird {
   splitMutations?: string[];
   statuses?: string[];
   imageUrl?: string;
+  ringNumber?: string;
   notes?: string;
   purchaseDate?: string;
   purchasePrice?: number;
@@ -115,14 +116,24 @@ export interface Pair {
   uid: string;
 }
 
+export interface Egg {
+  id: string;
+  laidDate?: string;
+  status: 'Laid' | 'Fertile' | 'Infertile / Clear' | 'Dead In Shell' | 'Hatched' | 'Died' | 'Weaned';
+  actualHatchDate?: string;
+  notes?: string;
+  birdId?: string; // If it becomes a bird
+}
+
 export interface BreedingRecord {
   id: string;
   pairId: string;
   startDate: string;
   endDate?: string;
-  eggsLaid: number;
-  eggsHatched: number;
-  chicksWeaned: number;
+  eggsLaid: number; // Keep for backward compatibility
+  eggsHatched: number; // Keep for backward compatibility 
+  chicksWeaned: number; // Keep for backward compatibility
+  eggs?: Egg[];
   offspringIds?: string[];
   notes?: string;
   uid: string;
