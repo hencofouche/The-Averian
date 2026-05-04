@@ -1740,6 +1740,12 @@ export default function App() {
             )}
           </Card>
 
+          {!isTransfer && (
+            <Button onClick={handleImport} className="w-full py-4 text-lg">
+              Import to My Aviary
+            </Button>
+          )}
+
           {isTransfer && (
             <div className="space-y-4">
               <div className="bg-black border border-black-800 rounded-2xl p-4 space-y-4">
@@ -4467,7 +4473,7 @@ function BreedingRecordForm({ user, initialData, pairs, birds, cages, onClose }:
     if (isSaving) return;
     setIsSaving(true);
     
-    const processSave = () => {
+    const processSave = async () => {
       try {
         const eggsArr = formData.eggs || [];
         const data = { 
@@ -4479,15 +4485,19 @@ function BreedingRecordForm({ user, initialData, pairs, birds, cages, onClose }:
         };
         
         if (initialData?.id) { 
-          updateDoc(doc(db, 'breedingRecords', initialData.id), data).catch(err => handleFirestoreError(err, OperationType.UPDATE, 'breedingRecords')); 
+          await updateDoc(doc(db, 'breedingRecords', initialData.id), data); 
         } 
         else { 
           const docRef = doc(collection(db, 'breedingRecords'));
-          setDoc(docRef, data).catch(err => handleFirestoreError(err, OperationType.CREATE, 'breedingRecords')); 
+          await setDoc(docRef, data); 
         }
         toast.success(`Breeding record ${initialData ? 'updated' : 'added'}!`);
+        setIsSaving(false);
         onClose();
-      } catch (err) { handleFirestoreError(err, initialData ? OperationType.UPDATE : OperationType.CREATE, 'breedingRecords'); }
+      } catch (err) { 
+        setIsSaving(false);
+        handleFirestoreError(err, initialData ? OperationType.UPDATE : OperationType.CREATE, 'breedingRecords'); 
+      }
     };
 
     processSave();
@@ -4764,22 +4774,24 @@ function TransactionForm({ user, initialData, birds, pairs, cages, contacts, cur
     if (isSaving) return;
     setIsSaving(true);
     
-    const processSave = () => {
+    const processSave = async () => {
       try {
         const data = { 
           ...formData,
           ...(initialData?.id ? {} : { uid: user.uid })
         };
         if (initialData?.id) { 
-          updateDoc(doc(db, 'transactions', initialData.id), data).catch(err => handleFirestoreError(err, OperationType.UPDATE, 'transactions')); 
+          await updateDoc(doc(db, 'transactions', initialData.id), data); 
         } 
         else { 
           const docRef = doc(collection(db, 'transactions'));
-          setDoc(docRef, data).catch(err => handleFirestoreError(err, OperationType.CREATE, 'transactions')); 
+          await setDoc(docRef, data); 
         }
         toast.success(`Transaction ${initialData ? 'updated' : 'added'}!`);
+        setIsSaving(false);
         onClose();
       } catch (err) { 
+        setIsSaving(false);
         handleFirestoreError(err, initialData ? OperationType.UPDATE : OperationType.CREATE, 'transactions'); 
       }
     };
@@ -4894,21 +4906,25 @@ function ContactForm({ user, initialData, onClose }: { user: FirebaseUser, initi
     if (isSaving) return;
     setIsSaving(true);
     
-    const processSave = () => {
+    const processSave = async () => {
       try {
         const data = { 
           ...formData,
           ...(initialData?.id ? {} : { uid: user.uid })
         };
         if (initialData?.id) { 
-          updateDoc(doc(db, 'contacts', initialData.id), data).catch(err => handleFirestoreError(err, OperationType.UPDATE, 'contacts')); 
+          await updateDoc(doc(db, 'contacts', initialData.id), data); 
         } else { 
           const docRef = doc(collection(db, 'contacts'));
-          setDoc(docRef, data).catch(err => handleFirestoreError(err, OperationType.CREATE, 'contacts')); 
+          await setDoc(docRef, data); 
         }
         toast.success(`Contact ${initialData ? 'updated' : 'added'}!`);
+        setIsSaving(false);
         onClose();
-      } catch (err) { handleFirestoreError(err, initialData ? OperationType.UPDATE : OperationType.CREATE, 'contacts'); }
+      } catch (err) { 
+        setIsSaving(false);
+        handleFirestoreError(err, initialData ? OperationType.UPDATE : OperationType.CREATE, 'contacts'); 
+      }
     };
 
     processSave();
@@ -7167,17 +7183,15 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
           });
         }
         
-        // Fire and forget commit to support seamless offline UX
-        batch.commit().catch(err => {
-          console.error("Batch commit error:", err);
-          handleFirestoreError(err, initialData ? OperationType.UPDATE : OperationType.CREATE, 'birds');
-        });
+        // Await commit to ensure we catch errors before closing
+        await batch.commit();
         
         toast.success(`Successfully ${initialData ? 'updated' : 'added'} bird!`);
         setIsSaving(false);
         onClose();
       } catch (err) { 
          setIsSaving(false);
+         console.error("Save error:", err);
          handleFirestoreError(err, initialData ? OperationType.UPDATE : OperationType.CREATE, 'birds'); 
       }
     };
@@ -7642,7 +7656,7 @@ function CageForm({ user, initialData, cages, onClose }: { user: FirebaseUser, i
     setIsSaving(true);
     setError(null);
     
-    const processSave = () => {
+    const processSave = async () => {
       try {
         if (isMultiMode && !initialData) {
           const start = parseInt(multiStart);
@@ -7670,7 +7684,7 @@ function CageForm({ user, initialData, cages, onClose }: { user: FirebaseUser, i
             throw new Error('All specified cages already exist');
           }
 
-          batch.commit().catch(err => handleFirestoreError(err, OperationType.CREATE, 'cages'));
+          await batch.commit();
         } else {
           if (cages.some(c => c.id !== initialData?.id && c.name.toLowerCase() === formData.name?.toLowerCase())) {
             throw new Error(`Cage "${formData.name}" already exists`);
@@ -7681,18 +7695,22 @@ function CageForm({ user, initialData, cages, onClose }: { user: FirebaseUser, i
             ...(initialData?.id ? {} : { uid: user.uid })
           };
           if (initialData?.id) { 
-            updateDoc(doc(db, 'cages', initialData.id), data).catch(err => handleFirestoreError(err, OperationType.UPDATE, 'cages')); 
+            await updateDoc(doc(db, 'cages', initialData.id), data); 
           } 
           else { 
             const docRef = doc(collection(db, 'cages'));
-            setDoc(docRef, data).catch(err => handleFirestoreError(err, OperationType.CREATE, 'cages')); 
+            await setDoc(docRef, data); 
           }
         }
         toast.success(isMultiMode && !initialData ? 'Bulk cages created!' : `Cage ${initialData ? 'updated' : 'added'}!`);
+        setIsSaving(false);
         onClose();
       } catch (err) { 
         setError(err instanceof Error ? err.message : 'Action failed');
         setIsSaving(false);
+        if (!(err instanceof Error && (err.message.includes('already exists') || err.message.includes('specified cages')))) {
+           handleFirestoreError(err, initialData ? OperationType.UPDATE : OperationType.CREATE, 'cages');
+        }
       }
     };
 
@@ -7775,22 +7793,24 @@ function PairForm({ user, initialData, birds, cages, onClose }: { user: Firebase
     if (isSaving) return;
     setIsSaving(true);
     
-    const processSave = () => {
+    const processSave = async () => {
       try {
         const data = { 
           ...formData,
           ...(initialData?.id ? {} : { uid: user.uid })
         };
         if (initialData?.id) { 
-          updateDoc(doc(db, 'pairs', initialData.id), data).catch(err => handleFirestoreError(err, OperationType.UPDATE, 'pairs')); 
+          await updateDoc(doc(db, 'pairs', initialData.id), data); 
         } 
         else { 
           const docRef = doc(collection(db, 'pairs'));
-          setDoc(docRef, data).catch(err => handleFirestoreError(err, OperationType.CREATE, 'pairs')); 
+          await setDoc(docRef, data); 
         }
         toast.success(`Pair ${initialData ? 'updated' : 'added'}!`);
+        setIsSaving(false);
         onClose();
       } catch (err) { 
+        setIsSaving(false);
         handleFirestoreError(err, initialData ? OperationType.UPDATE : OperationType.CREATE, 'pairs'); 
       }
     };
@@ -7874,28 +7894,26 @@ function TaskForm({ user, initialData, birds, cages, onClose }: { user: Firebase
     if (isSaving) return;
     setIsSaving(true);
     
-    const processSave = () => {
+    const processSave = async () => {
       try {
         const data = { 
           ...formData,
           ...(initialData?.id ? {} : { uid: user.uid })
         };
         if (initialData?.id) { 
-          updateDoc(doc(db, 'tasks', initialData.id), data).catch(err => {
-            handleFirestoreError(err, OperationType.UPDATE, 'tasks');
-            toast.error('Failed to update task');
-          });
-          toast.success('Task updated locally');
+          await updateDoc(doc(db, 'tasks', initialData.id), data);
+          toast.success('Task updated');
         } else { 
           const docRef = doc(collection(db, 'tasks'));
-          setDoc(docRef, data).catch(err => {
-            handleFirestoreError(err, OperationType.CREATE, 'tasks');
-            toast.error('Failed to create task');
-          });
-          toast.success('Task created locally');
+          await setDoc(docRef, data);
+          toast.success('Task created');
         }
+        setIsSaving(false);
         onClose();
-      } catch (err) { handleFirestoreError(err, initialData ? OperationType.UPDATE : OperationType.CREATE, 'tasks'); }
+      } catch (err) { 
+        setIsSaving(false);
+        handleFirestoreError(err, initialData ? OperationType.UPDATE : OperationType.CREATE, 'tasks'); 
+      }
     };
 
     processSave();
