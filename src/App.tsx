@@ -431,7 +431,6 @@ const PedigreeNode = ({ bird, roleLabel, generation, onBirdRef, cages, userSetti
                   <span className="text-secondary font-bold uppercase truncate">
                     {bird.species}{bird.subSpecies ? ` (${bird.subSpecies})` : ''}
                   </span>
-                  {bird.ringNumber && <span className="text-white/40 font-mono tracking-tighter">#{bird.ringNumber}</span>}
                 </div>
                 
                 {bird.mutations && bird.mutations.length > 0 && (
@@ -792,15 +791,22 @@ export default function App() {
   const [isSharedItemLoading, setIsSharedItemLoading] = useState(false);
   const [allSharedItems, setAllSharedItems] = useState<SharedItem[]>([]);
 
-  const handleConfirmDelete = () => {
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleConfirmDelete = async () => {
     if (!deleteConfirmation) return;
-    const result = deleteConfirmation.onConfirm();
-    if (result instanceof Promise) {
-      result.catch((e: any) => {
-        toast.error("Failed to delete: " + e.message);
-      });
+    setIsDeleting(true);
+    try {
+      const result = deleteConfirmation.onConfirm();
+      if (result instanceof Promise) {
+        await result;
+      }
+      setDeleteConfirmation(null);
+    } catch (e: any) {
+      toast.error("Failed to delete: " + e.message);
+    } finally {
+      setIsDeleting(false);
     }
-    setDeleteConfirmation(null);
   };
 
   const handleScanResult = (text: string) => {
@@ -1667,12 +1673,6 @@ export default function App() {
                         <p className="text-white font-medium">{data.birthDate}</p>
                       </div>
                     )}
-                    {data.ringNumber && (
-                      <div className="space-y-1">
-                        <p className="text-black-200 uppercase tracking-widest text-[10px] font-black">Ring Number</p>
-                        <p className="text-white font-medium">{data.ringNumber}</p>
-                      </div>
-                    )}
                     {data.fatherName && (
                       <div className="space-y-1">
                         <p className="text-black-200 uppercase tracking-widest text-[10px] font-black">Father</p>
@@ -2537,6 +2537,7 @@ export default function App() {
         onConfirm={handleConfirmDelete}
         title={deleteConfirmation?.title || 'Confirm Delete'}
         message={deleteConfirmation?.message || 'Are you sure you want to delete this item? This action cannot be undone.'}
+        isDeleting={isDeleting}
       />
 
       <AnimatePresence>
@@ -6975,7 +6976,7 @@ function BirdDocumentsModal({ bird, onClose }: { bird: Bird, onClose: () => void
   );
 }
 
-function ConfirmModal({ isOpen, onClose, onConfirm, title, message }: { isOpen: boolean, onClose: () => void, onConfirm: () => void, title: string, message: string }) {
+function ConfirmModal({ isOpen, onClose, onConfirm, title, message, isDeleting }: { isOpen: boolean, onClose: () => void, onConfirm: () => void, title: string, message: string, isDeleting?: boolean }) {
   if (!isOpen) return null;
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/90 backdrop-blur-xl">
@@ -6993,8 +6994,10 @@ function ConfirmModal({ isOpen, onClose, onConfirm, title, message }: { isOpen: 
           </div>
           <p className="text-white/70 text-sm font-medium leading-relaxed">{message}</p>
           <div className="flex gap-3 pt-2">
-            <Button variant="secondary" onClick={onClose} className="flex-1 py-4">Cancel</Button>
-            <Button variant="danger" onClick={onConfirm} className="flex-1 py-4">Delete</Button>
+            <Button variant="secondary" onClick={onClose} disabled={isDeleting} className="flex-1 py-4">Cancel</Button>
+            <Button variant="danger" onClick={onConfirm} disabled={isDeleting} className="flex-1 py-4">
+              {isDeleting ? 'Deleting...' : 'Delete'}
+            </Button>
           </div>
         </div>
       </motion.div>
@@ -7026,8 +7029,7 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
     mutations: [],
     splitMutations: [],
     statuses: [],
-    imageUrl: '',
-    ringNumber: ''
+    imageUrl: ''
   });
   const [addToExpenses, setAddToExpenses] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
@@ -7240,38 +7242,16 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="space-y-1">
-        <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">ID / Number</label>
-        <Input required value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} placeholder="e.g. RING-2024-001" />
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <SearchableSelect 
-          label="Species"
-          options={speciesOptions}
-          value={selectedSpecies?.id}
-          onChange={(id) => {
-            const name = speciesOptions.find(o => o.id === id)?.name || '';
-            setFormData({ ...formData, species: name, subSpecies: '' });
-          }}
-          onAdd={onAddSpecies}
-          placeholder="Select Species"
-        />
-        <SearchableSelect 
-          label="Sub-Species"
-          options={subSpeciesOptions}
-          value={subSpeciesOptions.find(o => o.name === formData.subSpecies)?.id}
-          onChange={(id) => {
-            const name = subSpeciesOptions.find(o => o.id === id)?.name || '';
-            setFormData({ ...formData, subSpecies: name });
-          }}
-          onAdd={(name) => selectedSpecies && onAddSubSpecies(name, selectedSpecies.id)}
-          placeholder={formData.species ? "Select Sub-Species" : "Select Species First"}
-          disabled={!formData.species}
-        />
-      </div>
-
       <div className="grid grid-cols-12 gap-4">
+        <div className="col-span-6 space-y-1">
+          <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Ring / Name</label>
+          <Input 
+            required
+            value={formData.name}
+            onChange={e => setFormData({ ...formData, name: e.target.value.toUpperCase() })}
+            placeholder="E.G. RING-123"
+          />
+        </div>
         <div className="col-span-3 space-y-1">
           <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Sex</label>
           <Select value={formData.sex} onChange={e => setFormData({ ...formData, sex: e.target.value as any })}>
@@ -7289,14 +7269,6 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
               { id: '', name: 'Unassigned' },
               ...cages.map(c => ({ id: c.id, name: c.name }))
             ]}
-          />
-        </div>
-        <div className="col-span-6 space-y-1">
-          <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Ring / Name</label>
-          <Input 
-            value={formData.name}
-            onChange={e => setFormData({ ...formData, name: e.target.value.toUpperCase() })}
-            placeholder="E.G. RING-123"
           />
         </div>
       </div>
