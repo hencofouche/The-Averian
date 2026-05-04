@@ -1416,7 +1416,15 @@ export default function App() {
         return;
       }
       if (sharedItemView.type === 'bird') {
-        const defaultData = { ...data, id: undefined };
+        const defaultData = { 
+          ...data, 
+          id: undefined, 
+          uid: undefined, 
+          mateId: undefined, 
+          cageId: undefined,
+          fatherId: undefined,
+          motherId: undefined
+        };
         if (isTransfer) {
           if (transferCageId) defaultData.cageId = transferCageId;
 
@@ -1452,6 +1460,7 @@ export default function App() {
         setEditingItem(defaultData);
         setIsModalOpen(true);
         setActiveTab('birds');
+        setSharedItemView(null);
       } else if (sharedItemView.type === 'pair') {
         try {
           let newMaleId = '';
@@ -1516,6 +1525,7 @@ export default function App() {
 
           toast.success('Pair imported successfully!');
           setActiveTab('pairs');
+          setSharedItemView(null);
         } catch (e) {
           console.error("Error importing pair:", e);
           toast.error('Failed to import pair');
@@ -2457,7 +2467,7 @@ export default function App() {
       <Modal 
         isOpen={isModalOpen} 
         onClose={() => { setIsModalOpen(false); setEditingItem(null); }}
-        title={`${editingItem ? 'Edit' : 'Add'} ${
+        title={`${(editingItem && (editingItem as any).id) ? 'Edit' : 'Add'} ${
           activeTab === 'breeding' ? 'Breeding Record' :
           activeTab === 'financials' ? 'Transaction' :
           activeTab === 'tasks' ? 'Task / Reminder' : 
@@ -4749,7 +4759,7 @@ function BreedingRecordForm({ user, initialData, pairs, birds, cages, onClose }:
 
       <Button type="submit" className="w-full py-4 text-sm uppercase tracking-widest font-black" disabled={isSaving}>
         {isSaving ? <Loader2 className="animate-spin mr-2" size={16} /> : null}
-        {initialData ? 'Update' : 'Add'} Record
+        {(initialData && (initialData as any).id) ? 'Update' : 'Add'} Record
       </Button>
     </form>
   );
@@ -4884,7 +4894,7 @@ function TransactionForm({ user, initialData, birds, pairs, cages, contacts, cur
       </div>
       <Button type="submit" className="w-full py-4 text-sm font-bold shadow-xl shadow-gold-500/20" disabled={isSaving}>
         {isSaving ? <Loader2 className="animate-spin mr-2" size={16} /> : null}
-        {initialData ? 'Update' : 'Add'} Transaction
+        {(initialData && (initialData as any).id) ? 'Update' : 'Add'} Transaction
       </Button>
     </form>
   );
@@ -4964,7 +4974,7 @@ function ContactForm({ user, initialData, onClose }: { user: FirebaseUser, initi
       </div>
       <Button type="submit" className="w-full py-4 text-sm font-bold shadow-xl shadow-gold-500/20" disabled={isSaving}>
         {isSaving ? <Loader2 className="animate-spin mr-2" size={16} /> : null}
-        {initialData ? 'Update' : 'Add'} Contact
+        {(initialData && (initialData as any).id) ? 'Update' : 'Add'} Contact
       </Button>
     </form>
   );
@@ -6969,7 +6979,7 @@ function ConfirmModal({ isOpen, onClose, onConfirm, title, message }: { isOpen: 
 
 function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettings, onAddSpecies, onAddSubSpecies, onAddMutation, onAddStatus, onClose }: { user: FirebaseUser, initialData?: Bird | null, cages: Cage[], birds: Bird[], pairs: Pair[], contacts: Contact[], userSettings: UserSettings | null, onAddSpecies: (n: string) => void, onAddSubSpecies: (n: string, sid: string) => void, onAddMutation: (n: string) => void, onAddStatus: (n: string) => void, onClose: () => void }) {
   const symbol = getCurrencySymbol(userSettings?.currency);
-  const detectedMateId = initialData ? (initialData.mateId || birds.find(b => b.mateId === initialData.id)?.id || '') : '';
+  const detectedMateId = (initialData && initialData.id) ? (initialData.mateId || birds.find(b => b.mateId === initialData.id)?.id || '') : '';
   const [formData, setFormData] = useState<Partial<Bird>>(initialData ? { ...initialData, mateId: detectedMateId } : { 
     name: '', 
     species: '', 
@@ -7618,7 +7628,7 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
       </div>
       <Button type="submit" className="w-full py-4 text-sm uppercase tracking-widest font-black" disabled={isUploading || isSaving}>
         {isSaving ? <Loader2 className="animate-spin mr-2" size={16} /> : null}
-        {initialData ? 'Update' : 'Add'} Bird
+        {(initialData && initialData.id) ? 'Update' : 'Add'} Bird
       </Button>
     </form>
   );
@@ -7775,7 +7785,7 @@ function CageForm({ user, initialData, cages, onClose }: { user: FirebaseUser, i
       </div>
       <Button type="submit" className="w-full py-4 text-sm uppercase tracking-widest font-black" disabled={isUploading || isSaving}>
         {isSaving ? <Loader2 className="animate-spin mr-2" size={16} /> : null}
-        {initialData ? 'Update' : isMultiMode ? `Bulk Create (${Math.max(0, parseInt(multiEnd) - parseInt(multiStart) + 1 || 0)})` : 'Add'} Cage
+        {(initialData && (initialData as any).id) ? 'Update' : isMultiMode ? `Bulk Create (${Math.max(0, parseInt(multiEnd) - parseInt(multiStart) + 1 || 0)})` : 'Add'} Cage
       </Button>
     </form>
   );
@@ -7868,7 +7878,7 @@ function PairForm({ user, initialData, birds, cages, onClose }: { user: Firebase
       </div>
       <Button type="submit" className="w-full py-4 text-sm uppercase tracking-widest font-black" disabled={isSaving}>
         {isSaving ? <Loader2 className="animate-spin mr-2" size={16} /> : null}
-        {initialData ? 'Update' : 'Add'} Pair
+        {(initialData && initialData.id) ? 'Update' : 'Add'} Pair
       </Button>
     </form>
   );
@@ -8048,7 +8058,7 @@ function TaskForm({ user, initialData, birds, cages, onClose }: { user: Firebase
       </div>
       <Button type="submit" className="w-full py-4 text-sm uppercase tracking-widest font-black" disabled={isSaving}>
         {isSaving ? <Loader2 className="animate-spin mr-2" size={16} /> : null}
-        {initialData ? 'Update' : 'Add'} Task
+        {(initialData && initialData.id) ? 'Update' : 'Add'} Task
       </Button>
     </form>
   );
