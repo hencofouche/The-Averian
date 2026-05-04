@@ -1545,6 +1545,17 @@ export default function App() {
             uid: user?.uid
           }));
 
+          if (newMaleId && newFemaleId) {
+            try {
+              const batch = writeBatch(db);
+              batch.update(doc(db, 'birds', newMaleId), { mateId: newFemaleId });
+              batch.update(doc(db, 'birds', newFemaleId), { mateId: newMaleId });
+              await batch.commit();
+            } catch (e) {
+              console.error("Failed to link mates:", e);
+            }
+          }
+
           if (isTransfer && transferImportBreeding && data.breedingRecords?.length > 0) {
             for (const record of data.breedingRecords) {
               await addDoc(collection(db, 'breedingRecords'), sanitizeData({
@@ -2184,7 +2195,14 @@ export default function App() {
                               title: 'Delete Pair', 
                               message: 'Are you sure you want to delete this breeding pair? This action cannot be undone.',
                               onConfirm: async () => {
-                                try { await deleteDoc(doc(db, 'pairs', pair.id)); }
+                                try { 
+                                  const batch = writeBatch(db);
+                                  batch.delete(doc(db, 'pairs', pair.id));
+                                  if (pair.maleId) batch.update(doc(db, 'birds', pair.maleId), { mateId: '' });
+                                  if (pair.femaleId) batch.update(doc(db, 'birds', pair.femaleId), { mateId: '' });
+                                  await batch.commit();
+                                  toast.success('Pair deleted and mate links removed');
+                                }
                                 catch (e) { handleFirestoreError(e, OperationType.DELETE, 'pairs'); }
                               }
                             })}
@@ -7806,17 +7824,37 @@ function PairForm({ user, initialData, birds, cages, onClose }: { user: Firebase
     
     const processSave = async () => {
       try {
+        const batch = writeBatch(db);
         const data = sanitizeData({ 
           ...formData,
           ...(initialData?.id ? {} : { uid: user.uid })
         });
+        
         if (initialData?.id) { 
-          await updateDoc(doc(db, 'pairs', initialData.id), data); 
+          batch.update(doc(db, 'pairs', initialData.id), data); 
+          // If mate changed, clear old ones
+          if (initialData.maleId && initialData.maleId !== data.maleId) {
+            batch.update(doc(db, 'birds', initialData.maleId), { mateId: '' });
+          }
+          if (initialData.femaleId && initialData.femaleId !== data.femaleId) {
+            batch.update(doc(db, 'birds', initialData.femaleId), { mateId: '' });
+          }
         } 
         else { 
           const docRef = doc(collection(db, 'pairs'));
-          await setDoc(docRef, data); 
+          batch.set(docRef, data); 
         }
+
+        // Link new mates
+        if (data.maleId) {
+          batch.update(doc(db, 'birds', data.maleId), { mateId: data.femaleId || '' });
+        }
+        if (data.femaleId) {
+          batch.update(doc(db, 'birds', data.femaleId), { mateId: data.maleId || '' });
+        }
+        
+        await batch.commit();
+
         toast.success(`Pair ${initialData ? 'updated' : 'added'}!`);
         setIsSaving(false);
         onClose();
