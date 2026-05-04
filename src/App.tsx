@@ -42,7 +42,7 @@ import { startOfDay, startOfWeek, startOfMonth, endOfMonth, endOfWeek, addDays, 
 const sanitizeData = (data: any) => {
   const sanitized: any = {};
   Object.keys(data).forEach(key => {
-    if (data[key] !== undefined) {
+    if (key !== 'id' && data[key] !== undefined) {
       sanitized[key] = data[key];
     }
   });
@@ -907,19 +907,19 @@ export default function App() {
     // Use limits to prevent "The Bleed" (excessive reads on large collections)
     const qBirds = query(collection(db, 'birds'), where('uid', '==', user.uid), limit(birdsLimit));
     const unsubBirds = onSnapshot(qBirds, (snapshot) => {
-      setBirds(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Bird)));
+      setBirds(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Bird)));
       setIsSyncing(snapshot.metadata.hasPendingWrites);
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'birds'));
 
     const qCages = query(collection(db, 'cages'), where('uid', '==', user.uid), limit(cagesLimit));
     const unsubCages = onSnapshot(qCages, (snapshot) => {
-      setCages(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Cage)));
+      setCages(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Cage)));
       setIsSyncing(snapshot.metadata.hasPendingWrites);
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'cages'));
 
     const qPairs = query(collection(db, 'pairs'), where('uid', '==', user.uid), limit(pairsLimit));
     const unsubPairs = onSnapshot(qPairs, (snapshot) => {
-      setPairs(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Pair)));
+      setPairs(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Pair)));
       setIsSyncing(snapshot.metadata.hasPendingWrites);
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'pairs'));
 
@@ -929,7 +929,7 @@ export default function App() {
       limit(breedingLimit)
     );
     const unsubBreeding = onSnapshot(qBreeding, (snapshot) => {
-      const records = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as BreedingRecord));
+      const records = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as BreedingRecord));
       records.sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime());
       setBreedingRecords(records);
       setIsSyncing(snapshot.metadata.hasPendingWrites);
@@ -937,7 +937,7 @@ export default function App() {
 
     const qTasks = query(collection(db, 'tasks'), where('uid', '==', user.uid), limit(tasksLimit));
     const unsubTasks = onSnapshot(qTasks, (snapshot) => {
-      setTasks(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Task)));
+      setTasks(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Task)));
       setIsSyncing(snapshot.metadata.hasPendingWrites);
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'tasks'));
 
@@ -947,7 +947,7 @@ export default function App() {
       limit(transactionLimit)
     );
     const unsubTransactions = onSnapshot(qTransactions, (snapshot) => {
-      const records = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Transaction));
+      const records = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Transaction));
       records.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
       setTransactions(records);
       setIsSyncing(snapshot.metadata.hasPendingWrites);
@@ -955,7 +955,7 @@ export default function App() {
 
     const qContacts = query(collection(db, 'contacts'), where('uid', '==', user.uid), orderBy('name', 'asc'), limit(contactsLimit));
     const unsubContacts = onSnapshot(qContacts, (snapshot) => {
-      setContacts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Contact)));
+      setContacts(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Contact)));
       setIsSyncing(snapshot.metadata.hasPendingWrites);
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'contacts'));
 
@@ -1055,7 +1055,7 @@ export default function App() {
 
     const qShared = query(collection(db, 'shared_items'), where('createdBy', '==', user.uid), limit(50));
     const unsubShared = onSnapshot(qShared, (snapshot) => {
-      setAllSharedItems(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SharedItem)));
+      setAllSharedItems(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as SharedItem)));
     }, (err) => console.error("Error fetching shared items:", err));
 
     return () => {
