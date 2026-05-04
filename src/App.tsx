@@ -5994,18 +5994,17 @@ function PrintView({ birds, pairs, cages, onBirdRef }: { birds: Bird[], pairs: P
     // Increased timeout to ensure all components and graphics (QR codes) are fully rendered
     setTimeout(() => {
       window.print();
-    }, 1500);
+    }, 2000);
 
     const cleanup = () => {
+      // Keep printing state active for a while after the dialog closes to ensure browser finished
       setTimeout(() => {
         setIsPrinting(false);
         window.removeEventListener('afterprint', cleanup);
-        window.removeEventListener('focus', cleanup);
-      }, 500);
+      }, 2000);
     };
     
     window.addEventListener('afterprint', cleanup);
-    window.addEventListener('focus', cleanup, { once: true });
   };
 
   const getQRData = (id: string) => {
@@ -6563,28 +6562,28 @@ function PrintView({ birds, pairs, cages, onBirdRef }: { birds: Bird[], pairs: P
                                 <div className="flex flex-col h-full justify-center w-full">
                                   <div className="flex items-center justify-between gap-1 w-full flex-1">
                                     {/* Male Column */}
-                                    <div className="flex-1 flex flex-col min-w-0 border-r border-black/5 pr-1 justify-center space-y-0.5 overflow-hidden">
-                                      <p style={{ fontSize: `${7.5 * scale}pt` }} className="font-black uppercase text-black truncate leading-none">
+                                    <div className="flex-1 flex flex-col min-w-0 border-r border-black/5 pr-1 justify-center space-y-0.5">
+                                      <p style={{ fontSize: `${7 * scale}pt` }} className="font-black uppercase text-black truncate leading-none">
                                         {pMale?.name || 'M?'} <span className="text-blue-600">({pMale?.sex?.charAt(0) || 'M'})</span>
                                       </p>
-                                      <p style={{ fontSize: `${5.5 * scale}pt` }} className="font-bold text-gray-500 truncate leading-none uppercase">
+                                      <p style={{ fontSize: `${5.2 * scale}pt` }} className="font-bold text-gray-500 leading-tight uppercase">
                                         {pMale?.species || '-'} {pMale?.subSpecies && `( ${pMale.subSpecies} )`}
                                       </p>
-                                      <p style={{ fontSize: `${4.5 * scale}pt` }} className="font-black text-black/70 truncate leading-none uppercase tracking-tighter">
+                                      <p style={{ fontSize: `${4.2 * scale}pt` }} className="font-black text-black/70 leading-tight uppercase tracking-tighter">
                                         {pMale?.mutations?.join(', ') || 'Normal'} 
                                         {pMale?.splitMutations?.length ? ` ( Split ${pMale.splitMutations.join(', ')} )` : ''}
                                       </p>
                                     </div>
 
                                     {/* Female Column */}
-                                    <div className="flex-1 flex flex-col min-w-0 pl-1 justify-center space-y-0.5 text-right overflow-hidden">
-                                      <p style={{ fontSize: `${7.5 * scale}pt` }} className="font-black uppercase text-black truncate leading-none">
+                                    <div className="flex-1 flex flex-col min-w-0 pl-1 justify-center space-y-0.5 text-right">
+                                      <p style={{ fontSize: `${7 * scale}pt` }} className="font-black uppercase text-black truncate leading-none">
                                         {pFemale?.name || 'F?'} <span className="text-pink-600">({pFemale?.sex?.charAt(0) || 'F'})</span>
                                       </p>
-                                      <p style={{ fontSize: `${5.5 * scale}pt` }} className="font-bold text-gray-500 truncate leading-none uppercase">
+                                      <p style={{ fontSize: `${5.2 * scale}pt` }} className="font-bold text-gray-500 leading-tight uppercase">
                                         {pFemale?.species || '-'} {pFemale?.subSpecies && `( ${pFemale.subSpecies} )`}
                                       </p>
-                                      <p style={{ fontSize: `${4.5 * scale}pt` }} className="font-black text-black/70 truncate leading-none uppercase tracking-tighter">
+                                      <p style={{ fontSize: `${4.2 * scale}pt` }} className="font-black text-black/70 leading-tight uppercase tracking-tighter">
                                         {pFemale?.mutations?.join(', ') || 'Normal'} 
                                         {pFemale?.splitMutations?.length ? ` ( Split ${pFemale.splitMutations.join(', ')} )` : ''}
                                       </p>
@@ -6599,10 +6598,10 @@ function PrintView({ birds, pairs, cages, onBirdRef }: { birds: Bird[], pairs: P
                                 <p style={{ fontSize: `${10 * scale}pt` }} className="font-black uppercase text-black truncate leading-tight">
                                   {cardBird?.name || 'Bird'} <span className={cn(cardBird?.sex === 'Male' ? "text-blue-600" : cardBird?.sex === 'Female' ? "text-pink-600" : "text-gray-400")}>({cardBird?.sex || '?'})</span>
                                 </p>
-                                <p style={{ fontSize: `${8 * scale}pt` }} className="font-bold text-gray-500 truncate leading-tight uppercase">
+                                <p style={{ fontSize: `${7.5 * scale}pt` }} className="font-bold text-gray-500 leading-tight uppercase">
                                   {cardBird?.species || '-'} {cardBird?.subSpecies && `( ${cardBird.subSpecies} )`}
                                 </p>
-                                <p style={{ fontSize: `${7 * scale}pt` }} className="font-black text-black/80 truncate leading-tight uppercase tracking-tight">
+                                <p style={{ fontSize: `${6.5 * scale}pt` }} className="font-black text-black/80 leading-tight uppercase tracking-tight">
                                   {cardBird?.mutations?.join(', ') || 'Normal'}
                                   {cardBird?.splitMutations?.length ? ` ( Split ${cardBird.splitMutations.join(', ')} )` : ''}
                                 </p>
