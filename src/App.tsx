@@ -39,6 +39,16 @@ import { hexToHsva, hsvaToHex } from '@uiw/color-convert';
 import { startOfDay, startOfWeek, startOfMonth, endOfMonth, endOfWeek, addDays, addMonths, isSameMonth, subDays, subWeeks, subMonths, isWithinInterval, parseISO } from 'date-fns';
 
 // --- Helpers ---
+const sanitizeData = (data: any) => {
+  const sanitized: any = {};
+  Object.keys(data).forEach(key => {
+    if (data[key] !== undefined) {
+      sanitized[key] = data[key];
+    }
+  });
+  return sanitized;
+};
+
 const getCurrencySymbol = (currency?: string) => {
   switch (currency) {
     case 'ZAR': return 'R';
@@ -1416,51 +1426,65 @@ export default function App() {
         return;
       }
       if (sharedItemView.type === 'bird') {
-        const defaultData = { 
-          ...data, 
-          id: undefined, 
-          uid: undefined, 
-          mateId: undefined, 
-          cageId: undefined,
-          fatherId: undefined,
-          motherId: undefined
-        };
-        if (isTransfer) {
-          if (transferCageId) defaultData.cageId = transferCageId;
+        try {
+          const birdData = { ...data };
+          // Clean up sensitive/contextual fields
+          delete birdData.id;
+          delete birdData.mateId;
+          delete birdData.cageId;
+          delete birdData.fatherId;
+          delete birdData.motherId;
+          delete birdData.uid;
+          
+          const defaultData = { 
+            ...birdData, 
+            uid: user.uid,
+            createdAt: new Date().toISOString()
+          };
 
-          if (transferImportPedigree) {
-            if (data.fatherName) {
-              const existingFather = birds.find(b => b.name === data.fatherName && b.sex === 'Male');
-              if (existingFather) {
-                defaultData.fatherId = existingFather.id;
-              } else {
-                try {
-                  const ref = await addDoc(collection(db, 'birds'), { name: data.fatherName, species: data.species || '', sex: 'Male', uid: user?.uid, createdAt: new Date().toISOString() });
-                  defaultData.fatherId = ref.id;
-                } catch (e) {
-                  console.error("Failed to create father:", e);
+          if (isTransfer) {
+            if (transferCageId) defaultData.cageId = transferCageId;
+
+            if (transferImportPedigree) {
+              if (data.fatherName) {
+                const existingFather = birds.find(b => b.name === data.fatherName && b.sex === 'Male');
+                if (existingFather) {
+                  defaultData.fatherId = existingFather.id;
+                } else {
+                  try {
+                    const ref = await addDoc(collection(db, 'birds'), { name: data.fatherName, species: data.species || '', sex: 'Male', uid: user?.uid, createdAt: new Date().toISOString() });
+                    defaultData.fatherId = ref.id;
+                  } catch (e) {
+                    console.error("Failed to create father:", e);
+                  }
                 }
               }
-            }
-            if (data.motherName) {
-              const existingMother = birds.find(b => b.name === data.motherName && b.sex === 'Female');
-              if (existingMother) {
-                defaultData.motherId = existingMother.id;
-              } else {
-                try {
-                  const ref = await addDoc(collection(db, 'birds'), { name: data.motherName, species: data.species || '', sex: 'Female', uid: user?.uid, createdAt: new Date().toISOString() });
-                  defaultData.motherId = ref.id;
-                } catch (e) {
-                   console.error("Failed to create mother:", e);
+              if (data.motherName) {
+                const existingMother = birds.find(b => b.name === data.motherName && b.sex === 'Female');
+                if (existingMother) {
+                  defaultData.motherId = existingMother.id;
+                } else {
+                  try {
+                    const ref = await addDoc(collection(db, 'birds'), { name: data.motherName, species: data.species || '', sex: 'Female', uid: user?.uid, createdAt: new Date().toISOString() });
+                    defaultData.motherId = ref.id;
+                  } catch (e) {
+                     console.error("Failed to create mother:", e);
+                  }
                 }
               }
             }
           }
+
+          // Actually save the bird
+          await addDoc(collection(db, 'birds'), sanitizeData(defaultData));
+          
+          toast.success('Bird imported successfully!');
+          setActiveTab('birds');
+          setSharedItemView(null);
+        } catch (e) {
+          console.error("Error importing bird:", e);
+          toast.error('Failed to import bird');
         }
-        setEditingItem(defaultData);
-        setIsModalOpen(true);
-        setActiveTab('birds');
-        setSharedItemView(null);
       } else if (sharedItemView.type === 'pair') {
         try {
           let newMaleId = '';
@@ -1474,12 +1498,13 @@ export default function App() {
             if (existingMale) {
               newMaleId = existingMale.id;
             } else {
-              if (transferCageId) maleData.cageId = transferCageId;
-              const maleRef = await addDoc(collection(db, 'birds'), {
+              const maleToSave = sanitizeData({
                 ...maleData,
+                cageId: transferCageId || '',
                 uid: user?.uid,
                 createdAt: new Date().toISOString()
               });
+              const maleRef = await addDoc(collection(db, 'birds'), maleToSave);
               newMaleId = maleRef.id;
             }
           }
@@ -1495,31 +1520,33 @@ export default function App() {
             if (existingFemale) {
               newFemaleId = existingFemale.id;
             } else {
-              if (transferCageId) femaleData.cageId = transferCageId;
-              const femaleRef = await addDoc(collection(db, 'birds'), {
+              const femaleToSave = sanitizeData({
                 ...femaleData,
+                cageId: transferCageId || '',
                 uid: user?.uid,
                 createdAt: new Date().toISOString()
               });
+              const femaleRef = await addDoc(collection(db, 'birds'), femaleToSave);
               newFemaleId = femaleRef.id;
             }
           }
           
-          const pairRef = await addDoc(collection(db, 'pairs'), {
+          const pairRef = await addDoc(collection(db, 'pairs'), sanitizeData({
             maleId: newMaleId,
             femaleId: newFemaleId,
             status: data.status || 'Active',
             startDate: data.startDate || new Date().toISOString().split('T')[0],
             uid: user?.uid
-          });
+          }));
 
           if (isTransfer && transferImportBreeding && data.breedingRecords?.length > 0) {
             for (const record of data.breedingRecords) {
-              await addDoc(collection(db, 'breedingRecords'), {
+              await addDoc(collection(db, 'breedingRecords'), sanitizeData({
                 ...record,
+                id: undefined, // ensure we don't copy old IDs
                 pairId: pairRef.id,
                 uid: user?.uid
-              });
+              }));
             }
           }
 
@@ -1532,22 +1559,23 @@ export default function App() {
         }
       } else if (sharedItemView.type === 'cage') {
         try {
-          const cageRef = await addDoc(collection(db, 'cages'), {
+          const cageRef = await addDoc(collection(db, 'cages'), sanitizeData({
             name: data.name,
             location: data.location || '',
             type: data.type || 'Standard',
             uid: user?.uid,
             createdAt: new Date().toISOString()
-          });
+          }));
           
           if (data.birds && data.birds.length > 0) {
             for (const b of data.birds) {
-              await addDoc(collection(db, 'birds'), {
+              await addDoc(collection(db, 'birds'), sanitizeData({
                 ...b,
+                id: undefined,
                 cageId: cageRef.id,
                 uid: user?.uid,
                 createdAt: new Date().toISOString()
-              });
+              }));
             }
           }
           toast.success('Cage and birds imported successfully!');
@@ -1752,17 +1780,16 @@ export default function App() {
 
           {!isTransfer && (
             <Button onClick={handleImport} className="w-full py-4 text-lg">
-              Import to My Aviary
+              Add Bird to My Aviary
             </Button>
           )}
 
           {isTransfer && (
             <div className="space-y-4">
               <div className="bg-black border border-black-800 rounded-2xl p-4 space-y-4">
-                <h3 className="text-sm font-black uppercase text-white tracking-widest">Import Options</h3>
+                <h3 className="text-sm font-black uppercase text-white tracking-widest">Cage Assignment (Optional)</h3>
                 
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-black-200">Assign to Cage (Optional)</label>
                   <select 
                     value={transferCageId} 
                     onChange={e => setTransferCageId(e.target.value)}
@@ -1794,7 +1821,7 @@ export default function App() {
                 )}
               </div>
               <Button onClick={handleImport} className="w-full py-4 text-lg">
-                Import to My Aviary
+                Add {sharedItemView.type === 'bird' ? 'Bird' : sharedItemView.type === 'pair' ? 'Pair' : 'Cage'} to My Aviary
               </Button>
             </div>
           )}
@@ -4486,13 +4513,13 @@ function BreedingRecordForm({ user, initialData, pairs, birds, cages, onClose }:
     const processSave = async () => {
       try {
         const eggsArr = formData.eggs || [];
-        const data = { 
+        const data = sanitizeData({ 
           ...formData, 
           ...(initialData?.id ? {} : { uid: user.uid }),
           eggsLaid: eggsArr.length,
           eggsHatched: eggsArr.filter(e => ['Hatched', 'Died', 'Weaned'].includes(e.status)).length,
           chicksWeaned: eggsArr.filter(e => e.status === 'Weaned').length
-        };
+        });
         
         if (initialData?.id) { 
           await updateDoc(doc(db, 'breedingRecords', initialData.id), data); 
@@ -7081,7 +7108,9 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
     
     const processSave = async () => {
       try {
-        const data = { ...formData };
+        // Sanitize data: remove undefined fields
+        const data = sanitizeData(formData);
+
         if (!initialData?.id) {
           data.uid = user.uid;
         }
@@ -7700,10 +7729,10 @@ function CageForm({ user, initialData, cages, onClose }: { user: FirebaseUser, i
             throw new Error(`Cage "${formData.name}" already exists`);
           }
 
-          const data = { 
+          const data = sanitizeData({ 
             ...formData,
             ...(initialData?.id ? {} : { uid: user.uid })
-          };
+          });
           if (initialData?.id) { 
             await updateDoc(doc(db, 'cages', initialData.id), data); 
           } 
@@ -7805,10 +7834,10 @@ function PairForm({ user, initialData, birds, cages, onClose }: { user: Firebase
     
     const processSave = async () => {
       try {
-        const data = { 
+        const data = sanitizeData({ 
           ...formData,
           ...(initialData?.id ? {} : { uid: user.uid })
-        };
+        });
         if (initialData?.id) { 
           await updateDoc(doc(db, 'pairs', initialData.id), data); 
         } 
@@ -7906,10 +7935,10 @@ function TaskForm({ user, initialData, birds, cages, onClose }: { user: Firebase
     
     const processSave = async () => {
       try {
-        const data = { 
+        const data = sanitizeData({ 
           ...formData,
           ...(initialData?.id ? {} : { uid: user.uid })
-        };
+        });
         if (initialData?.id) { 
           await updateDoc(doc(db, 'tasks', initialData.id), data);
           toast.success('Task updated');
