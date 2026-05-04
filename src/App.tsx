@@ -8,7 +8,7 @@ import {
   Tag, Calendar, ChevronDown, ChevronUp, ChevronRight, X, GitBranch,
   Image as ImageIcon, Loader2, DollarSign, TrendingUp, TrendingDown,
   Activity, ArrowUpRight, ArrowDownRight, BarChart3, PieChart as PieChartIcon,
-  Menu, Egg, LayoutGrid, Grid3x3, List as ListIcon, AlertTriangle, CreditCard, CheckCircle2, Bell, Cloud, Maximize2, Share2, Send, Printer, MoreHorizontal, Dna, Users, Palette, QrCode, Scan, FileText, ExternalLink, ArrowLeft
+  Menu, Egg, LayoutGrid, Grid3x3, List as ListIcon, AlertTriangle, CreditCard, CheckCircle2, Bell, Cloud, Maximize2, Share2, Send, Printer, MoreHorizontal, Dna, Users, Palette, QrCode, Scan, FileText, ExternalLink, ArrowLeft, ArrowRightLeft, History as HistoryIcon
 } from 'lucide-react';
 import GeneticsCalculator from './components/GeneticsCalculator';
 import { ContactsView } from './components/ContactsView';
@@ -780,6 +780,7 @@ export default function App() {
 
   const [sharedItemView, setSharedItemView] = useState<SharedItem | null>(null);
   const [isSharedItemLoading, setIsSharedItemLoading] = useState(false);
+  const [allSharedItems, setAllSharedItems] = useState<SharedItem[]>([]);
 
   const handleConfirmDelete = () => {
     if (!deleteConfirmation) return;
@@ -1036,6 +1037,11 @@ export default function App() {
       }
     }, (err) => handleFirestoreError(err, OperationType.GET, 'userSettings'));
 
+    const qShared = query(collection(db, 'shared_items'), where('createdBy', '==', user.uid), limit(50));
+    const unsubShared = onSnapshot(qShared, (snapshot) => {
+      setAllSharedItems(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SharedItem)));
+    }, (err) => console.error("Error fetching shared items:", err));
+
     return () => {
       unsubBirds();
       unsubCages();
@@ -1045,6 +1051,7 @@ export default function App() {
       unsubTransactions();
       unsubContacts();
       unsubSettings();
+      unsubShared();
     };
   }, [user, birdsLimit, cagesLimit, pairsLimit, breedingLimit, tasksLimit, transactionLimit, contactsLimit]);
 
@@ -1404,6 +1411,10 @@ export default function App() {
     const isTransfer = sharedItemView.action === 'transfer';
 
     const handleImport = async () => {
+      if (!user) {
+        toast.error('Please log in to import birds to your aviary.');
+        return;
+      }
       if (sharedItemView.type === 'bird') {
         const defaultData = { ...data, id: undefined };
         if (isTransfer) {
@@ -1416,7 +1427,7 @@ export default function App() {
                 defaultData.fatherId = existingFather.id;
               } else {
                 try {
-                  const ref = await addDoc(collection(db, 'birds'), { name: data.fatherName, sex: 'Male', uid: user?.uid, createdAt: new Date().toISOString() });
+                  const ref = await addDoc(collection(db, 'birds'), { name: data.fatherName, species: data.species || '', sex: 'Male', uid: user?.uid, createdAt: new Date().toISOString() });
                   defaultData.fatherId = ref.id;
                 } catch (e) {
                   console.error("Failed to create father:", e);
@@ -1429,7 +1440,7 @@ export default function App() {
                 defaultData.motherId = existingMother.id;
               } else {
                 try {
-                  const ref = await addDoc(collection(db, 'birds'), { name: data.motherName, sex: 'Female', uid: user?.uid, createdAt: new Date().toISOString() });
+                  const ref = await addDoc(collection(db, 'birds'), { name: data.motherName, species: data.species || '', sex: 'Female', uid: user?.uid, createdAt: new Date().toISOString() });
                   defaultData.motherId = ref.id;
                 } catch (e) {
                    console.error("Failed to create mother:", e);
@@ -1495,7 +1506,7 @@ export default function App() {
 
           if (isTransfer && transferImportBreeding && data.breedingRecords?.length > 0) {
             for (const record of data.breedingRecords) {
-              await addDoc(collection(db, 'breeding_records'), {
+              await addDoc(collection(db, 'breedingRecords'), {
                 ...record,
                 pairId: pairRef.id,
                 uid: user?.uid
@@ -1548,6 +1559,23 @@ export default function App() {
       window.history.replaceState({}, document.title, newUrl);
     };
 
+    const handleDeleteShared = async () => {
+      if (!user || user.uid !== sharedItemView.createdBy) {
+        toast.error('You do not have permission to delete this shared item.');
+        return;
+      }
+      try {
+        await deleteDoc(doc(db, 'shared_items', sharedItemView.id));
+        toast.success('Shared item deleted successfully');
+        setSharedItemView(null);
+        const newUrl = window.location.pathname;
+        window.history.replaceState({}, document.title, newUrl);
+      } catch (e) {
+        console.error("Error deleting shared item:", e);
+        toast.error('Failed to delete shared item');
+      }
+    };
+
     return (
       <div className="min-h-screen bg-black flex flex-col items-center justify-center p-4">
         <div className="w-full max-w-md space-y-6">
@@ -1555,9 +1583,20 @@ export default function App() {
             <h1 className="text-2xl font-black uppercase tracking-widest text-white">
               {isTransfer ? `${sharedItemView.type} Transfer` : `Shared ${sharedItemView.type}`}
             </h1>
-            <button onClick={handleCloseSharedView} className="p-2 text-black-200 hover:text-white transition-colors">
-              <X size={24} />
-            </button>
+            <div className="flex items-center gap-2">
+              {user && user.uid === sharedItemView.createdBy && (
+                <button 
+                  onClick={handleDeleteShared}
+                  className="p-2 text-rose-500 hover:text-rose-400 bg-rose-500/10 rounded-xl transition-colors"
+                  title="Delete Shared Document"
+                >
+                  <Trash2 size={20} />
+                </button>
+              )}
+              <button onClick={handleCloseSharedView} className="p-2 text-black-200 hover:text-white transition-colors">
+                <X size={24} />
+              </button>
+            </div>
           </div>
           
           <Card className="p-6 space-y-6">
@@ -1590,6 +1629,12 @@ export default function App() {
                         <p className="text-white font-medium">{data.birthDate}</p>
                       </div>
                     )}
+                    {data.ringNumber && (
+                      <div className="space-y-1">
+                        <p className="text-black-200 uppercase tracking-widest text-[10px] font-black">Ring Number</p>
+                        <p className="text-white font-medium">{data.ringNumber}</p>
+                      </div>
+                    )}
                     {data.fatherName && (
                       <div className="space-y-1">
                         <p className="text-black-200 uppercase tracking-widest text-[10px] font-black">Father</p>
@@ -1602,7 +1647,35 @@ export default function App() {
                         <p className="text-white font-medium">{data.motherName}</p>
                       </div>
                     )}
+                    {data.mateName && (
+                      <div className="space-y-1">
+                        <p className="text-black-200 uppercase tracking-widest text-[10px] font-black">Mate</p>
+                        <p className="text-white font-medium">{data.mateName}</p>
+                      </div>
+                    )}
+                    {data.purchasePrice > 0 && (
+                      <div className="space-y-1">
+                        <p className="text-black-200 uppercase tracking-widest text-[10px] font-black">Price</p>
+                        <p className="text-white font-medium">{data.purchasePrice}</p>
+                      </div>
+                    )}
                   </div>
+
+                  {data.notes && (
+                    <div className="space-y-1 border-t border-black-800 pt-4">
+                      <p className="text-black-200 uppercase tracking-widest text-[10px] font-black">Notes</p>
+                      <p className="text-white text-xs whitespace-pre-wrap">{data.notes}</p>
+                    </div>
+                  )}
+
+                  {data.statuses?.length > 0 && (
+                    <div className="space-y-2 border-t border-black-800 pt-4">
+                      <p className="text-black-200 uppercase tracking-widest text-[10px] font-black">Status</p>
+                      <div className="flex flex-wrap gap-2">
+                        {data.statuses.map((s: string) => <Badge key={s} className="bg-zinc-800 border-white/5">{s}</Badge>)}
+                      </div>
+                    </div>
+                  )}
 
                   {(data.mutations?.length > 0 || data.splitMutations?.length > 0) && (
                     <div className="space-y-2 border-t border-black-800 pt-4">
@@ -1963,7 +2036,25 @@ export default function App() {
                               title: 'Delete Bird', 
                               message: `Are you sure you want to delete "${bird.name}"? This action cannot be undone.`,
                               onConfirm: async () => {
-                                try { await deleteDoc(doc(db, 'birds', bird.id)); }
+                                try { 
+                                  const batch = writeBatch(db);
+                                  batch.delete(doc(db, 'birds', bird.id));
+                                  
+                                  // Clean up associated pairs
+                                  const birdPairs = pairs.filter(p => p.maleId === bird.id || p.femaleId === bird.id);
+                                  birdPairs.forEach(p => {
+                                    batch.delete(doc(db, 'pairs', p.id));
+                                  });
+
+                                  // Clear mate's record
+                                  const mateId = bird.mateId || birds.find(b => b.mateId === bird.id)?.id;
+                                  if (mateId && mateId !== bird.id) {
+                                    batch.update(doc(db, 'birds', mateId), { mateId: '' });
+                                  }
+
+                                  await batch.commit();
+                                  toast.success('Bird and associated pair data deleted');
+                                }
                                 catch (e) { handleFirestoreError(e, OperationType.DELETE, 'birds'); }
                               }
                             })}
@@ -2339,6 +2430,8 @@ export default function App() {
                     user={user}
                     isSyncing={isSyncing}
                     setDeleteConfirmation={setDeleteConfirmation}
+                    allSharedItems={allSharedItems}
+                    setAllSharedItems={setAllSharedItems}
                   />
                 )}
 
@@ -2534,10 +2627,6 @@ function ShareBirdModal({ bird, mother, father, mate, offspring, cages, cageName
         motherName: mother?.name,
         fatherName: father?.name,
         mateName: mate?.name,
-        purchasePrice: undefined,
-        estimatedValue: undefined,
-        notes: undefined,
-        statuses: undefined
       };
       
       try {
@@ -2674,9 +2763,18 @@ function SharePairModal({ pair, male, female, birds, records, onClose }: { pair:
       const femaleMother = female ? birds.find(b => b.id === female.motherId) : undefined;
 
       const cleanBirdForTransfer = (b?: Bird, f?: Bird, m?: Bird) => b ? {
-        ...b, uid: undefined, cageId: undefined, purchasePrice: undefined, estimatedValue: undefined,
-        notes: undefined, statuses: undefined, fatherId: undefined, motherId: undefined, mateId: undefined,
-        fatherName: f?.name, motherName: m?.name
+        ...b, 
+        uid: undefined, 
+        cageId: undefined, 
+        fatherId: undefined, 
+        motherId: undefined, 
+        mateId: undefined,
+        fatherName: f?.name, 
+        motherName: m?.name,
+        notes: b.notes || '',
+        statuses: b.statuses || [],
+        purchasePrice: b.purchasePrice || 0,
+        estimatedValue: b.estimatedValue || 0,
       } : undefined;
 
       const transferData = {
@@ -2970,10 +3068,10 @@ function BirdCard({ bird, cage, birds, cages, viewMode = 'grid-large', currency,
         motherName: mother?.name,
         fatherName: father?.name,
         mateName: mate?.name,
-        purchasePrice: undefined,
-        estimatedValue: undefined,
-        notes: undefined,
-        statuses: undefined
+        notes: bird.notes || '',
+        statuses: bird.statuses || [],
+        purchasePrice: bird.purchasePrice || 0,
+        estimatedValue: bird.estimatedValue || 0,
       };
       
       const docRef = await addDoc(collection(db, 'shared_items'), {
@@ -4374,7 +4472,7 @@ function BreedingRecordForm({ user, initialData, pairs, birds, cages, onClose }:
         const eggsArr = formData.eggs || [];
         const data = { 
           ...formData, 
-          uid: user.uid,
+          ...(initialData?.id ? {} : { uid: user.uid }),
           eggsLaid: eggsArr.length,
           eggsHatched: eggsArr.filter(e => ['Hatched', 'Died', 'Weaned'].includes(e.status)).length,
           chicksWeaned: eggsArr.filter(e => e.status === 'Weaned').length
@@ -4668,7 +4766,10 @@ function TransactionForm({ user, initialData, birds, pairs, cages, contacts, cur
     
     const processSave = () => {
       try {
-        const data = { ...formData, uid: user.uid };
+        const data = { 
+          ...formData,
+          ...(initialData?.id ? {} : { uid: user.uid })
+        };
         if (initialData?.id) { 
           updateDoc(doc(db, 'transactions', initialData.id), data).catch(err => handleFirestoreError(err, OperationType.UPDATE, 'transactions')); 
         } 
@@ -4795,7 +4896,10 @@ function ContactForm({ user, initialData, onClose }: { user: FirebaseUser, initi
     
     const processSave = () => {
       try {
-        const data = { ...formData, uid: user.uid };
+        const data = { 
+          ...formData,
+          ...(initialData?.id ? {} : { uid: user.uid })
+        };
         if (initialData?.id) { 
           updateDoc(doc(db, 'contacts', initialData.id), data).catch(err => handleFirestoreError(err, OperationType.UPDATE, 'contacts')); 
         } else { 
@@ -5369,7 +5473,7 @@ function ThemeColorPicker({ label, color, defaultColor, onChange }: { label: str
 
 // --- Settings View ---
 
-function SettingsView({ settings, onUpdate, allData, user, isSyncing, setDeleteConfirmation }: { settings: UserSettings, onUpdate: (s: UserSettings) => void, allData: any, user: FirebaseUser | null, isSyncing: boolean, setDeleteConfirmation: (data: any) => void }) {
+function SettingsView({ settings, onUpdate, allData, user, isSyncing, setDeleteConfirmation, allSharedItems, setAllSharedItems }: { settings: UserSettings, onUpdate: (s: UserSettings) => void, allData: any, user: FirebaseUser | null, isSyncing: boolean, setDeleteConfirmation: (data: any) => void, allSharedItems: SharedItem[], setAllSharedItems: React.Dispatch<React.SetStateAction<SharedItem[]>> }) {
   const [activeSection, setActiveSection] = useState<'general' | 'species' | 'subspecies' | 'mutations' | 'statuses' | 'data' | null>('general');
   const [newSpecies, setNewSpecies] = useState('');
   const [newMutation, setNewMutation] = useState('');
@@ -5885,6 +5989,91 @@ function SettingsView({ settings, onUpdate, allData, user, isSyncing, setDeleteC
                       <span className="text-white/50">Cages</span>
                       <span className="text-white">{allData.cages.length}</span>
                     </div>
+                  </div>
+                </div>
+
+                <div className="space-y-4 pt-8 border-t border-black-800">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-black uppercase tracking-widest text-gold-500">Shared Items History</h3>
+                    <Badge variant="info" className="bg-black border-black-700">{allSharedItems.length} Records</Badge>
+                  </div>
+                  <p className="text-[10px] text-white/50 uppercase font-bold tracking-widest leading-relaxed">
+                    Access history of items you've shared or transferred. You can re-open their link to import them again.
+                  </p>
+                  
+                  <div className="grid grid-cols-1 gap-3">
+                    {allSharedItems.length > 0 ? (
+                      allSharedItems.map(item => {
+                        let itemName = 'Unknown Item';
+                        try {
+                          const itemData = JSON.parse(item.data);
+                          itemName = itemData.name || itemData.id || 'Unnamed';
+                        } catch (e) {}
+
+                        return (
+                          <div key={item.id} className="p-4 bg-black border border-black-800 rounded-2xl flex items-center justify-between group hover:border-gold-500/30 transition-all">
+                            <div className="flex items-center gap-4">
+                              <div className={cn(
+                                "p-3 rounded-xl border shrink-0",
+                                item.action === 'transfer' 
+                                  ? "bg-gold-500/10 border-gold-500/20 text-gold-500" 
+                                  : "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
+                              )}>
+                                {item.action === 'transfer' ? <ArrowRightLeft size={20} /> : <Share2 size={20} />}
+                              </div>
+                              <div className="min-w-0">
+                                <h4 className="text-sm font-black text-white uppercase tracking-widest truncate">{itemName}</h4>
+                                <div className="flex items-center gap-2 mt-1">
+                                  <span className="text-[9px] font-black uppercase tracking-wider text-white/40">{item.type}</span>
+                                  <span className="w-1 h-1 rounded-full bg-black-700" />
+                                  <span className="text-[9px] font-black uppercase tracking-wider text-white/40">{new Date(item.createdAt).toLocaleDateString()}</span>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <button 
+                                onClick={() => {
+                                  const url = `${window.location.origin}?${item.action === 'transfer' ? 'transferId' : 'shareId'}=${item.id}`;
+                                  window.open(url, '_blank');
+                                }}
+                                className="p-2.5 bg-zinc-800 text-white/50 hover:text-white rounded-xl transition-all border border-black-700 hover:border-black-600"
+                                title="Open Link"
+                              >
+                                <ExternalLink size={16} />
+                              </button>
+                              <button 
+                                onClick={() => {
+                                  setDeleteConfirmation({
+                                    title: 'Remove Shared Item',
+                                    message: 'Are you sure you want to remove this shared record? The link will no longer work.',
+                                    onConfirm: async () => {
+                                      try {
+                                        await deleteDoc(doc(db, 'shared_items', item.id));
+                                        toast.success('Shared item removed.');
+                                      } catch (err) {
+                                        handleFirestoreError(err, OperationType.DELETE, 'shared_items');
+                                      }
+                                    }
+                                  });
+                                }}
+                                className="p-2.5 bg-rose-500/5 text-rose-500/50 hover:text-rose-500 rounded-xl transition-all border border-rose-500/10 hover:border-rose-500/30"
+                                title="Delete Record"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <div className="py-12 border-2 border-dashed border-black-800 rounded-3xl flex flex-col items-center justify-center text-center px-6">
+                        <div className="p-4 bg-black-900 rounded-full text-white/10 mb-4">
+                          <HistoryIcon size={32} />
+                        </div>
+                        <p className="text-xs font-black text-white/30 uppercase tracking-widest">No shared items found</p>
+                        <p className="text-[10px] font-bold text-white/20 uppercase tracking-tighter mt-1 max-w-[200px]">Items you share or transfer will appear here for history.</p>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -6559,35 +6748,33 @@ function PrintView({ birds, pairs, cages, onBirdRef }: { birds: Bird[], pairs: P
                               const pMale = birds.find(b => b.id === pair.maleId);
                               const pFemale = birds.find(b => b.id === pair.femaleId);
                               return (
-                                <div className="flex flex-col h-full justify-center w-full">
-                                  <div className="flex items-center justify-between gap-1 w-full flex-1">
-                                    {/* Male Column */}
-                                    <div className="flex-1 flex flex-col min-w-0 border-r border-black/5 pr-1 justify-center space-y-0.5">
-                                      <p style={{ fontSize: `${7 * scale}pt` }} className="font-black uppercase text-black truncate leading-none">
-                                        {pMale?.name || 'M?'} <span className="text-blue-600">({pMale?.sex?.charAt(0) || 'M'})</span>
-                                      </p>
-                                      <p style={{ fontSize: `${5.2 * scale}pt` }} className="font-bold text-gray-500 leading-tight uppercase">
-                                        {pMale?.species || '-'} {pMale?.subSpecies && `( ${pMale.subSpecies} )`}
-                                      </p>
-                                      <p style={{ fontSize: `${4.2 * scale}pt` }} className="font-black text-black/70 leading-tight uppercase tracking-tighter">
-                                        {pMale?.mutations?.join(', ') || 'Normal'} 
-                                        {pMale?.splitMutations?.length ? ` ( Split ${pMale.splitMutations.join(', ')} )` : ''}
-                                      </p>
-                                    </div>
+                                <div className="flex flex-col h-full justify-center w-full px-1 space-y-1">
+                                  {/* Male Info */}
+                                  <div className="flex-1 flex flex-col min-w-0 border-b border-black/5 pb-0.5 justify-center">
+                                    <p style={{ fontSize: `${7 * scale}pt` }} className="font-black uppercase text-black truncate leading-none">
+                                      {pMale?.name || 'M?'} <span className="text-blue-600">({pMale?.sex?.charAt(0) || 'M'})</span>
+                                    </p>
+                                    <p style={{ fontSize: `${5.2 * scale}pt` }} className="font-bold text-gray-500 leading-tight uppercase truncate">
+                                      {pMale?.species || '-'} {pMale?.subSpecies && `( ${pMale.subSpecies} )`}
+                                    </p>
+                                    <p style={{ fontSize: `${4.2 * scale}pt` }} className="font-black text-black/70 leading-tight uppercase tracking-tighter truncate">
+                                      {pMale?.mutations?.join(', ') || 'Normal'} 
+                                      {pMale?.splitMutations?.length ? ` ( Split ${pMale.splitMutations.join(', ')} )` : ''}
+                                    </p>
+                                  </div>
 
-                                    {/* Female Column */}
-                                    <div className="flex-1 flex flex-col min-w-0 pl-1 justify-center space-y-0.5 text-right">
-                                      <p style={{ fontSize: `${7 * scale}pt` }} className="font-black uppercase text-black truncate leading-none">
-                                        {pFemale?.name || 'F?'} <span className="text-pink-600">({pFemale?.sex?.charAt(0) || 'F'})</span>
-                                      </p>
-                                      <p style={{ fontSize: `${5.2 * scale}pt` }} className="font-bold text-gray-500 leading-tight uppercase">
-                                        {pFemale?.species || '-'} {pFemale?.subSpecies && `( ${pFemale.subSpecies} )`}
-                                      </p>
-                                      <p style={{ fontSize: `${4.2 * scale}pt` }} className="font-black text-black/70 leading-tight uppercase tracking-tighter">
-                                        {pFemale?.mutations?.join(', ') || 'Normal'} 
-                                        {pFemale?.splitMutations?.length ? ` ( Split ${pFemale.splitMutations.join(', ')} )` : ''}
-                                      </p>
-                                    </div>
+                                  {/* Female Info */}
+                                  <div className="flex-1 flex flex-col min-w-0 pt-0.5 justify-center">
+                                    <p style={{ fontSize: `${7 * scale}pt` }} className="font-black uppercase text-black truncate leading-none">
+                                      {pFemale?.name || 'F?'} <span className="text-pink-600">({pFemale?.sex?.charAt(0) || 'F'})</span>
+                                    </p>
+                                    <p style={{ fontSize: `${5.2 * scale}pt` }} className="font-bold text-gray-500 leading-tight uppercase truncate">
+                                      {pFemale?.species || '-'} {pFemale?.subSpecies && `( ${pFemale.subSpecies} )`}
+                                    </p>
+                                    <p style={{ fontSize: `${4.2 * scale}pt` }} className="font-black text-black/70 leading-tight uppercase tracking-tighter truncate">
+                                      {pFemale?.mutations?.join(', ') || 'Normal'} 
+                                      {pFemale?.splitMutations?.length ? ` ( Split ${pFemale.splitMutations.join(', ')} )` : ''}
+                                    </p>
                                   </div>
                                 </div>
                               );
@@ -6868,7 +7055,10 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
     
     const processSave = async () => {
       try {
-        const data = { ...formData, uid: user.uid };
+        const data = { ...formData };
+        if (!initialData?.id) {
+          data.uid = user.uid;
+        }
         const batch = writeBatch(db);
         
         // Sold / Deceased logic: remove from cage and mate
@@ -6885,15 +7075,32 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
           birdRef = doc(db, 'birds', initialData.id);
           birdId = initialData.id;
 
+          // Handle Mate Changes
+          const oldMateId = detectedMateId;
+          const newMateId = formData.mateId;
+
+          if (oldMateId && oldMateId !== newMateId) {
+            // Remove mateId from old mate
+            if (oldMateId !== birdId) {
+              batch.update(doc(db, 'birds', oldMateId), { mateId: '' });
+            }
+            
+            // Delete the old pair association
+            const oldPair = pairs.find(p => (p.maleId === birdId && p.femaleId === oldMateId) || (p.maleId === oldMateId && p.femaleId === birdId));
+            if (oldPair) {
+              batch.delete(doc(db, 'pairs', oldPair.id));
+            }
+          }
+
           // If marking as deceased/sold, we need to clean up its current associations
           if (isDeceasedOrSold) {
              const currentMate = birds.find(b => b.id === initialData.mateId || (b.mateId === initialData.id && b.id !== initialData.id));
-             if (currentMate) {
+             if (currentMate && currentMate.id !== birdId) {
                batch.update(doc(db, 'birds', currentMate.id), { mateId: '' });
              }
              const activePair = pairs.find(p => p.status === 'Active' && (p.maleId === initialData.id || p.femaleId === initialData.id));
              if (activePair) {
-               batch.update(doc(db, 'pairs', activePair.id), { status: 'Inactive', endDate: format(new Date(), 'yyyy-MM-dd') });
+               batch.delete(doc(db, 'pairs', activePair.id));
              }
           }
         } else { 
@@ -7469,7 +7676,10 @@ function CageForm({ user, initialData, cages, onClose }: { user: FirebaseUser, i
             throw new Error(`Cage "${formData.name}" already exists`);
           }
 
-          const data = { ...formData, uid: user.uid };
+          const data = { 
+            ...formData,
+            ...(initialData?.id ? {} : { uid: user.uid })
+          };
           if (initialData?.id) { 
             updateDoc(doc(db, 'cages', initialData.id), data).catch(err => handleFirestoreError(err, OperationType.UPDATE, 'cages')); 
           } 
@@ -7567,7 +7777,10 @@ function PairForm({ user, initialData, birds, cages, onClose }: { user: Firebase
     
     const processSave = () => {
       try {
-        const data = { ...formData, uid: user.uid };
+        const data = { 
+          ...formData,
+          ...(initialData?.id ? {} : { uid: user.uid })
+        };
         if (initialData?.id) { 
           updateDoc(doc(db, 'pairs', initialData.id), data).catch(err => handleFirestoreError(err, OperationType.UPDATE, 'pairs')); 
         } 
@@ -7663,7 +7876,10 @@ function TaskForm({ user, initialData, birds, cages, onClose }: { user: Firebase
     
     const processSave = () => {
       try {
-        const data = { ...formData, uid: user.uid };
+        const data = { 
+          ...formData,
+          ...(initialData?.id ? {} : { uid: user.uid })
+        };
         if (initialData?.id) { 
           updateDoc(doc(db, 'tasks', initialData.id), data).catch(err => {
             handleFirestoreError(err, OperationType.UPDATE, 'tasks');
