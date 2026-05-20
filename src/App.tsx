@@ -1439,15 +1439,6 @@ export default function App() {
     }
   };
 
-  const handleBirdPedigreeRef = (birdName: string) => {
-    const b = birds.find(birds => birds.name.toLowerCase() === birdName.toLowerCase());
-    if (b) {
-      handleNavigate('pedigree', '', { birdId: b.id });
-    } else {
-      handleNavigate('birds', birdName);
-    }
-  };
-
   const handleBirdRef = (birdName: string) => {
     handleNavigate('birds', birdName);
   };
@@ -2424,7 +2415,7 @@ export default function App() {
                     birdId={searchQuery} 
                     birds={birds} 
                     cages={cages} 
-                    onBirdRef={handleBirdPedigreeRef} 
+                    onBirdRef={handleBirdRef} 
                     onBack={handleGoBack} 
                     userSettings={userSettings ?? undefined}
                   />
@@ -6361,20 +6352,22 @@ function PrintView({ birds, pairs, cages, onBirdRef }: { birds: Bird[], pairs: P
         @media print {
           @page { 
             size: ${isThermal && printMode === 'qr' ? `${qrWidth}mm ${qrHeight}mm` : (printMode === 'certificate' || printMode === 'list') && printLayout === 'horizontal' ? 'A4 landscape' : 'A4 portrait'}; 
-            margin: 0; 
+            margin: 0 !important;
           }
-          body { -webkit-print-color-adjust: exact; background: #fff !important; }
+          body { -webkit-print-color-adjust: exact; background: #fff !important; margin: 0; padding: 0; }
           body * { visibility: hidden; }
           #print-area-portal, #print-area-portal * { visibility: visible !important; }
           #print-area-portal {
             display: block !important;
-            position: static !important;
+            position: absolute !important;
+            top: 0 !important;
+            left: 0 !important;
             width: ${isThermal && printMode === 'qr' ? `${qrWidth}mm` : '100%'} !important;
+            min-height: 100vh !important;
             background: white !important; 
-
             color: black !important;
             margin: 0 !important;
-            padding: 0 !important;
+            padding: ${printMode === 'list' || printMode === 'certificate' ? '8mm' : '0'} !important;
             z-index: 999999 !important;
             box-sizing: border-box !important;
           }
@@ -6752,8 +6745,8 @@ function PrintView({ birds, pairs, cages, onBirdRef }: { birds: Bird[], pairs: P
                     <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left w-[18%]">Split</th>
                   </tr></thead>
                   <tbody>
-                    {printEmpty ? Array.from({ length: printLayout === 'horizontal' ? 18 : 26 }).map((_, i) => (
-                      <tr key={i} className="border-b border-gray-400 h-[9mm]">
+                    {printEmpty ? Array.from({ length: printLayout === 'horizontal' ? 14 : 20 }).map((_, i) => (
+                      <tr key={i} className="border-b border-gray-400 h-[10mm]">
                         <td className="border-r-2 border-gray-400"></td>
                         <td className="border-r-2 border-gray-400"></td>
                         <td className="border-r-2 border-gray-400"></td>
@@ -6792,9 +6785,9 @@ function PrintView({ birds, pairs, cages, onBirdRef }: { birds: Bird[], pairs: P
                     <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left w-[18%]">Split</th>
                   </tr></thead>
                   <tbody>
-                    {printEmpty ? Array.from({ length: printLayout === 'horizontal' ? 9 : 13 }).map((_, i) => (
-                      <tr key={i} className="border-b border-gray-400 h-[19mm]">
-                        <td className="border-r-2 border-gray-400 h-[9.5mm]"></td>
+                    {printEmpty ? Array.from({ length: printLayout === 'horizontal' ? 7 : 10 }).map((_, i) => (
+                      <tr key={i} className="border-b border-gray-400 h-[20mm]">
+                        <td className="border-r-2 border-gray-400 h-[10mm]"></td>
                         <td className="border-r-2 border-gray-400"></td>
                         <td className="border-r-2 border-gray-400"></td>
                         <td className="border-r-2 border-gray-400"></td>
@@ -6858,8 +6851,8 @@ function PrintView({ birds, pairs, cages, onBirdRef }: { birds: Bird[], pairs: P
                     )}
                   </tr></thead>
                   <tbody>
-                    {printEmpty ? Array.from({ length: printLayout === 'horizontal' ? 18 : 26 }).map((_, i) => (
-                      <tr key={`blank-${i}`} className="border-b border-gray-400 h-[9.5mm]">
+                    {printEmpty ? Array.from({ length: printLayout === 'horizontal' ? 14 : 20 }).map((_, i) => (
+                      <tr key={`blank-${i}`} className="border-b border-gray-400 h-[10mm]">
                         <td className="border-r-2 border-gray-400"></td>
                         <td className="border-r-2 border-gray-400"></td>
                         <td className="border-r-4 border-black"></td>
