@@ -6736,16 +6736,16 @@ function PrintView({ birds, pairs, cages, onBirdRef }: { birds: Bird[], pairs: P
               {qrType === 'bird' && (
                 <table className="w-full border-4 border-black">
                   <thead><tr className="bg-gray-100 border-b-4 border-black">
-                    <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black w-[5%]">Cage</th>
-                    <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black w-[5%]">Sex</th>
-                    <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black w-[18%]">ID / Ring</th>
-                    <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black w-[18%]">Species</th>
-                    <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black w-[18%]">Sub-Species</th>
-                    <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black w-[18%]">Mutation</th>
-                    <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left w-[18%]">Split</th>
+                    <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black w-[8%]">Cage</th>
+                    <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black w-[7%]">Sex</th>
+                    <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black w-[17%]">ID / Ring</th>
+                    <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black w-[17%]">Species</th>
+                    <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black w-[17%]">Sub-Species</th>
+                    <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black w-[17%]">Mutation</th>
+                    <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left w-[17%]">Split</th>
                   </tr></thead>
                   <tbody>
-                    {printEmpty ? Array.from({ length: printLayout === 'horizontal' ? 14 : 20 }).map((_, i) => (
+                    {printEmpty ? Array.from({ length: printLayout === 'horizontal' ? 14 : 24 }).map((_, i) => (
                       <tr key={i} className="border-b border-gray-400 h-[10mm]">
                         <td className="border-r-2 border-gray-400"></td>
                         <td className="border-r-2 border-gray-400"></td>
@@ -6776,16 +6776,16 @@ function PrintView({ birds, pairs, cages, onBirdRef }: { birds: Bird[], pairs: P
               {qrType === 'pair' && (
                 <table className="w-full border-4 border-black">
                   <thead><tr className="bg-gray-100 border-b-4 border-black">
-                    <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black w-[5%]">Cage</th>
-                    <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black w-[5%]">Sex</th>
-                    <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black w-[18%]">ID / Ring</th>
-                    <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black w-[18%]">Species</th>
-                    <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black w-[18%]">Sub-Species</th>
-                    <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black w-[18%]">Mutation</th>
-                    <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left w-[18%]">Split</th>
+                    <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black w-[8%]">Cage</th>
+                    <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black w-[7%]">Sex</th>
+                    <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black w-[17%]">ID / Ring</th>
+                    <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black w-[17%]">Species</th>
+                    <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black w-[17%]">Sub-Species</th>
+                    <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black w-[17%]">Mutation</th>
+                    <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left w-[17%]">Split</th>
                   </tr></thead>
                   <tbody>
-                    {printEmpty ? Array.from({ length: printLayout === 'horizontal' ? 7 : 10 }).map((_, i) => (
+                    {printEmpty ? Array.from({ length: printLayout === 'horizontal' ? 7 : 12 }).map((_, i) => (
                       <tr key={i} className="border-b border-gray-400 h-[20mm]">
                         <td className="border-r-2 border-gray-400 h-[10mm]"></td>
                         <td className="border-r-2 border-gray-400"></td>
@@ -6851,7 +6851,7 @@ function PrintView({ birds, pairs, cages, onBirdRef }: { birds: Bird[], pairs: P
                     )}
                   </tr></thead>
                   <tbody>
-                    {printEmpty ? Array.from({ length: printLayout === 'horizontal' ? 14 : 20 }).map((_, i) => (
+                    {printEmpty ? Array.from({ length: printLayout === 'horizontal' ? 14 : 24 }).map((_, i) => (
                       <tr key={`blank-${i}`} className="border-b border-gray-400 h-[10mm]">
                         <td className="border-r-2 border-gray-400"></td>
                         <td className="border-r-2 border-gray-400"></td>
