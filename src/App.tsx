@@ -6752,8 +6752,8 @@ function PrintView({ birds, pairs, cages, onBirdRef }: { birds: Bird[], pairs: P
                     <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left w-[18%]">Split</th>
                   </tr></thead>
                   <tbody>
-                    {printEmpty ? Array.from({ length: 26 }).map((_, i) => (
-                      <tr key={i} className="border-b border-gray-400 h-[9.5mm]">
+                    {printEmpty ? Array.from({ length: printLayout === 'horizontal' ? 18 : 26 }).map((_, i) => (
+                      <tr key={i} className="border-b border-gray-400 h-[9mm]">
                         <td className="border-r-2 border-gray-400"></td>
                         <td className="border-r-2 border-gray-400"></td>
                         <td className="border-r-2 border-gray-400"></td>
@@ -6792,7 +6792,7 @@ function PrintView({ birds, pairs, cages, onBirdRef }: { birds: Bird[], pairs: P
                     <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left w-[18%]">Split</th>
                   </tr></thead>
                   <tbody>
-                    {printEmpty ? Array.from({ length: 15 }).map((_, i) => (
+                    {printEmpty ? Array.from({ length: printLayout === 'horizontal' ? 9 : 13 }).map((_, i) => (
                       <tr key={i} className="border-b border-gray-400 h-[19mm]">
                         <td className="border-r-2 border-gray-400 h-[9.5mm]"></td>
                         <td className="border-r-2 border-gray-400"></td>
@@ -6858,7 +6858,7 @@ function PrintView({ birds, pairs, cages, onBirdRef }: { birds: Bird[], pairs: P
                     )}
                   </tr></thead>
                   <tbody>
-                    {printEmpty ? Array.from({ length: 30 }).map((_, i) => (
+                    {printEmpty ? Array.from({ length: printLayout === 'horizontal' ? 18 : 26 }).map((_, i) => (
                       <tr key={`blank-${i}`} className="border-b border-gray-400 h-[9.5mm]">
                         <td className="border-r-2 border-gray-400"></td>
                         <td className="border-r-2 border-gray-400"></td>
