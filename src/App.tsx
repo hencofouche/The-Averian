@@ -3144,13 +3144,13 @@ function PedigreeFullView({ birdId, birds, cages, onBirdRef, onBack, userSetting
            }
            .fixed, nav { display: none !important; }
            #pedigree-print-area, #pedigree-print-area * {
-              visibility: visible;
+              visibility: visible !important;
            }
            #pedigree-print-area {
-              position: absolute;
-              left: 0;
-              top: 0;
-              width: 100%;
+              position: absolute !important;
+              left: 0 !important;
+              top: 0 !important;
+              width: 100% !important;
               background: white !important;
               color: black !important;
               padding: 0 !important;
@@ -6284,7 +6284,6 @@ function SettingsView({ settings, onUpdate, allData, user, isSyncing, setDeleteC
 function PrintView({ birds, pairs, cages, onBirdRef }: { birds: Bird[], pairs: Pair[], cages: Cage[], onBirdRef: (name: string) => void }) {
   const [printMode, setPrintMode] = useState<'list' | 'qr' | 'certificate'>('list');
   const [printLayout, setPrintLayout] = useState<'vertical' | 'horizontal'>('vertical');
-  const [isPrinting, setIsPrinting] = useState(false);
   const [printEmpty, setPrintEmpty] = useState(false);
   const [qrType, setQrType] = useState<'bird' | 'pair' | 'cage'>('bird');
   const [qrSelections, setQrSelections] = useState<string[]>([]);
@@ -6347,21 +6346,7 @@ function PrintView({ birds, pairs, cages, onBirdRef }: { birds: Bird[], pairs: P
   }));
 
   const handlePrint = () => {
-    setIsPrinting(true);
-    // Increased timeout to ensure all components and graphics (QR codes) are fully rendered
-    setTimeout(() => {
-      window.print();
-    }, 2000);
-
-    const cleanup = () => {
-      // Keep printing state active for a while after the dialog closes to ensure browser finished
-      setTimeout(() => {
-        setIsPrinting(false);
-        window.removeEventListener('afterprint', cleanup);
-      }, 2000);
-    };
-    
-    window.addEventListener('afterprint', cleanup);
+    window.print();
   };
 
   const getQRData = (id: string) => {
@@ -6381,12 +6366,13 @@ function PrintView({ birds, pairs, cages, onBirdRef }: { birds: Bird[], pairs: P
             margin: 0; 
           }
           body { -webkit-print-color-adjust: exact; background: #fff !important; }
-          body > :not(#print-area-portal) { display: none !important; }
+          body * { visibility: hidden; }
+          #print-area-portal, #print-area-portal * { visibility: visible !important; }
           #print-area-portal {
-            display: block !important; 
-            visibility: visible !important;
-            position: relative !important; 
-            width: ${isThermal && printMode === 'qr' ? `${qrWidth}mm` : '100%'} !important; 
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 100% !important;
             background: white !important; 
             color: black !important;
             margin: 0 !important;
@@ -6652,9 +6638,9 @@ function PrintView({ birds, pairs, cages, onBirdRef }: { birds: Bird[], pairs: P
         </div>
       </div>
 
-      {/* Hidden Print Area rendered via Portal */}
-      {isPrinting && createPortal(
-        <div id="print-area-portal" className="bg-white text-black p-10 font-sans">
+      {/* Hidden Print Area */}
+      {createPortal(
+        <div id="print-area-portal" className="bg-white text-black p-10 font-sans hidden print:block">
           {printMode === 'certificate' ? (
             <div className={cn("flex", printLayout === 'horizontal' ? "flex-row flex-wrap gap-4" : "flex-col")}>
               {birds.filter(b => qrSelections.includes(b.id)).map(bird => (

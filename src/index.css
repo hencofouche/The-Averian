@@ -91,4 +91,10 @@ input[type="range"]::-moz-range-thumb {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
+  html, body, #root, .flex-1, .h-screen, .min-h-screen, .min-h-\[100dvh\], .overflow-hidden, .overflow-y-auto, .overflow-x-hidden {
+    height: auto !important;
+    min-height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
 }
