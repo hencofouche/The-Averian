@@ -472,35 +472,64 @@ const PedigreeNode = ({ bird, roleLabel, generation, onBirdRef, cages, userSetti
   );
 };
 
-const VerticalPedigreeNode = ({ birdId, birds, cages, onBirdRef, userSettings, generation = 1, maxGenerations = 3, roleLabel }: { birdId?: string, birds: Bird[], cages: Cage[], onBirdRef: (name: string) => void, userSettings?: UserSettings, generation?: number, maxGenerations?: number, roleLabel?: string }) => {
+const AncestryNode = ({ birdId, birds, cages, onBirdRef, userSettings, generation = 1, maxGenerations = 3, roleLabel }: { birdId?: string, birds: Bird[], cages: Cage[], onBirdRef: (name: string) => void, userSettings?: UserSettings, generation?: number, maxGenerations?: number, roleLabel?: string }) => {
   const bird = birds.find(b => b.id === birdId);
-
+  if (!bird && generation > 1) return null; // Don't show empty grandparent slots if they don't exist
   if (generation > maxGenerations) return null;
+
+  const hasParents = bird?.fatherId || bird?.motherId;
 
   return (
     <div className="flex flex-col items-center">
-      <PedigreeNode bird={bird} roleLabel={roleLabel} generation={generation} onBirdRef={onBirdRef} cages={cages} userSettings={userSettings} />
-
-      {generation < maxGenerations && (
-        <>
-          <div className="w-[1px] h-3 sm:h-8 bg-white/20 print:bg-black/20 mt-1 sm:mt-2"></div>
-          <div className="flex flex-row gap-1 sm:gap-8 relative">
-             <div className="absolute top-0 left-1/4 right-1/4 h-[1px] bg-white/20 print:bg-black/20 pointer-events-none"></div>
-             
-             <div className="flex flex-col items-center relative pt-2 sm:pt-8 flex-1">
-                <div className="absolute top-0 left-1/2 w-[1px] h-3 sm:h-8 bg-white/20 print:bg-black/20 -translate-x-1/2 pointer-events-none"></div>
-                <VerticalPedigreeNode birdId={bird?.fatherId} birds={birds} cages={cages} onBirdRef={onBirdRef} userSettings={userSettings} generation={generation + 1} maxGenerations={maxGenerations} roleLabel={generation === 1 ? 'Sire' : 'Grandsire'} />
+      {hasParents && generation < maxGenerations && (
+        <div className="flex flex-col items-center w-full min-w-max">
+          <div className="flex flex-row justify-center gap-4 sm:gap-16 w-full relative">
+             <div className="flex flex-col items-center flex-1">
+               <AncestryNode birdId={bird.fatherId} birds={birds} cages={cages} onBirdRef={onBirdRef} userSettings={userSettings} generation={generation + 1} maxGenerations={maxGenerations} roleLabel={generation === 1 ? 'Sire' : 'Grandsire'} />
              </div>
-             
-             <div className="flex flex-col items-center relative pt-2 sm:pt-8 flex-1">
-                <div className="absolute top-0 left-1/2 w-[1px] h-3 sm:h-8 bg-white/20 print:bg-black/20 -translate-x-1/2 pointer-events-none"></div>
-                <VerticalPedigreeNode birdId={bird?.motherId} birds={birds} cages={cages} onBirdRef={onBirdRef} userSettings={userSettings} generation={generation + 1} maxGenerations={maxGenerations} roleLabel={generation === 1 ? 'Dam' : 'Granddam'} />
+             <div className="flex flex-col items-center flex-1">
+               <AncestryNode birdId={bird.motherId} birds={birds} cages={cages} onBirdRef={onBirdRef} userSettings={userSettings} generation={generation + 1} maxGenerations={maxGenerations} roleLabel={generation === 1 ? 'Dam' : 'Granddam'} />
              </div>
           </div>
-        </>
+          <div className="relative w-full h-6 sm:h-12 flex justify-center mt-2 sm:mt-4">
+             <div className="absolute top-0 border-t border-white/20 print:border-black/20 pointer-events-none left-1/4 right-1/4"></div>
+             <div className="w-[1px] h-full bg-white/20 print:bg-black/20 pointer-events-none"></div>
+          </div>
+        </div>
       )}
+      <PedigreeNode bird={bird} roleLabel={roleLabel} generation={generation} onBirdRef={onBirdRef} cages={cages} userSettings={userSettings} />
     </div>
   );
+};
+
+const DescendantsTree = ({ birdId, birds, cages, onBirdRef, userSettings, generation = 1, maxGenerations = 4 }: { birdId?: string, birds: Bird[], cages: Cage[], onBirdRef: (name: string) => void, userSettings?: UserSettings, generation?: number, maxGenerations?: number }) => {
+   const offspring = birds.filter(b => b.motherId === birdId || b.fatherId === birdId);
+
+   if (generation > maxGenerations || offspring.length === 0) return null;
+
+   return (
+     <div className="flex flex-col items-center w-full min-w-max mt-2 sm:mt-4">
+        <div className="w-[1px] h-6 sm:h-12 bg-white/20 print:bg-black/20 pointer-events-none"></div>
+        <div className="relative w-full flex justify-center">
+           {offspring.length > 1 && (
+             <div className="absolute top-0 border-t border-white/20 print:border-black/20 pointer-events-none" 
+                  style={{ 
+                    left: `${100 / (offspring.length * 2)}%`, 
+                    right: `${100 / (offspring.length * 2)}%` 
+                  }}></div>
+           )}
+           <div className="flex flex-row gap-4 sm:gap-16 justify-center w-full">
+              {offspring.map((off) => (
+                 <div key={off.id} className="flex flex-col items-center flex-1 relative pt-4 sm:pt-8 min-w-max">
+                   <div className="absolute top-0 w-[1px] h-4 sm:h-8 bg-white/20 print:bg-black/20 pointer-events-none"></div>
+                   <PedigreeNode bird={off} roleLabel="Offspring" generation={2} onBirdRef={onBirdRef} cages={cages} userSettings={userSettings} />
+                   <DescendantsTree birdId={off.id} birds={birds} cages={cages} onBirdRef={onBirdRef} userSettings={userSettings} generation={generation + 1} maxGenerations={maxGenerations} />
+                 </div>
+              ))}
+           </div>
+        </div>
+     </div>
+   );
 };
 
 
@@ -1076,6 +1105,7 @@ export default function App() {
     switch (activeTab) {
       case 'birds':
         return birds.filter(b => {
+          if (b.isGhost) return false;
           const cage = cages.find(c => c.id === b.cageId);
           const inPair = pairs.find(p => p.id.toLowerCase() === query && (p.maleId === b.id || p.femaleId === b.id));
           const cageLabel = cage ? cage.name : 'unassigned';
@@ -1448,33 +1478,77 @@ export default function App() {
             createdAt: new Date().toISOString()
           };
 
+          const mainBirdDocRef = doc(collection(db, 'birds'));
+          const mainBirdId = mainBirdDocRef.id;
+
           if (isTransfer) {
             if (transferCageId) defaultData.cageId = transferCageId;
 
             if (transferImportPedigree) {
-              if (data.fatherName) {
-                const existingFather = birds.find(b => b.name === data.fatherName && b.sex === 'Male');
-                if (existingFather) {
-                  defaultData.fatherId = existingFather.id;
-                } else {
-                  try {
-                    const ref = await addDoc(collection(db, 'birds'), { name: data.fatherName, species: data.species || '', sex: 'Male', uid: user?.uid, createdAt: new Date().toISOString() });
-                    defaultData.fatherId = ref.id;
-                  } catch (e) {
-                    console.error("Failed to create father:", e);
+              if (data.relatedBirds && Array.isArray(data.relatedBirds)) {
+                try {
+                  const batch = writeBatch(db);
+                  const idMap = new Map<string, string>();
+                  
+                  if (data.originalId) {
+                    idMap.set(data.originalId, mainBirdId);
+                  }
+                  
+                  data.relatedBirds.forEach((rb: any) => {
+                    const existing = birds.find(b => b.ghostId === rb.originalId);
+                    idMap.set(rb.originalId, existing ? existing.id : doc(collection(db, 'birds')).id);
+                  });
+
+                  data.relatedBirds.forEach((rb: any) => {
+                    const existing = birds.find(b => b.ghostId === rb.originalId);
+                    if (!existing) {
+                      const newBird = sanitizeData({
+                        ...rb,
+                        id: undefined,
+                        originalId: undefined,
+                        ghostId: rb.originalId,
+                        motherId: rb.motherId ? idMap.get(rb.motherId) : undefined,
+                        fatherId: rb.fatherId ? idMap.get(rb.fatherId) : undefined,
+                        mateId: undefined,
+                        uid: user.uid,
+                        createdAt: new Date().toISOString()
+                      });
+                      batch.set(doc(db, 'birds', idMap.get(rb.originalId)!), newBird);
+                    }
+                  });
+                  await batch.commit();
+
+                  if (data.motherId) defaultData.motherId = idMap.get(data.motherId);
+                  if (data.fatherId) defaultData.fatherId = idMap.get(data.fatherId);
+                } catch (e) {
+                  console.error("Failed to restore pedigree:", e);
+                }
+              } else {
+                // Fallback for old shared items
+                if (data.fatherName) {
+                  const existingFather = birds.find(b => b.name === data.fatherName && b.sex === 'Male');
+                  if (existingFather) {
+                    defaultData.fatherId = existingFather.id;
+                  } else {
+                    try {
+                      const ref = await addDoc(collection(db, 'birds'), { name: data.fatherName, species: data.species || '', sex: 'Male', uid: user?.uid, createdAt: new Date().toISOString() });
+                      defaultData.fatherId = ref.id;
+                    } catch (e) {
+                      console.error("Failed to create father:", e);
+                    }
                   }
                 }
-              }
-              if (data.motherName) {
-                const existingMother = birds.find(b => b.name === data.motherName && b.sex === 'Female');
-                if (existingMother) {
-                  defaultData.motherId = existingMother.id;
-                } else {
-                  try {
-                    const ref = await addDoc(collection(db, 'birds'), { name: data.motherName, species: data.species || '', sex: 'Female', uid: user?.uid, createdAt: new Date().toISOString() });
-                    defaultData.motherId = ref.id;
-                  } catch (e) {
-                     console.error("Failed to create mother:", e);
+                if (data.motherName) {
+                  const existingMother = birds.find(b => b.name === data.motherName && b.sex === 'Female');
+                  if (existingMother) {
+                    defaultData.motherId = existingMother.id;
+                  } else {
+                    try {
+                      const ref = await addDoc(collection(db, 'birds'), { name: data.motherName, species: data.species || '', sex: 'Female', uid: user?.uid, createdAt: new Date().toISOString() });
+                      defaultData.motherId = ref.id;
+                    } catch (e) {
+                       console.error("Failed to create mother:", e);
+                    }
                   }
                 }
               }
@@ -1482,7 +1556,7 @@ export default function App() {
           }
 
           // Actually save the bird
-          await addDoc(collection(db, 'birds'), sanitizeData(defaultData));
+          await setDoc(doc(db, 'birds', mainBirdId), sanitizeData(defaultData));
           
           toast.success('Bird imported successfully!');
           setActiveTab('birds');
@@ -3039,32 +3113,27 @@ function PedigreeFullView({ birdId, birds, cages, onBirdRef, onBack, userSetting
                  width: contentWidth,
                  marginBottom: `calc(${contentWidth * 0.8}px * (1 - ${finalScale}) * -1)`
                }}>
-                  <div ref={contentRef} className="w-max flex justify-center">
-                    <VerticalPedigreeNode 
+                  <div ref={contentRef} className="w-max flex justify-center flex-col items-center">
+                    <AncestryNode 
                        birdId={bird.id} 
                        birds={birds} 
                        cages={cages} 
                        onBirdRef={onBirdRef} 
                        userSettings={userSettings}
-                       maxGenerations={3} 
+                       maxGenerations={4} 
                        roleLabel="Focus Bird" 
+                    />
+                    <DescendantsTree
+                       birdId={bird.id}
+                       birds={birds}
+                       cages={cages}
+                       onBirdRef={onBirdRef}
+                       userSettings={userSettings}
+                       maxGenerations={4}
                     />
                   </div>
                </div>
             </div>
-           
-           {offspring.length > 0 && (
-             <div className="mt-16 pt-8 border-t border-black-800 text-center flex flex-col items-center print:mt-8 print:pt-4 print:border-black/10">
-                <p className="text-[10px] text-white/50 print:text-black/50 uppercase tracking-widest font-black mb-6">Direct Offspring ({offspring.length})</p>
-                <div className="flex flex-wrap justify-center gap-4 max-w-4xl">
-                  {offspring.map(o => (
-                     <div key={o.id} className="w-[180px]">
-                        <BirdCompactInfo bird={o} cages={cages} onClick={() => onBirdRef(o.name)} />
-                     </div>
-                  ))}
-                </div>
-             </div>
-           )}
          </div>
       </div>
       
@@ -3119,21 +3188,48 @@ function BirdCard({ bird, cage, birds, cages, viewMode = 'grid-large', currency,
   const handleTransfer = async (e: React.MouseEvent) => {
     e.stopPropagation();
     try {
-      // For transfer, we include almost everything except uid, cageId (since it won't match the new user's cages), and maybe price/value
+      const visited = new Set<string>();
+      const relatedBirds: any[] = [];
+      const collect = (id: string | null | undefined) => {
+        if (!id || visited.has(id)) return;
+        visited.add(id);
+        const b = birds.find(x => x.id === id);
+        if (b && b.id !== bird.id) {
+          relatedBirds.push({
+            originalId: b.id,
+            name: b.name,
+            species: b.species,
+            subSpecies: b.subSpecies,
+            sex: b.sex,
+            mutations: b.mutations,
+            splitMutations: b.splitMutations,
+            motherId: b.motherId,
+            fatherId: b.fatherId,
+            imageUrl: b.imageUrl,
+            isGhost: true, // Marker for imported relative
+          });
+          collect(b.motherId);
+          collect(b.fatherId);
+          birds.filter(off => off.motherId === b.id || off.fatherId === b.id).forEach(o => collect(o.id));
+        }
+      };
+      
+      collect(bird.motherId);
+      collect(bird.fatherId);
+      offspring.forEach(o => collect(o.id));
+
+      // For transfer, we include almost everything except uid, cageId
       const transferData = {
         ...bird,
+        originalId: bird.id,
         uid: undefined,
         cageId: undefined,
-        motherId: undefined, // IDs won't match, we should probably pass names
-        fatherId: undefined,
         mateId: undefined,
-        motherName: mother?.name,
-        fatherName: father?.name,
-        mateName: mate?.name,
         notes: bird.notes || '',
         statuses: bird.statuses || [],
         purchasePrice: bird.purchasePrice || 0,
         estimatedValue: bird.estimatedValue || 0,
+        relatedBirds, // all collected relations
       };
       
       const docRef = await addDoc(collection(db, 'shared_items'), {
@@ -4770,7 +4866,7 @@ function BreedingRecordForm({ user, initialData, pairs, birds, cages, onClose }:
       <div className="space-y-1">
         <SearchableSelect 
           label="Tag Existing Offspring"
-          options={birds.map(b => {
+          options={birds.filter(b => !b.isGhost).map(b => {
             const cage = cages.find(c => c.id === b.cageId);
             const mutationsStr = b.mutations?.length ? `[${b.mutations.join(', ')}]` : '';
             return {
@@ -4887,7 +4983,7 @@ function TransactionForm({ user, initialData, birds, pairs, cages, contacts, cur
             onChange={(val) => setFormData({ ...formData, birdId: val })}
             options={[
               { id: '', name: 'None' },
-              ...birds.map(b => {
+              ...birds.filter(b => !b.isGhost).map(b => {
                 const cage = cages.find(c => c.id === b.cageId);
                 const mutationsStr = b.mutations?.length ? `[${b.mutations.join(', ')}]` : '';
                 return {
@@ -6214,7 +6310,7 @@ function PrintView({ birds, pairs, cages, onBirdRef }: { birds: Bird[], pairs: P
     return [...cages].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
   }, [cages]);
 
-  const birdOptions = birds.map(b => {
+  const birdOptions = birds.filter(b => !b.isGhost).map(b => {
     const cage = cages.find(c => c.id === b.cageId);
     return { 
       id: b.id, 
@@ -7458,7 +7554,7 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
               const mutationsStr = b.mutations?.length ? `[${b.mutations.join(', ')}]` : '';
               return { 
                 id: b.id, 
-                name: b.name,
+                name: b.isGhost ? `${b.name} (Pedigree Only)` : b.name,
                 details: cage?.name || 'Unassigned',
                 subText: mutationsStr,
                 bird: b
@@ -7479,7 +7575,7 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
               const mutationsStr = b.mutations?.length ? `[${b.mutations.join(', ')}]` : '';
               return { 
                 id: b.id, 
-                name: b.name,
+                name: b.isGhost ? `${b.name} (Pedigree Only)` : b.name,
                 details: cage?.name || 'Unassigned',
                 subText: mutationsStr,
                 bird: b
@@ -7503,7 +7599,7 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
               const mutationsStr = b.mutations?.length ? `[${b.mutations.join(', ')}]` : '';
               return { 
                 id: b.id, 
-                name: b.name,
+                name: b.isGhost ? `${b.name} (Pedigree Only)` : b.name,
                 details: cage?.name || 'Unassigned',
                 subText: mutationsStr,
                 bird: b
@@ -7517,7 +7613,7 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
         />
         <SearchableSelect 
           label="Offspring"
-          options={birds.filter(b => b.id !== initialData?.id).map(b => {
+          options={birds.filter(b => !b.isGhost && b.id !== initialData?.id).map(b => {
             const cage = cages.find(c => c.id === b.cageId);
             const mutationsStr = b.mutations?.length ? `[${b.mutations.join(', ')}]` : '';
             return { 
@@ -8056,7 +8152,7 @@ function TaskForm({ user, initialData, birds, cages, onClose }: { user: Firebase
         <SearchableSelect 
           label=""
           placeholder="Tag more birds..."
-          options={birds.map(b => {
+          options={birds.filter(b => !b.isGhost).map(b => {
              const cage = cages.find(c => c.id === b.cageId);
              const mutationsStr = b.mutations?.length ? `[${b.mutations.join(', ')}]` : '';
              return {

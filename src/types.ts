@@ -80,6 +80,8 @@ export interface Bird {
   boughtFromId?: string;
   uid: string;
   documents?: BirdDocument[];
+  isGhost?: boolean;
+  ghostId?: string;
 }
 
 export interface Transaction {
