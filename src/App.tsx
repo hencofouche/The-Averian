@@ -3147,9 +3147,7 @@ function PedigreeFullView({ birdId, birds, cages, onBirdRef, onBack, userSetting
               visibility: visible !important;
            }
            #pedigree-print-area {
-              position: absolute !important;
-              left: 0 !important;
-              top: 0 !important;
+              position: static !important;
               width: 100% !important;
               background: white !important;
               color: black !important;
@@ -6369,11 +6367,11 @@ function PrintView({ birds, pairs, cages, onBirdRef }: { birds: Bird[], pairs: P
           body * { visibility: hidden; }
           #print-area-portal, #print-area-portal * { visibility: visible !important; }
           #print-area-portal {
-            position: absolute !important;
-            left: 0 !important;
-            top: 0 !important;
-            width: 100% !important;
+            display: block !important;
+            position: static !important;
+            width: ${isThermal && printMode === 'qr' ? `${qrWidth}mm` : '100%'} !important;
             background: white !important; 
+
             color: black !important;
             margin: 0 !important;
             padding: 0 !important;
@@ -6640,7 +6638,7 @@ function PrintView({ birds, pairs, cages, onBirdRef }: { birds: Bird[], pairs: P
 
       {/* Hidden Print Area */}
       {createPortal(
-        <div id="print-area-portal" className="bg-white text-black p-10 font-sans hidden print:block">
+        <div id="print-area-portal" className="bg-white text-black p-10 font-sans fixed -left-[9999px] -top-[9999px] opacity-0 pointer-events-none print:static print:opacity-100">
           {printMode === 'certificate' ? (
             <div className={cn("flex", printLayout === 'horizontal' ? "flex-row flex-wrap gap-4" : "flex-col")}>
               {birds.filter(b => qrSelections.includes(b.id)).map(bird => (
@@ -6839,13 +6837,35 @@ function PrintView({ birds, pairs, cages, onBirdRef }: { birds: Bird[], pairs: P
               {qrType === 'cage' && (
                 <table className="w-full border-4 border-black">
                   <thead><tr className="bg-gray-100 border-b-4 border-black">
-                    <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black">Cage ID / Number</th>
-                    <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black">Location</th>
-                    <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left">Type</th>
+                    {printEmpty ? (
+                       <>
+                         <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black w-[11%]">Cage ID / Number</th>
+                         <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black w-[11%]">Location</th>
+                         <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-4 border-black w-[11%]">Type</th>
+                         <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black w-[11%]">Cage ID / Number</th>
+                         <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black w-[11%]">Location</th>
+                         <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-4 border-black w-[11%]">Type</th>
+                         <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black w-[11%]">Cage ID / Number</th>
+                         <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black w-[11%]">Location</th>
+                         <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left w-[11%]">Type</th>
+                       </>
+                    ) : (
+                       <>
+                         <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black">Cage ID / Number</th>
+                         <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black">Location</th>
+                         <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left">Type</th>
+                       </>
+                    )}
                   </tr></thead>
                   <tbody>
-                    {printEmpty ? Array.from({ length: 26 }).map((_, i) => (
-                      <tr key={i} className="border-b border-gray-400 h-[9.5mm]">
+                    {printEmpty ? Array.from({ length: 30 }).map((_, i) => (
+                      <tr key={`blank-${i}`} className="border-b border-gray-400 h-[9.5mm]">
+                        <td className="border-r-2 border-gray-400"></td>
+                        <td className="border-r-2 border-gray-400"></td>
+                        <td className="border-r-4 border-black"></td>
+                        <td className="border-r-2 border-gray-400"></td>
+                        <td className="border-r-2 border-gray-400"></td>
+                        <td className="border-r-4 border-black"></td>
                         <td className="border-r-2 border-gray-400"></td>
                         <td className="border-r-2 border-gray-400"></td>
                         <td></td>
