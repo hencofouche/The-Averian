@@ -72,6 +72,7 @@ export interface Bird {
   splitMutations?: string[];
   statuses?: string[];
   imageUrl?: string;
+  imageUrls?: string[];
   ringNumber?: string;
   notes?: string;
   purchaseDate?: string;
@@ -114,6 +115,7 @@ export interface Cage {
   location?: string;
   type?: string;
   imageUrl?: string;
+  imageUrls?: string[];
   uid: string;
 }
 
@@ -125,6 +127,7 @@ export interface Pair {
   startDate?: string;
   endDate?: string;
   status: 'Active' | 'Inactive';
+  imageUrls?: string[];
   uid: string;
 }
 

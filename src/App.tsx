@@ -5,7 +5,7 @@ import { Toaster, toast } from 'sonner';
 import { 
   Plus, Search, Bird as BirdIcon, Home, Heart, CheckSquare, 
   Info, Trash2, Edit2, LogOut, User, 
-  Tag, Calendar, ChevronDown, ChevronUp, ChevronRight, X, GitBranch,
+  Tag, Calendar, ChevronDown, ChevronUp, ChevronRight, ChevronLeft, X, GitBranch,
   Image as ImageIcon, Loader2, DollarSign, TrendingUp, TrendingDown,
   Activity, ArrowUpRight, ArrowDownRight, BarChart3, PieChart as PieChartIcon,
   Menu, Egg, LayoutGrid, Grid3x3, List as ListIcon, AlertTriangle, CreditCard, CheckCircle2, Bell, Cloud, Maximize2, Share2, Send, Printer, MoreHorizontal, Dna, Users, Palette, QrCode, Scan, FileText, ExternalLink, ArrowLeft, ArrowRightLeft, History as HistoryIcon
@@ -15,6 +15,72 @@ import { ContactsView } from './components/ContactsView';
 import { QRCodeSVG } from 'qrcode.react';
 import { Scanner } from '@yudiel/react-qr-scanner';
 import { motion, AnimatePresence } from 'motion/react';
+import { generateBirdListPDF, generateCageListPDF, generatePairListPDF, generateCertificatePDF, generateQRListPDF } from './lib/pdf-engine';
+
+function ImageGallery({ imageUrls, initialIndex, onClose }: { imageUrls: string[], initialIndex: number, onClose: () => void }) {
+  const [currentIndex, setCurrentIndex] = useState(initialIndex);
+
+  const nextImage = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setCurrentIndex((prev) => (prev + 1) % imageUrls.length);
+  };
+
+  const prevImage = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setCurrentIndex((prev) => (prev - 1 + imageUrls.length) % imageUrls.length);
+  };
+
+  if (!imageUrls || imageUrls.length === 0) return null;
+
+  return (
+    <div 
+      className="fixed inset-0 z-[300] flex items-center justify-center bg-black/95 backdrop-blur-md p-4 sm:p-8 cursor-zoom-out"
+      onClick={onClose}
+    >
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.9 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.9 }}
+        className="relative max-w-5xl w-full max-h-full flex items-center justify-center group"
+      >
+        <img 
+          src={imageUrls[currentIndex]} 
+          alt={`Gallery view ${currentIndex + 1}`} 
+          className="max-w-full max-h-[90vh] object-contain rounded-2xl shadow-2xl"
+          referrerPolicy="no-referrer"
+        />
+        
+        {imageUrls.length > 1 && (
+          <>
+            <button 
+              onClick={prevImage}
+              className="absolute left-4 top-1/2 -translate-y-1/2 p-3 bg-black/50 hover:bg-black/80 text-white rounded-full backdrop-blur-md transition-all opacity-0 group-hover:opacity-100"
+            >
+              <ChevronLeft size={24} />
+            </button>
+            <button 
+              onClick={nextImage}
+              className="absolute right-4 top-1/2 -translate-y-1/2 p-3 bg-black/50 hover:bg-black/80 text-white rounded-full backdrop-blur-md transition-all opacity-0 group-hover:opacity-100"
+            >
+              <ChevronRight size={24} />
+            </button>
+            <div className="absolute bottom-4 left-1/2 -translate-y-1/2 -translate-x-1/2 px-4 py-2 bg-black/50 text-white rounded-full backdrop-blur-md text-xs font-bold tracking-widest">
+              {currentIndex + 1} / {imageUrls.length}
+            </div>
+          </>
+        )}
+
+        <button 
+          onClick={onClose}
+          className="absolute -top-12 right-0 sm:top-4 sm:right-4 p-3 bg-black/50 hover:bg-black/80 text-white rounded-full backdrop-blur-md transition-all"
+        >
+          <X size={24} />
+        </button>
+      </motion.div>
+    </div>
+  );
+}
+
 import { 
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
   BarChart, Bar, Cell, Legend, PieChart, Pie, AreaChart, Area
@@ -786,7 +852,7 @@ export default function App() {
   const [viewMode, setViewMode] = useState<'grid-large' | 'list'>('grid-large');
   const [taskViewMode, setTaskViewMode] = useState<'list' | 'calendar'>('list');
   const [currentMonth, setCurrentMonth] = useState(new Date());
-  const [viewingImage, setViewingImage] = useState<string | null>(null);
+  const [galleryData, setGalleryData] = useState<{ urls: string[], index: number } | null>(null);
   
   const [transferCageId, setTransferCageId] = useState('');
   const [transferImportBreeding, setTransferImportBreeding] = useState(true);
@@ -1105,7 +1171,9 @@ export default function App() {
     switch (activeTab) {
       case 'birds':
         return birds.filter(b => {
-          if (b.isGhost) return false;
+          const isExplicitMatch = query && (b.name.toLowerCase() === query || b.id.toLowerCase() === query);
+          if (b.isGhost && !isExplicitMatch) return false;
+          
           const cage = cages.find(c => c.id === b.cageId);
           const inPair = pairs.find(p => p.id.toLowerCase() === query && (p.maleId === b.id || p.femaleId === b.id));
           const cageLabel = cage ? cage.name : 'unassigned';
@@ -1725,7 +1793,10 @@ export default function App() {
                 {data.imageUrl && (
                   <div 
                     className="w-full aspect-square rounded-xl overflow-hidden bg-black-900 border border-black-800 cursor-pointer"
-                    onClick={() => setViewingImage(data.imageUrl)}
+                    onClick={() => {
+                        const urls = data.imageUrls || (data.imageUrl ? [data.imageUrl] : []);
+                        if (urls.length > 0) setGalleryData({ urls, index: 0 });
+                    }}
                   >
                     <img src={data.imageUrl} alt={data.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                   </div>
@@ -2624,24 +2695,12 @@ export default function App() {
       />
 
       <AnimatePresence>
-        {viewingImage && (
-          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/90 backdrop-blur-sm" onClick={() => setViewingImage(null)}>
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="relative max-w-4xl max-h-[90vh] w-full"
-              onClick={e => e.stopPropagation()}
-            >
-              <button 
-                onClick={() => setViewingImage(null)}
-                className="absolute -top-12 right-0 p-2 text-white/50 hover:text-white bg-black/50 rounded-full transition-colors"
-              >
-                <X size={24} />
-              </button>
-              <img src={viewingImage} alt="Enlarged view" className="w-full h-full object-contain rounded-xl" referrerPolicy="no-referrer" />
-            </motion.div>
-          </div>
+        {galleryData && (
+          <ImageGallery 
+            imageUrls={galleryData.urls} 
+            initialIndex={galleryData.index} 
+            onClose={() => setGalleryData(null)} 
+          />
         )}
       </AnimatePresence>
 
@@ -3089,7 +3148,7 @@ function PedigreeFullView({ birdId, birds, cages, onBirdRef, onBack, userSetting
             </div>
          </div>
          <div className="flex items-center gap-2">
-           <button onClick={() => window.print()} className="h-9 w-9 flex items-center justify-center bg-zinc-900 border border-white/5 hover:bg-gold-500 hover:text-black hover:border-gold-500 text-white rounded-xl transition-all shadow-lg active:scale-95">
+           <button onClick={() => bird && generateCertificatePDF([bird], birds)} className="h-9 w-9 flex items-center justify-center bg-zinc-900 border border-white/5 hover:bg-gold-500 hover:text-black hover:border-gold-500 text-white rounded-xl transition-all shadow-lg active:scale-95">
               <Printer size={16} />
            </button>
          </div>
@@ -3156,18 +3215,20 @@ function PedigreeFullView({ birdId, birds, cages, onBirdRef, onBack, userSetting
 
 function BirdCard({ bird, cage, birds, cages, viewMode = 'grid-large', currency, onBirdRef, onNavigate, onEdit, onDelete, userSettings }: { bird: Bird, cage?: Cage, birds: Bird[], cages: Cage[], viewMode?: 'grid-large' | 'list', currency?: string, onBirdRef: (name: string) => void, onNavigate: (tab: string, query?: string, filter?: any) => void, onEdit: () => void, onDelete: () => void, userSettings?: UserSettings }) {
   const [isExpanded, setIsExpanded] = useState(false);
-  const [fullscreenImage, setFullscreenImage] = useState(false);
+  const [showGallery, setShowGallery] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [showDocs, setShowDocs] = useState(false);
   const [showActions, setShowActions] = useState(false);
   const symbol = getCurrencySymbol(currency);
   const offspring = birds.filter(b => b.motherId === bird.id || b.fatherId === bird.id || bird.offspringIds?.includes(b.id));
+
   const mother = birds.find(b => b.id === bird.motherId);
   const father = birds.find(b => b.id === bird.fatherId);
   const mate = birds.find(b => b.id === bird.mateId) || birds.find(b => b.mateId === bird.id);
 
   const effectiveViewMode = (viewMode === 'list' && isExpanded) ? 'grid-large' : viewMode;
-  const imageUrl = bird.imageUrl || null;
+  const imageUrls = bird.imageUrls?.length ? bird.imageUrls : (bird.imageUrl ? [bird.imageUrl] : []);
+  const coverImage = imageUrls[0] || null;
 
   const handleShare = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -3255,18 +3316,24 @@ function BirdCard({ bird, cage, birds, cages, viewMode = 'grid-large', currency,
         effectiveViewMode === 'list' ? "flex flex-row items-center p-4 gap-4 cursor-pointer hover:bg-black-900/50" : "cursor-default"
       )}
     >
-      {imageUrl && effectiveViewMode !== 'list' && (
+      {coverImage && effectiveViewMode !== 'list' && (
         <div 
           className={cn("w-full overflow-hidden bg-black aspect-[4/3] cursor-pointer relative")}
-          onClick={(e) => { e.stopPropagation(); setFullscreenImage(true); }}
+          onClick={(e) => { e.stopPropagation(); setShowGallery(true); }}
         >
           <img 
-            src={imageUrl} 
+            src={coverImage} 
             alt={bird.name} 
             className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
             referrerPolicy="no-referrer"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black-950 via-transparent to-transparent opacity-60" />
+          {imageUrls.length > 1 && (
+            <div className="absolute top-3 left-3 px-2 py-1 bg-black/60 backdrop-blur-md rounded-lg flex items-center gap-1.5 text-white/90">
+              <ImageIcon size={12} />
+              <span className="text-[10px] font-black">{imageUrls.length}</span>
+            </div>
+          )}
           <div className="absolute top-3 right-3 p-2 bg-black/50 backdrop-blur-sm rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
             <Maximize2 size={16} className="text-white" />
           </div>
@@ -3440,31 +3507,12 @@ function BirdCard({ bird, cage, birds, cages, viewMode = 'grid-large', currency,
       </div>
 
       <AnimatePresence>
-        {fullscreenImage && imageUrl && (
-          <div 
-            className="fixed inset-0 z-[200] flex items-center justify-center bg-black/95 backdrop-blur-md p-4 sm:p-8 cursor-zoom-out"
-            onClick={(e) => { e.stopPropagation(); setFullscreenImage(false); }}
-          >
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.9 }}
-              className="relative max-w-5xl w-full max-h-full flex items-center justify-center"
-            >
-              <img 
-                src={imageUrl} 
-                alt={bird.name} 
-                className="max-w-full max-h-[90vh] object-contain rounded-2xl shadow-2xl"
-                referrerPolicy="no-referrer"
-              />
-              <button 
-                onClick={(e) => { e.stopPropagation(); setFullscreenImage(false); }}
-                className="absolute top-4 right-4 p-3 bg-black/50 hover:bg-black/80 text-white rounded-full backdrop-blur-md transition-all"
-              >
-                <X size={24} />
-              </button>
-            </motion.div>
-          </div>
+        {showGallery && imageUrls.length > 0 && (
+          <ImageGallery 
+            imageUrls={imageUrls} 
+            initialIndex={0} 
+            onClose={() => setShowGallery(false)} 
+          />
         )}
       </AnimatePresence>
     </Card>
@@ -6335,7 +6383,28 @@ function PrintView({ birds, pairs, cages, onBirdRef }: { birds: Bird[], pairs: P
   }));
 
   const handlePrint = () => {
-    window.print();
+    if (printMode === 'list') {
+      if (qrType === 'bird') {
+        generateBirdListPDF(sortedBirds.filter(b => printEmpty || qrSelections.includes(b.id)), cages, printLayout, printEmpty);
+      } else if (qrType === 'cage') {
+        generateCageListPDF(sortedCages.filter(c => printEmpty || qrSelections.includes(c.id)), printLayout, printEmpty);
+      } else if (qrType === 'pair') {
+        generatePairListPDF(pairs.filter(p => printEmpty || qrSelections.includes(p.id)), birds, cages, printLayout, printEmpty);
+      }
+    } else if (printMode === 'certificate') {
+      const selected = birds.filter(b => qrSelections.includes(b.id));
+      if (selected.length > 0) {
+        generateCertificatePDF(selected, birds);
+      }
+    } else {
+      const selectedItems = currentOptions
+        .filter(o => qrSelections.includes(o.id))
+        .map(o => (o as any).bird || (o as any).pair || (o as any).cage);
+      
+      if (selectedItems.length > 0) {
+        generateQRListPDF(selectedItems, qrType, qrWidth, qrHeight, isThermal, birds);
+      }
+    }
   };
 
   const getQRData = (id: string) => {
@@ -6348,63 +6417,7 @@ function PrintView({ birds, pairs, cages, onBirdRef }: { birds: Bird[], pairs: P
 
   return (
     <div className="w-full px-4 md:px-8 space-y-12 pb-24">
-      <style>{`
-        @media print {
-          @page { 
-            size: ${isThermal && printMode === 'qr' ? `${qrWidth}mm ${qrHeight}mm` : (printMode === 'certificate' || printMode === 'list') && printLayout === 'horizontal' ? 'A4 landscape' : 'A4 portrait'}; 
-            margin: 0 !important;
-          }
-          body { -webkit-print-color-adjust: exact; background: #fff !important; margin: 0; padding: 0; }
-          body * { visibility: hidden; }
-          #print-area-portal, #print-area-portal * { visibility: visible !important; }
-          #print-area-portal {
-            display: block !important;
-            position: absolute !important;
-            top: 0 !important;
-            left: 0 !important;
-            width: ${isThermal && printMode === 'qr' ? `${qrWidth}mm` : '100%'} !important;
-            min-height: 100vh !important;
-            background: white !important; 
-            color: black !important;
-            margin: 0 !important;
-            padding: ${printMode === 'list' || printMode === 'certificate' ? '8mm' : '0'} !important;
-            z-index: 999999 !important;
-            box-sizing: border-box !important;
-          }
-          #print-area-portal * { visibility: visible !important; color: black !important; border-color: #000 !important; }
-          .no-print { display: none !important; }
-          table { width: 100% !important; border-collapse: collapse !important; table-layout: auto !important; font-size: 9pt !important; color: black !important; }
-          th, td { border: 1px solid #000 !important; padding: 6px 4px !important; word-break: break-all !important; height: auto !important; color: black !important; }
-          th { background-color: #f3f4f6 !important; -webkit-print-color-adjust: exact; color: black !important; }
-          .qr-print-container { 
-            display: flex !important;
-            flex-direction: row !important;
-            flex-wrap: wrap !important;
-            gap: ${isThermal ? '0' : '2mm'} !important;
-            width: 100% !important;
-            justify-content: flex-start !important;
-            align-items: flex-start !important;
-          }
-          .qr-print-item {
-            width: ${qrWidth}mm !important;
-            height: ${qrHeight}mm !important;
-            min-height: ${qrHeight}mm !important;
-            border: ${isThermal ? 'none' : '2px solid black'} !important;
-            display: flex !important;
-            flex-direction: ${qrWidth > qrHeight ? 'row' : 'column'} !important;
-            align-items: center !important;
-            justify-content: center !important;
-            padding: 2mm !important;
-            page-break-inside: avoid !important;
-            page-break-after: ${isThermal ? 'always' : 'auto'} !important;
-            background: white !important;
-            overflow: hidden !important;
-            box-sizing: border-box !important;
-          }
-        }
-      `}</style>
-      
-      {/* Dynamic Header with Print Mode Switch */}
+      {/* Configuration Header */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 pb-6 border-b border-black-800">
         <div>
           <h1 className="text-3xl font-black text-white uppercase tracking-tighter">Print Center</h1>
@@ -6628,359 +6641,6 @@ function PrintView({ birds, pairs, cages, onBirdRef }: { birds: Bird[], pairs: P
           </div>
         </div>
       </div>
-
-      {/* Hidden Print Area */}
-      {createPortal(
-        <div id="print-area-portal" className="bg-white text-black p-10 font-sans fixed -left-[9999px] -top-[9999px] opacity-0 pointer-events-none print:static print:opacity-100">
-          {printMode === 'certificate' ? (
-            <div className={cn("flex", printLayout === 'horizontal' ? "flex-row flex-wrap gap-4" : "flex-col")}>
-              {birds.filter(b => qrSelections.includes(b.id)).map(bird => (
-                <div key={bird.id} className={cn(
-                  "border-8 border-double border-gray-300 p-8 flex flex-col relative page-break-after-always",
-                  printLayout === 'horizontal' ? "w-[27cm] h-[19cm] min-h-[19cm]" : "w-full min-h-[27cm]"
-                )}>
-                  <div className="absolute inset-0 bg-white opacity-50 pointer-events-none" />
-                  <div className="relative z-10 flex flex-col h-full items-center text-center">
-                    <h1 className="text-4xl font-serif font-bold uppercase tracking-widest text-gray-900 border-b-2 border-gray-400 pb-6 mb-8 w-full">Pedigree Certificate</h1>
-                    
-                    <div className="w-full flex justify-between items-start mb-12 text-left">
-                      <div className="space-y-4">
-                         <div className="space-y-1">
-                            <p className="text-xs font-bold text-gray-500 uppercase tracking-widest">Bird Name / Ring No.</p>
-                            <p className="text-2xl font-black">{bird.name}</p>
-                         </div>
-                         <div className="space-y-1">
-                            <p className="text-xs font-bold text-gray-500 uppercase tracking-widest">Species</p>
-                            <p className="text-lg font-bold">{bird.species} {bird.subSpecies}</p>
-                         </div>
-                      </div>
-                      <div className="text-right space-y-4">
-                        <div className="space-y-1">
-                            <p className="text-xs font-bold text-gray-500 uppercase tracking-widest">Hatch Date</p>
-                            <p className="text-lg">{bird.birthDate || 'Unknown'}</p>
-                         </div>
-                         <div className="space-y-1">
-                            <p className="text-xs font-bold text-gray-500 uppercase tracking-widest">Sex</p>
-                            <p className="text-lg">{bird.sex}</p>
-                         </div>
-                      </div>
-                    </div>
-
-                    <div className="w-full space-y-4 text-left border-t border-b border-gray-300 py-6 mb-12">
-                      <p className="text-sm font-bold text-gray-500 uppercase tracking-widest">Mutations & Genetics</p>
-                      <p className="text-xl">{bird.mutations?.join(' • ') || 'Normal / Wild Type'} {bird.splitMutations?.length ? ` split for ${bird.splitMutations.join(', ')}` : ''}</p>
-                    </div>
-
-                    <div className="flex-1 w-full flex flex-col justify-center">
-                      <div className="grid grid-cols-3 gap-8 h-[12cm]">
-                        {/* Selected Bird */}
-                        <div className="col-span-1 border-r border-gray-300 flex flex-col justify-center pr-8 h-full">
-                           <div className="p-4 border border-gray-400 rounded-lg bg-gray-50">
-                             <p className="text-[10px] uppercase font-bold text-gray-500 mb-2">Subject</p>
-                             <p className="font-black text-lg">{bird.name}</p>
-                           </div>
-                        </div>
-
-                        {/* Parents */}
-                        <div className="col-span-1 border-r border-gray-300 flex flex-col justify-around pr-8 h-full">
-                           <div className="p-4 border border-gray-400 rounded-lg">
-                             <p className="text-[10px] uppercase font-bold text-gray-500 mb-2">Sire (Father)</p>
-                             <p className="font-bold">{birds.find(b => b.id === bird.fatherId)?.name || 'Unknown'}</p>
-                           </div>
-                           <div className="p-4 border border-gray-400 rounded-lg">
-                             <p className="text-[10px] uppercase font-bold text-gray-500 mb-2">Dam (Mother)</p>
-                             <p className="font-bold">{birds.find(b => b.id === bird.motherId)?.name || 'Unknown'}</p>
-                           </div>
-                        </div>
-
-                        {/* Grandparents */}
-                        <div className="col-span-1 flex flex-col justify-between h-full py-4">
-                           <div className="p-3 border border-gray-300 rounded-lg bg-gray-50 h-1/5 flex flex-col justify-center">
-                             <p className="text-[9px] uppercase font-bold text-gray-500 mb-1">Paternal Grandsire</p>
-                             <p className="text-sm font-bold">{birds.find(b => b.id === birds.find(f => f.id === bird.fatherId)?.fatherId)?.name || 'Unknown'}</p>
-                           </div>
-                           <div className="p-3 border border-gray-300 rounded-lg bg-gray-50 h-1/5 flex flex-col justify-center">
-                             <p className="text-[9px] uppercase font-bold text-gray-500 mb-1">Paternal Granddam</p>
-                             <p className="text-sm font-bold">{birds.find(b => b.id === birds.find(f => f.id === bird.fatherId)?.motherId)?.name || 'Unknown'}</p>
-                           </div>
-                           <div className="p-3 border border-gray-300 rounded-lg bg-gray-50 h-1/5 flex flex-col justify-center">
-                             <p className="text-[9px] uppercase font-bold text-gray-500 mb-1">Maternal Grandsire</p>
-                             <p className="text-sm font-bold">{birds.find(b => b.id === birds.find(m => m.id === bird.motherId)?.fatherId)?.name || 'Unknown'}</p>
-                           </div>
-                           <div className="p-3 border border-gray-300 rounded-lg bg-gray-50 h-1/5 flex flex-col justify-center">
-                             <p className="text-[9px] uppercase font-bold text-gray-500 mb-1">Maternal Granddam</p>
-                             <p className="text-sm font-bold">{birds.find(b => b.id === birds.find(m => m.id === bird.motherId)?.motherId)?.name || 'Unknown'}</p>
-                           </div>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div className="w-full mt-auto pt-8 border-t-2 border-gray-400 flex justify-between items-end text-left">
-                       <div className="space-y-4">
-                         <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Breeder Signature</p>
-                         <div className="w-48 border-b border-gray-400 h-8"></div>
-                       </div>
-                       <div className="text-right">
-                         <QRCodeSVG value={getQRData(bird.id)} size={64} level="M" />
-                       </div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : printMode === 'list' ? (
-            <>
-              <div className="flex justify-between items-center border-b-2 border-black pb-4 mb-8">
-                <p className="text-sm font-bold text-gray-800 uppercase tracking-widest">Date Generated: {format(new Date(), 'PPPP')}</p>
-              </div>
-              {qrType === 'bird' && (
-                <table className="w-full border-4 border-black">
-                  <thead><tr className="bg-gray-100 border-b-4 border-black">
-                    <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black w-[8%]">Cage</th>
-                    <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black w-[7%]">Sex</th>
-                    <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black w-[17%]">ID / Ring</th>
-                    <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black w-[17%]">Species</th>
-                    <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black w-[17%]">Sub-Species</th>
-                    <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black w-[17%]">Mutation</th>
-                    <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left w-[17%]">Split</th>
-                  </tr></thead>
-                  <tbody>
-                    {printEmpty ? Array.from({ length: printLayout === 'horizontal' ? 14 : 24 }).map((_, i) => (
-                      <tr key={i} className="border-b border-gray-400 h-[10mm]">
-                        <td className="border-r-2 border-gray-400"></td>
-                        <td className="border-r-2 border-gray-400"></td>
-                        <td className="border-r-2 border-gray-400"></td>
-                        <td className="border-r-2 border-gray-400"></td>
-                        <td className="border-r-2 border-gray-400"></td>
-                        <td className="border-r-2 border-gray-400"></td>
-                        <td></td>
-                      </tr>
-                    )) : sortedBirds.filter(b => qrSelections.includes(b.id)).map(bird => {
-                      const birdCage = cages.find(c => c.id === bird.cageId);
-                      return (
-                        <tr key={bird.id} className="border-b border-gray-400 h-[9.5mm]">
-                          <td className="py-1 px-2 border-r-2 border-gray-400 text-[10px] font-black uppercase">{birdCage?.name || '-'}</td>
-                          <td className="py-1 px-2 border-r-2 border-gray-400 text-[10px] font-black uppercase text-center">{bird.sex?.charAt(0) || '?'}</td>
-                          <td className="py-1 px-2 border-r-2 border-gray-400 text-[10px] font-black uppercase italic">{bird.name}</td>
-                          <td className="py-1 px-2 border-r-2 border-gray-400 text-[10px] font-bold uppercase">{bird.species || '-'}</td>
-                          <td className="py-1 px-2 border-r-2 border-gray-400 text-[10px] font-bold uppercase">{bird.subSpecies || '-'}</td>
-                          <td className="py-1 px-2 border-r-2 border-gray-400 text-[9px] font-bold uppercase leading-tight">{bird.mutations?.join(' • ') || 'Normal'}</td>
-                          <td className="py-1 px-2 text-[9px] font-bold uppercase italic text-gray-500 leading-tight">{bird.splitMutations?.join(' • ') || '-'}</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              )}
-
-              {qrType === 'pair' && (
-                <table className="w-full border-4 border-black">
-                  <thead><tr className="bg-gray-100 border-b-4 border-black">
-                    <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black w-[8%]">Cage</th>
-                    <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black w-[7%]">Sex</th>
-                    <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black w-[17%]">ID / Ring</th>
-                    <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black w-[17%]">Species</th>
-                    <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black w-[17%]">Sub-Species</th>
-                    <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black w-[17%]">Mutation</th>
-                    <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left w-[17%]">Split</th>
-                  </tr></thead>
-                  <tbody>
-                    {printEmpty ? Array.from({ length: printLayout === 'horizontal' ? 7 : 12 }).map((_, i) => (
-                      <tr key={i} className="border-b border-gray-400 h-[20mm]">
-                        <td className="border-r-2 border-gray-400 h-[10mm]"></td>
-                        <td className="border-r-2 border-gray-400"></td>
-                        <td className="border-r-2 border-gray-400"></td>
-                        <td className="border-r-2 border-gray-400"></td>
-                        <td className="border-r-2 border-gray-400"></td>
-                        <td className="border-r-2 border-gray-400"></td>
-                        <td></td>
-                      </tr>
-                    )) : pairs.filter(p => qrSelections.includes(p.id)).map(pair => {
-                      const male = birds.find(b => b.id === pair.maleId);
-                      const female = birds.find(b => b.id === pair.femaleId);
-                      const mCage = cages.find(c => c.id === male?.cageId)?.name || '-';
-                      const fCage = cages.find(c => c.id === female?.cageId)?.name || '-';
-                      return (
-                        <React.Fragment key={pair.id}>
-                          <tr className="border-b border-gray-300 h-[9.5mm] bg-blue-50/10">
-                            <td className="py-1 px-2 border-r-2 border-gray-400 text-[10px] font-black uppercase">{mCage}</td>
-                            <td className="py-1 px-2 border-r-2 border-gray-400 text-[10px] font-black uppercase text-center text-blue-800">♂</td>
-                            <td className="py-1 px-2 border-r-2 border-gray-400 text-[10px] font-black uppercase italic">{male?.name || 'M?'}</td>
-                            <td className="py-1 px-2 border-r-2 border-gray-400 text-[10px] font-bold uppercase">{male?.species || '-'}</td>
-                            <td className="py-1 px-2 border-r-2 border-gray-400 text-[10px] font-bold uppercase">{male?.subSpecies || '-'}</td>
-                            <td className="py-1 px-2 border-r-2 border-gray-400 text-[9px] font-bold uppercase leading-tight">{male?.mutations?.join(' • ') || 'Normal'}</td>
-                            <td className="py-1 px-2 text-[9px] font-bold uppercase italic text-gray-500 leading-tight">{male?.splitMutations?.join(' • ') || '-'}</td>
-                          </tr>
-                          <tr className="border-b-2 border-black h-[9.5mm] bg-pink-50/10">
-                            <td className="py-1 px-2 border-r-2 border-gray-400 text-[10px] font-black uppercase">{fCage}</td>
-                            <td className="py-1 px-2 border-r-2 border-gray-400 text-[10px] font-black uppercase text-center text-pink-800">♀</td>
-                            <td className="py-1 px-2 border-r-2 border-gray-400 text-[10px] font-black uppercase italic">{female?.name || 'F?'}</td>
-                            <td className="py-1 px-2 border-r-2 border-gray-400 text-[10px] font-bold uppercase">{female?.species || '-'}</td>
-                            <td className="py-1 px-2 border-r-2 border-gray-400 text-[10px] font-bold uppercase">{female?.subSpecies || '-'}</td>
-                            <td className="py-1 px-2 border-r-2 border-gray-400 text-[9px] font-bold uppercase leading-tight">{female?.mutations?.join(' • ') || 'Normal'}</td>
-                            <td className="py-1 px-2 text-[9px] font-bold uppercase italic text-gray-500 leading-tight">{female?.splitMutations?.join(' • ') || '-'}</td>
-                          </tr>
-                        </React.Fragment>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              )}
-
-              {qrType === 'cage' && (
-                <table className="w-full border-4 border-black">
-                  <thead><tr className="bg-gray-100 border-b-4 border-black">
-                    {printEmpty ? (
-                       <>
-                         <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black w-[11%]">Cage ID / Number</th>
-                         <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black w-[11%]">Location</th>
-                         <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-4 border-black w-[11%]">Type</th>
-                         <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black w-[11%]">Cage ID / Number</th>
-                         <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black w-[11%]">Location</th>
-                         <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-4 border-black w-[11%]">Type</th>
-                         <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black w-[11%]">Cage ID / Number</th>
-                         <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black w-[11%]">Location</th>
-                         <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left w-[11%]">Type</th>
-                       </>
-                    ) : (
-                       <>
-                         <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black">Cage ID / Number</th>
-                         <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left border-r-2 border-black">Location</th>
-                         <th className="py-4 px-3 text-[10px] font-black uppercase tracking-widest text-left">Type</th>
-                       </>
-                    )}
-                  </tr></thead>
-                  <tbody>
-                    {printEmpty ? Array.from({ length: printLayout === 'horizontal' ? 14 : 24 }).map((_, i) => (
-                      <tr key={`blank-${i}`} className="border-b border-gray-400 h-[10mm]">
-                        <td className="border-r-2 border-gray-400"></td>
-                        <td className="border-r-2 border-gray-400"></td>
-                        <td className="border-r-4 border-black"></td>
-                        <td className="border-r-2 border-gray-400"></td>
-                        <td className="border-r-2 border-gray-400"></td>
-                        <td className="border-r-4 border-black"></td>
-                        <td className="border-r-2 border-gray-400"></td>
-                        <td className="border-r-2 border-gray-400"></td>
-                        <td></td>
-                      </tr>
-                    )) : sortedCages.filter(c => qrSelections.includes(c.id)).map(cage => (
-                      <tr key={cage.id} className="border-b border-gray-400 h-[9.5mm]">
-                        <td className="py-1 px-2 border-r-2 border-gray-400 text-[11px] font-black uppercase">{cage.name}</td>
-                        <td className="py-1 px-2 border-r-2 border-gray-400 text-[11px] font-bold uppercase">{cage.location || '-'}</td>
-                        <td className="py-1 px-2 text-[11px] font-bold uppercase text-gray-600">{cage.type}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-              <footer className="mt-12 text-center text-xs font-black uppercase tracking-widest text-gray-400 border-t pt-8">
-                 Generated via The Averian Aviary Management System
-              </footer>
-            </>
-          ) : (
-            <div className="qr-print-container">
-               {qrSelections.map(id => {
-                 const bird = birds.find(b => b.id === id);
-                 const pair = pairs.find(p => p.id === id);
-                 const cage = cages.find(c => c.id === id);
-
-                 return (
-                    <div key={id} className={cn(
-                      "qr-print-item bg-white p-[1.5mm] rounded border border-black/10"
-                    )}>
-                        <div className={cn(
-                          "flex flex-col items-center justify-center shrink-0 overflow-hidden",
-                          qrWidth > qrHeight ? "w-[40%] h-full pr-1" : "w-full h-[60%] pb-1"
-                        )}>
-                          <QRCodeSVG 
-                            value={getQRData(id)} 
-                            size={512} 
-                            level="H" 
-                            bgColor="#ffffff"
-                            fgColor="#000000"
-                            style={{ width: '100%', height: '100%', maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
-                          />
-                        </div>
-                        
-                        <div className={cn(
-                          "flex flex-col text-left overflow-hidden bg-white px-1 justify-center border-black/10",
-                          qrWidth > qrHeight ? "flex-1 h-full border-l pl-2" : "w-full h-[40%] border-t pt-1.5"
-                        )}>
-                          {(qrType === 'bird' || qrType === 'pair') && (() => {
-                            const cardBird = qrType === 'bird' ? bird : null;
-                            const scale = Math.min(qrWidth, qrHeight) / 50;
-                            const badgeFontSize = 4.5 * scale;
-                            
-                            if (qrType === 'pair' && pair) {
-                              const pMale = birds.find(b => b.id === pair.maleId);
-                              const pFemale = birds.find(b => b.id === pair.femaleId);
-                              return (
-                                <div className="flex flex-col h-full justify-center w-full px-1 space-y-1">
-                                  {/* Male Info */}
-                                  <div className="flex-1 flex flex-col min-w-0 border-b border-black/5 pb-0.5 justify-center">
-                                    <p style={{ fontSize: `${7 * scale}pt` }} className="font-black uppercase text-black truncate leading-none">
-                                      {pMale?.name || 'M?'} <span className="text-blue-600">({pMale?.sex?.charAt(0) || 'M'})</span>
-                                    </p>
-                                    <p style={{ fontSize: `${5.2 * scale}pt` }} className="font-bold text-gray-500 leading-tight uppercase truncate">
-                                      {pMale?.species || '-'} {pMale?.subSpecies && `( ${pMale.subSpecies} )`}
-                                    </p>
-                                    <p style={{ fontSize: `${4.2 * scale}pt` }} className="font-black text-black/70 leading-tight uppercase tracking-tighter truncate">
-                                      {pMale?.mutations?.join(', ') || 'Normal'} 
-                                      {pMale?.splitMutations?.length ? ` ( Split ${pMale.splitMutations.join(', ')} )` : ''}
-                                    </p>
-                                  </div>
-
-                                  {/* Female Info */}
-                                  <div className="flex-1 flex flex-col min-w-0 pt-0.5 justify-center">
-                                    <p style={{ fontSize: `${7 * scale}pt` }} className="font-black uppercase text-black truncate leading-none">
-                                      {pFemale?.name || 'F?'} <span className="text-pink-600">({pFemale?.sex?.charAt(0) || 'F'})</span>
-                                    </p>
-                                    <p style={{ fontSize: `${5.2 * scale}pt` }} className="font-bold text-gray-500 leading-tight uppercase truncate">
-                                      {pFemale?.species || '-'} {pFemale?.subSpecies && `( ${pFemale.subSpecies} )`}
-                                    </p>
-                                    <p style={{ fontSize: `${4.2 * scale}pt` }} className="font-black text-black/70 leading-tight uppercase tracking-tighter truncate">
-                                      {pFemale?.mutations?.join(', ') || 'Normal'} 
-                                      {pFemale?.splitMutations?.length ? ` ( Split ${pFemale.splitMutations.join(', ')} )` : ''}
-                                    </p>
-                                  </div>
-                                </div>
-                              );
-                            }
-
-                            return (
-                              <div className="flex flex-col h-full justify-center w-full px-1 space-y-0.5 text-center">
-                                <p style={{ fontSize: `${10 * scale}pt` }} className="font-black uppercase text-black truncate leading-tight">
-                                  {cardBird?.name || 'Bird'} <span className={cn(cardBird?.sex === 'Male' ? "text-blue-600" : cardBird?.sex === 'Female' ? "text-pink-600" : "text-gray-400")}>({cardBird?.sex || '?'})</span>
-                                </p>
-                                <p style={{ fontSize: `${7.5 * scale}pt` }} className="font-bold text-gray-500 leading-tight uppercase">
-                                  {cardBird?.species || '-'} {cardBird?.subSpecies && `( ${cardBird.subSpecies} )`}
-                                </p>
-                                <p style={{ fontSize: `${6.5 * scale}pt` }} className="font-black text-black/80 leading-tight uppercase tracking-tight">
-                                  {cardBird?.mutations?.join(', ') || 'Normal'}
-                                  {cardBird?.splitMutations?.length ? ` ( Split ${cardBird.splitMutations.join(', ')} )` : ''}
-                                </p>
-                              </div>
-                            );
-                          })()}
-
-                          {qrType === 'cage' && cage && (
-                            <div className="flex flex-col items-center justify-center h-full text-center space-y-1">
-                              <p style={{ fontSize: `${Math.max(8, 14 * (Math.min(qrWidth, qrHeight) / 50))}pt` }} className="font-black uppercase leading-none tracking-tighter text-black">{cage.name}</p>
-                              <div className="flex flex-col items-center gap-0.5">
-                                <p style={{ fontSize: `${Math.max(5, 7 * (Math.min(qrWidth, qrHeight) / 50))}pt` }} className="font-black text-gray-400 uppercase tracking-widest truncate">{cage.location || 'Aviary'}</p>
-                                <p style={{ fontSize: `${Math.max(4, 6 * (Math.min(qrWidth, qrHeight) / 50))}pt` }} className="font-bold text-gray-300 uppercase italic tracking-tighter">{cage.type}</p>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                 );
-               })}
-            </div>
-          )}
-        </div>,
-        document.body
-      )}
     </div>
   );
 }
@@ -7142,7 +6802,8 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
     mutations: [],
     splitMutations: [],
     statuses: [],
-    imageUrl: ''
+    imageUrl: '',
+    imageUrls: []
   });
   const [addToExpenses, setAddToExpenses] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
@@ -7197,14 +6858,22 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
   const isCurrentlySold = formData.statuses?.some(s => s === 'Sold');
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
 
     setIsUploading(true);
     setUploadError(null);
     try {
-      const downloadURL = await compressAndUploadImage(file, `birds/${user.uid}`);
-      setFormData(prev => ({ ...prev, imageUrl: downloadURL }));
+      const urls: string[] = [];
+      for (const file of files) {
+        const url = await compressAndUploadImage(file, `birds/${user.uid}`);
+        urls.push(url);
+      }
+      setFormData(prev => {
+        const existing = prev.imageUrls || [];
+        const merged = [...existing, ...urls];
+        return { ...prev, imageUrl: merged[0], imageUrls: merged };
+      });
       setIsUploading(false);
     } catch (err) {
       setUploadError(err instanceof Error ? err.message : 'Upload failed');
@@ -7507,10 +7176,10 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
       )}
       
       <div className="space-y-1">
-        <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Image</label>
+        <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Images</label>
         <div className="flex items-center gap-3">
           <div className="flex-1">
-            <input type="file" accept="image/*" onChange={handleFileChange} className="hidden" id="bird-image-upload" name="bird-image-upload"
+            <input type="file" multiple accept="image/*" onChange={handleFileChange} className="hidden" id="bird-image-upload" name="bird-image-upload"
               disabled={isUploading}
             />
             <label 
@@ -7521,20 +7190,42 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
               )}
             >
               {isUploading ? <Loader2 size={16} className="animate-spin" /> : <ImageIcon size={16} />}
-              {formData.imageUrl ? 'Change Image' : 'Upload Image'}
+              Upload Image(s)
             </label>
           </div>
-          {formData.imageUrl && (
-            <div className="w-12 h-12 rounded-2xl bg-black overflow-hidden border border-black-700">
-              <img 
-                src={formData.imageUrl} 
-                alt="Preview" 
-                className="w-full h-full object-cover"
-                referrerPolicy="no-referrer"
-              />
-            </div>
-          )}
         </div>
+
+        {(formData.imageUrls?.length ?? 0) > 0 && (
+          <div className="flex flex-wrap gap-2 pt-2">
+            {formData.imageUrls?.map((url, idx) => (
+              <div key={idx} className="relative w-12 h-12 rounded-2xl bg-black overflow-hidden border border-black-700 group">
+                <img 
+                  src={url} 
+                  alt="Preview" 
+                  className="w-full h-full object-cover"
+                  referrerPolicy="no-referrer"
+                />
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const existing = formData.imageUrls || [];
+                    const filtered = existing.filter((_, i) => i !== idx);
+                    setFormData(prev => {
+                       const merged = filtered;
+                       return { ...prev, imageUrls: merged, imageUrl: merged[0] || '' };
+                    });
+                  }}
+                  className="absolute inset-0 bg-black/80 items-center justify-center hidden group-hover:flex transition-all text-red-500 cursor-pointer"
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
         {uploadError && <p className="text-[10px] text-red-500 mt-1 font-bold">{uploadError}</p>}
       </div>
  
@@ -7749,7 +7440,7 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
 }
 
 function CageForm({ user, initialData, cages, onClose }: { user: FirebaseUser, initialData?: Cage, cages: Cage[], onClose: () => void }) {
-  const [formData, setFormData] = useState<Partial<Cage>>(initialData || { name: '', location: '', type: 'Standard', imageUrl: '' });
+  const [formData, setFormData] = useState<Partial<Cage>>(initialData || { name: '', location: '', type: 'Standard', imageUrl: '', imageUrls: [] });
   const [isUploading, setIsUploading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -7760,13 +7451,21 @@ function CageForm({ user, initialData, cages, onClose }: { user: FirebaseUser, i
   const [multiEnd, setMultiEnd] = useState('10');
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
     setIsUploading(true);
     setUploadError(null);
     try {
-      const downloadURL = await compressAndUploadImage(file, `cages/${user.uid}`);
-      setFormData(prev => ({ ...prev, imageUrl: downloadURL }));
+      const urls: string[] = [];
+      for (const file of files) {
+        const url = await compressAndUploadImage(file, `cages/${user.uid}`);
+        urls.push(url);
+      }
+      setFormData(prev => {
+        const existing = prev.imageUrls || [];
+        const merged = [...existing, ...urls];
+        return { ...prev, imageUrl: merged[0], imageUrls: merged };
+      });
       setIsUploading(false);
     } catch (err) {
       setUploadError(err instanceof Error ? err.message : 'Upload failed');
@@ -7849,25 +7548,56 @@ function CageForm({ user, initialData, cages, onClose }: { user: FirebaseUser, i
         </div>
       )}
 
-      <div className="flex justify-center">
-        <div className="relative group">
-          <div className="w-24 h-24 rounded-3xl bg-black border border-black-700 flex items-center justify-center overflow-hidden">
-            {formData.imageUrl ? (
-              <img src={formData.imageUrl} alt="Cage" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-            ) : (
-              <ImageIcon className="text-black-700" size={32} />
-            )}
-            {isUploading && (
-              <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
-                <Loader2 className="text-gold-500 animate-spin" size={24} />
-              </div>
-            )}
+      <div className="space-y-1">
+        <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Images</label>
+        <div className="flex items-center gap-3">
+          <div className="flex-1">
+            <input type="file" multiple accept="image/*" onChange={handleFileChange} className="hidden" id="cage-image-upload" name="cage-image-upload"
+              disabled={isUploading}
+            />
+            <label 
+              htmlFor="cage-image-upload"
+              className={cn(
+                "flex items-center justify-center gap-2 px-4 py-3 bg-black border border-black-700 rounded-2xl cursor-pointer hover:bg-zinc-700 transition-all text-xs font-black uppercase tracking-widest text-white hover:text-gold-500",
+                isUploading && "opacity-50 cursor-not-allowed"
+              )}
+            >
+              {isUploading ? <Loader2 size={16} className="animate-spin" /> : <ImageIcon size={16} />}
+              Upload Image(s)
+            </label>
           </div>
-          <label className="absolute -bottom-2 -right-2 p-2 bg-gold-500 text-black-950 rounded-xl cursor-pointer shadow-lg hover:bg-gold-600 transition-colors">
-            <Plus size={16} />
-            <input type="file" className="hidden" accept="image/*" onChange={handleFileChange} id="cage-image-upload" name="cage-image-upload" />
-          </label>
         </div>
+
+        {(formData.imageUrls?.length ?? 0) > 0 && (
+          <div className="flex flex-wrap gap-2 pt-2">
+            {formData.imageUrls?.map((url, idx) => (
+              <div key={idx} className="relative w-12 h-12 rounded-2xl bg-black overflow-hidden border border-black-700 group">
+                <img 
+                  src={url} 
+                  alt="Preview" 
+                  className="w-full h-full object-cover"
+                  referrerPolicy="no-referrer"
+                />
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const existing = formData.imageUrls || [];
+                    const filtered = existing.filter((_, i) => i !== idx);
+                    setFormData(prev => {
+                       const merged = filtered;
+                       return { ...prev, imageUrls: merged, imageUrl: merged[0] || '' };
+                    });
+                  }}
+                  className="absolute inset-0 bg-black/80 items-center justify-center hidden group-hover:flex transition-all text-red-500 cursor-pointer"
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
       {(uploadError || error) && <p className="text-rose-500 text-[10px] text-center font-bold uppercase tracking-widest">{uploadError || error}</p>}
 
@@ -7908,13 +7638,39 @@ function CageForm({ user, initialData, cages, onClose }: { user: FirebaseUser, i
 function PairForm({ user, initialData, birds, cages, onClose }: { user: FirebaseUser, initialData?: Pair, birds: Bird[], cages: Cage[], onClose: () => void }) {
   const [formData, setFormData] = useState<Partial<Pair>>(initialData || { maleId: '', femaleId: '', status: 'Active', startDate: '', endDate: '' });
   const [isSaving, setIsSaving] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+    setIsUploading(true);
+    setUploadError(null);
+    try {
+      const urls: string[] = [];
+      for (const file of files) {
+        const url = await compressAndUploadImage(file, `pairs/${user.uid}`);
+        urls.push(url);
+      }
+      setFormData(prev => {
+        const existing = prev.imageUrls || [];
+        const merged = [...existing, ...urls];
+        return { ...prev, imageUrls: merged };
+      });
+      setIsUploading(false);
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : 'Upload failed');
+      setIsUploading(false);
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.maleId || !formData.femaleId) {
       toast.error('Please select both a male and a female bird.');
       return;
     }
-    if (isSaving) return;
+    if (isSaving || isUploading) return;
     setIsSaving(true);
     
     const processSave = async () => {
@@ -8010,7 +7766,58 @@ function PairForm({ user, initialData, birds, cages, onClose }: { user: Firebase
         <div className="space-y-1"><label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Start Date</label><Input type="date" value={formData.startDate} onChange={e => setFormData({ ...formData, startDate: e.target.value })} /></div>
         <div className="space-y-1"><label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">End Date</label><Input type="date" value={formData.endDate} onChange={e => setFormData({ ...formData, endDate: e.target.value })} /></div>
       </div>
-      <Button type="submit" className="w-full py-4 text-sm uppercase tracking-widest font-black" disabled={isSaving}>
+
+      <div className="space-y-1">
+        <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Images</label>
+        <div className="flex items-center gap-3">
+          <div className="flex-1">
+            <input type="file" multiple accept="image/*" onChange={handleFileChange} className="hidden" id="pair-image-upload" name="pair-image-upload"
+              disabled={isUploading}
+            />
+            <label 
+              htmlFor="pair-image-upload"
+              className={cn(
+                "flex items-center justify-center gap-2 px-4 py-3 bg-black border border-black-700 rounded-2xl cursor-pointer hover:bg-zinc-700 transition-all text-xs font-black uppercase tracking-widest text-white hover:text-gold-500",
+                isUploading && "opacity-50 cursor-not-allowed"
+              )}
+            >
+              {isUploading ? <Loader2 size={16} className="animate-spin" /> : <ImageIcon size={16} />}
+              Upload Image(s)
+            </label>
+          </div>
+        </div>
+
+        {(formData.imageUrls?.length ?? 0) > 0 && (
+          <div className="flex flex-wrap gap-2 pt-2">
+            {formData.imageUrls?.map((url, idx) => (
+              <div key={idx} className="relative w-12 h-12 rounded-2xl bg-black overflow-hidden border border-black-700 group">
+                <img 
+                  src={url} 
+                  alt="Preview" 
+                  className="w-full h-full object-cover"
+                  referrerPolicy="no-referrer"
+                />
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const existing = formData.imageUrls || [];
+                    const filtered = existing.filter((_, i) => i !== idx);
+                    setFormData(prev => ({ ...prev, imageUrls: filtered }));
+                  }}
+                  className="absolute inset-0 bg-black/80 items-center justify-center hidden group-hover:flex transition-all text-red-500 cursor-pointer"
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+      {uploadError && <p className="text-[10px] text-red-500 mt-1 font-bold">{uploadError}</p>}
+
+      <Button type="submit" className="w-full py-4 text-sm uppercase tracking-widest font-black" disabled={isSaving || isUploading}>
         {isSaving ? <Loader2 className="animate-spin mr-2" size={16} /> : null}
         {(initialData && initialData.id) ? 'Update' : 'Add'} Pair
       </Button>
