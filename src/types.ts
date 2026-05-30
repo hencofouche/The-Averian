@@ -28,6 +28,7 @@ export interface UserSettings {
   statuses?: CustomStatus[];
   uid: string;
   currency?: string;
+  language?: string;
   account_expiry_date?: string; // ISO date string
   themeColor?: string; // Hex color string
   textColor?: string; 

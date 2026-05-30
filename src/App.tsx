@@ -17,6 +17,7 @@ import { Scanner } from '@yudiel/react-qr-scanner';
 import { motion, AnimatePresence } from 'motion/react';
 import { generateBirdListPDF, generateCageListPDF, generatePairListPDF, generateCertificatePDF, generateQRListPDF } from './lib/pdf-engine';
 import { defaultSpecies, defaultMutations } from './lib/default-data';
+import { getTranslatedLabel, LANGUAGE_NAMES, setActiveLanguage, t as tGlobal } from './lib/translations';
 
 function ImageGallery({ imageUrls, initialIndex, onClose }: { imageUrls: string[], initialIndex: number, onClose: () => void }) {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
@@ -121,6 +122,22 @@ const getCurrencySymbol = (currency?: string) => {
     case 'ZAR': return 'R';
     case 'EUR': return '€';
     case 'GBP': return '£';
+    case 'AUD': return 'A$';
+    case 'CAD': return 'C$';
+    case 'CHF': return 'CHF';
+    case 'JPY': return '¥';
+    case 'CNY': return '¥';
+    case 'INR': return '₹';
+    case 'RUB': return '₽';
+    case 'BRL': return 'R$';
+    case 'MXN': return 'Mex$';
+    case 'SAR': return 'SR';
+    case 'AED': return 'AED';
+    case 'ILS': return '₪';
+    case 'NZD': return 'NZ$';
+    case 'SGD': return 'S$';
+    case 'TRY': return '₺';
+    case 'PLN': return 'zł';
     case 'USD': default: return '$';
   }
 };
@@ -867,6 +884,12 @@ export default function App() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [userSettings, setUserSettings] = useState<UserSettings | null>(null);
+
+  const t = (text: string) => getTranslatedLabel(text, userSettings?.language || 'en');
+
+  useEffect(() => {
+    setActiveLanguage(userSettings?.language || 'en');
+  }, [userSettings?.language]);
   
   const effectiveSettings = useMemo(() => {
     if (!userSettings) return null;
@@ -2126,19 +2149,19 @@ export default function App() {
 
         <nav className="flex-1 flex flex-col justify-between pr-1 pb-4 overflow-hidden">
           <div className="space-y-1.5 flex flex-col">
-            <NavItem active={activeTab === 'birds'} onClick={() => handleNavigate('birds', '', null, true)} icon={<BirdIcon size={18} />} label="Birds" count={birds.length} />
-            <NavItem active={activeTab === 'cages'} onClick={() => handleNavigate('cages', '', null, true)} icon={<Home size={18} />} label="Cages" count={cages.length} />
-            <NavItem active={activeTab === 'pairs'} onClick={() => handleNavigate('pairs', '', null, true)} icon={<Heart size={18} />} label="Pairs" count={pairs.filter(p => birds.some(b => b.id === p.maleId) || birds.some(b => b.id === p.femaleId)).length} />
-            <NavItem active={activeTab === 'breeding'} onClick={() => handleNavigate('breeding', '', null, true)} icon={<Egg size={18} />} label="Breeding" count={breedingRecords.length} />
-            <NavItem active={activeTab === 'financials'} onClick={() => handleNavigate('financials', '', null, true)} icon={<DollarSign size={18} />} label="Financials" count={transactions.length} />
-            <NavItem active={activeTab === 'genetics'} onClick={() => handleNavigate('genetics', '', null, true)} icon={<Dna size={18} />} label="Genetics" count={0} />
+            <NavItem active={activeTab === 'birds'} onClick={() => handleNavigate('birds', '', null, true)} icon={<BirdIcon size={18} />} label={t("Birds")} count={birds.length} />
+            <NavItem active={activeTab === 'cages'} onClick={() => handleNavigate('cages', '', null, true)} icon={<Home size={18} />} label={t("Cages")} count={cages.length} />
+            <NavItem active={activeTab === 'pairs'} onClick={() => handleNavigate('pairs', '', null, true)} icon={<Heart size={18} />} label={t("Pairs")} count={pairs.filter(p => birds.some(b => b.id === p.maleId) || birds.some(b => b.id === p.femaleId)).length} />
+            <NavItem active={activeTab === 'breeding'} onClick={() => handleNavigate('breeding', '', null, true)} icon={<Egg size={18} />} label={t("Breeding")} count={breedingRecords.length} />
+            <NavItem active={activeTab === 'financials'} onClick={() => handleNavigate('financials', '', null, true)} icon={<DollarSign size={18} />} label={t("Financials")} count={transactions.length} />
+            <NavItem active={activeTab === 'genetics'} onClick={() => handleNavigate('genetics', '', null, true)} icon={<Dna size={18} />} label={t("Genetics")} count={0} />
           </div>
           
           <div className="space-y-1.5 mt-4 pt-4 border-t border-white/5 flex flex-col">
-            <NavItem active={activeTab === 'tasks'} onClick={() => handleNavigate('tasks', '', null, true)} icon={<CheckSquare size={18} />} label="Tasks" count={tasks.length} />
-            <NavItem active={activeTab === 'contacts'} onClick={() => handleNavigate('contacts', '', null, true)} icon={<Users size={18} />} label="Contacts" count={contacts.length} />
-            <NavItem active={activeTab === 'print'} onClick={() => handleNavigate('print', '', null, true)} icon={<QrCode size={18} />} label="Print" count={0} />
-            <NavItem active={activeTab === 'settings'} onClick={() => handleNavigate('settings', '', null, true)} icon={<Tag size={18} />} label="Settings" count={0} />
+            <NavItem active={activeTab === 'tasks'} onClick={() => handleNavigate('tasks', '', null, true)} icon={<CheckSquare size={18} />} label={t("Tasks")} count={tasks.length} />
+            <NavItem active={activeTab === 'contacts'} onClick={() => handleNavigate('contacts', '', null, true)} icon={<Users size={18} />} label={t("Contacts")} count={contacts.length} />
+            <NavItem active={activeTab === 'print'} onClick={() => handleNavigate('print', '', null, true)} icon={<QrCode size={18} />} label={t("Print")} count={0} />
+            <NavItem active={activeTab === 'settings'} onClick={() => handleNavigate('settings', '', null, true)} icon={<Tag size={18} />} label={t("Settings")} count={0} />
           </div>
         </nav>
 
@@ -2200,10 +2223,16 @@ export default function App() {
                 <Menu size={24} />
               </button>
               <h2 className="text-xl font-black uppercase tracking-widest text-white">
-                {activeTab === 'print' ? 'Print Center' : 
-                 activeTab === 'tasks' ? 'Tasks & Reminders' : 
-                 activeTab === 'genetics' ? 'Genetics Engine' : 
-                 activeTab === 'stats' ? 'Entity Stats' :
+                {activeTab === 'print' ? t('Print Center') : 
+                 activeTab === 'tasks' ? t('Tasks') : 
+                 activeTab === 'genetics' ? t('Genetics Engine') : 
+                 activeTab === 'settings' ? t('Settings') :
+                 activeTab === 'birds' ? t('Birds') :
+                 activeTab === 'cages' ? t('Cages') :
+                 activeTab === 'pairs' ? t('Pairs') :
+                 activeTab === 'breeding' ? t('Breeding') :
+                 activeTab === 'financials' ? t('Financials') :
+                 activeTab === 'contacts' ? t('Contacts') :
                  activeTab}
               </h2>
             </div>
@@ -2227,14 +2256,14 @@ export default function App() {
                 className="shrink-0 flex items-center gap-2 text-[10px] font-black uppercase tracking-widest bg-gold-500/10 text-gold-500 border-gold-500/20 hover:bg-gold-500/20 px-3"
               >
                 <ArrowLeft size={14} />
-                Back to {navigationHistory.tab === 'birds' ? 'Flock' : navigationHistory.tab}
+                Back to {navigationHistory.tab === 'birds' ? t('Birds') : t(navigationHistory.tab.charAt(0).toUpperCase() + navigationHistory.tab.slice(1))}
               </Button>
             )}
             {activeTab !== 'settings' && activeTab !== 'genetics' && activeTab !== 'stats' && activeTab !== 'print' && (
               <div className="relative flex-1 xl:w-64">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-black-100" size={16} />
                 <Input 
-                  placeholder={`Search ${activeTab === 'tasks' ? 'tasks & reminders' : activeTab}...`} 
+                  placeholder={`${t('Search')} ${t(activeTab.charAt(0).toUpperCase() + activeTab.slice(1))}...`} 
                   className="pl-11 pr-10 w-full text-sm font-medium"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
@@ -2293,11 +2322,15 @@ export default function App() {
                 <Button onClick={() => { setEditingItem(null); setIsModalOpen(true); }} className="py-3 px-5 text-sm font-bold uppercase tracking-widest text-black">
                   <Plus size={18} />
                   <span className="ml-2">
-                    Add {
-                      activeTab === 'breeding' ? 'Record' : 
-                      activeTab === 'tasks' ? 'Task / Reminder' : 
-                      activeTab === 'financials' ? 'Transaction' :
-                      activeTab.slice(0, -1)
+                    {
+                      activeTab === 'birds' ? t('Add Bird') : 
+                      activeTab === 'cages' ? t('Add New') : 
+                      activeTab === 'pairs' ? t('Add Pair') : 
+                      activeTab === 'breeding' ? t('Add Record') : 
+                      activeTab === 'tasks' ? t('Add Task') : 
+                      activeTab === 'financials' ? t('Add Transaction') :
+                      activeTab === 'contacts' ? t('Add New') :
+                      t('Add New')
                     }
                   </span>
                 </Button>
@@ -2376,7 +2409,7 @@ export default function App() {
                       ) : (
                         <div className="col-span-full py-20 text-center bg-black-900/30 border border-dashed border-black-800 rounded-3xl">
                           <BirdIcon size={48} className="mx-auto text-black-300 mb-4" />
-                          <p className="text-black-100 font-black uppercase tracking-widest">No birds found</p>
+                          <p className="text-black-100 font-black uppercase tracking-widest">{t('No birds found')}</p>
                         </div>
                       )}
                     </div>
@@ -2423,7 +2456,7 @@ export default function App() {
                       ) : (
                         <div className="col-span-full py-20 text-center bg-black-900/30 border border-dashed border-black-800 rounded-3xl">
                           <Home size={48} className="mx-auto text-black-300 mb-4" />
-                          <p className="text-black-100 font-black uppercase tracking-widest">No cages found</p>
+                          <p className="text-black-100 font-black uppercase tracking-widest">{t('No cages found')}</p>
                         </div>
                       )}
                     </div>
@@ -2470,7 +2503,7 @@ export default function App() {
                       ) : (
                         <div className="col-span-full py-20 text-center bg-black-900/30 border border-dashed border-black-800 rounded-3xl">
                           <Heart size={48} className="mx-auto text-black-300 mb-4" />
-                          <p className="text-black-100 font-black uppercase tracking-widest">No pairs found</p>
+                          <p className="text-black-100 font-black uppercase tracking-widest">{t('No pairs found')}</p>
                         </div>
                       )}
                     </div>
@@ -2515,7 +2548,7 @@ export default function App() {
                       ) : (
                         <div className="col-span-full py-20 text-center bg-black-900/30 border border-dashed border-black-800 rounded-3xl">
                           <Egg size={48} className="mx-auto text-black-300 mb-4" />
-                          <p className="text-black-100 font-black uppercase tracking-widest">No breeding records found</p>
+                          <p className="text-black-100 font-black uppercase tracking-widest">{t('No breeding records found')}</p>
                         </div>
                       )}
                     </div>
@@ -2695,7 +2728,7 @@ export default function App() {
                         ) : (
                           <div className="col-span-full py-20 text-center bg-black-900/30 border border-dashed border-black-800 rounded-3xl">
                             <CheckSquare size={48} className="mx-auto text-black-300 mb-4" />
-                            <p className="text-black-100 font-black uppercase tracking-widest">No tasks found</p>
+                            <p className="text-black-100 font-black uppercase tracking-widest">{t('No tasks found')}</p>
                           </div>
                         )}
                       </div>
@@ -3473,7 +3506,7 @@ function BirdCard({ bird, cage, birds, cages, viewMode = 'grid-large', currency,
                 variant={bird.sex === 'Male' ? 'male' : bird.sex === 'Female' ? 'female' : 'neutral'} 
                 className="shrink-0"
               >
-                {bird.sex}
+                {tGlobal(bird.sex)}
               </Badge>
             </h3>
             
@@ -3496,8 +3529,8 @@ function BirdCard({ bird, cage, birds, cages, viewMode = 'grid-large', currency,
         {(bird.mutations?.length || 0) > 0 || (bird.splitMutations?.length || 0) > 0 || (bird.statuses?.length || 0) > 0 ? (
           <div className="flex flex-wrap gap-1">
             {bird.mutations?.map(m => <Badge key={m} className="bg-zinc-700 border-black-700 text-white text-[9px] px-1.5 py-0">{m}</Badge>)}
-            {bird.splitMutations?.map(m => <Badge key={m} className="bg-zinc-700 border-black-700 text-gold-500 italic text-[9px] px-1.5 py-0">Split {m}</Badge>)}
-            {bird.statuses?.map(s => <Badge key={s} className="bg-blue-900/40 border-blue-800 text-blue-200 text-[9px] px-1.5 py-0 shadow-sm">{s}</Badge>)}
+            {bird.splitMutations?.map(m => <Badge key={m} className="bg-zinc-700 border-black-700 text-gold-500 italic text-[9px] px-1.5 py-0">{tGlobal('Split')} {m}</Badge>)}
+            {bird.statuses?.map(s => <Badge key={s} className="bg-blue-900/40 border-blue-800 text-blue-200 text-[9px] px-1.5 py-0 shadow-sm">{tGlobal(s)}</Badge>)}
           </div>
         ) : null}
 
@@ -3507,29 +3540,29 @@ function BirdCard({ bird, cage, birds, cages, viewMode = 'grid-large', currency,
           effectiveViewMode === 'list' ? "flex flex-wrap items-center gap-x-6 gap-y-2" : "grid grid-cols-2 gap-3"
         )}>
           <div className={cn(effectiveViewMode === 'list' ? "flex items-center gap-2" : "space-y-0.5")}>
-            <p className="text-white uppercase tracking-widest font-black text-[8px]">Cage{effectiveViewMode === 'list' ? ':' : ''}</p>
+            <p className="text-white uppercase tracking-widest font-black text-[8px]">{tGlobal('Cage')}{effectiveViewMode === 'list' ? ':' : ''}</p>
             {cage ? (
               <button onClick={(e) => { e.stopPropagation(); onNavigate('birds', cage.name); }} className="text-white font-bold flex items-center gap-1.5 hover:text-secondary transition-colors">
                 <Home size={10} className="text-secondary" /> {cage.name}
               </button>
             ) : (
-              <p className="text-white font-bold flex items-center gap-1.5"><Home size={10} className="text-secondary" /> Unassigned</p>
+              <p className="text-white font-bold flex items-center gap-1.5"><Home size={10} className="text-secondary" /> {tGlobal('Unassigned')}</p>
             )}
           </div>
           <div className={cn(effectiveViewMode === 'list' ? "flex items-center gap-2" : "space-y-0.5")}>
-            <p className="text-white uppercase tracking-widest font-black text-[8px]">Born{effectiveViewMode === 'list' ? ':' : ''}</p>
-            <p className="text-white font-bold flex items-center gap-1.5"><Calendar size={10} className="text-secondary" /> {bird.birthDate || 'Unknown'}</p>
+            <p className="text-white uppercase tracking-widest font-black text-[8px]">{tGlobal('Born')}{effectiveViewMode === 'list' ? ':' : ''}</p>
+            <p className="text-white font-bold flex items-center gap-1.5"><Calendar size={10} className="text-secondary" /> {bird.birthDate || tGlobal('Unknown')}</p>
           </div>
           <div className={cn(effectiveViewMode === 'list' ? "flex items-center gap-2" : "space-y-0.5")}>
-            <p className="text-white uppercase tracking-widest font-black text-[8px]">Value{effectiveViewMode === 'list' ? ':' : ''}</p>
+            <p className="text-white uppercase tracking-widest font-black text-[8px]">{tGlobal('Value')}{effectiveViewMode === 'list' ? ':' : ''}</p>
             <p className="text-secondary font-bold flex items-center gap-1.5">{symbol}{bird.estimatedValue?.toFixed(2) || '0.00'}</p>
           </div>
           <div className={cn(effectiveViewMode === 'list' ? "flex items-center gap-2 flex-1" : "col-span-2 space-y-1.5 pt-1 w-full")}>
-              <p className="text-white uppercase tracking-widest font-black text-[8px]">Mate{effectiveViewMode === 'list' ? ':' : ''}</p>
+              <p className="text-white uppercase tracking-widest font-black text-[8px]">{tGlobal('Mate')}{effectiveViewMode === 'list' ? ':' : ''}</p>
               {mate ? (
                 <BirdCompactInfo bird={mate} cages={cages} onClick={() => onBirdRef(mate.name)} />
               ) : (
-                <p className="text-white/30 italic text-[10px]">No mate assigned</p>
+                <p className="text-white/30 italic text-[10px]">{tGlobal('No mate assigned')}</p>
               )}
             </div>
         </div>
@@ -3539,7 +3572,7 @@ function BirdCard({ bird, cage, birds, cages, viewMode = 'grid-large', currency,
             className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-xl transition-all border border-black-700"
           >
             <MoreHorizontal size={16} />
-            <span className="text-[10px] font-black uppercase tracking-widest">Actions</span>
+            <span className="text-[10px] font-black uppercase tracking-widest">{tGlobal('Actions')}</span>
           </button>
           
           <AnimatePresence>
@@ -3556,21 +3589,21 @@ function BirdCard({ bird, cage, birds, cages, viewMode = 'grid-large', currency,
                     className="flex-1 p-2 bg-secondary/10 border border-secondary/20 rounded-lg text-[10px] text-secondary font-black uppercase tracking-widest hover:bg-secondary/20 transition-colors flex items-center justify-center gap-2 min-w-[100px]"
                   >
                     <Egg size={12} className="text-secondary" />
-                    Breeding
+                    {tGlobal('Breeding')}
                   </button>
                   <button 
                     onClick={handleShare} 
                     className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-zinc-700 hover:bg-zinc-600 text-white hover:text-secondary rounded-lg transition-all border border-black-700 min-w-[100px]"
                   >
                     <Share2 size={14} />
-                    <span className="text-[9px] font-black uppercase tracking-widest">Share</span>
+                    <span className="text-[9px] font-black uppercase tracking-widest">{tGlobal('Share')}</span>
                   </button>
                   <button 
                     onClick={(e) => { e.stopPropagation(); setShowDocs(true); }} 
                     className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-zinc-700 hover:bg-zinc-600 text-white hover:text-secondary rounded-lg transition-all border border-black-700 min-w-[100px]"
                   >
                     <FileText size={14} />
-                    <span className="text-[9px] font-black uppercase tracking-widest">Docs</span>
+                    <span className="text-[9px] font-black uppercase tracking-widest">{tGlobal('Docs')}</span>
                   </button>
                 </div>
                 <div className="flex flex-wrap items-center gap-2 pt-2">
@@ -3579,14 +3612,14 @@ function BirdCard({ bird, cage, birds, cages, viewMode = 'grid-large', currency,
                     className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 bg-secondary/10 hover:bg-secondary/20 text-secondary rounded-xl transition-all border border-secondary/20 group/btn min-w-[80px]"
                   >
                     <GitBranch size={16} className="group-hover/btn:scale-110 transition-transform" />
-                    <span className="text-[10px] font-black uppercase tracking-widest whitespace-nowrap">Pedigree</span>
+                    <span className="text-[10px] font-black uppercase tracking-widest whitespace-nowrap">{tGlobal('Pedigree')}</span>
                   </button>
                   <button 
                     onClick={(e) => { e.stopPropagation(); onEdit(); }} 
                     className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-white rounded-xl transition-all border border-black-700 group/btn min-w-[80px]"
                   >
                     <Edit2 size={16} className="group-hover/btn:scale-110 transition-transform" />
-                    <span className="text-[10px] font-black uppercase tracking-widest whitespace-nowrap">Edit</span>
+                    <span className="text-[10px] font-black uppercase tracking-widest whitespace-nowrap">{tGlobal('Edit')}</span>
                   </button>
                   <button 
                     onClick={(e) => { e.stopPropagation(); onDelete(); }} 
@@ -3599,7 +3632,7 @@ function BirdCard({ bird, cage, birds, cages, viewMode = 'grid-large', currency,
                     }}
                   >
                     <Trash2 size={16} className="group-hover/btn:scale-110 transition-transform" />
-                    <span className="text-[10px] font-black uppercase tracking-widest whitespace-nowrap">Delete</span>
+                    <span className="text-[10px] font-black uppercase tracking-widest whitespace-nowrap">{tGlobal('Delete')}</span>
                   </button>
                 </div>
               </motion.div>
@@ -6164,10 +6197,38 @@ function SettingsView({ settings, onUpdate, allData, user, isSyncing, setDeleteC
                       value={settings.currency || 'ZAR'} 
                       onChange={e => onUpdate({ ...settings, currency: e.target.value })}
                     >
-                      <option value="ZAR">Rand (R)</option>
-                      <option value="USD">USD ($)</option>
+                      <option value="ZAR">South African Rand (R)</option>
+                      <option value="USD">US Dollar ($)</option>
                       <option value="EUR">Euro (€)</option>
-                      <option value="GBP">Pound (£)</option>
+                      <option value="GBP">British Pound (£)</option>
+                      <option value="AUD">Australian Dollar (A$)</option>
+                      <option value="CAD">Canadian Dollar (C$)</option>
+                      <option value="CHF">Swiss Franc (CHF)</option>
+                      <option value="JPY">Japanese Yen (¥)</option>
+                      <option value="CNY">Chinese Yuan (¥)</option>
+                      <option value="INR">Indian Rupee (₹)</option>
+                      <option value="RUB">Russian Ruble (₽)</option>
+                      <option value="BRL">Brazilian Real (R$)</option>
+                      <option value="MXN">Mexican Peso (Mex$)</option>
+                      <option value="SAR">Saudi Riyal (SR)</option>
+                      <option value="AED">UAE Dirham (AED)</option>
+                      <option value="ILS">Israeli Shekel (₪)</option>
+                      <option value="NZD">New Zealand Dollar (NZ$)</option>
+                      <option value="SGD">Singapore Dollar (S$)</option>
+                      <option value="TRY">Turkish Lira (₺)</option>
+                      <option value="PLN">Polish Złoty (zł)</option>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-black-100 uppercase tracking-widest ml-1">Language</label>
+                    <Select 
+                      value={settings.language || 'en'} 
+                      onChange={e => onUpdate({ ...settings, language: e.target.value })}
+                    >
+                      {Object.entries(LANGUAGE_NAMES).map(([code, name]) => (
+                        <option key={code} value={code}>{name}</option>
+                      ))}
                     </Select>
                   </div>
 
@@ -7442,6 +7503,7 @@ function ConfirmModal({ isOpen, onClose, onConfirm, title, message, isDeleting }
 // --- Forms ---
 
 function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettings, onAddSpecies, onAddSubSpecies, onAddMutation, onAddStatus, onClose }: { user: FirebaseUser, initialData?: Bird | null, cages: Cage[], birds: Bird[], pairs: Pair[], contacts: Contact[], userSettings: UserSettings | null, onAddSpecies: (n: string) => void, onAddSubSpecies: (n: string, sid: string) => void, onAddMutation: (n: string) => void, onAddStatus: (n: string) => void, onClose: () => void }) {
+  const t = (text: string) => tGlobal(text, userSettings?.language || 'en');
   const symbol = getCurrencySymbol(userSettings?.currency);
   const detectedMateId = (initialData && initialData.id) ? (initialData.mateId || birds.find(b => b.mateId === initialData.id)?.id || '') : '';
   const [formData, setFormData] = useState<Partial<Bird>>(initialData ? { ...initialData, mateId: detectedMateId } : { 
@@ -7687,7 +7749,7 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="grid grid-cols-12 gap-4">
         <div className="col-span-6 space-y-1">
-          <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Ring / Name</label>
+          <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">{t('Ring / Name')}</label>
           <Input 
             required
             value={formData.name}
@@ -7696,20 +7758,20 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
           />
         </div>
         <div className="col-span-3 space-y-1">
-          <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Sex</label>
+          <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">{t('Sex')}</label>
           <Select value={formData.sex} onChange={e => setFormData({ ...formData, sex: e.target.value as any })}>
-            <option value="Unknown" className="bg-black text-white">Unknown</option>
-            <option value="Male" className="bg-black text-white">Male</option>
-            <option value="Female" className="bg-black text-white">Female</option>
+            <option value="Unknown" className="bg-black text-white">{t('Unknown')}</option>
+            <option value="Male" className="bg-black text-white">{t('Male')}</option>
+            <option value="Female" className="bg-black text-white">{t('Female')}</option>
           </Select>
         </div>
         <div className="col-span-3">
           <SearchableSelect 
-            label="Cage"
+            label={t('Cage')}
             value={formData.cageId || ''}
             onChange={(val) => setFormData({ ...formData, cageId: val })}
             options={[
-              { id: '', name: 'Unassigned' },
+              { id: '', name: t('Unassigned') },
               ...[...cages].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })).map(c => ({ id: c.id, name: c.name }))
             ]}
           />
@@ -7719,7 +7781,7 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
       <div className="grid grid-cols-12 gap-4">
         <div className="col-span-6">
           <SearchableSelect 
-            label="Species"
+            label={t('Species')}
             options={speciesOptions}
             value={selectedSpecies?.id}
             onChange={(id) => {
@@ -7727,12 +7789,12 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
               setFormData({ ...formData, species: name, subSpecies: '' });
             }}
             onAdd={onAddSpecies}
-            placeholder="Select Species"
+            placeholder={t('Select Species')}
           />
         </div>
         <div className="col-span-6">
           <SearchableSelect 
-            label="Sub-Species"
+            label={t('Sub-Species')}
             options={subSpeciesOptions}
             value={subSpeciesOptions.find(o => o.name === formData.subSpecies)?.id}
             onChange={(id) => {
@@ -7740,7 +7802,7 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
               setFormData({ ...formData, subSpecies: name });
             }}
             onAdd={(n) => selectedSpecies && onAddSubSpecies(n, selectedSpecies.id)}
-            placeholder="Select Sub-Species"
+            placeholder={t('Select Sub-Species')}
             disabled={!formData.species}
           />
         </div>
@@ -7749,7 +7811,7 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
       <div className="grid grid-cols-12 gap-4">
         <div className="col-span-6">
           <SearchableSelect 
-            label="Mutations"
+            label={t('Mutations')}
             options={mutationOptions}
             multi
             selectedValues={formData.mutations?.map(m => mutationOptions.find(o => o.name === m)?.id || m) || []}
@@ -7762,12 +7824,12 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
               });
             }}
             onAdd={onAddMutation}
-            placeholder="Select Mutations"
+            placeholder={t('Select Mutations')}
           />
         </div>
         <div className="col-span-6">
           <SearchableSelect 
-            label="Split Mutations"
+            label={t('Split Mutations')}
             options={mutationOptions}
             multi
             selectedValues={formData.splitMutations?.map(m => mutationOptions.find(o => o.name === m)?.id || m) || []}
@@ -7780,14 +7842,14 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
               });
             }}
             onAdd={onAddMutation}
-            placeholder="Select Split Mutations"
+            placeholder={t('Select Split Mutations')}
           />
         </div>
       </div>
 
       <div className="space-y-1">
         <SearchableSelect
-          label="Statuses"
+          label={t('Statuses')}
           options={statusOptions}
           multi
           selectedValues={formData.statuses?.map(s => statusOptions.find(o => o.name === s)?.id || s) || []}
@@ -7800,7 +7862,7 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
             });
           }}
           onAdd={onAddStatus}
-          placeholder="Select or add statuses"
+          placeholder={t('Select or add statuses')}
         />
       </div>
 
@@ -7808,18 +7870,18 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
         <div className="p-4 bg-gold-500/10 border border-gold-500/20 rounded-2xl space-y-3">
           <div className="flex items-center gap-2 text-gold-500">
             <DollarSign size={18} />
-            <h4 className="text-xs font-black uppercase tracking-widest">Record Sale as Income?</h4>
+            <h4 className="text-xs font-black uppercase tracking-widest">{t('Record Sale as Income?')}</h4>
           </div>
-          <p className="text-[10px] text-white/60">This bird is marked as Sold. Would you like to record the transaction for profit tracking?</p>
+          <p className="text-[10px] text-white/60">{t('This bird is marked as Sold. Would you like to record the transaction for profit tracking?')}</p>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
-              <label className="text-[9px] font-bold text-white/40 uppercase tracking-tighter">Sale Price ({symbol})</label>
+              <label className="text-[9px] font-bold text-white/40 uppercase tracking-tighter">{t('Sale Price')} ({symbol})</label>
               <Input type="number" value={salePrice} onChange={e => setSalePrice(parseFloat(e.target.value) || 0)} />
             </div>
             <div className="space-y-1">
-              <label className="text-[9px] font-bold text-white/40 uppercase tracking-tighter">Buyer</label>
+              <label className="text-[9px] font-bold text-white/40 uppercase tracking-tighter">{t('Buyer')}</label>
               <Select value={buyerId} onChange={e => setBuyerId(e.target.value)}>
-                <option value="" className="bg-black text-white">Unknown / None</option>
+                <option value="" className="bg-black text-white">{t('Unknown / None')}</option>
                 {contacts.map(c => <option key={c.id} value={c.id} className="bg-black text-white">{c.name}</option>)}
               </Select>
             </div>
@@ -7831,13 +7893,13 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
               onChange={e => setRecordSale(e.target.checked)}
               className="w-4 h-4 rounded border-black-700 bg-black text-gold-500 focus:ring-gold-500/20"
             />
-            <span className="text-[10px] font-bold text-white/60 group-hover:text-white transition-colors">Record as Sales Income</span>
+            <span className="text-[10px] font-bold text-white/60 group-hover:text-white transition-colors">{t('Record as Sales Income')}</span>
           </label>
         </div>
       )}
       
       <div className="space-y-1">
-        <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Images</label>
+        <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">{t('Images')}</label>
         <div className="flex items-center gap-3">
           <div className="flex-1">
             <input type="file" multiple accept="image/*" onChange={handleFileChange} className="hidden" id="bird-image-upload" name="bird-image-upload"
@@ -7851,7 +7913,7 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
               )}
             >
               {isUploading ? <Loader2 size={16} className="animate-spin" /> : <ImageIcon size={16} />}
-              Upload Image(s)
+              {t('Upload Image(s)')}
             </label>
           </div>
         </div>
@@ -7891,22 +7953,22 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
       </div>
  
       <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-1"><label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Birth Date</label><Input type="date" value={formData.birthDate} onChange={e => setFormData({ ...formData, birthDate: e.target.value })} /></div>
+        <div className="space-y-1"><label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">{t('Birth Date')}</label><Input type="date" value={formData.birthDate} onChange={e => setFormData({ ...formData, birthDate: e.target.value })} /></div>
         <div className="flex-1 opacity-0 pointer-events-none"></div>
       </div>
  
       <div className="grid grid-cols-2 gap-4">
         <SearchableSelect 
-          label="Father"
+          label={t('Father')}
           options={[
-            { id: '', name: 'Unknown' }, 
+            { id: '', name: t('Unknown') }, 
             ...birds.filter(b => b.sex === 'Male' && b.id !== initialData?.id).map(b => {
               const cage = cages.find(c => c.id === b.cageId);
               const mutationsStr = b.mutations?.length ? `[${b.mutations.join(', ')}]` : '';
               return { 
                 id: b.id, 
                 name: b.isGhost ? `${b.name} (Pedigree Only)` : b.name,
-                details: cage?.name || 'Unassigned',
+                details: cage?.name || t('Unassigned'),
                 subText: mutationsStr,
                 bird: b,
                 cageName: cage?.name || ''
@@ -7922,20 +7984,20 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
           ]}
           value={formData.fatherId}
           onChange={(id) => setFormData({ ...formData, fatherId: id })}
-          placeholder="Unknown"
+          placeholder={t('Unknown')}
           cages={cages}
         />
         <SearchableSelect 
-          label="Mother"
+          label={t('Mother')}
           options={[
-            { id: '', name: 'Unknown' }, 
+            { id: '', name: t('Unknown') }, 
             ...birds.filter(b => b.sex === 'Female' && b.id !== initialData?.id).map(b => {
               const cage = cages.find(c => c.id === b.cageId);
               const mutationsStr = b.mutations?.length ? `[${b.mutations.join(', ')}]` : '';
               return { 
                 id: b.id, 
                 name: b.isGhost ? `${b.name} (Pedigree Only)` : b.name,
-                details: cage?.name || 'Unassigned',
+                details: cage?.name || t('Unassigned'),
                 subText: mutationsStr,
                 bird: b,
                 cageName: cage?.name || ''
@@ -7951,23 +8013,23 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
           ]}
           value={formData.motherId}
           onChange={(id) => setFormData({ ...formData, motherId: id })}
-          placeholder="Unknown"
+          placeholder={t('Unknown')}
           cages={cages}
         />
       </div>
  
       <div className="grid grid-cols-2 gap-4">
         <SearchableSelect 
-          label="Mate"
+          label={t('Mate')}
           options={[
-            { id: '', name: 'None' }, 
+            { id: '', name: t('None') }, 
             ...birds.filter(b => b.id !== initialData?.id).map(b => {
               const cage = cages.find(c => c.id === b.cageId);
               const mutationsStr = b.mutations?.length ? `[${b.mutations.join(', ')}]` : '';
               return { 
                 id: b.id, 
                 name: b.isGhost ? `${b.name} (Pedigree Only)` : b.name,
-                details: cage?.name || 'Unassigned',
+                details: cage?.name || t('Unassigned'),
                 subText: mutationsStr,
                 bird: b,
                 cageName: cage?.name || ''
@@ -7983,18 +8045,18 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
           ]}
           value={formData.mateId}
           onChange={(id) => setFormData({ ...formData, mateId: id })}
-          placeholder="None"
+          placeholder={t('None')}
           cages={cages}
         />
         <SearchableSelect 
-          label="Offspring"
+          label={t('Offspring')}
           options={birds.filter(b => !b.isGhost && b.id !== initialData?.id).map(b => {
             const cage = cages.find(c => c.id === b.cageId);
             const mutationsStr = b.mutations?.length ? `[${b.mutations.join(', ')}]` : '';
             return { 
               id: b.id, 
               name: b.name,
-              details: cage?.name || 'Unassigned',
+              details: cage?.name || t('Unassigned'),
               subText: mutationsStr,
               bird: b,
               cageName: cage?.name || ''
@@ -8017,32 +8079,32 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
               offspringIds: current.includes(id) ? current.filter(m => m !== id) : [...current, id] 
             });
           }}
-          placeholder="Select Offspring"
+          placeholder={t('Select Offspring')}
         />
       </div>
 
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1">
-          <label className="text-[10px] font-black text-black-100 uppercase tracking-widest ml-1">Purchase Date</label>
+          <label className="text-[10px] font-black text-black-100 uppercase tracking-widest ml-1">{t('Purchase Date')}</label>
           <Input type="date" value={formData.purchaseDate} onChange={e => setFormData({ ...formData, purchaseDate: e.target.value })} />
         </div>
         <div className="space-y-1">
-          <label className="text-[10px] font-black text-black-100 uppercase tracking-widest ml-1">Purchase Price ({symbol})</label>
+          <label className="text-[10px] font-black text-black-100 uppercase tracking-widest ml-1">{t('Purchase Price')} ({symbol})</label>
           <Input type="number" min="0" step="0.01" value={formData.purchasePrice} onChange={e => setFormData({ ...formData, purchasePrice: parseFloat(e.target.value) || 0 })} />
         </div>
       </div>
 
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1">
-          <label className="text-[10px] font-black text-black-100 uppercase tracking-widest ml-1">Est. Value ({symbol})</label>
+          <label className="text-[10px] font-black text-black-100 uppercase tracking-widest ml-1">{t('Est. Value')} ({symbol})</label>
           <Input type="number" min="0" step="0.01" value={formData.estimatedValue} onChange={e => setFormData({ ...formData, estimatedValue: parseFloat(e.target.value) || 0 })} />
         </div>
         <SearchableSelect 
-          label="Bought From"
-          options={[{ id: '', name: 'None' }, ...contacts.map(c => ({ id: c.id, name: c.name }))]}
+          label={t('Bought From')}
+          options={[{ id: '', name: t('None') }, ...contacts.map(c => ({ id: c.id, name: c.name }))]}
           value={formData.boughtFromId || ''}
           onChange={(id) => setFormData({ ...formData, boughtFromId: id })}
-          placeholder="Select Contact"
+          placeholder={t('Bought From')}
         />
       </div>
 
@@ -8055,20 +8117,20 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
           className="w-4 h-4 rounded border-black-700 bg-black text-gold-500 focus:ring-gold-500"
         />
         <label htmlFor="add-to-expenses" className="text-[10px] font-black text-white uppercase tracking-widest cursor-pointer">
-          Add Purchase to Expenses
+          {t('Add Purchase to Expenses')}
         </label>
       </div>
 
       <div className="space-y-1">
-        <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Notes</label>
-        <textarea name="birdNotes" id="birdNotes" className="w-full px-4 py-3 bg-black border border-black-700 rounded-2xl focus:outline-none focus:ring-2 focus:ring-gold-500/20 focus:border-gold-500 text-white transition-all min-h-[100px] text-sm font-medium placeholder:text-white/30" placeholder="Additional notes..."
+        <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">{t('Notes')}</label>
+        <textarea name="birdNotes" id="birdNotes" className="w-full px-4 py-3 bg-black border border-black-700 rounded-2xl focus:outline-none focus:ring-2 focus:ring-gold-500/20 focus:border-gold-500 text-white transition-all min-h-[100px] text-sm font-medium placeholder:text-white/30" placeholder={t('Additional notes...')}
           value={formData.notes} 
           onChange={e => setFormData({ ...formData, notes: e.target.value })} 
         />
       </div>
 
       <div className="space-y-3 pt-2 border-t border-black-800">
-        <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Documents (DNA, Vet, Permits)</label>
+        <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">{t('Documents (DNA, Vet, Permits)')}</label>
         
         <div className="flex gap-2">
           <Select 
@@ -8076,11 +8138,11 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
             onChange={e => setDocType(e.target.value)}
             className="flex-1"
           >
-            <option value="General" className="bg-black text-white">General</option>
-            <option value="DNA Sexing" className="bg-black text-white">DNA Sexing</option>
-            <option value="Vet Check" className="bg-black text-white">Vet Check</option>
-            <option value="Permit" className="bg-black text-white">Permit</option>
-            <option value="Purchase Invoice" className="bg-black text-white">Invoice</option>
+            <option value="General" className="bg-black text-white">{t('General')}</option>
+            <option value="DNA Sexing" className="bg-black text-white">{t('DNA Sexing')}</option>
+            <option value="Vet Check" className="bg-black text-white">{t('Vet Check')}</option>
+            <option value="Permit" className="bg-black text-white">{t('Permit')}</option>
+            <option value="Purchase Invoice" className="bg-black text-white">{t('Invoice')}</option>
           </Select>
           
           <input type="file" onChange={handleDocUpload} className="hidden" id="bird-doc-upload" disabled={isUploadingDoc} />
@@ -8092,7 +8154,7 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
             )}
           >
             {isUploadingDoc ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
-            Upload
+            {t('Upload')}
           </label>
         </div>
 
