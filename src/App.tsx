@@ -458,6 +458,7 @@ const BirdCompactInfo = ({ bird, cages, className, onClick }: { bird: Bird, cage
 };
 
 const PedigreeNode = ({ bird, roleLabel, generation, onBirdRef, cages, userSettings }: { bird?: Bird, roleLabel?: string, generation: number, onBirdRef: (name: string) => void, cages: Cage[], userSettings?: UserSettings }) => {
+  const t = (text: string) => getTranslatedLabel(text, userSettings?.language || 'en');
   const abbreviatedRole = roleLabel?.includes('Grandsire') ? 'GS' : 
                          roleLabel?.includes('Granddam') ? 'GD' : 
                          roleLabel?.[0];
@@ -475,7 +476,7 @@ const PedigreeNode = ({ bird, roleLabel, generation, onBirdRef, cages, userSetti
         {roleLabel && (
           <p className="absolute -top-2 left-1/2 -translate-x-1/2 text-[7px] sm:text-[9px] font-black uppercase tracking-widest text-secondary/90 bg-black px-1.5 py-0.5 rounded-full z-20 border border-secondary/30 whitespace-nowrap shadow-xl">
             <span className="sm:hidden">{abbreviatedRole}</span>
-            <span className="hidden sm:inline">{roleLabel}</span>
+            <span className="hidden sm:inline">{t(roleLabel)}</span>
           </p>
         )}
         {bird ? (
@@ -537,18 +538,18 @@ const PedigreeNode = ({ bird, roleLabel, generation, onBirdRef, cages, userSetti
                   <div className="flex items-center justify-between gap-1 text-[5px] sm:text-[9px]">
                     <div className="flex items-center gap-0.5 truncate">
                       <div className={cn("w-1 h-1 rounded-full shrink-0", bird.statuses?.includes('Active') ? 'bg-emerald-500' : 'bg-zinc-500')} />
-                      <span className="text-white/50 uppercase font-black tracking-tighter truncate">{bird.statuses?.[0] || 'ACTIVE'}</span>
+                      <span className="text-white/50 uppercase font-black tracking-tighter truncate">{bird.statuses?.[0] ? t(bird.statuses[0]) : t('ACTIVE')}</span>
                     </div>
                     {bird.birthDate && <span className="text-white/30 uppercase font-bold text-[4px] sm:text-[8px]">{bird.birthDate}</span>}
                   </div>
-                  {cage && <span className="text-[5px] sm:text-[8px] text-white/20 italic truncate font-bold text-right leading-none">CAGE: {cage.name}</span>}
+                  {cage && <span className="text-[5px] sm:text-[8px] text-white/20 italic truncate font-bold text-right leading-none">{t('Cage')}: {cage.name}</span>}
                 </div>
               </div>
             </div>
           </div>
         ) : (
           <div className="p-3 sm:p-6 bg-black/20 border border-white/5 rounded-lg sm:rounded-2xl border-dashed text-center opacity-30 flex flex-col items-center justify-center min-h-[50px] sm:min-h-[100px]">
-             <p className="text-[7px] sm:text-[10px] font-black uppercase tracking-widest text-white/30 truncate px-2">UNKNOWN</p>
+              <p className="text-[7px] sm:text-[10px] font-black uppercase tracking-widest text-white/30 truncate px-2">{t('UNKNOWN')}</p>
           </div>
         )}
       </div>
@@ -2635,7 +2636,7 @@ export default function App() {
                 )}
 
                 {activeTab === 'print' && (
-                  <PrintView birds={birds} pairs={pairs} cages={cages} onBirdRef={handleBirdRef} />
+                  <PrintView birds={birds} pairs={pairs} cages={cages} onBirdRef={handleBirdRef} userSettings={effectiveSettings ?? undefined} />
                 )}
 
                 {activeTab === 'pedigree' && (
@@ -2828,12 +2829,12 @@ export default function App() {
             onClose={() => setIsModalOpen(false)} 
           />
         )}
-        {activeTab === 'cages' && <CageForm user={user} initialData={editingItem} cages={cages} onClose={() => setIsModalOpen(false)} />}
-        {activeTab === 'pairs' && <PairForm user={user} initialData={editingItem} birds={birds} cages={cages} onClose={() => setIsModalOpen(false)} />}
-        {activeTab === 'breeding' && <BreedingRecordForm user={user} initialData={editingItem} pairs={pairs} birds={birds} cages={cages} onClose={() => setIsModalOpen(false)} />}
-        {activeTab === 'tasks' && <TaskForm user={user} initialData={editingItem} birds={birds} cages={cages} onClose={() => setIsModalOpen(false)} />}
-        {activeTab === 'financials' && <TransactionForm user={user} initialData={editingItem} birds={birds} pairs={pairs} cages={cages} contacts={contacts} currency={userSettings?.currency} onClose={() => setIsModalOpen(false)} />}
-        {activeTab === 'contacts' && <ContactForm user={user} initialData={editingItem} onClose={() => setIsModalOpen(false)} />}
+        {activeTab === 'cages' && <CageForm user={user} initialData={editingItem} cages={cages} onClose={() => setIsModalOpen(false)} userSettings={effectiveSettings ?? undefined} />}
+        {activeTab === 'pairs' && <PairForm user={user} initialData={editingItem} birds={birds} cages={cages} onClose={() => setIsModalOpen(false)} userSettings={effectiveSettings ?? undefined} />}
+        {activeTab === 'breeding' && <BreedingRecordForm user={user} initialData={editingItem} pairs={pairs} birds={birds} cages={cages} onClose={() => setIsModalOpen(false)} userSettings={effectiveSettings ?? undefined} />}
+        {activeTab === 'tasks' && <TaskForm user={user} initialData={editingItem} birds={birds} cages={cages} onClose={() => setIsModalOpen(false)} userSettings={effectiveSettings ?? undefined} />}
+        {activeTab === 'financials' && <TransactionForm user={user} initialData={editingItem} birds={birds} pairs={pairs} cages={cages} contacts={contacts} currency={userSettings?.currency} onClose={() => setIsModalOpen(false)} userSettings={effectiveSettings ?? undefined} />}
+        {activeTab === 'contacts' && <ContactForm user={user} initialData={editingItem} onClose={() => setIsModalOpen(false)} userSettings={effectiveSettings ?? undefined} />}
       </Modal>
 
       <ScannerModal 
@@ -3205,6 +3206,7 @@ function SharePairModal({ pair, male, female, birds, records, onClose }: { pair:
 }
 
 function PedigreeFullView({ birdId, birds, cages, onBirdRef, onBack, userSettings }: { birdId: string, birds: Bird[], cages: Cage[], onBirdRef: (name: string) => void, onBack: () => void, userSettings?: UserSettings }) {
+  const t = (text: string) => getTranslatedLabel(text, userSettings?.language || 'en');
   const bird = birds.find(b => b.id === birdId);
   const [containerWidth, setContainerWidth] = useState(0);
   const [contentWidth, setContentWidth] = useState(1200);
@@ -3297,7 +3299,7 @@ function PedigreeFullView({ birdId, birds, cages, onBirdRef, onBack, userSetting
                <ArrowLeft size={18} />
             </button>
             <div>
-               <h2 className="text-lg sm:text-xl font-black uppercase tracking-widest text-white leading-none">FAMILY TREE</h2>
+               <h2 className="text-lg sm:text-xl font-black uppercase tracking-widest text-white leading-none">{t('Family Tree')}</h2>
                <p className="text-gold-500 font-bold uppercase tracking-widest text-[9px] sm:text-xs mt-1 flex items-center gap-1.5 opacity-80">
                  <div className="w-1.5 h-1.5 rounded-full bg-gold-500" />
                  {bird.name}
@@ -4859,7 +4861,8 @@ function BreedingRecordCard({ record, pair, male, female, birds, onEdit, onDelet
   );
 }
 
-function BreedingRecordForm({ user, initialData, pairs, birds, cages, onClose }: { user: FirebaseUser, initialData?: BreedingRecord, pairs: Pair[], birds: Bird[], cages: Cage[], onClose: () => void }) {
+function BreedingRecordForm({ user, initialData, pairs, birds, cages, onClose, userSettings }: { user: FirebaseUser, initialData?: BreedingRecord, pairs: Pair[], birds: Bird[], cages: Cage[], onClose: () => void, userSettings?: UserSettings }) {
+  const t = (text: string) => getTranslatedLabel(text, userSettings?.language || 'en');
   const [formData, setFormData] = useState<Partial<BreedingRecord>>(initialData || { 
     pairId: '', 
     startDate: format(new Date(), 'yyyy-MM-dd'), 
@@ -4966,11 +4969,11 @@ function BreedingRecordForm({ user, initialData, pairs, birds, cages, onClose }:
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="space-y-1">
         <SearchableSelect 
-          label="Pair"
+          label={t('Pair')}
           value={formData.pairId || ''}
           onChange={(val) => setFormData({ ...formData, pairId: val })}
           options={[
-            { id: '', name: 'Select Pair' },
+            { id: '', name: t('Select Pair') },
             ...pairs.filter(p => p.maleId || p.femaleId).map(p => {
               const male = birds.find(b => b.id === p.maleId);
               const female = birds.find(b => b.id === p.femaleId);
@@ -4990,18 +4993,18 @@ function BreedingRecordForm({ user, initialData, pairs, birds, cages, onClose }:
       
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1">
-          <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Start Date</label>
+          <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">{t('Start Date')}</label>
           <Input type="date" required value={formData.startDate} onChange={e => setFormData({ ...formData, startDate: e.target.value })} />
         </div>
         <div className="space-y-1">
-          <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">End Date</label>
+          <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">{t('End Date')}</label>
           <Input type="date" value={formData.endDate} onChange={e => setFormData({ ...formData, endDate: e.target.value })} />
         </div>
       </div>
       
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1">
-          <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Incubation (Days)</label>
+          <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">{t('Incubation (Days)')}</label>
           <Input 
             type="number" 
             min="1" 
@@ -5010,7 +5013,7 @@ function BreedingRecordForm({ user, initialData, pairs, birds, cages, onClose }:
           />
         </div>
         <div className="space-y-1">
-          <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Ringing Age (Days)</label>
+          <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">{t('Ringing Age (Days)')}</label>
           <Input 
             type="number" 
             min="1" 
@@ -5022,24 +5025,24 @@ function BreedingRecordForm({ user, initialData, pairs, birds, cages, onClose }:
       
       <div className="grid grid-cols-3 gap-4 pb-2 border-b border-black-800">
         <div className="space-y-1">
-          <label className="text-[10px] font-black text-white/50 uppercase tracking-widest ml-1">Laid</label>
+          <label className="text-[10px] font-black text-white/50 uppercase tracking-widest ml-1">{t('Laid')}</label>
           <div className="h-10 px-3 bg-white/5 border border-white/10 rounded-xl flex items-center text-white font-bold text-sm">{formData.eggs?.length || 0}</div>
         </div>
         <div className="space-y-1">
-          <label className="text-[10px] font-black text-white/50 uppercase tracking-widest ml-1">Hatched</label>
+          <label className="text-[10px] font-black text-white/50 uppercase tracking-widest ml-1">{t('Hatched')}</label>
           <div className="h-10 px-3 bg-white/5 border border-white/10 rounded-xl flex items-center text-white font-bold text-sm">{formData.eggs?.filter(e => ['Hatched', 'Died', 'Weaned'].includes(e.status)).length || 0}</div>
         </div>
         <div className="space-y-1">
-          <label className="text-[10px] font-black text-white/50 uppercase tracking-widest ml-1">Weaned</label>
+          <label className="text-[10px] font-black text-white/50 uppercase tracking-widest ml-1">{t('Weaned')}</label>
           <div className="h-10 px-3 bg-white/5 border border-white/10 rounded-xl flex items-center text-white font-bold text-sm">{formData.eggs?.filter(e => e.status === 'Weaned').length || 0}</div>
         </div>
       </div>
       
       <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Eggs & Offspring</label>
+          <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">{t('Eggs & Offspring')}</label>
           <Button type="button" onClick={handleAddEgg} variant="secondary" className="h-6 text-xs px-3 bg-zinc-700 hover:bg-zinc-600 rounded">
-            + Add Egg
+            + {t('Add Egg')}
           </Button>
         </div>
         
@@ -5050,20 +5053,20 @@ function BreedingRecordForm({ user, initialData, pairs, birds, cages, onClose }:
               .map(({ egg, originalIndex: index }) => (
               <div key={egg.id} className="p-3 bg-black border border-black-700 rounded-xl space-y-2">
                 <div className="flex justify-between items-center bg-black-900 -mx-3 -mt-3 p-2 rounded-t-xl border-b border-black-800">
-                  <span className="text-xs font-black text-white">Egg {index + 1}</span>
+                  <span className="text-xs font-black text-white">{t('Egg')} {index + 1}</span>
                   <div className="flex items-center gap-2">
                     <select 
                       value={egg.status} 
                       onChange={e => updateEgg(index, { status: e.target.value as any })} 
                       className="bg-black border border-black-700 text-xs font-bold uppercase tracking-widest rounded px-2 py-1 text-white focus:outline-none focus:border-gold-500"
                     >
-                      <option value="Laid">Laid</option>
-                      <option value="Fertile">Fertile</option>
-                      <option value="Infertile / Clear">Infertile / Clear</option>
-                      <option value="Dead In Shell">Dead In Shell</option>
-                      <option value="Hatched">Hatched</option>
-                      <option value="Died">Died</option>
-                      <option value="Weaned">Weaned</option>
+                      <option value="Laid">{t('Laid')}</option>
+                      <option value="Fertile">{t('Fertile')}</option>
+                      <option value="Infertile / Clear">{t('Infertile / Clear')}</option>
+                      <option value="Dead In Shell">{t('Dead In Shell')}</option>
+                      <option value="Hatched">{t('Hatched')}</option>
+                      <option value="Died">{t('Died')}</option>
+                      <option value="Weaned">{t('Weaned')}</option>
                     </select>
                     <button 
                       type="button" 
@@ -5083,7 +5086,7 @@ function BreedingRecordForm({ user, initialData, pairs, birds, cages, onClose }:
                 
                 <div className="grid grid-cols-2 gap-3 pt-1">
                   <div className="space-y-1">
-                    <label className="text-[9px] font-bold text-white/50 uppercase tracking-widest">Laid Date</label>
+                    <label className="text-[9px] font-bold text-white/50 uppercase tracking-widest">{t('Laid Date')}</label>
                     <Input 
                       type="date" 
                       value={egg.laidDate || ''} 
@@ -5092,7 +5095,7 @@ function BreedingRecordForm({ user, initialData, pairs, birds, cages, onClose }:
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[9px] font-bold text-white/50 uppercase tracking-widest">Hatch Date</label>
+                    <label className="text-[9px] font-bold text-white/50 uppercase tracking-widest">{t('Hatch Date')}</label>
                     <Input 
                       type="date" 
                       value={egg.actualHatchDate || ''} 
@@ -5105,9 +5108,9 @@ function BreedingRecordForm({ user, initialData, pairs, birds, cages, onClose }:
                 {(egg.status === 'Hatched' || egg.status === 'Died' || egg.status === 'Weaned') && (
                   <div className="pt-1">
                     <div className="space-y-1">
-                      <label className="text-[9px] font-bold text-white/50 uppercase tracking-widest">Notes</label>
+                      <label className="text-[9px] font-bold text-white/50 uppercase tracking-widest">{t('Notes')}</label>
                       <Input 
-                        placeholder="Info..." 
+                         placeholder="Info..." 
                         value={egg.notes || ''} 
                         onChange={e => updateEgg(index, { notes: e.target.value })} 
                         className="h-8 text-xs" 
@@ -5154,14 +5157,14 @@ function BreedingRecordForm({ user, initialData, pairs, birds, cages, onClose }:
                            toast.dismiss(loadingToast);
                         }
                      }}>
-                        Promote to New Bird Profile
+                        {t('Promote to New Bird Profile')}
                      </Button>
                   </div>
                 )}
                 
                 {egg.birdId && (
                   <div className="text-[9px] font-black text-emerald-500 uppercase tracking-widest text-center py-1 mt-1 bg-emerald-500/10 rounded">
-                    Promoted to Bird
+                    {t('Promoted to Bird')}
                   </div>
                 )}
               </div>
@@ -5172,7 +5175,7 @@ function BreedingRecordForm({ user, initialData, pairs, birds, cages, onClose }:
 
       <div className="space-y-1">
         <SearchableSelect 
-          label="Tag Existing Offspring"
+          label={t('Tag Existing Offspring')}
           options={birds.filter(b => !b.isGhost).map(b => {
             const cage = cages.find(c => c.id === b.cageId);
             const mutationsStr = b.mutations?.length ? `[${b.mutations.join(', ')}]` : '';
@@ -5194,13 +5197,13 @@ function BreedingRecordForm({ user, initialData, pairs, birds, cages, onClose }:
               offspringIds: current.includes(id) ? current.filter(m => m !== id) : [...current, id] 
             });
           }}
-          placeholder="Select Offspring"
+          placeholder={t('Select Offspring')}
         />
       </div>
       
       <div className="space-y-1">
-        <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Clutch Notes</label>
-        <textarea name="breedingNotes" id="breedingNotes" className="w-full px-4 py-3 bg-black border border-black-700 rounded-2xl focus:outline-none focus:ring-2 focus:ring-gold-500/20 focus:border-gold-500 text-white transition-all min-h-[80px] text-sm font-medium placeholder:text-white/30" placeholder="General breeding notes..."
+        <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">{t('Clutch Notes')}</label>
+        <textarea name="breedingNotes" id="breedingNotes" className="w-full px-4 py-3 bg-black border border-black-700 rounded-2xl focus:outline-none focus:ring-2 focus:ring-gold-500/20 focus:border-gold-500 text-white transition-all min-h-[80px] text-sm font-medium placeholder:text-white/30" placeholder={t('General breeding notes...')}
           value={formData.notes} 
           onChange={e => setFormData({ ...formData, notes: e.target.value })} 
         />
@@ -5208,13 +5211,14 @@ function BreedingRecordForm({ user, initialData, pairs, birds, cages, onClose }:
 
       <Button type="submit" className="w-full py-4 text-sm uppercase tracking-widest font-black" disabled={isSaving}>
         {isSaving ? <Loader2 className="animate-spin mr-2" size={16} /> : null}
-        {(initialData && (initialData as any).id) ? 'Update' : 'Add'} Record
+        {(initialData && (initialData as any).id) ? t('Update Record') : t('Add Record')}
       </Button>
     </form>
   );
 }
 
-function TransactionForm({ user, initialData, birds, pairs, cages, contacts, currency, onClose }: { user: FirebaseUser, initialData?: Transaction, birds: Bird[], pairs: Pair[], cages: Cage[], contacts: Contact[], currency?: string, onClose: () => void }) {
+function TransactionForm({ user, initialData, birds, pairs, cages, contacts, currency, onClose, userSettings }: { user: FirebaseUser, initialData?: Transaction, birds: Bird[], pairs: Pair[], cages: Cage[], contacts: Contact[], currency?: string, onClose: () => void, userSettings?: UserSettings }) {
+  const t = (text: string) => getTranslatedLabel(text, userSettings?.language || 'en');
   const symbol = getCurrencySymbol(currency);
   const [formData, setFormData] = useState<Partial<Transaction>>(initialData || {
     type: 'Expense',
@@ -5275,45 +5279,45 @@ function TransactionForm({ user, initialData, birds, pairs, cages, contacts, cur
     <form onSubmit={handleSubmit} className="space-y-6">
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
-          <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Type</label>
+          <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">{t('Type')}</label>
           <Select value={formData.type} onChange={e => setFormData({ ...formData, type: e.target.value as any })}>
-            <option value="Income" className="bg-black text-white">Income</option>
-            <option value="Expense" className="bg-black text-white">Expense</option>
+            <option value="Income" className="bg-black text-white">{t('Income')}</option>
+            <option value="Expense" className="bg-black text-white">{t('Expense')}</option>
           </Select>
         </div>
         <div className="space-y-2">
-          <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Amount ({symbol})</label>
+          <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">{t('Amount')} ({symbol})</label>
           <Input type="number" step="0.01" required value={formData.amount} onChange={e => setFormData({ ...formData, amount: parseFloat(e.target.value) || 0 })} />
         </div>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="space-y-2">
-          <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Category</label>
-          <Input required placeholder="e.g. Seed, Sale, Vet" value={formData.category} onChange={e => setFormData({ ...formData, category: e.target.value })} />
+          <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">{t('Category')}</label>
+          <Input required placeholder={t('e.g. Seed, Sale, Vet')} value={formData.category} onChange={e => setFormData({ ...formData, category: e.target.value })} />
         </div>
         <div className="space-y-2">
-          <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Date</label>
+          <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">{t('Date')}</label>
           <Input type="date" required value={formData.date} onChange={e => setFormData({ ...formData, date: e.target.value })} />
         </div>
         <div className="space-y-2">
-          <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Recurring Schedule</label>
+          <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">{t('Recurring Schedule')}</label>
           <Select value={formData.recurring || 'None'} onChange={e => setFormData({ ...formData, recurring: e.target.value as any })}>
-            <option value="None" className="bg-black text-white">None (One-time)</option>
-            <option value="Daily" className="bg-black text-white">Daily</option>
-            <option value="Weekly" className="bg-black text-white">Weekly</option>
-            <option value="Monthly" className="bg-black text-white">Monthly</option>
-            <option value="Yearly" className="bg-black text-white">Yearly</option>
+            <option value="None" className="bg-black text-white">{t('None (One-time)')}</option>
+            <option value="Daily" className="bg-black text-white">{t('Daily')}</option>
+            <option value="Weekly" className="bg-black text-white">{t('Weekly')}</option>
+            <option value="Monthly" className="bg-black text-white">{t('Monthly')}</option>
+            <option value="Yearly" className="bg-black text-white">{t('Yearly')}</option>
           </Select>
         </div>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="space-y-2">
           <SearchableSelect 
-            label="Related Bird"
+            label={t('Related Bird')}
             value={formData.birdId || ''}
             onChange={(val) => setFormData({ ...formData, birdId: val })}
             options={[
-              { id: '', name: 'None' },
+              { id: '', name: t('None') },
               ...birds.filter(b => !b.isGhost).map(b => {
                 const cage = cages.find(c => c.id === b.cageId);
                 const mutationsStr = b.mutations?.length ? `[${b.mutations.join(', ')}]` : '';
@@ -5330,11 +5334,11 @@ function TransactionForm({ user, initialData, birds, pairs, cages, contacts, cur
         </div>
         <div className="space-y-2">
           <SearchableSelect 
-            label="Related Pair"
+            label={t('Related Pair')}
             value={formData.pairId || ''}
             onChange={(val) => setFormData({ ...formData, pairId: val })}
             options={[
-              { id: '', name: 'None' },
+              { id: '', name: t('None') },
               ...pairs.filter(p => p.maleId || p.femaleId).map(p => {
                 const m = birds.find(b => b.id === p.maleId)?.name || 'Empty';
                 const f = birds.find(b => b.id === p.femaleId)?.name || 'Empty';
@@ -5351,29 +5355,30 @@ function TransactionForm({ user, initialData, birds, pairs, cages, contacts, cur
         </div>
         <div className="space-y-2">
           <SearchableSelect 
-            label="Contact"
+            label={t('Contact')}
             value={formData.contactId || ''}
             onChange={(val) => setFormData({ ...formData, contactId: val })}
             options={[
-              { id: '', name: 'None' },
+              { id: '', name: t('None') },
               ...contacts.map(c => ({ id: c.id, name: c.name }))
             ]}
           />
         </div>
       </div>
       <div className="space-y-2">
-        <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Description</label>
-        <Textarea rows={3} placeholder="Additional details..." value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} />
+        <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">{t('Description')}</label>
+        <Textarea rows={3} placeholder={t('Additional details...')} value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} />
       </div>
       <Button type="submit" className="w-full py-4 text-sm font-bold shadow-xl shadow-gold-500/20" disabled={isSaving}>
         {isSaving ? <Loader2 className="animate-spin mr-2" size={16} /> : null}
-        {(initialData && (initialData as any).id) ? 'Update' : 'Add'} Transaction
+        {(initialData && (initialData as any).id) ? t('Update Transaction') : t('Add Transaction')}
       </Button>
     </form>
   );
 }
 
-function ContactForm({ user, initialData, onClose }: { user: FirebaseUser, initialData?: Contact, onClose: () => void }) {
+function ContactForm({ user, initialData, onClose, userSettings }: { user: FirebaseUser, initialData?: Contact, onClose: () => void, userSettings?: UserSettings }) {
+  const t = (text: string) => getTranslatedLabel(text, userSettings?.language || 'en');
   const [formData, setFormData] = useState<Partial<Contact>>(initialData || {
     name: '',
     type: 'Both',
@@ -5416,38 +5421,38 @@ function ContactForm({ user, initialData, onClose }: { user: FirebaseUser, initi
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       <div className="space-y-2">
-        <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Name</label>
-        <Input required placeholder="Contact Name" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} />
+        <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">{t('Name')}</label>
+        <Input required placeholder={t('Contact Name')} value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} />
       </div>
       <div className="space-y-2">
-        <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Type</label>
+        <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">{t('Type')}</label>
         <Select value={formData.type} onChange={e => setFormData({ ...formData, type: e.target.value as any })}>
-          <option value="Buyer" className="bg-black text-white">Buyer</option>
-          <option value="Seller" className="bg-black text-white">Seller</option>
-          <option value="Both" className="bg-black text-white">Both</option>
+          <option value="Buyer" className="bg-black text-white">{t('Buyer')}</option>
+          <option value="Seller" className="bg-black text-white">{t('Seller')}</option>
+          <option value="Both" className="bg-black text-white">{t('Both')}</option>
         </Select>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-2">
-          <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Email</label>
-          <Input type="email" placeholder="Email Address" value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} />
+          <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">{t('Email')}</label>
+          <Input type="email" placeholder={t('Email Address')} value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} />
         </div>
         <div className="space-y-2">
-          <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Phone</label>
-          <Input type="tel" placeholder="Phone Number" value={formData.phone} onChange={e => setFormData({ ...formData, phone: e.target.value })} />
+          <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">{t('Phone')}</label>
+          <Input type="tel" placeholder={t('Phone Number')} value={formData.phone} onChange={e => setFormData({ ...formData, phone: e.target.value })} />
         </div>
       </div>
       <div className="space-y-2">
-        <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Address</label>
-        <Input placeholder="Physical Address" value={formData.address} onChange={e => setFormData({ ...formData, address: e.target.value })} />
+        <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">{t('Address')}</label>
+        <Input placeholder={t('Physical Address')} value={formData.address} onChange={e => setFormData({ ...formData, address: e.target.value })} />
       </div>
       <div className="space-y-2">
-        <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Notes</label>
-        <Textarea rows={3} placeholder="Additional details..." value={formData.notes} onChange={e => setFormData({ ...formData, notes: e.target.value })} />
+        <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">{t('Notes')}</label>
+        <Textarea rows={3} placeholder={t('Additional details...')} value={formData.notes} onChange={e => setFormData({ ...formData, notes: e.target.value })} />
       </div>
       <Button type="submit" className="w-full py-4 text-sm font-bold shadow-xl shadow-gold-500/20" disabled={isSaving}>
         {isSaving ? <Loader2 className="animate-spin mr-2" size={16} /> : null}
-        {(initialData && (initialData as any).id) ? 'Update' : 'Add'} Contact
+        {(initialData && (initialData as any).id) ? t('Update Contact') : t('Add Contact')}
       </Button>
     </form>
   );
@@ -6692,7 +6697,8 @@ function SettingsView({ settings, onUpdate, allData, user, isSyncing, setDeleteC
   );
 }
 
-function PrintView({ birds, pairs, cages, onBirdRef }: { birds: Bird[], pairs: Pair[], cages: Cage[], onBirdRef: (name: string) => void }) {
+function PrintView({ birds, pairs, cages, onBirdRef, userSettings }: { birds: Bird[], pairs: Pair[], cages: Cage[], onBirdRef: (name: string) => void, userSettings?: UserSettings }) {
+  const t = (text: string) => getTranslatedLabel(text, userSettings?.language || 'en');
   const [printMode, setPrintMode] = useState<'list' | 'qr' | 'certificate'>('list');
   const [printLayout, setPrintLayout] = useState<'vertical' | 'horizontal'>('vertical');
   const [printEmpty, setPrintEmpty] = useState(false);
@@ -6816,27 +6822,27 @@ function PrintView({ birds, pairs, cages, onBirdRef }: { birds: Bird[], pairs: P
       {/* Configuration Header */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 pb-6 border-b border-black-800">
         <div>
-          <h1 className="text-3xl font-black text-white uppercase tracking-tighter">Print Center</h1>
-          <p className="text-black-100 text-xs font-bold uppercase tracking-widest mt-1">Configure your physical records & labels</p>
+          <h1 className="text-3xl font-black text-white uppercase tracking-tighter">{t('Print Center')}</h1>
+          <p className="text-black-100 text-xs font-bold uppercase tracking-widest mt-1">{t('Configure your physical records & labels')}</p>
         </div>
         <div className="flex bg-black-900 border border-black-800 p-1 rounded-2xl w-full lg:w-[450px]">
           <button 
             className={cn("flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all", printMode === 'list' ? "bg-gold-500 text-black shadow-lg" : "text-black-100 hover:text-white")} 
             onClick={() => setPrintMode('list')}
           >
-            Data Sheets
+            {t('Data Sheets')}
           </button>
           <button 
             className={cn("flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all", printMode === 'qr' ? "bg-gold-500 text-black shadow-lg" : "text-black-100 hover:text-white")} 
             onClick={() => setPrintMode('qr')}
           >
-            QR Labels
+            {t('QR Labels')}
           </button>
           <button 
             className={cn("flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all", printMode === 'certificate' ? "bg-gold-500 text-black shadow-lg" : "text-black-100 hover:text-white")} 
             onClick={() => setPrintMode('certificate')}
           >
-            Certificates
+            {t('Certificates')}
           </button>
         </div>
       </div>
@@ -6846,31 +6852,31 @@ function PrintView({ birds, pairs, cages, onBirdRef }: { birds: Bird[], pairs: P
         <div className="xl:col-span-5 space-y-8">
           <section className="space-y-6">
             <div className="space-y-2">
-              <label className="text-[10px] font-black text-gold-500 uppercase tracking-widest ml-1">Entity Selection Type</label>
+              <label className="text-[10px] font-black text-gold-500 uppercase tracking-widest ml-1">{t('Entity Selection Type')}</label>
               <div className="flex bg-black p-1.5 rounded-2xl border border-black-800 shadow-xl">
-                <button onClick={() => { setQrType('bird'); setQrSelections([]); }} className={cn("flex-1 py-3 rounded-xl text-[10px] font-black uppercase transition-all tracking-widest", qrType === 'bird' ? "bg-zinc-800 text-white border border-white/5" : "text-black-100 hover:text-white")}>Birds</button>
-                <button onClick={() => { setQrType('pair'); setQrSelections([]); }} className={cn("flex-1 py-3 rounded-xl text-[10px] font-black uppercase transition-all tracking-widest", qrType === 'pair' ? "bg-zinc-800 text-white border border-white/5" : "text-black-100 hover:text-white")}>Pairs</button>
-                <button onClick={() => { setQrType('cage'); setQrSelections([]); }} className={cn("flex-1 py-3 rounded-xl text-[10px] font-black uppercase transition-all tracking-widest", qrType === 'cage' ? "bg-zinc-800 text-white border border-white/5" : "text-black-100 hover:text-white")}>Cages</button>
+                <button onClick={() => { setQrType('bird'); setQrSelections([]); }} className={cn("flex-1 py-3 rounded-xl text-[10px] font-black uppercase transition-all tracking-widest", qrType === 'bird' ? "bg-zinc-800 text-white border border-white/5" : "text-black-100 hover:text-white")}>{t('Birds')}</button>
+                <button onClick={() => { setQrType('pair'); setQrSelections([]); }} className={cn("flex-1 py-3 rounded-xl text-[10px] font-black uppercase transition-all tracking-widest", qrType === 'pair' ? "bg-zinc-800 text-white border border-white/5" : "text-black-100 hover:text-white")}>{t('Pairs')}</button>
+                <button onClick={() => { setQrType('cage'); setQrSelections([]); }} className={cn("flex-1 py-3 rounded-xl text-[10px] font-black uppercase transition-all tracking-widest", qrType === 'cage' ? "bg-zinc-800 text-white border border-white/5" : "text-black-100 hover:text-white")}>{t('Cages')}</button>
               </div>
             </div>
 
             <SearchableSelect 
-              label={`Bulk Select ${qrType}s`}
+              label={t(qrType === 'bird' ? 'Bulk Select Birds' : qrType === 'pair' ? 'Bulk Select Pairs' : 'Bulk Select Cages')}
               options={currentOptions}
               multi
               selectedValues={qrSelections}
               onChange={(val) => toggleSelection(val)}
-              placeholder={`Search ${qrType}s...`}
+              placeholder={t(qrType === 'bird' ? 'Search Birds...' : qrType === 'pair' ? 'Search Pairs...' : 'Search Cages...')}
               cages={cages}
               birds={birds}
             />
 
             {(printMode === 'certificate' || printMode === 'list') && (
               <div className="p-4 bg-zinc-900/30 border border-black-800 rounded-2xl flex items-center justify-between">
-                <span className="text-[10px] font-black text-gold-500 uppercase tracking-widest">Page Layout</span>
+                <span className="text-[10px] font-black text-gold-500 uppercase tracking-widest">{t('Page Layout')}</span>
                 <div className="flex bg-black p-1 rounded-lg border border-black-800">
-                  <button onClick={() => setPrintLayout('vertical')} className={cn("px-3 py-1.5 rounded-md text-[9px] font-black uppercase transition-all tracking-widest", printLayout === 'vertical' ? "bg-zinc-800 text-white border border-white/5" : "text-black-100 hover:text-white")}>Vertical</button>
-                  <button onClick={() => setPrintLayout('horizontal')} className={cn("px-3 py-1.5 rounded-md text-[9px] font-black uppercase transition-all tracking-widest", printLayout === 'horizontal' ? "bg-zinc-800 text-white border border-white/5" : "text-black-100 hover:text-white")}>Horizontal</button>
+                  <button onClick={() => setPrintLayout('vertical')} className={cn("px-3 py-1.5 rounded-md text-[9px] font-black uppercase transition-all tracking-widest", printLayout === 'vertical' ? "bg-zinc-800 text-white border border-white/5" : "text-black-100 hover:text-white")}>{t('Vertical')}</button>
+                  <button onClick={() => setPrintLayout('horizontal')} className={cn("px-3 py-1.5 rounded-md text-[9px] font-black uppercase transition-all tracking-widest", printLayout === 'horizontal' ? "bg-zinc-800 text-white border border-white/5" : "text-black-100 hover:text-white")}>{t('Horizontal')}</button>
                 </div>
               </div>
             )}
@@ -6878,9 +6884,9 @@ function PrintView({ birds, pairs, cages, onBirdRef }: { birds: Bird[], pairs: P
             {printMode === 'qr' && (
               <div className="space-y-4 p-4 bg-zinc-900/30 border border-black-800 rounded-2xl">
                 <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-black text-gold-500 uppercase tracking-widest">QR Dimensions (mm)</span>
+                  <span className="text-[10px] font-black text-gold-500 uppercase tracking-widest">{t('QR Dimensions (mm)')}</span>
                   <div className="flex items-center gap-2">
-                    <span className="text-[9px] text-white/50 uppercase font-black">Thermal Mode</span>
+                    <span className="text-[9px] text-white/50 uppercase font-black">{t('Thermal Mode')}</span>
                     <button 
                       onClick={() => setIsThermal(!isThermal)}
                       className={cn("w-10 h-5 rounded-full transition-all relative border border-white/10", isThermal ? "bg-gold-500" : "bg-black-900")}
@@ -6891,7 +6897,7 @@ function PrintView({ birds, pairs, cages, onBirdRef }: { birds: Bird[], pairs: P
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <label className="text-[8px] font-bold text-white/40 uppercase">Width</label>
+                    <label className="text-[8px] font-bold text-white/40 uppercase">{t('Width')}</label>
                     <div className="flex items-center bg-black border border-white/5 rounded-lg overflow-hidden">
                       <input 
                         type="number" 
@@ -6903,7 +6909,7 @@ function PrintView({ birds, pairs, cages, onBirdRef }: { birds: Bird[], pairs: P
                     </div>
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-[8px] font-bold text-white/40 uppercase">Height</label>
+                    <label className="text-[8px] font-bold text-white/40 uppercase">{t('Height')}</label>
                     <div className="flex items-center bg-black border border-white/5 rounded-lg overflow-hidden">
                       <input 
                         type="number" 
@@ -6921,8 +6927,8 @@ function PrintView({ birds, pairs, cages, onBirdRef }: { birds: Bird[], pairs: P
             {printMode === 'list' && (
               <div className="p-4 bg-zinc-900/30 border border-black-800 rounded-2xl flex items-center justify-between group">
                 <div className="space-y-0.5">
-                  <p className="text-white font-black uppercase text-[10px] tracking-widest">Blank Template Mode</p>
-                  <p className="text-black-300 text-[9px] uppercase font-bold tracking-tight">Print empty records for hand logs</p>
+                  <p className="text-white font-black uppercase text-[10px] tracking-widest">{t('Blank Template Mode')}</p>
+                  <p className="text-black-300 text-[9px] uppercase font-bold tracking-tight">{t('Print empty records for hand logs')}</p>
                 </div>
                 <button 
                   onClick={() => setPrintEmpty(!printEmpty)}
@@ -6936,7 +6942,7 @@ function PrintView({ birds, pairs, cages, onBirdRef }: { birds: Bird[], pairs: P
 
           <Button onClick={handlePrint} disabled={!printEmpty && qrSelections.length === 0} className="w-full py-6 text-base font-black uppercase border-b-4 border-gold-600 shadow-gold-500/10 shadow-2xl h-auto">
             {printMode === 'qr' ? <QrCode size={20} /> : <Printer size={20} />}
-            Generate {printEmpty ? 'Blank Template' : `${qrSelections.length} Records`}
+            {printEmpty ? t('Generate Blank Template') : `${t('Generate')} ${qrSelections.length} ${t('Records')}`}
           </Button>
         </div>
 
@@ -6945,7 +6951,7 @@ function PrintView({ birds, pairs, cages, onBirdRef }: { birds: Bird[], pairs: P
           <div className="flex items-center justify-between px-2">
             <h4 className="text-[10px] font-black text-white uppercase tracking-widest flex items-center gap-2">
               <CheckSquare size={14} className="text-gold-500" />
-              Active Selection ({qrSelections.length})
+              {t('Active Selection')} ({qrSelections.length})
             </h4>
             {qrSelections.length > 0 && (
               <button 
@@ -6957,7 +6963,7 @@ function PrintView({ birds, pairs, cages, onBirdRef }: { birds: Bird[], pairs: P
                   borderColor: 'color-mix(in srgb, var(--theme-delete-color, #ef4444), transparent 80%)'
                 }}
               >
-                Clear All
+                {t('Clear All')}
               </button>
             )}
           </div>
@@ -6966,7 +6972,7 @@ function PrintView({ birds, pairs, cages, onBirdRef }: { birds: Bird[], pairs: P
             {qrSelections.length === 0 && !printEmpty ? (
               <div className="h-full flex flex-col items-center justify-center py-20 text-center opacity-40">
                 <Search size={48} className="mb-4 text-black-400" />
-                <p className="text-xs font-black uppercase tracking-[0.2em]">Select items from the list to preview</p>
+                <p className="text-xs font-black uppercase tracking-[0.2em]">{t('Select items from the list to preview')}</p>
               </div>
             ) : printEmpty ? (
               <div className="p-8 text-center space-y-6">
@@ -6974,8 +6980,8 @@ function PrintView({ birds, pairs, cages, onBirdRef }: { birds: Bird[], pairs: P
                   <Printer size={32} className="text-gold-500" />
                 </div>
                 <div className="space-y-2">
-                   <p className="text-lg font-black text-white uppercase tracking-widest underline decoration-gold-500 underline-offset-8">Observation Sheet</p>
-                   <p className="text-[10px] text-black-100 font-bold uppercase max-w-sm mx-auto leading-relaxed">System will generate a high-fidelity blank table formatted for manual entry and pen-and-paper tracking.</p>
+                   <p className="text-lg font-black text-white uppercase tracking-widest underline decoration-gold-500 underline-offset-8">{t('Observation Sheet')}</p>
+                   <p className="text-[10px] text-black-100 font-bold uppercase max-w-sm mx-auto leading-relaxed">{t('System will generate a high-fidelity blank table formatted for manual entry and pen-and-paper tracking.')}</p>
                 </div>
               </div>
             ) : (
@@ -8194,7 +8200,8 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
   );
 }
 
-function CageForm({ user, initialData, cages, onClose }: { user: FirebaseUser, initialData?: Cage, cages: Cage[], onClose: () => void }) {
+function CageForm({ user, initialData, cages, onClose, userSettings }: { user: FirebaseUser, initialData?: Cage, cages: Cage[], onClose: () => void, userSettings?: UserSettings }) {
+  const t = (text: string) => getTranslatedLabel(text, userSettings?.language || 'en');
   const [formData, setFormData] = useState<Partial<Cage>>(initialData || { name: '', location: '', type: 'Standard', imageUrl: '', imageUrls: [] });
   const [isUploading, setIsUploading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -8298,13 +8305,13 @@ function CageForm({ user, initialData, cages, onClose }: { user: FirebaseUser, i
     <form onSubmit={handleSubmit} className="space-y-4">
       {!initialData && (
         <div className="flex bg-black-900 p-1 rounded-xl border border-black-800">
-          <button type="button" onClick={() => setIsMultiMode(false)} className={cn("flex-1 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all", !isMultiMode ? "bg-gold-500 text-black shadow-lg shadow-gold-500/20" : "text-black-100 hover:text-white")}>Single Cage</button>
-          <button type="button" onClick={() => setIsMultiMode(true)} className={cn("flex-1 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all", isMultiMode ? "bg-gold-500 text-black shadow-lg shadow-gold-500/20" : "text-black-100 hover:text-white")}>Bulk Create</button>
+          <button type="button" onClick={() => setIsMultiMode(false)} className={cn("flex-1 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all", !isMultiMode ? "bg-gold-500 text-black shadow-lg shadow-gold-500/20" : "text-black-100 hover:text-white")}>{t('Single Cage')}</button>
+          <button type="button" onClick={() => setIsMultiMode(true)} className={cn("flex-1 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all", isMultiMode ? "bg-gold-500 text-black shadow-lg shadow-gold-500/20" : "text-black-100 hover:text-white")}>{t('Bulk Create')}</button>
         </div>
       )}
 
       <div className="space-y-1">
-        <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Images</label>
+        <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">{t('Images')}</label>
         <div className="flex items-center gap-3">
           <div className="flex-1">
             <input type="file" multiple accept="image/*" onChange={handleFileChange} className="hidden" id="cage-image-upload" name="cage-image-upload"
@@ -8318,7 +8325,7 @@ function CageForm({ user, initialData, cages, onClose }: { user: FirebaseUser, i
               )}
             >
               {isUploading ? <Loader2 size={16} className="animate-spin" /> : <ImageIcon size={16} />}
-              Upload Image(s)
+              {t('Upload Image(s)')}
             </label>
           </div>
         </div>
@@ -8359,38 +8366,39 @@ function CageForm({ user, initialData, cages, onClose }: { user: FirebaseUser, i
       {isMultiMode && !initialData ? (
         <div className="space-y-4 bg-black/20 p-4 rounded-2xl border border-black-800 animate-in fade-in slide-in-from-top-2">
           <div className="space-y-1">
-            <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Name Prefix (e.g. A)</label>
-            <Input required value={multiPrefix} onChange={e => setMultiPrefix(e.target.value)} placeholder="Prefix" />
+            <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">{t('Name Prefix (e.g. A)')}</label>
+            <Input required value={multiPrefix} onChange={e => setMultiPrefix(e.target.value)} placeholder={t('Prefix')} />
           </div>
           <div className="grid grid-cols-2 gap-4 text-center">
             <div className="space-y-1">
-              <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Range Start</label>
+              <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">{t('Range Start')}</label>
               <Input type="number" required value={multiStart} onChange={e => setMultiStart(e.target.value)} />
             </div>
             <div className="space-y-1">
-              <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Range End</label>
+              <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">{t('Range End')}</label>
               <Input type="number" required value={multiEnd} onChange={e => setMultiEnd(e.target.value)} />
             </div>
           </div>
           <p className="text-[9px] text-zinc-500 font-bold uppercase tracking-tight text-center italic">Example: {multiPrefix || 'PREFIX'}{multiStart || '1'} TO {multiPrefix || 'PREFIX'}{multiEnd || '10'}</p>
         </div>
       ) : (
-        <div className="space-y-1"><label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Cage Name/Number</label><Input required value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} /></div>
+        <div className="space-y-1"><label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">{t('Cage Name/Number')}</label><Input required value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} /></div>
       )}
 
       <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-1"><label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Location</label><Input value={formData.location} onChange={e => setFormData({ ...formData, location: e.target.value })} /></div>
-        <div className="space-y-1"><label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Type</label><Select value={formData.type} onChange={e => setFormData({ ...formData, type: e.target.value })}><option value="Standard" className="bg-black text-white">Standard</option><option value="Breeding" className="bg-black text-white">Breeding</option><option value="Flight" className="bg-black text-white">Flight</option><option value="Hospital" className="bg-black text-white">Hospital</option></Select></div>
+        <div className="space-y-1"><label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">{t('Location')}</label><Input value={formData.location} onChange={e => setFormData({ ...formData, location: e.target.value })} /></div>
+        <div className="space-y-1"><label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">{t('Type')}</label><Select value={formData.type} onChange={e => setFormData({ ...formData, type: e.target.value })}><option value="Standard" className="bg-black text-white">{t('Standard')}</option><option value="Breeding" className="bg-black text-white">{t('Breeding')}</option><option value="Flight" className="bg-black text-white">{t('Flight')}</option><option value="Hospital" className="bg-black text-white">{t('Hospital')}</option></Select></div>
       </div>
       <Button type="submit" className="w-full py-4 text-sm uppercase tracking-widest font-black" disabled={isUploading || isSaving}>
         {isSaving ? <Loader2 className="animate-spin mr-2" size={16} /> : null}
-        {(initialData && (initialData as any).id) ? 'Update' : isMultiMode ? `Bulk Create (${Math.max(0, parseInt(multiEnd) - parseInt(multiStart) + 1 || 0)})` : 'Add'} Cage
+        {(initialData && (initialData as any).id) ? t('Update Cage') : isMultiMode ? `${t('Bulk Create')} (${Math.max(0, parseInt(multiEnd) - parseInt(multiStart) + 1 || 0)})` : t('Add Cage')}
       </Button>
     </form>
   );
 }
 
-function PairForm({ user, initialData, birds, cages, onClose }: { user: FirebaseUser, initialData?: Pair, birds: Bird[], cages: Cage[], onClose: () => void }) {
+function PairForm({ user, initialData, birds, cages, onClose, userSettings }: { user: FirebaseUser, initialData?: Pair, birds: Bird[], cages: Cage[], onClose: () => void, userSettings?: UserSettings }) {
+  const t = (text: string) => getTranslatedLabel(text, userSettings?.language || 'en');
   const [formData, setFormData] = useState<Partial<Pair>>(initialData || { maleId: '', femaleId: '', status: 'Active', startDate: '', endDate: '' });
   const [isSaving, setIsSaving] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -8476,11 +8484,11 @@ function PairForm({ user, initialData, birds, cages, onClose }: { user: Firebase
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="grid grid-cols-2 gap-4">
         <SearchableSelect 
-          label="Male / Bird 1"
+          label={t('Male / Bird 1')}
           value={formData.maleId || ''}
           onChange={(val) => setFormData({ ...formData, maleId: val })}
           options={[
-            { id: '', name: 'Select Bird 1' },
+            { id: '', name: t('Select Bird 1') },
             ...birds.filter(b => b.sex === 'Male' || b.sex === 'Unknown').map(b => {
               const cage = cages.find(c => c.id === b.cageId);
               const mutationsStr = b.mutations?.length ? `[${b.mutations.join(', ')}]` : '';
@@ -8504,11 +8512,11 @@ function PairForm({ user, initialData, birds, cages, onClose }: { user: Firebase
           cages={cages}
         />
         <SearchableSelect 
-          label="Female / Bird 2"
+          label={t('Female / Bird 2')}
           value={formData.femaleId || ''}
           onChange={(val) => setFormData({ ...formData, femaleId: val })}
           options={[
-            { id: '', name: 'Select Bird 2' },
+            { id: '', name: t('Select Bird 2') },
             ...birds.filter(b => b.sex === 'Female' || b.sex === 'Unknown').map(b => {
               const cage = cages.find(c => c.id === b.cageId);
               const mutationsStr = b.mutations?.length ? `[${b.mutations.join(', ')}]` : '';
@@ -8532,14 +8540,14 @@ function PairForm({ user, initialData, birds, cages, onClose }: { user: Firebase
           cages={cages}
         />
       </div>
-      <div className="space-y-1"><label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Status</label><Select value={formData.status} onChange={e => setFormData({ ...formData, status: e.target.value as any })}><option value="Active" className="bg-black text-white">Active</option><option value="Inactive" className="bg-black text-white">Inactive</option></Select></div>
+      <div className="space-y-1"><label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">{t('Status')}</label><Select value={formData.status} onChange={e => setFormData({ ...formData, status: e.target.value as any })}><option value="Active" className="bg-black text-white">{t('Active')}</option><option value="Inactive" className="bg-black text-white">{t('Inactive')}</option></Select></div>
       <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-1"><label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Start Date</label><Input type="date" value={formData.startDate} onChange={e => setFormData({ ...formData, startDate: e.target.value })} /></div>
-        <div className="space-y-1"><label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">End Date</label><Input type="date" value={formData.endDate} onChange={e => setFormData({ ...formData, endDate: e.target.value })} /></div>
+        <div className="space-y-1"><label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">{t('Start Date')}</label><Input type="date" value={formData.startDate} onChange={e => setFormData({ ...formData, startDate: e.target.value })} /></div>
+        <div className="space-y-1"><label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">{t('End Date')}</label><Input type="date" value={formData.endDate} onChange={e => setFormData({ ...formData, endDate: e.target.value })} /></div>
       </div>
 
       <div className="space-y-1">
-        <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Images</label>
+        <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">{t('Images')}</label>
         <div className="flex items-center gap-3">
           <div className="flex-1">
             <input type="file" multiple accept="image/*" onChange={handleFileChange} className="hidden" id="pair-image-upload" name="pair-image-upload"
@@ -8553,7 +8561,7 @@ function PairForm({ user, initialData, birds, cages, onClose }: { user: Firebase
               )}
             >
               {isUploading ? <Loader2 size={16} className="animate-spin" /> : <ImageIcon size={16} />}
-              Upload Image(s)
+              {t('Upload Image(s)')}
             </label>
           </div>
         </div>
@@ -8590,13 +8598,14 @@ function PairForm({ user, initialData, birds, cages, onClose }: { user: Firebase
 
       <Button type="submit" className="w-full py-4 text-sm uppercase tracking-widest font-black" disabled={isSaving || isUploading}>
         {isSaving ? <Loader2 className="animate-spin mr-2" size={16} /> : null}
-        {(initialData && initialData.id) ? 'Update' : 'Add'} Pair
+        {(initialData && initialData.id) ? t('Update Pair') : t('Add Pair')}
       </Button>
     </form>
   );
 }
 
-function TaskForm({ user, initialData, birds, cages, onClose }: { user: FirebaseUser, initialData?: Task, birds: Bird[], cages: Cage[], onClose: () => void }) {
+function TaskForm({ user, initialData, birds, cages, onClose, userSettings }: { user: FirebaseUser, initialData?: Task, birds: Bird[], cages: Cage[], onClose: () => void, userSettings?: UserSettings }) {
+  const t = (text: string) => getTranslatedLabel(text, userSettings?.language || 'en');
   const [formData, setFormData] = useState<Partial<Task>>(initialData || { title: '', description: '', status: 'Pending', priority: 'Medium', category: 'General', dueDate: '', reminderDate: '', birdIds: [], subTasks: [] });
   const [newSubTask, setNewSubTask] = useState('');
   const [isSaving, setIsSaving] = useState(false);
@@ -8624,11 +8633,11 @@ function TaskForm({ user, initialData, birds, cages, onClose }: { user: Firebase
         });
         if (initialData?.id) { 
           await updateDoc(doc(db, 'tasks', initialData.id), data);
-          toast.success('Task updated');
+          toast.success(t('Task updated'));
         } else { 
           const docRef = doc(collection(db, 'tasks'));
           await setDoc(docRef, data);
-          toast.success('Task created');
+          toast.success(t('Task created'));
         }
         setIsSaving(false);
         onClose();
@@ -8640,6 +8649,7 @@ function TaskForm({ user, initialData, birds, cages, onClose }: { user: Firebase
 
     processSave();
   };
+
   const addSubTask = () => {
     if (!newSubTask.trim()) return;
     setFormData({ ...formData, subTasks: [...(formData.subTasks || []), { title: newSubTask, completed: false, birdIds: [] }] });
@@ -8651,45 +8661,45 @@ function TaskForm({ user, initialData, birds, cages, onClose }: { user: Firebase
   };
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="space-y-1"><label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Title</label><Input required value={formData.title} onChange={e => setFormData({ ...formData, title: e.target.value })} /></div>
+      <div className="space-y-1"><label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">{t('Title')}</label><Input required value={formData.title} onChange={e => setFormData({ ...formData, title: e.target.value })} /></div>
       <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-1"><label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Category</label><Input required value={formData.category} onChange={e => setFormData({ ...formData, category: e.target.value })} /></div>
-        <div className="space-y-1"><label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Priority</label><Select value={formData.priority} onChange={e => setFormData({ ...formData, priority: e.target.value as any })}><option value="Low" className="bg-black text-white">Low</option><option value="Medium" className="bg-black text-white">Medium</option><option value="High" className="bg-black text-white">High</option></Select></div>
+        <div className="space-y-1"><label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">{t('Category')}</label><Input required value={formData.category} onChange={e => setFormData({ ...formData, category: e.target.value })} /></div>
+        <div className="space-y-1"><label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">{t('Priority')}</label><Select value={formData.priority} onChange={e => setFormData({ ...formData, priority: e.target.value as any })}><option value="Low" className="bg-black text-white">{t('Low')}</option><option value="Medium" className="bg-black text-white">{t('Medium')}</option><option value="High" className="bg-black text-white">{t('High')}</option></Select></div>
       </div>
       <div className="space-y-1">
-        <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Description</label>
-        <textarea name="taskDescription" id="taskDescription" className="w-full px-4 py-3 bg-black border border-black-700 rounded-2xl focus:outline-none focus:ring-2 focus:ring-gold-500/20 focus:border-gold-500 text-white transition-all min-h-[80px] text-sm font-medium placeholder:text-white/30" placeholder="Task description..."
+        <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">{t('Description')}</label>
+        <textarea name="taskDescription" id="taskDescription" className="w-full px-4 py-3 bg-black border border-black-700 rounded-2xl focus:outline-none focus:ring-2 focus:ring-gold-500/20 focus:border-gold-500 text-white transition-all min-h-[80px] text-sm font-medium placeholder:text-white/30" placeholder={t('Task description...')}
           value={formData.description} 
           onChange={e => setFormData({ ...formData, description: e.target.value })} 
         />
       </div>
       <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-1"><label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Status</label><Select value={formData.status} onChange={e => setFormData({ ...formData, status: e.target.value as any })}><option value="Pending" className="bg-black text-white">Pending</option><option value="Completed" className="bg-black text-white">Completed</option></Select></div>
-        <div className="space-y-1"><label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Due Date</label><Input type="date" value={formData.dueDate} onChange={e => setFormData({ ...formData, dueDate: e.target.value })} /></div>
+        <div className="space-y-1"><label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">{t('Status')}</label><Select value={formData.status} onChange={e => setFormData({ ...formData, status: e.target.value as any })}><option value="Pending" className="bg-black text-white">{t('Pending')}</option><option value="Completed" className="bg-black text-white">{t('Completed')}</option></Select></div>
+        <div className="space-y-1"><label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">{t('Due Date')}</label><Input type="date" value={formData.dueDate} onChange={e => setFormData({ ...formData, dueDate: e.target.value })} /></div>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="space-y-1">
-          <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Calendar & Reminder</label>
+          <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">{t('Calendar & Reminder')}</label>
           <Input type="datetime-local" value={formData.reminderDate || ''} onChange={e => setFormData({ ...formData, reminderDate: e.target.value })} />
         </div>
         <div className="space-y-1">
-          <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Reminder notification</label>
+          <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">{t('Reminder notification')}</label>
           <Select 
             value={formData.reminderLeadTime || 0} 
             onChange={e => setFormData({ ...formData, reminderLeadTime: parseInt(e.target.value) })}
           >
-            <option value={0} className="bg-black text-white text-xs">At time of event</option>
-            <option value={2} className="bg-black text-white text-xs">2 minutes before</option>
-            <option value={5} className="bg-black text-white text-xs">5 minutes before</option>
-            <option value={10} className="bg-black text-white text-xs">10 minutes before</option>
-            <option value={15} className="bg-black text-white text-xs">15 minutes before</option>
-            <option value={30} className="bg-black text-white text-xs">30 minutes before</option>
-            <option value={60} className="bg-black text-white text-xs">1 hour before</option>
-            <option value={1440} className="bg-black text-white text-xs">1 day before</option>
+            <option value={0} className="bg-black text-white text-xs">{t('At time of event')}</option>
+            <option value={2} className="bg-black text-white text-xs">{t('2 minutes before')}</option>
+            <option value={5} className="bg-black text-white text-xs">{t('5 minutes before')}</option>
+            <option value={10} className="bg-black text-white text-xs">{t('10 minutes before')}</option>
+            <option value={15} className="bg-black text-white text-xs">{t('15 minutes before')}</option>
+            <option value={30} className="bg-black text-white text-xs">{t('30 minutes before')}</option>
+            <option value={60} className="bg-black text-white text-xs">{t('1 hour before')}</option>
+            <option value={1440} className="bg-black text-white text-xs">{t('1 day before')}</option>
           </Select>
         </div>
       </div>
-      <p className="text-[10px] text-white/50 ml-1">Sync with your Google Calendar for reliable mobile notifications.</p>
+      <p className="text-[10px] text-white/50 ml-1">{t('Sync with your Google Calendar for reliable mobile notifications.')}</p>
         
       {formData.title && (formData.reminderDate || formData.dueDate) && (
         <Button 
@@ -8699,11 +8709,11 @@ function TaskForm({ user, initialData, birds, cages, onClose }: { user: Firebase
           onClick={() => window.open(getGoogleCalendarUrl(formData as Task, birds, cages), '_blank')}
         >
           <Calendar size={14} className="mr-2 text-gold-500 group-hover:scale-110 transition-transform" />
-          Add to Google Calendar
+          {t('Add to Google Calendar')}
         </Button>
       )}
       <div className="space-y-2 relative">
-        <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Tag Birds</label>
+        <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">{t('Tag Birds')}</label>
         
         {/* Selected Birds Chips */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2">
@@ -8722,13 +8732,13 @@ function TaskForm({ user, initialData, birds, cages, onClose }: { user: Firebase
             </div>
           ))}
           {selectedBirdsData.length === 0 && (
-            <span className="text-[10px] text-white/30 italic ml-1 leading-8 col-span-2">No birds tagged yet...</span>
+            <span className="text-[10px] text-white/30 italic ml-1 leading-8 col-span-2">{t('No birds tagged yet...')}</span>
           )}
         </div>
 
         <SearchableSelect 
           label=""
-          placeholder="Tag more birds..."
+          placeholder={t('Tag more birds...')}
           options={birds.filter(b => !b.isGhost).map(b => {
              const cage = cages.find(c => c.id === b.cageId);
              const mutationsStr = b.mutations?.length ? `[${b.mutations.join(', ')}]` : '';
@@ -8746,9 +8756,9 @@ function TaskForm({ user, initialData, birds, cages, onClose }: { user: Firebase
         />
       </div>
       <div className="space-y-2">
-        <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Subtasks</label>
+        <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">{t('Subtasks')}</label>
         <div className="flex gap-2">
-          <Input placeholder="Add subtask..." value={newSubTask} onChange={e => setNewSubTask(e.target.value)} onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addSubTask())} />
+          <Input placeholder={t('Add subtask...')} value={newSubTask} onChange={e => setNewSubTask(e.target.value)} onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addSubTask())} />
           <Button type="button" onClick={addSubTask} variant="secondary" className="px-3"><Plus size={16} /></Button>
         </div>
         <div className="space-y-2">
@@ -8770,7 +8780,7 @@ function TaskForm({ user, initialData, birds, cages, onClose }: { user: Firebase
       </div>
       <Button type="submit" className="w-full py-4 text-sm uppercase tracking-widest font-black" disabled={isSaving}>
         {isSaving ? <Loader2 className="animate-spin mr-2" size={16} /> : null}
-        {(initialData && initialData.id) ? 'Update' : 'Add'} Task
+        {(initialData && initialData.id) ? t('Update Task') : t('Add Task')}
       </Button>
     </form>
   );
