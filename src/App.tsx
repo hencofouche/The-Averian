@@ -8,7 +8,7 @@ import {
   Tag, Calendar, ChevronDown, ChevronUp, ChevronRight, ChevronLeft, X, GitBranch,
   Image as ImageIcon, Loader2, DollarSign, TrendingUp, TrendingDown,
   Activity, ArrowUpRight, ArrowDownRight, BarChart3, PieChart as PieChartIcon,
-  Menu, Egg, LayoutGrid, Grid3x3, List as ListIcon, AlertTriangle, CreditCard, CheckCircle2, Bell, Cloud, Maximize2, Share2, Send, Printer, MoreHorizontal, Dna, Users, Palette, QrCode, Scan, FileText, ExternalLink, ArrowLeft, ArrowRightLeft, History as HistoryIcon, RefreshCw
+  Menu, Egg, LayoutGrid, Grid3x3, List as ListIcon, AlertTriangle, CreditCard, CheckCircle2, Bell, Cloud, Maximize2, Share2, Send, Printer, MoreHorizontal, Dna, Users, Palette, QrCode, Scan, FileText, ExternalLink, ArrowLeft, ArrowRightLeft, History as HistoryIcon, RefreshCw, UploadCloud, Eye
 } from 'lucide-react';
 import GeneticsCalculator from './components/GeneticsCalculator';
 import { ContactsView } from './components/ContactsView';
@@ -103,7 +103,7 @@ import {
 import { cn, generateColorPalette } from './lib/utils';
 import ColorWheel from '@uiw/react-color-wheel';
 import { hexToHsva, hsvaToHex } from '@uiw/color-convert';
-import { startOfDay, startOfWeek, startOfMonth, endOfMonth, endOfWeek, addDays, addMonths, isSameMonth, subDays, subWeeks, subMonths, isWithinInterval, parseISO } from 'date-fns';
+import { startOfDay, startOfWeek, startOfMonth, startOfYear, endOfMonth, endOfWeek, addDays, addMonths, isSameMonth, subDays, subWeeks, subMonths, subYears, isWithinInterval, parseISO } from 'date-fns';
 
 // --- Helpers ---
 const sanitizeData = (data: any) => {
@@ -2344,6 +2344,7 @@ export default function App() {
                             onBirdRef={handleBirdRef}
                             onNavigate={handleNavigate}
                             onEdit={() => { setEditingItem(bird); setIsModalOpen(true); }}
+                            user={user}
                             onDelete={() => setDeleteConfirmation({ 
                               title: 'Delete Bird', 
                               message: `Are you sure you want to delete "${bird.name}"? This action cannot be undone.`,
@@ -3336,7 +3337,7 @@ function PedigreeFullView({ birdId, birds, cages, onBirdRef, onBack, userSetting
   );
 }
 
-function BirdCard({ bird, cage, birds, cages, viewMode = 'grid-large', currency, onBirdRef, onNavigate, onEdit, onDelete, userSettings }: { bird: Bird, cage?: Cage, birds: Bird[], cages: Cage[], viewMode?: 'grid-large' | 'list', currency?: string, onBirdRef: (name: string) => void, onNavigate: (tab: string, query?: string, filter?: any) => void, onEdit: () => void, onDelete: () => void, userSettings?: UserSettings }) {
+function BirdCard({ bird, cage, birds, cages, viewMode = 'grid-large', currency, onBirdRef, onNavigate, onEdit, onDelete, userSettings, user }: { bird: Bird, cage?: Cage, birds: Bird[], cages: Cage[], viewMode?: 'grid-large' | 'list', currency?: string, onBirdRef: (name: string) => void, onNavigate: (tab: string, query?: string, filter?: any) => void, onEdit: () => void, onDelete: () => void, userSettings?: UserSettings, user: FirebaseUser | null }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [showGallery, setShowGallery] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
@@ -3609,7 +3610,7 @@ function BirdCard({ bird, cage, birds, cages, viewMode = 'grid-large', currency,
           <ShareBirdModal bird={bird} mother={mother} father={father} mate={mate} offspring={offspring} cages={cages} cageName={cage?.name} onClose={() => setIsShareModalOpen(false)} /> 
         </Modal> 
         <Modal isOpen={showDocs} onClose={() => setShowDocs(false)} title={`Documents - ${bird.name}`}> 
-          <BirdDocumentsModal bird={bird} onClose={() => setShowDocs(false)} /> 
+          <BirdDocumentsModal bird={bird} onClose={() => setShowDocs(false)} user={user} /> 
         </Modal>
         <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-black-800/50">
           {viewMode === 'list' && (
@@ -4002,7 +4003,6 @@ function FinancialsView({
   onEditTransaction: (t: Transaction) => void, 
   onDeleteTransaction: (id: string) => void
 }) {
-  const [timeRange, setTimeRange] = useState<'daily' | 'weekly' | 'monthly'>('weekly');
   const symbol = getCurrencySymbol(currency);
 
   const stats = useMemo(() => {
@@ -4016,59 +4016,10 @@ function FinancialsView({
     };
   }, [transactions]);
 
-  const chartData = useMemo(() => {
-    const now = new Date();
-    let points: number;
-    let formatStr: string;
-
-    if (timeRange === 'daily') {
-      points = 7;
-      formatStr = 'EEE';
-    } else if (timeRange === 'weekly') {
-      points = 4;
-      formatStr = 'MMM d';
-    } else {
-      points = 6;
-      formatStr = 'MMM';
-    }
-
-    const data: any[] = [];
-    for (let i = 0; i < points; i++) {
-      let d: Date;
-      let endD: Date;
-      if (timeRange === 'daily') {
-        d = startOfDay(subDays(now, points - 1 - i));
-        endD = new Date(d.getTime() + 24 * 60 * 60 * 1000);
-      } else if (timeRange === 'weekly') {
-        d = startOfWeek(subWeeks(now, points - 1 - i));
-        endD = new Date(d.getTime() + 7 * 24 * 60 * 60 * 1000);
-      } else {
-        d = startOfMonth(subMonths(now, points - 1 - i));
-        endD = new Date(d.getFullYear(), d.getMonth() + 1, 1);
-      }
-
-      const periodTransactions = transactions.filter(t => {
-        const tDate = parseISO(t.date);
-        return tDate >= d && tDate < endD;
-      });
-
-      const income = periodTransactions.filter(t => t.type === 'Income').reduce((acc, t) => acc + t.amount, 0);
-      const expense = periodTransactions.filter(t => t.type === 'Expense').reduce((acc, t) => acc + t.amount, 0);
-
-      data.push({
-        name: format(d, formatStr),
-        income,
-        expense,
-        profit: income - expense
-      });
-    }
-    return data;
-  }, [transactions, timeRange]);
-
   return (
-    <div className="space-y-6 max-w-6xl mx-auto">
+    <div className="space-y-6 max-w-6xl mx-auto w-full">
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 w-full">
         <Card className="p-4 sm:p-5 bg-zinc-800 border-black-700 flex flex-col justify-between min-w-0">
           <div className="flex items-center justify-between mb-3 sm:mb-4">
             <p className="text-[8px] sm:text-[10px] font-black text-white uppercase tracking-widest mr-2">Net Profit</p>
@@ -4099,86 +4050,34 @@ function FinancialsView({
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Charts */}
-        <Card className="p-6 bg-zinc-800 border-black-700 lg:col-span-2 flex flex-col">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-gold-500/10 rounded-lg">
-                <BarChart3 size={20} className="text-gold-500" />
-              </div>
-              <h3 className="font-black text-lg text-white tracking-tight uppercase">Financial Performance</h3>
+      {/* Transactions List */}
+      <div className="flex flex-col space-y-4 w-full">
+        <div className="flex items-center justify-between">
+          <h3 className="font-black text-white uppercase tracking-widest text-sm">Recent Transactions</h3>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 w-full">
+          {transactions.map(t => (
+            <TransactionCard 
+              key={t.id} 
+              transaction={t} 
+              bird={birds.find(b => b.id === t.birdId)}
+              pair={pairs.find(p => p.id === t.pairId)}
+              contact={contacts.find(c => c.id === t.contactId)}
+              cages={cages}
+              birds={birds}
+              onBirdRef={onBirdRef}
+              onEdit={() => onEditTransaction(t)}
+              onDelete={() => onDeleteTransaction(t.id)}
+              viewMode="list"
+              currency={currency}
+            />
+          ))}
+          {transactions.length === 0 && (
+            <div className="col-span-full text-center py-12 bg-black/50 border border-dashed border-black-700 rounded-2xl">
+              <Activity size={32} className="mx-auto text-white mb-2" />
+              <p className="text-white text-sm font-bold uppercase tracking-widest">No transactions found</p>
             </div>
-            <div className="flex bg-black p-1 rounded-xl border border-black-700">
-              {(['daily', 'weekly', 'monthly'] as const).map(range => (
-                <button
-                  key={range}
-                  onClick={() => setTimeRange(range)}
-                  className={cn(
-                    "px-4 py-1.5 text-[10px] font-black rounded-lg transition-all capitalize tracking-widest",
-                    timeRange === range ? "bg-gold-500 text-black-950 shadow-lg shadow-gold-500/20" : "text-white hover:text-white"
-                  )}
-                >
-                  {range}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="flex-1 min-h-[300px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="colorProfit" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#d4af37" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#d4af37" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#1f1f1f" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#525252', fontWeight: 'bold' }} dy={10} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#525252', fontWeight: 'bold' }} tickFormatter={(v) => `${symbol}${v}`} />
-                <Tooltip 
-                  contentStyle={{ backgroundColor: '#0a0a0a', borderRadius: '12px', border: '1px solid #1f1f1f', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.5)' }}
-                  itemStyle={{ fontSize: '11px', fontWeight: 'bold' }}
-                  labelStyle={{ color: '#d4af37', fontWeight: 'black', marginBottom: '4px', textTransform: 'uppercase', fontSize: '10px', letterSpacing: '0.1em' }}
-                  formatter={(value: any) => [`${symbol}${value}`, '']}
-                />
-                <Area type="monotone" dataKey="profit" stroke="#d4af37" strokeWidth={3} fillOpacity={1} fill="url(#colorProfit)" />
-                <Area type="monotone" dataKey="income" stroke="#10b981" strokeWidth={2} fill="transparent" strokeDasharray="5 5" />
-                <Area type="monotone" dataKey="expense" stroke="#f43f5e" strokeWidth={2} fill="transparent" strokeDasharray="5 5" />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </Card>
-
-        {/* Transactions List */}
-        <div className="flex flex-col space-y-4 lg:col-span-1">
-          <div className="flex items-center justify-between">
-            <h3 className="font-black text-white uppercase tracking-widest text-sm">Recent Transactions</h3>
-          </div>
-          <div className="grid gap-3 overflow-y-auto pr-2 custom-scrollbar" style={{ maxHeight: 'calc(100vh - 350px)' }}>
-            {transactions.map(t => (
-              <TransactionCard 
-                key={t.id} 
-                transaction={t} 
-                bird={birds.find(b => b.id === t.birdId)}
-                pair={pairs.find(p => p.id === t.pairId)}
-                contact={contacts.find(c => c.id === t.contactId)}
-                cages={cages}
-                birds={birds}
-                onBirdRef={onBirdRef}
-                onEdit={() => onEditTransaction(t)}
-                onDelete={() => onDeleteTransaction(t.id)}
-                viewMode="list"
-                currency={currency}
-              />
-            ))}
-            {transactions.length === 0 && (
-              <div className="text-center py-12 bg-black/50 border border-dashed border-black-700 rounded-2xl">
-                <Activity size={32} className="mx-auto text-white mb-2" />
-                <p className="text-white text-sm font-bold uppercase tracking-widest">No transactions found</p>
-              </div>
-            )}
-          </div>
+          )}
         </div>
       </div>
     </div>
@@ -4389,7 +4288,7 @@ function EntityStatsView({
                 />
               </div>
             </div>
-            <div className="grid gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 w-full">
               {filteredTransactions.map(t => (
                 <TransactionCard 
                   key={t.id} 
@@ -4407,7 +4306,7 @@ function EntityStatsView({
                 />
               ))}
               {filteredTransactions.length === 0 && (
-                <div className="text-center py-12 bg-black/50 border border-dashed border-black-700 rounded-2xl">
+                <div className="col-span-full text-center py-12 bg-black/50 border border-dashed border-black-700 rounded-2xl">
                   <Activity size={32} className="mx-auto text-white mb-2" />
                   <p className="text-white text-sm font-bold uppercase tracking-widest">No transactions found</p>
                 </div>
@@ -4494,87 +4393,284 @@ function EntityStatsView({
 }
 
 function TransactionCard({ transaction, bird, pair, contact, cages, birds, currency, onBirdRef, onEdit, onDelete, viewMode = 'list' }: { transaction: Transaction, bird?: Bird, pair?: Pair, contact?: Contact, cages: Cage[], birds?: Bird[], currency?: string, onBirdRef: (name: string) => void, onEdit: () => void, onDelete: () => void, viewMode?: 'grid-large' | 'list' }) {
+  const [showDetails, setShowDetails] = useState(false);
   const symbol = getCurrencySymbol(currency);
+
+  const catInfo = useMemo(() => {
+    const cat = transaction.category.toLowerCase();
+    if (cat.includes('sale') || cat.includes('sold') || cat.includes('revenue')) {
+      return { icon: '💰', label: 'Bird Sale', style: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/25' };
+    } else if (cat.includes('feed') || cat.includes('seed') || cat.includes('food') || cat.includes('nutrition')) {
+      return { icon: '🌾', label: 'Feed & Nutrition', style: 'bg-amber-500/10 text-amber-400 border-amber-505/25' };
+    } else if (cat.includes('vet') || cat.includes('med') || cat.includes('health') || cat.includes('treatment')) {
+      return { icon: '🏥', label: 'Veterinary / Medical', style: 'bg-rose-500/10 text-rose-400 border-rose-500/25' };
+    } else if (cat.includes('test') || cat.includes('dna') || cat.includes('sexing')) {
+      return { icon: '🧬', label: 'DNA & Sexing', style: 'bg-teal-500/10 text-teal-400 border-teal-505/25' };
+    } else if (cat.includes('cage') || cat.includes('equipment') || cat.includes('nest') || cat.includes('ring') || cat.includes('toy')) {
+      return { icon: '⚙️', label: 'Equipment & Cages', style: 'bg-sky-500/10 text-sky-400 border-sky-505/25' };
+    } else if (cat.includes('buy') || cat.includes('purchase') || cat.includes('acquisition') || cat.includes('import')) {
+      return { icon: '🕊️', label: 'Acquisition', style: 'bg-indigo-500/10 text-indigo-400 border-indigo-505/25' };
+    } else {
+      return transaction.type === 'Income'
+        ? { icon: '📈', label: 'Other Income', style: 'bg-emerald-500/10 text-emerald-400 border-emerald-505/25' }
+        : { icon: '📉', label: 'Other Expense', style: 'bg-zinc-800 text-zinc-400 border-zinc-700' };
+    }
+  }, [transaction.category, transaction.type]);
+
+  const handlePrint = () => {
+    window.print();
+  };
+
   return (
-    <Card className={cn(
-      "p-3 sm:p-4 flex flex-col gap-3 sm:gap-4 group border-black-800 hover:border-gold-500/50 transition-colors relative"
-    )}>
-      <div className="flex items-center gap-3 sm:gap-4">
-        <div 
-          className={cn(
-            "rounded-xl sm:rounded-2xl flex items-center justify-center shrink-0 shadow-inner",
-            "w-10 h-10 sm:w-12 sm:h-12",
-            transaction.type === 'Income' ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20" : ""
-          )}
-          style={transaction.type === 'Expense' ? {
-            backgroundColor: 'color-mix(in srgb, var(--theme-delete-color, #ef4444), transparent 90%)',
-            color: 'var(--theme-delete-color, #ef4444)',
-            borderColor: 'color-mix(in srgb, var(--theme-delete-color, #ef4444), transparent 80%)',
-            borderWidth: '1px'
-          } : {}}
-        >
-          {transaction.type === 'Income' ? <TrendingUp size={20} /> : <TrendingDown size={20} />}
+    <>
+      <Card 
+        onClick={() => setShowDetails(true)}
+        className="p-4 flex flex-col gap-3 sm:gap-4 group border-zinc-800 hover:border-gold-500/50 bg-zinc-900 hover:bg-zinc-950/40 transition-all cursor-pointer relative"
+      >
+        <div className="flex flex-col xs:flex-row xs:items-center justify-between gap-3 min-w-0">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className={cn(
+              "w-11 h-11 rounded-xl flex items-center justify-center shrink-0 border text-lg shadow-inner",
+              catInfo.style
+            )}>
+              <span>{catInfo.icon}</span>
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="font-black text-white uppercase tracking-wider text-[10px] sm:text-xs truncate">{catInfo.label}</span>
+                <Badge variant="neutral" className="bg-zinc-950 border border-zinc-850 text-white/50 text-[8px] uppercase tracking-widest">{transaction.category}</Badge>
+                {transaction.recurring && transaction.recurring !== 'None' && (
+                  <Badge variant="info" className="text-[7px] sm:text-[8px] bg-sky-500/10 text-sky-400 border-sky-500/20 flex items-center gap-0.5">
+                    <RefreshCw size={8} className="animate-spin-slow" />
+                    {transaction.recurring}
+                  </Badge>
+                )}
+              </div>
+              <p className="text-[10px] sm:text-[11px] text-white/70 truncate font-semibold mt-1 uppercase max-w-xs">{transaction.description || 'No Description Attached'}</p>
+            </div>
+          </div>
+
+          <div className="text-left xs:text-right shrink-0 mt-1 xs:mt-0">
+            <p 
+              className="font-black tracking-tighter truncate text-sm sm:text-base md:text-lg leading-none"
+              style={{ color: transaction.type === 'Income' ? '#10b981' : 'var(--theme-delete-color, #ef4444)' }}
+            >
+              {transaction.type === 'Income' ? '+' : '-'}{symbol}{transaction.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+            </p>
+            <p className="text-[8px] sm:text-[9px] text-white/40 font-bold uppercase tracking-widest mt-1">{format(new Date(transaction.date), 'MMM dd, yyyy')}</p>
+          </div>
         </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-0.5 sm:mb-1 flex-wrap">
-            <p className="font-black text-white uppercase tracking-wider text-[10px] sm:text-xs truncate">{transaction.category}</p>
-            {transaction.recurring && transaction.recurring !== 'None' && (
-               <Badge variant="info" className="text-[7px] sm:text-[8px] bg-sky-500/10 text-sky-500 border-sky-500/20 flex items-center gap-1">
-                 <RefreshCw size={8} />
-                 {transaction.recurring}
-               </Badge>
-            )}
+
+        {/* Display linked entities compactly inside card for neat visuals */}
+        {(bird || pair || contact) && (
+          <div className="flex flex-col gap-1 pt-2 border-t border-zinc-850 min-w-0">
             {bird && (
-              <div className="w-full mt-1">
-                <BirdCompactInfo 
-                  bird={bird} 
-                  cages={cages} 
-                  onClick={() => onBirdRef(bird.name)}
-                />
+              <div className="flex items-center gap-1.5 text-[10px] text-zinc-400 truncate" onClick={e => e.stopPropagation()}>
+                <span className="text-[9px] uppercase font-bold text-zinc-500 whitespace-nowrap">Linked Bird:</span>
+                <span onClick={() => onBirdRef(bird.name)} className="text-gold-500 font-black hover:underline cursor-pointer truncate">{bird.name}</span>
+                <span className="text-[8px] px-1 bg-zinc-950 border border-zinc-800 rounded text-zinc-400 uppercase tracking-tight">{bird.ringNumber}</span>
               </div>
             )}
             {pair && birds && (
-              <div className="w-full mt-1 flex items-center gap-2 text-xs font-bold text-white/70">
-                <Heart size={12} className="text-rose-500" />
-                <span>Pair: {birds.find(b => b.id === pair.maleId)?.name || 'Unknown'} x {birds.find(b => b.id === pair.femaleId)?.name || 'Unknown'}</span>
+              <div className="flex items-center gap-1.5 text-[10px] text-zinc-400 truncate">
+                <Heart size={10} className="text-rose-500 shrink-0 animate-pulse" />
+                <span className="text-[9px] uppercase font-bold text-zinc-500 whitespace-nowrap">Breeding Pair:</span>
+                <span className="text-white/80 font-bold truncate">
+                  {birds.find(b => b.id === pair.maleId)?.name || 'Male'} × {birds.find(b => b.id === pair.femaleId)?.name || 'Female'}
+                </span>
               </div>
             )}
             {contact && (
-              <Badge variant="warning" className="text-[7px] sm:text-[8px] bg-secondary/10 text-secondary border-secondary/20">{contact.name}</Badge>
+              <div className="flex items-center gap-1.5 text-[10px] text-zinc-400 truncate">
+                <User size={10} className="text-secondary shrink-0" />
+                <span className="text-[9px] uppercase font-bold text-zinc-500 whitespace-nowrap">Contact Partner:</span>
+                <span className="text-white font-bold">{contact.name}</span>
+                <Badge variant="warning" className="text-[7px] bg-secondary/15 text-secondary">{contact.type}</Badge>
+              </div>
             )}
           </div>
-          <p className="text-[10px] sm:text-[11px] text-white truncate font-medium">{transaction.description || 'No description'}</p>
-        </div>
-        <div className={cn("shrink-0 text-right")}>
-                <p 
-                  className={cn("font-black tracking-tighter truncate", "text-base sm:text-lg")}
-                  style={{ color: transaction.type === 'Income' ? '#10b981' : 'var(--theme-delete-color, #ef4444)' }}
-                >
-                  {transaction.type === 'Income' ? '+' : '-'}{symbol}{transaction.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                </p>
-          <p className="text-[8px] sm:text-[9px] text-white font-bold uppercase tracking-widest">{transaction.date}</p>
-        </div>
-      </div>
+        )}
 
-      <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-black-800/50">
-        <button onClick={onEdit} className="flex-1 flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 bg-zinc-700 hover:bg-zinc-600 text-white hover:text-secondary rounded-lg transition-all border border-black-700 min-w-0">
-          <Edit2 size={14} />
-          <span className="text-[9px] font-black uppercase tracking-widest hidden sm:inline">Edit</span>
-        </button>
-        <button 
-          onClick={onDelete} 
-          className="flex-1 flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 rounded-lg transition-all border min-w-0"
-          style={{
-            backgroundColor: 'color-mix(in srgb, var(--theme-delete-color, #ef4444), transparent 90%)',
-            color: 'var(--theme-delete-color, #ef4444)',
-            borderColor: 'color-mix(in srgb, var(--theme-delete-color, #ef4444), transparent 80%)'
-          }}
-        >
-          <Trash2 size={14} />
-          <span className="text-[9px] font-black uppercase tracking-widest hidden sm:inline">Delete</span>
-        </button>
-      </div>
-    </Card>
+        <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-zinc-850/60" onClick={e => e.stopPropagation()}>
+          <button 
+            type="button"
+            onClick={() => setShowDetails(true)} 
+            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg transition-all border border-zinc-750 text-[9px] font-black uppercase tracking-widest"
+          >
+            <Eye size={12} />
+            <span>Details</span>
+          </button>
+          <button 
+            type="button"
+            onClick={onEdit} 
+            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-white hover:text-secondary rounded-lg transition-all border border-zinc-750 text-[9px] font-black uppercase tracking-widest"
+          >
+            <Edit2 size={12} />
+            <span>Edit</span>
+          </button>
+          <button 
+            type="button"
+            onClick={onDelete} 
+            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg transition-all border text-[9px] font-black uppercase tracking-widest"
+            style={{
+              backgroundColor: 'color-mix(in srgb, var(--theme-delete-color, #ef4444), transparent 90%)',
+              color: 'var(--theme-delete-color, #ef4444)',
+              borderColor: 'color-mix(in srgb, var(--theme-delete-color, #ef4444), transparent 80%)'
+            }}
+          >
+            <Trash2 size={12} />
+            <span>Delete</span>
+          </button>
+        </div>
+      </Card>
+
+      {/* Transaction Detail Ledger / Receipt Overlay */}
+      {showDetails && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/95 backdrop-blur-2xl">
+          <div className="bg-zinc-950 border border-zinc-800 rounded-[2.5rem] shadow-2xl w-full max-w-md overflow-hidden flex flex-col max-h-[90vh]">
+            
+            {/* Header */}
+            <div className="p-5 border-b border-zinc-800 flex items-center justify-between">
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-widest text-gold-500 block leading-none mb-1">Accounting Ledger</span>
+                <h4 className="text-sm font-black text-white uppercase tracking-wider">Transaction Detail</h4>
+              </div>
+              <button
+                onClick={() => setShowDetails(false)}
+                className="p-2.5 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-white/50 hover:text-white rounded-xl transition-all"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Receipt Content */}
+            <div className="p-6 overflow-y-auto space-y-6 custom-scrollbar text-white">
+              <div className="p-5 bg-zinc-900 border border-zinc-850 rounded-[2rem] text-center space-y-3 relative overflow-hidden">
+                <div className="absolute top-0 left-0 right-0 h-1" style={{ backgroundColor: transaction.type === 'Income' ? '#10b981' : 'var(--theme-delete-color, #ef4444)' }} />
+                
+                <div className={cn(
+                  "w-14 h-14 rounded-full mx-auto flex items-center justify-center text-2xl border shadow-lg mt-1",
+                  catInfo.style
+                )}>
+                  {catInfo.icon}
+                </div>
+
+                <div>
+                  <h5 className="text-[10px] font-black uppercase text-white/40 tracking-widest">{transaction.category}</h5>
+                  <h3 
+                    className="text-2xl sm:text-3xl font-black tracking-tight mt-1"
+                    style={{ color: transaction.type === 'Income' ? '#10b981' : 'var(--theme-delete-color, #ef4444)' }}
+                  >
+                    {transaction.type === 'Income' ? '+' : '-'}{symbol}{transaction.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  </h3>
+                  <Badge variant="neutral" className="bg-black/40 text-zinc-400 border-zinc-800 text-[8px] uppercase tracking-widest mt-2">{transaction.type}</Badge>
+                </div>
+              </div>
+
+              {/* Ledger Breakdown Fields */}
+              <div className="space-y-3 text-xs uppercase font-bold tracking-wider">
+                <div className="flex justify-between items-center py-2 border-b border-zinc-900">
+                  <span className="text-white/40 text-[10px]">Reference ID</span>
+                  <span className="font-mono text-zinc-300 text-[10px]">{transaction.id}</span>
+                </div>
+                <div className="flex justify-between items-center py-2 border-b border-zinc-900">
+                  <span className="text-white/40 text-[10px]">Posting Date</span>
+                  <span className="text-white">{format(new Date(transaction.date), 'MMMM dd, yyyy')}</span>
+                </div>
+                <div className="flex justify-between items-center py-2 border-b border-zinc-900">
+                  <span className="text-white/40 text-[10px]">Recurring Cycle</span>
+                  <Badge variant="info" className="text-[8px] bg-sky-500/15 text-sky-400 border border-sky-500/25">
+                    {transaction.recurring || 'None'}
+                  </Badge>
+                </div>
+
+                {transaction.description && (
+                  <div className="py-2 space-y-1">
+                    <span className="text-white/40 text-[10px] block">Ledger Specification / Comment</span>
+                    <div className="p-3 bg-black border border-zinc-850 rounded-xl text-[11px] text-zinc-300 leading-normal capitalize font-normal">
+                      {transaction.description}
+                    </div>
+                  </div>
+                )}
+
+                {/* Linked Objects */}
+                {(bird || pair || contact) && (
+                  <div className="py-3 mt-2 border-t border-zinc-900 space-y-3">
+                    <span className="text-white/40 text-[10px] block font-black text-gold-500 uppercase tracking-widest mb-1">Linked Registry Entity</span>
+                    
+                    {bird && (
+                      <div className="flex items-center gap-3 p-3 bg-black rounded-xl border border-zinc-850">
+                        <div className="w-8 h-8 bg-zinc-900 rounded-lg flex items-center justify-center border border-zinc-800 shrink-0">
+                          <BirdIcon size={16} className="text-gold-500" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p onClick={() => { setShowDetails(false); onBirdRef(bird.name); }} className="text-xs font-black text-white leading-tight uppercase hover:underline cursor-pointer truncate">{bird.name}</p>
+                          <p className="text-[10px] text-white/40 mt-0.5 truncate font-bold font-mono">RING: {bird.ringNumber}</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {pair && birds && (
+                      <div className="flex items-center gap-3 p-3 bg-black rounded-xl border border-zinc-850">
+                        <div className="w-8 h-8 bg-zinc-900 rounded-lg flex items-center justify-center border border-zinc-800 shrink-0">
+                          <Heart size={16} className="text-rose-500" />
+                        </div>
+                        <div className="min-w-0 flex-1 text-left">
+                          <p className="text-xs font-black text-white leading-tight uppercase truncate">
+                            Pair Breeding Registry
+                          </p>
+                          <p className="text-[10px] text-white/50 mt-0.5 font-bold truncate">
+                            {birds.find(b => b.id === pair.maleId)?.name || 'Male'} × {birds.find(b => b.id === pair.femaleId)?.name || 'Female'}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {contact && (
+                      <div className="flex items-center gap-3 p-3 bg-black rounded-xl border border-zinc-850">
+                        <div className="w-8 h-8 bg-zinc-900 rounded-lg flex items-center justify-center border border-zinc-800 shrink-0">
+                          <User size={16} className="text-secondary" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-black text-white leading-tight uppercase truncate">{contact.name}</p>
+                          <p className="text-[10px] text-white/40 mt-0.5 truncate font-normal normal-case">{contact.email || contact.phone || 'No direct info address'}</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Actions Footer inside Dialogue */}
+            <div className="p-5 border-t border-zinc-800 bg-zinc-950 flex gap-2">
+              <button
+                type="button"
+                onClick={handlePrint}
+                className="flex-1 px-4 py-2.5 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-1.5"
+              >
+                <Printer size={12} /> Print Spec
+              </button>
+              <button
+                type="button"
+                onClick={() => { setShowDetails(false); onEdit(); }}
+                className="flex-1 px-4 py-2.5 bg-gold-500 hover:bg-gold-400 text-black rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-1.5"
+              >
+                <Edit2 size={12} /> Edit
+              </button>
+              <button
+                type="button"
+                onClick={() => { setShowDetails(false); onDelete(); }}
+                className="px-3 py-2.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/10 text-red-400 rounded-xl flex items-center justify-center"
+              >
+                <Trash2 size={14} />
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -6940,50 +7036,376 @@ function Modal({ isOpen, onClose, title, children }: { isOpen: boolean, onClose:
   );
 }
 
-function BirdDocumentsModal({ bird, onClose }: { bird: Bird, onClose: () => void }) {
-  if (!bird.documents || bird.documents.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center py-12 text-center text-white">
-        <div className="w-16 h-16 bg-zinc-800 rounded-full flex items-center justify-center mb-4 border border-black-700">
-          <FileText size={32} className="text-zinc-600" />
-        </div>
-        <h3 className="text-white font-bold mb-1">No documents found</h3>
-        <p className="text-white/40 text-xs">This bird has no attached DNA certificates, vet records or permits.</p>
-        <Button onClick={onClose} variant="secondary" className="mt-6">Close</Button>
-      </div>
-    );
-  }
+function BirdDocumentsModal({ bird, onClose, user }: { bird: Bird, onClose: () => void, user: FirebaseUser | null }) {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string>('All');
+  const [uploadType, setUploadType] = useState('DNA Sexing');
+  const [isUploading, setIsUploading] = useState(false);
+  const [previewDoc, setPreviewDoc] = useState<BirdDocument | null>(null);
+  const [zoom, setZoom] = useState(1);
+
+  const documents = bird.documents || [];
+
+  // Filter logic
+  const filteredDocs = useMemo(() => {
+    return documents.filter(doc => {
+      const matchesSearch = doc.name.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesCategory = selectedCategory === 'All' || doc.type === selectedCategory;
+      return matchesSearch && matchesCategory;
+    });
+  }, [documents, searchQuery, selectedCategory]);
+
+  // Statistics counters
+  const stats = useMemo(() => {
+    return {
+      total: documents.length,
+      dna: documents.filter(d => d.type === 'DNA Sexing').length,
+      vet: documents.filter(d => d.type === 'Vet Record').length,
+      permit: documents.filter(d => d.type === 'Permit').length,
+      pedigree: documents.filter(d => d.type === 'Pedigree').length,
+      general: documents.filter(d => d.type === 'General').length,
+    };
+  }, [documents]);
+
+  const handleUploadClick = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+
+    setIsUploading(true);
+    try {
+      const storageRef = ref(storage, `documents/${user.uid}/${Date.now()}_${file.name}`);
+      const snapshot = await uploadBytes(storageRef, file);
+      const url = await getDownloadURL(snapshot.ref);
+
+      const newDoc: BirdDocument = {
+        id: Math.random().toString(36).substr(2, 9),
+        name: file.name,
+        url,
+        type: uploadType,
+        fileType: file.type || (file.name.match(/\.(jpg|jpeg|png|gif)$/i) ? 'image/jpeg' : 'application/pdf'),
+        createdAt: new Date().toISOString()
+      };
+
+      const updatedDocs = [...documents, newDoc];
+
+      await updateDoc(doc(db, 'birds', bird.id), {
+        documents: updatedDocs
+      });
+
+      toast.success('Document added to Vault successfully');
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to upload document');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleDelete = async (docId: string) => {
+    if (!user) return;
+    try {
+      const updatedDocs = documents.filter(d => d.id !== docId);
+
+      await updateDoc(doc(db, 'birds', bird.id), {
+        documents: updatedDocs
+      });
+
+      toast.success('Document deleted from Vault');
+      if (previewDoc?.id === docId) {
+        setPreviewDoc(null);
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to delete document');
+    }
+  };
+
+  // Check if a file type is previewable as an image
+  const isImage = (doc: BirdDocument) => {
+    return doc.fileType.startsWith('image/') || doc.url.match(/\.(jpg|jpeg|png|gif|webp)$/i);
+  };
 
   return (
-    <div className="space-y-4">
-      <div className="grid gap-3">
-        {bird.documents.map((doc) => (
-          <div key={doc.id} className="flex items-center justify-between p-4 bg-black rounded-2xl border border-black-800 group hover:border-gold-500/50 transition-all">
-            <div className="flex items-center gap-4">
-              <div className="w-10 h-10 bg-zinc-800 rounded-xl flex items-center justify-center border border-black-700">
-                <FileText size={20} className="text-gold-500" />
+    <div className="space-y-6">
+      {/* Vault Statistics */}
+      <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+        <div className="p-2 sm:p-3 bg-zinc-900 border border-zinc-805/50 rounded-2xl text-center">
+          <p className="text-[9px] font-black uppercase text-gold-500 tracking-wider">Total</p>
+          <p className="text-sm sm:text-base font-black text-white mt-1">{stats.total}</p>
+        </div>
+        <div className="p-2 sm:p-3 bg-zinc-900 border border-zinc-805/50 rounded-2xl text-center">
+          <p className="text-[9px] font-black uppercase text-zinc-400 tracking-wider">DNA 🧬</p>
+          <p className="text-sm sm:text-base font-black text-white mt-1">{stats.dna}</p>
+        </div>
+        <div className="p-2 sm:p-3 bg-zinc-900 border border-zinc-805/50 rounded-2xl text-center">
+          <p className="text-[9px] font-black uppercase text-zinc-400 tracking-wider">Vet 🏥</p>
+          <p className="text-sm sm:text-base font-black text-white mt-1">{stats.vet}</p>
+        </div>
+        <div className="p-2 sm:p-3 bg-zinc-900 border border-zinc-805/50 rounded-2xl text-center">
+          <p className="text-[9px] font-black uppercase text-zinc-400 tracking-wider">Permit 📄</p>
+          <p className="text-sm sm:text-base font-black text-white mt-1">{stats.permit}</p>
+        </div>
+        <div className="p-2 sm:p-3 bg-zinc-900 border border-zinc-805/50 rounded-2xl text-center">
+          <p className="text-[9px] font-black uppercase text-zinc-400 tracking-wider">Pedigree 🌳</p>
+          <p className="text-sm sm:text-base font-black text-white mt-1">{stats.pedigree}</p>
+        </div>
+        <div className="p-2 sm:p-3 bg-zinc-900 border border-zinc-805/50 rounded-2xl text-center">
+          <p className="text-[9px] font-black uppercase text-zinc-400 tracking-wider">Other 📁</p>
+          <p className="text-sm sm:text-base font-black text-white mt-1">{stats.general}</p>
+        </div>
+      </div>
+
+      {/* Document Upload Area */}
+      <div className="p-4 bg-zinc-900 border border-zinc-800 rounded-[2rem] space-y-4">
+        <h4 className="text-xs font-black uppercase tracking-widest text-gold-500 flex items-center gap-2">
+          <UploadCloud size={14} /> Add Document / DNA Certificate to Vault
+        </h4>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label className="text-[10px] font-black uppercase tracking-wider text-white/50 block mb-1.5">Document Type</label>
+            <div className="grid grid-cols-2 xs:grid-cols-3 sm:grid-cols-2 lg:grid-cols-3 gap-1.5">
+              {['DNA Sexing', 'Vet Record', 'Permit', 'Pedigree', 'General'].map(type => (
+                <button
+                  type="button"
+                  key={type}
+                  onClick={() => setUploadType(type)}
+                  className={cn(
+                    "px-2.5 py-1.5 text-[9px] font-bold rounded-lg border uppercase tracking-wider transition-all truncate",
+                    uploadType === type ? "bg-gold-500 border-gold-400 text-black font-black" : "bg-black border-zinc-800 text-white/70 hover:bg-zinc-850"
+                  )}
+                >
+                  {type === 'DNA Sexing' ? '🧬 DNA' :
+                   type === 'Vet Record' ? '🏥 Vet' :
+                   type === 'Permit' ? '📄 Permit' :
+                   type === 'Pedigree' ? '🌳 Link' : '📁 Other'}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="flex flex-col justify-end">
+            <label className="text-[10px] font-black uppercase tracking-wider text-white/50 block mb-1.5">Attach File</label>
+            <div className="relative">
+              <input
+                type="file"
+                onChange={handleUploadClick}
+                disabled={isUploading}
+                accept="image/*,application/pdf"
+                className="hidden"
+                id="doc-file-upload"
+              />
+              <label
+                htmlFor="doc-file-upload"
+                className={cn(
+                  "flex items-center justify-center gap-3 px-4 py-3 bg-black border border-dashed border-zinc-700 hover:border-gold-500 rounded-xl cursor-pointer transition-all uppercase tracking-widest text-[10px] font-black text-white mb-0",
+                  isUploading && "opacity-50 pointer-events-none"
+                )}
+              >
+                {isUploading ? (
+                  <>
+                    <RefreshCw size={14} className="animate-spin text-gold-500" />
+                    Uploading document...
+                  </>
+                ) : (
+                  <>
+                    <Plus size={14} className="text-gold-500" />
+                    Select & Upload Document
+                  </>
+                )}
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* High-Speed Search and Filters */}
+      <div className="space-y-3">
+        <div className="flex flex-col sm:flex-row gap-3">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30" size={16} />
+            <Input
+              placeholder="Search documents by name..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              className="pl-10 py-2.5 text-xs bg-zinc-900 border-zinc-800 text-white placeholder-white/30 rounded-xl"
+            />
+          </div>
+          <div className="flex bg-zinc-900 border border-zinc-800 p-1 rounded-xl overflow-x-auto shrink-0 scrollbar-none">
+            {['All', 'DNA Sexing', 'Vet Record', 'Permit', 'Pedigree', 'General'].map(cat => (
+              <button
+                key={cat}
+                onClick={() => setSelectedCategory(cat)}
+                className={cn(
+                  "px-3 py-1.5 text-[9px] font-black rounded-lg uppercase tracking-wider transition-all whitespace-nowrap",
+                  selectedCategory === cat ? "bg-zinc-800 text-gold-500 border border-zinc-700 shadow-sm" : "text-white/60 hover:text-white"
+                )}
+              >
+                {cat === 'All' ? '📂 All' : cat}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Documents Grid / Vault Container */}
+      <div className="max-h-[300px] overflow-y-auto pr-1 space-y-2 custom-scrollbar">
+        {filteredDocs.map((doc) => (
+          <div
+            key={doc.id}
+            onClick={() => setPreviewDoc(doc)}
+            className="flex items-center justify-between p-3.5 bg-black rounded-2xl border border-zinc-850 group hover:border-gold-500/50 hover:bg-zinc-950/20 transition-all cursor-pointer"
+          >
+            <div className="flex items-center gap-3.5 min-w-0">
+              <div className="w-10 h-10 bg-zinc-900 rounded-xl flex items-center justify-center border border-zinc-800 shrink-0">
+                {isImage(doc) ? (
+                  <ImageIcon size={18} className="text-gold-500" />
+                ) : (
+                  <FileText size={18} className="text-gold-500" />
+                )}
               </div>
-              <div className="flex flex-col">
-                <span className="text-sm font-bold text-white leading-tight mb-1">{doc.name}</span>
-                <div className="flex items-center gap-2">
-                  <Badge variant="neutral" className="bg-zinc-800 text-gold-500 text-[8px] px-1.5 py-0">{doc.type}</Badge>
-                  <span className="text-[10px] text-white/30">{format(new Date(doc.createdAt), 'MMM dd, yyyy')}</span>
+              <div className="min-w-0">
+                <span className="text-xs font-black text-white leading-tight block truncate group-hover:text-gold-500 transition-colors uppercase tracking-wide">{doc.name}</span>
+                <div className="flex items-center gap-2 mt-1 flex-wrap">
+                  <Badge variant="neutral" className="bg-zinc-850 text-gold-500 text-[8px] px-1.5 py-0 border border-zinc-800 uppercase tracking-widest">{doc.type}</Badge>
+                  <span className="text-[9px] text-white/30 font-bold uppercase">{format(new Date(doc.createdAt), 'MMM dd, yyyy')}</span>
                 </div>
               </div>
             </div>
-            <a 
-              href={doc.url} 
-              target="_blank" 
-              rel="noreferrer" 
-              className="px-4 py-2 bg-gold-500/10 hover:bg-gold-500 text-gold-500 hover:text-black rounded-xl transition-all border border-gold-500/20 text-[10px] font-black uppercase tracking-widest flex items-center gap-2"
-            >
-              <ExternalLink size={14} />
-              View
-            </a>
+            <div className="flex items-center gap-2 shrink-0" onClick={e => e.stopPropagation()}>
+              <button
+                onClick={() => setPreviewDoc(doc)}
+                className="p-2 bg-zinc-900 hover:bg-gold-500 hover:text-black text-white/70 rounded-xl transition-all border border-zinc-800/80"
+                title="Preview document"
+              >
+                <Eye size={14} />
+              </button>
+              <a
+                href={doc.url}
+                target="_blank"
+                rel="noreferrer"
+                className="p-2 bg-zinc-900 hover:bg-gold-500 hover:text-black text-white/70 rounded-xl transition-all border border-zinc-800/80"
+                title="Open original link"
+              >
+                <ExternalLink size={14} />
+              </a>
+              <button
+                onClick={() => handleDelete(doc.id)}
+                className="p-2 bg-red-500/10 border border-red-500/10 hover:bg-red-500/20 hover:border-red-500/30 text-red-400 rounded-xl transition-all"
+                title="Delete from Vault"
+              >
+                <Trash2 size={14} />
+              </button>
+            </div>
           </div>
         ))}
+
+        {filteredDocs.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-10 text-center border border-dashed border-zinc-800 rounded-2xl bg-black">
+            <div className="w-12 h-12 bg-zinc-900 rounded-full flex items-center justify-center mb-3">
+              <FileText size={22} className="text-white/25" />
+            </div>
+            <h5 className="text-white text-xs font-black uppercase tracking-widest leading-none mb-1">No Vault Items Found</h5>
+            <p className="text-white/40 text-[10px] uppercase font-bold sm:inline-block">Search or filter criteria did not yield results.</p>
+          </div>
+        )}
       </div>
-      <Button onClick={onClose} variant="secondary" className="w-full py-4 text-xs">Close</Button>
+
+      {/* Interactive State-Of-The-Art Lightbox Previewer Modal */}
+      {previewDoc && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/95 backdrop-blur-2xl">
+          <div className="bg-zinc-950 border border-zinc-800 rounded-[2.5rem] shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[85vh]">
+            <div className="p-5 border-b border-zinc-800 flex items-center justify-between">
+              <div className="min-w-0 pr-4">
+                <span className="text-xs font-black uppercase tracking-widest text-gold-500 leading-none mb-1 block">Vault Document Preview</span>
+                <h4 className="text-sm font-black text-white uppercase tracking-wide truncate">{previewDoc.name}</h4>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  onClick={() => setPreviewDoc(null)}
+                  className="p-2.5 bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 rounded-xl text-white/75 hover:text-white transition-all"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+            </div>
+            <div className="p-6 overflow-y-auto bg-black flex flex-col items-center justify-center text-white min-h-[300px] max-h-[60vh] relative">
+              {isImage(previewDoc) ? (
+                <div className="relative w-full h-full flex items-center justify-center overflow-auto max-h-[50vh] p-4">
+                  <img
+                    src={previewDoc.url}
+                    alt={previewDoc.name}
+                    referrerPolicy="no-referrer"
+                    style={{ transform: `scale(${zoom})` }}
+                    className="max-w-full max-h-[45vh] rounded-lg shadow-xl border border-zinc-800/50 object-contain transition-transform duration-200"
+                  />
+                </div>
+              ) : (
+                <div className="text-center py-12 max-w-md">
+                  <div className="w-16 h-16 bg-zinc-900 rounded-3xl flex items-center justify-center mb-4 mx-auto border border-zinc-800 shadow-inner">
+                    <FileText size={32} className="text-gold-500" />
+                  </div>
+                  <h5 className="text-sm font-black uppercase tracking-wider text-white">Full-Screen File (PDF/Doc)</h5>
+                  <p className="text-white/40 text-xs mt-2 uppercase font-bold tracking-tight">PDFs and other web documents cannot be previewed natively as images in secure frames.</p>
+                  <a
+                    href={previewDoc.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="mt-6 inline-flex items-center gap-2 px-5 py-3 bg-gold-500 hover:bg-gold-400 text-black font-black uppercase tracking-widest text-[10px] rounded-xl transition-all"
+                  >
+                    <ExternalLink size={14} /> Open Original Document
+                  </a>
+                </div>
+              )}
+
+              {/* Zoom Controls for Image Viewer */}
+              {isImage(previewDoc) && (
+                <div className="absolute bottom-4 left-1/2 -translate-y-1/2 -translate-x-1/2 flex items-center bg-zinc-900/80 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-zinc-800 shadow-xl gap-2 mt-2">
+                  <button
+                    onClick={() => setZoom(prev => Math.max(0.5, prev - 0.25))}
+                    className="p-1 hover:text-gold-500 text-white/50 transition-all font-black"
+                  >
+                    Zoom -
+                  </button>
+                  <span className="text-[10px] font-black uppercase text-gold-500 px-1">{Math.round(zoom * 100)}%</span>
+                  <button
+                    onClick={() => setZoom(prev => Math.min(3, prev + 0.25))}
+                    className="p-1 hover:text-gold-500 text-white/50 transition-all font-black"
+                  >
+                    Zoom +
+                  </button>
+                </div>
+              )}
+            </div>
+            <div className="p-5 border-t border-zinc-800 bg-zinc-950 flex flex-col sm:flex-row gap-3">
+              <div className="flex-1 text-left">
+                <p className="text-[8px] font-black uppercase text-white/30 tracking-wider">Vault Registry Details</p>
+                <div className="flex items-center gap-2 mt-1">
+                  <Badge variant="neutral" className="bg-zinc-900 text-gold-500 text-[8px] px-1.5 py-0.5 border border-zinc-800">{previewDoc.type}</Badge>
+                  <span className="text-[9px] font-bold text-white/50 uppercase">Uploaded on {format(new Date(previewDoc.createdAt), 'MMMM dd, yyyy')}</span>
+                </div>
+              </div>
+              <div className="flex gap-2 shrink-0">
+                <a
+                  href={previewDoc.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="px-4 py-2.5 bg-zinc-900 hover:bg-zinc-800 text-white border border-zinc-800 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5"
+                >
+                  <ExternalLink size={12} /> External
+                </a>
+                <button
+                  onClick={() => handleDelete(previewDoc.id)}
+                  className="px-4 py-2.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/10 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5"
+                >
+                  <Trash2 size={12} /> Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Footer Close Button */}
+      <Button onClick={onClose} variant="secondary" className="w-full py-4 text-xs font-black uppercase tracking-widest">Close Vault</Button>
     </div>
   );
 }
