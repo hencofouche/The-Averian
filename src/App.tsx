@@ -7534,7 +7534,7 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
     imageUrl: '',
     imageUrls: []
   });
-  const [addToExpenses, setAddToExpenses] = useState(true);
+  const [addToExpenses, setAddToExpenses] = useState(!initialData?.id);
   const [isUploading, setIsUploading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [recordSale, setRecordSale] = useState(true);
