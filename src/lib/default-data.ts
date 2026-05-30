@@ -173,8 +173,17 @@ export const defaultSpecies: DefaultSpecies[] = [
   },
   {
     id: 'group_finches',
-    name: 'Finches',
+    name: 'Doves and Finches',
     subspecies: [
+      // Doves
+      { id: 'dove_diamond', name: 'Diamond Dove (Geopelia cuneata)' },
+      { id: 'dove_ringneck', name: 'Ringneck Dove (Streptopelia risoria)' },
+      { id: 'dove_zebra', name: 'Zebra Dove (Geopelia striata)' },
+      { id: 'dove_emerald', name: 'Emerald Dove (Chalcophaps indica)' },
+      { id: 'dove_senegal', name: 'Senegal Dove (Spilopelia senegalensis)' },
+      { id: 'dove_crested', name: 'Crested Pigeon (Ocyphaps lophotes)' },
+
+      // Finches
       { id: 'finch_black_bellied_firefinch', name: 'Black-bellied Firefinch' },
       { id: 'finch_black_rumped_waxbill', name: 'Black-rumped Waxbill' },
       { id: 'finch_black_throated', name: 'Black-throated Finch (Parson Finch)' },
@@ -186,17 +195,9 @@ export const defaultSpecies: DefaultSpecies[] = [
       { id: 'finch_double_barred', name: 'Double-barred Finch (Owl Finch)' },
       { id: 'finch_forbes_parrot', name: 'Forbes\' Parrot Finch' },
       { id: 'finch_goldbreast_waxbill', name: 'Goldbreast Waxbill (Zebra Waxbill)' },
-      { id: 'finch_gouldian_black', name: 'Gouldian Finch (Black Headed)' },
-      { id: 'finch_gouldian_blue', name: 'Gouldian Finch (Blue Breast)' },
-      { id: 'finch_gouldian_red', name: 'Gouldian Finch (Red Headed)' },
-      { id: 'finch_gouldian_silver', name: 'Gouldian Finch (Silver)' },
-      { id: 'finch_gouldian_white_breast', name: 'Gouldian Finch (White-breasted)' },
-      { id: 'finch_gouldian_yellow', name: 'Gouldian Finch (Yellow Headed)' },
+      { id: 'finch_gouldian_finch', name: 'Gouldian Finch' },
       { id: 'finch_green_winged_pytilia', name: 'Green-winged Pytilia (Melba Finch)' },
-      { id: 'finch_java_fawn', name: 'Java Sparrow (Fawn)' },
-      { id: 'finch_java_normal', name: 'Java Sparrow (Normal)' },
-      { id: 'finch_java_pied', name: 'Java Sparrow (Pied)' },
-      { id: 'finch_java_white', name: 'Java Sparrow (White)' },
+      { id: 'finch_java_sparrow', name: 'Java Sparrow' },
       { id: 'finch_lavender_waxbill', name: 'Lavender Waxbill' },
       { id: 'finch_long_tailed_shaft', name: 'Long-tailed Finch (Shaft-tail)' },
       { id: 'finch_masked', name: 'Masked Finch' },
@@ -209,22 +210,26 @@ export const defaultSpecies: DefaultSpecies[] = [
       { id: 'finch_red_headed_aberdeen', name: 'Red-headed Finch (Aberdeen Finch)' },
       { id: 'finch_red_headed_parrot', name: 'Red-headed Parrot Finch' },
       { id: 'finch_seagreen_parrot', name: 'Seagreen Parrot Finch' },
-      { id: 'finch_society_bengalese', name: 'Society Finch (Bengalese)' },
-      { id: 'finch_society_chocolate', name: 'Society Finch (Chocolate)' },
-      { id: 'finch_society_fawn', name: 'Society Finch (Fawn)' },
-      { id: 'finch_society_self_white', name: 'Society Finch (Self White)' },
+      { id: 'finch_society_finch', name: 'Society Finch' },
       { id: 'finch_spice_munia', name: 'Spice Finch (Scaly-breasted Munia)' },
-      { id: 'finch_star_red', name: 'Star Finch (Red Head)' },
-      { id: 'finch_star_yellow', name: 'Star Finch (Yellow Head)' },
+      { id: 'finch_star_finch', name: 'Star Finch' },
       { id: 'finch_strawberry_avadavat', name: 'Strawberry Finch (Red Avadavat)' },
       { id: 'finch_tricolored_munia', name: 'Tricolored Munia' },
-      { id: 'finch_zebra_black_cheeked', name: 'Zebra Finch (Black-cheeked)' },
-      { id: 'finch_zebra_chestnut_flanked', name: 'Zebra Finch (Chestnut-flanked White)' },
-      { id: 'finch_zebra_fawn', name: 'Zebra Finch (Fawn)' },
-      { id: 'finch_zebra_normal_grey', name: 'Zebra Finch (Normal Grey)' },
-      { id: 'finch_zebra_orange_breasted', name: 'Zebra Finch (Orange-breasted)' },
-      { id: 'finch_zebra_penguin', name: 'Zebra Finch (Penguin)' },
-      { id: 'finch_zebra_white', name: 'Zebra Finch (White)' }
+      { id: 'finch_zebra_finch', name: 'Zebra Finch' }
+    ]
+  },
+  {
+    id: 'group_pheasants_quails',
+    name: 'Pheasants and Quails',
+    subspecies: [
+      { id: 'quail_king', name: 'King Quail (Synoicus chinensis)' },
+      { id: 'quail_japanese', name: 'Japanese Quail (Coturnix japonica)' },
+      { id: 'quail_california', name: 'California Quail (Callipepla californica)' },
+      { id: 'quail_bobwhite', name: 'Northern Bobwhite Quail (Colinus virginianus)' },
+      { id: 'pheasant_ringnecked', name: 'Ring-necked Pheasant (Phasianus colchicus)' },
+      { id: 'pheasant_golden', name: 'Golden Pheasant (Chrysolophus pictus)' },
+      { id: 'pheasant_silver', name: 'Silver Pheasant (Lophura nycthemera)' },
+      { id: 'pheasant_lady_amherst', name: 'Lady Amherst\'s Pheasant (Chrysolophus amherstiae)' }
     ]
   },
   {
@@ -503,5 +508,16 @@ export const defaultMutations: DefaultMutation[] = [
   { id: 'default_pied', name: 'Dominant Pied', inheritance: 'autosomal_dominant' },
   { id: 'default_edged', name: 'Edged', inheritance: 'autosomal_dominant' },
   { id: 'default_dominant_grey', name: 'Dominant Grey', inheritance: 'autosomal_dominant' },
-  { id: 'default_grizzle', name: 'Grizzle', inheritance: 'autosomal_dominant' }
+  { id: 'default_grizzle', name: 'Grizzle', inheritance: 'autosomal_dominant' },
+  // User Requested and Finch/Quail/Dove Specific Mutations
+  { id: 'default_melanistic', name: 'Melanistic', inheritance: 'autosomal_recessive' },
+  { id: 'default_euwing', name: 'Euwing', inheritance: 'incomplete_dominant' },
+  { id: 'default_fawn', name: 'Fawn', inheritance: 'sex_linked_recessive' },
+  { id: 'default_black_cheeked', name: 'Black-cheeked', inheritance: 'autosomal_recessive' },
+  { id: 'default_orange_breasted', name: 'Orange-breasted', inheritance: 'autosomal_recessive' },
+  { id: 'default_penguin', name: 'Penguin', inheritance: 'autosomal_recessive' },
+  { id: 'default_chestnut_flanked', name: 'Chestnut-flanked White (CFW)', inheritance: 'sex_linked_recessive' },
+  { id: 'default_black_headed', name: 'Black Headed', inheritance: 'autosomal_recessive' },
+  { id: 'default_yellow_headed', name: 'Yellow Headed', inheritance: 'sex_linked_recessive' },
+  { id: 'default_white_breasted', name: 'White-breasted', inheritance: 'autosomal_recessive' }
 ];
