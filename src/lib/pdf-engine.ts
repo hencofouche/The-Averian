@@ -19,41 +19,61 @@ export const generateQRListPDF = async (
     format: isThermal ? [width, height] : 'a4',
   });
 
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  let x = isThermal ? 0 : 10;
+  let y = isThermal ? 0 : 10;
+
   for (let i = 0; i < items.length; i++) {
     const item = items[i];
-    if (i > 0) {
-      if (isThermal) {
+
+    if (isThermal) {
+      if (i > 0) {
         doc.addPage([width, height], width > height ? 'landscape' : 'portrait');
-      } else {
-        // For non-thermal, we probably want them in a grid on A4, 
-        // but for now let's stick to one per page or implement a grid logic.
-        // Given the request for precision, we'll follow the thermal logic for simplicity 
-        // if user specifically chose dims, or implement a grid later.
-        doc.addPage('a4', width > height ? 'landscape' : 'portrait');
+      }
+      x = 0;
+      y = 0;
+    } else {
+      // For non-thermal, place in a grid
+      if (i > 0) {
+        x += width + 2; // 2mm spacing
+        if (x + width > pageWidth - 10) {
+          x = 10;
+          y += height + 2; // 2mm row spacing
+        }
+        if (y + height > pageHeight - 10) {
+          doc.addPage('a4', width > height ? 'landscape' : 'portrait');
+          x = 10;
+          y = 10;
+        }
       }
     }
 
     const qrData = JSON.stringify({ t: type === 'bird' ? 'b' : type === 'pair' ? 'p' : 'c', id: item.id });
     const qrDataUrl = await QRCode.toDataURL(qrData, { margin: 1, errorCorrectionLevel: 'H' });
 
-    const x = 0;
-    const y = 0;
+    if (!isThermal) {
+      // Draw light border for cutting
+      doc.setDrawColor(200, 200, 200);
+      doc.setLineWidth(0.3);
+      doc.rect(x, y, width, height);
+    }
 
     // Draw QR Code
     const qrSize = Math.min(width, height) * 0.8;
-    const qrX = (width - qrSize) / 2;
-    const qrY = (height - qrSize) / 2;
+    const qrX = x + (width - qrSize) / 2;
+    const qrY = y + (height - qrSize) / 2;
     
     // If landscape and wide, put QR on left
     if (width > height * 1.5) {
         const sideQrSize = height * 0.8;
-        doc.addImage(qrDataUrl, 'PNG', 2, (height - sideQrSize) / 2, sideQrSize, sideQrSize);
+        doc.addImage(qrDataUrl, 'PNG', x + 2, y + (height - sideQrSize) / 2, sideQrSize, sideQrSize);
         
         // Text on right
         doc.setFontSize(8);
         doc.setFont('helvetica', 'bold');
-        let textX = sideQrSize + 5;
-        let textY = height / 2 - 2;
+        let textX = x + sideQrSize + 5;
+        let textY = y + height / 2 - 2;
         
         if (type === 'bird') {
             const b = item as Bird;
@@ -77,11 +97,11 @@ export const generateQRListPDF = async (
         doc.setFontSize(6);
         doc.setFont('helvetica', 'bold');
         if (type === 'bird') {
-            doc.text((item as Bird).name, width / 2, height - (height * 0.1), { align: 'center' });
+            doc.text((item as Bird).name, x + width / 2, y + height - (height * 0.1), { align: 'center' });
         } else if (type === 'pair') {
-            doc.text('Pair Label', width / 2, height - (height * 0.1), { align: 'center' });
+            doc.text('Pair Label', x + width / 2, y + height - (height * 0.1), { align: 'center' });
         } else {
-            doc.text(item.name, width / 2, height - (height * 0.1), { align: 'center' });
+            doc.text(item.name, x + width / 2, y + height - (height * 0.1), { align: 'center' });
         }
     }
   }

@@ -1,6 +1,9 @@
 import React, { useState, useMemo } from 'react';
-import { Dna, Plus, X } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import { Dna, Plus, X, RefreshCw, ChevronDown, CheckSquare, Home } from 'lucide-react';
 import { InheritanceType, MutationState, getAlleles, interpretGenotype } from '../lib/genetics';
+import { Bird, Pair, Cage } from '../types';
+import { cn } from '../lib/utils';
 
 interface ParentMutation {
   id: string;
@@ -9,11 +12,485 @@ interface ParentMutation {
   state: MutationState;
 }
 
-export default function GeneticsCalculator({ userMutations }: { userMutations: { id: string, name: string }[] }) {
+interface SearchableSelectOption {
+  id: string;
+  name: string;
+  details?: string;
+  subText?: string;
+  bird?: Bird;
+  pair?: Pair;
+  cage?: Cage;
+}
+
+const LocalPairCompactInfo = ({ pair, birds, cages, className, onClick }: { pair: Pair, birds: Bird[], cages: Cage[], className?: string, onClick?: () => void }) => {
+  const male = birds.find(b => b.id === pair.maleId);
+  const female = birds.find(b => b.id === pair.femaleId);
+  const cageId = male?.cageId || female?.cageId || pair.cageId;
+  const cage = cages.find(c => c.id === cageId);
+
+  const BirdMini = ({ bird, label, isMale }: { bird?: Bird, label: string, isMale: boolean }) => (
+    <div className="flex items-center gap-2 min-w-0">
+      <div 
+        className="w-5 h-5 rounded-md flex items-center justify-center text-[10px] font-black shrink-0 border animate-pulse-subtle"
+        style={{
+          backgroundColor: isMale ? 'rgba(59, 130, 246, 0.15)' : 'rgba(225, 29, 72, 0.15)',
+          color: isMale ? '#60a5fa' : '#fb7185',
+          borderColor: isMale ? 'rgba(59, 130, 246, 0.3)' : 'rgba(225, 29, 72, 0.3)'
+        }}
+      >
+        {label}
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className="text-[10px] font-black text-white uppercase truncate shrink-0">{bird?.name || 'Unassigned'}</span>
+          {bird && (
+            <span className="text-[8px] font-bold text-white/50 uppercase truncate">
+              {bird.species}{bird.subSpecies ? ` (${bird.subSpecies})` : ''}
+            </span>
+          )}
+        </div>
+        {bird && ((bird.mutations?.length || 0) > 0 || (bird.splitMutations?.length || 0) > 0 || (bird.statuses?.length || 0) > 0) && (
+          <div className="flex flex-wrap gap-1 mt-0.5 opacity-60 scale-90 origin-left">
+            {bird.mutations?.slice(0, 2).map(m => (
+              <span key={m} className="text-[7px] px-1 bg-black/40 text-white/50 rounded-sm font-black uppercase border border-white/5">{m}</span>
+            ))}
+            {bird.splitMutations?.slice(0, 1).map(m => (
+              <span key={m} className="text-[7px] px-1 bg-black/40 text-amber-500/50 rounded-sm font-black uppercase italic border border-amber-500/5">/{m}</span>
+            ))}
+            {bird.statuses?.slice(0, 2).map(s => (
+              <span key={s} className="text-[7px] px-1 bg-blue-900/30 text-blue-300/80 rounded-sm font-black uppercase border border-blue-500/10 shadow-sm">{s}</span>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
+  return (
+    <div 
+      className={cn("flex flex-col gap-2 p-3 bg-zinc-900/60 rounded-xl border border-white/10 transition-all text-left w-full min-w-0", onClick && "cursor-pointer hover:bg-zinc-800/80 hover:border-gold-500/30", className)}
+      onClick={(e) => {
+        if (onClick) {
+          e.stopPropagation();
+          onClick();
+        }
+      }}
+    >
+      <div className="flex items-center justify-between gap-2 border-b border-white/5 pb-1.5 mb-0.5">
+        <span className="text-[9px] font-black text-gold-500 uppercase tracking-widest">Breeding Pair</span>
+        {cage && (
+          <span className="text-[8px] font-bold text-white/80 uppercase flex items-center gap-1 shrink-0 bg-white/5 px-1.5 py-0.5 rounded-md border border-white/10 truncate">
+            <Home size={8} className="shrink-0" /> {cage.name}
+          </span>
+        )}
+      </div>
+      <div className="space-y-2">
+        <BirdMini bird={male} label="M" isMale={true} />
+        <BirdMini bird={female} label="F" isMale={false} />
+      </div>
+    </div>
+  );
+};
+
+const LocalBirdCompactInfo = ({ bird, cages, className, onClick }: { bird: Bird, cages: Cage[], className?: string, onClick?: () => void }) => {
+  const cage = cages.find(c => c.id === bird.cageId);
+  return (
+    <div 
+      className={cn("flex flex-col gap-2 p-3 bg-zinc-900/60 rounded-xl border border-white/10 transition-all text-left w-full min-w-0", onClick && "cursor-pointer hover:bg-zinc-800/80 hover:border-gold-500/30", className)}
+      onClick={(e) => {
+        if (onClick) {
+          e.stopPropagation();
+          onClick();
+        }
+      }}
+    >
+      <div className="flex items-center justify-between gap-2 border-b border-white/5 pb-1.5 mb-0.5">
+        <span className="text-[9px] font-black text-gold-500 uppercase tracking-widest">Bird Profile</span>
+        {cage && (
+          <span className="text-[8px] font-bold text-white/80 uppercase flex items-center gap-1 shrink-0 bg-white/5 px-1.5 py-0.5 rounded-md border border-white/10 truncate max-w-[120px]">
+            <Home size={8} className="shrink-0 animate-pulse-subtle" /> <span className="truncate">{cage.name}</span>
+          </span>
+        )}
+      </div>
+      
+      <div className="flex items-center gap-2 min-w-0">
+        <div 
+          className="w-5 h-5 rounded-md flex items-center justify-center text-[10px] font-black shrink-0 border"
+          style={{
+            backgroundColor: bird.sex === 'Male' ? 'rgba(59, 130, 246, 0.15)' : bird.sex === 'Female' ? 'rgba(225, 29, 72, 0.15)' : 'rgba(255,255,255,0.05)',
+            color: bird.sex === 'Male' ? '#60a5fa' : bird.sex === 'Female' ? '#fb7185' : 'rgba(255,255,255,0.4)',
+            borderColor: bird.sex === 'Male' ? 'rgba(59, 130, 246, 0.3)' : bird.sex === 'Female' ? 'rgba(225, 29, 72, 0.3)' : 'rgba(255,255,255,0.1)'
+          }}
+        >
+          {bird.sex === 'Male' ? 'M' : bird.sex === 'Female' ? 'F' : '?'}
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-[10px] font-black text-white uppercase truncate shrink-0">{bird.name}</span>
+            <span className="text-[8px] font-bold text-white/50 uppercase truncate">
+              {bird.species}{bird.subSpecies ? ` (${bird.subSpecies})` : ''}
+            </span>
+          </div>
+          {((bird.mutations?.length || 0) > 0 || (bird.splitMutations?.length || 0) > 0 || (bird.statuses?.length || 0) > 0) ? (
+            <div className="flex flex-wrap gap-1 mt-0.5 opacity-60 scale-90 origin-left">
+              {bird.mutations?.map(m => (
+                <span key={m} className="text-[7px] px-1 bg-black/40 text-white/50 rounded-sm font-black uppercase border border-white/5">
+                  {m}
+                </span>
+              ))}
+              {bird.splitMutations?.map(m => (
+                <span key={m} className="text-[7px] px-1 bg-black/40 text-amber-500/50 rounded-sm font-black uppercase italic border border-amber-500/5">
+                  /{m}
+                </span>
+              ))}
+              {bird.statuses?.map(s => (
+                <span key={s} className="text-[7px] px-1 bg-blue-900/30 text-blue-300/80 rounded-sm font-black uppercase border border-blue-500/10 shadow-sm">
+                  {s}
+                </span>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const LocalSearchableSelect = ({
+  label,
+  options,
+  value,
+  onChange,
+  placeholder = "Search or select...",
+  disabled = false,
+  cages = [],
+  birds = []
+}: {
+  label: string;
+  options: SearchableSelectOption[];
+  value?: string;
+  onChange: (val: string) => void;
+  placeholder?: string;
+  disabled?: boolean;
+  cages?: Cage[];
+  birds?: Bird[];
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  
+  const filteredOptions = options.filter(opt => {
+    // Treat placeholder special
+    if (opt.id === '') return true;
+    return opt.name.toLowerCase().includes(search.toLowerCase()) ||
+          (opt.details?.toLowerCase().includes(search.toLowerCase())) ||
+          (opt.subText?.toLowerCase().includes(search.toLowerCase()));
+  });
+
+  const selectedOption = options.find(o => o.id === value);
+
+  const renderOptionContent = (opt: SearchableSelectOption) => {
+    if (opt.id === '') {
+      return <span className="text-zinc-500 font-bold">{opt.name}</span>;
+    }
+
+    if (opt.bird) {
+      return <LocalBirdCompactInfo bird={opt.bird} cages={cages} className="border-0 bg-transparent p-0" />;
+    }
+
+    if (opt.pair && birds) {
+      return <LocalPairCompactInfo pair={opt.pair} birds={birds} cages={cages} className="border-0 bg-transparent p-0" />;
+    }
+
+    if (opt.details || opt.subText) {
+      return (
+        <div className="flex flex-col gap-0.5 py-1">
+          <span className="font-bold text-white group-hover:text-gold-500 transition-colors">{opt.name}</span>
+          {opt.details && <span className="text-[10px] text-white/50">{opt.details}</span>}
+          {opt.subText && <span className="text-[9px] text-gold-500/50 italic">{opt.subText}</span>}
+        </div>
+      );
+    }
+    
+    return <span>{opt.name}</span>;
+  };
+
+  return (
+    <div className="relative space-y-1">
+      <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">{label}</label>
+      
+      {/* Main trigger button */}
+      <div 
+        className={cn(
+          "w-full px-4 py-3 bg-black border border-black-700 text-white rounded-2xl cursor-pointer flex items-center justify-between transition-all text-sm font-medium hover:border-zinc-500",
+          disabled && "opacity-50 cursor-not-allowed"
+        )}
+        onClick={() => !disabled && setIsOpen(!isOpen)}
+      >
+        <div className="truncate flex-1 text-left">
+          {selectedOption && selectedOption.id !== '' ? (
+            selectedOption.bird ? (
+              <LocalBirdCompactInfo bird={selectedOption.bird} cages={cages} className="border-0 bg-transparent p-0" />
+            ) : selectedOption.pair ? (
+              <LocalPairCompactInfo pair={selectedOption.pair} birds={birds} cages={cages} className="border-0 bg-transparent p-0" />
+            ) : (
+              <span>{selectedOption.name}</span>
+            )
+          ) : (
+            <span className="text-zinc-500 italic">{placeholder}</span>
+          )}
+        </div>
+        <ChevronDown size={14} className={cn("transition-transform shrink-0 ml-2 text-zinc-500", isOpen && "rotate-180")} />
+      </div>
+
+      <AnimatePresence>
+        {isOpen && (
+          <>
+            <div className="fixed inset-0 z-[100]" onClick={() => setIsOpen(false)} />
+            <motion.div 
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="absolute z-[101] w-full mt-1 bg-black border border-black-700 rounded-2xl shadow-2xl overflow-hidden"
+            >
+              <div className="p-2 border-b border-black-800">
+                <input 
+                  autoFocus
+                  placeholder="Search..." 
+                  value={search} 
+                  onChange={e => setSearch(e.target.value)}
+                  className="w-full px-3 py-1.5 bg-zinc-900 border border-black-700 text-white rounded-xl focus:outline-none focus:border-gold-500 text-xs font-medium placeholder:text-white/30"
+                />
+              </div>
+              <div className="max-h-64 overflow-y-auto custom-scrollbar">
+                {filteredOptions.length > 0 ? (
+                  filteredOptions.map(opt => (
+                    <div 
+                      key={opt.id}
+                      className={cn(
+                        "px-3 py-2 text-xs cursor-pointer hover:bg-zinc-800 transition-colors flex items-center justify-between group border-b border-zinc-900/40 last:border-b-0",
+                        value === opt.id && "text-gold-500 bg-zinc-800"
+                      )}
+                      onClick={() => {
+                        onChange(opt.id);
+                        setIsOpen(false);
+                      }}
+                    >
+                      <div className="flex-1 min-w-0">
+                        {renderOptionContent(opt)}
+                      </div>
+                      {value === opt.id && <CheckSquare size={12} className="shrink-0 ml-2 text-gold-500" />}
+                    </div>
+                  ))
+                ) : (
+                  <div className="px-3 py-4 text-center text-[10px] text-zinc-500 uppercase tracking-widest font-bold">
+                    No results found
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
+
+export default function GeneticsCalculator({ 
+  userMutations,
+  birds = [],
+  pairs = [],
+  cages = []
+}: { 
+  userMutations: { id: string, name: string, inheritance?: string }[];
+  birds?: Bird[];
+  pairs?: Pair[];
+  cages?: Cage[];
+}) {
   const [dadMutations, setDadMutations] = useState<ParentMutation[]>([]);
   const [momMutations, setMomMutations] = useState<ParentMutation[]>([]);
 
-  const mutationOptions = userMutations.map(m => ({ id: m.id, name: m.name }));
+  const [selectedPairId, setSelectedPairId] = useState<string>('');
+  const [selectedDadId, setSelectedDadId] = useState<string>('');
+  const [selectedMomId, setSelectedMomId] = useState<string>('');
+
+  const sortedPairsList = useMemo(() => {
+    return [...pairs].filter(p => p.maleId || p.femaleId).map(p => {
+      const male = birds.find(b => b.id === p.maleId);
+      const female = birds.find(b => b.id === p.femaleId);
+      const mName = male?.name || 'Empty';
+      const fName = female?.name || 'Empty';
+      const cageId = p.cageId || male?.cageId || female?.cageId;
+      const cage = cages.find(c => c.id === cageId);
+      
+      const maleInfo = male ? `${male.species}${male.subSpecies ? ` (${male.subSpecies})` : ''} ${male.mutations?.join(', ')}${male.splitMutations?.length ? ` / ${male.splitMutations.join(', ')}` : ''}` : 'Empty Male';
+      const femaleInfo = female ? `${female.species}${female.subSpecies ? ` (${female.subSpecies})` : ''} ${female.mutations?.join(', ')}${female.splitMutations?.length ? ` / ${female.splitMutations.join(', ')}` : ''}` : 'Empty Female';
+
+      return { 
+        id: p.id, 
+        name: `${mName} x ${fName}`, 
+        details: `M: ${maleInfo} | F: ${femaleInfo}${cage ? ` - Cage: ${cage.name}` : ''}`,
+        pair: p,
+        cageName: cage?.name || ''
+      };
+    }).sort((a, b) => {
+      if (a.cageName !== b.cageName) {
+        if (!a.cageName) return 1;
+        if (!b.cageName) return -1;
+        return a.cageName.localeCompare(b.cageName, undefined, { numeric: true, sensitivity: 'base' });
+      }
+      return a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' });
+    });
+  }, [pairs, birds, cages]);
+
+  const sortedDadsList = useMemo(() => {
+    return [...birds]
+      .filter(b => !b.isGhost && (b.sex === 'Male' || b.sex === 'Unknown'))
+      .map(b => {
+        const cage = cages.find(c => c.id === b.cageId);
+        return { 
+          id: b.id, 
+          name: b.name, 
+          details: `${b.species}${b.subSpecies ? ` • ${b.subSpecies}` : ''}${cage ? ` - Cage: ${cage.name}` : ''}`, 
+          bird: b,
+          cageName: cage?.name || ''
+        };
+      })
+      .sort((a, b) => {
+        if (a.cageName !== b.cageName) {
+          if (!a.cageName) return 1;
+          if (!b.cageName) return -1;
+          return a.cageName.localeCompare(b.cageName, undefined, { numeric: true, sensitivity: 'base' });
+        }
+        return a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' });
+      });
+  }, [birds, cages]);
+
+  const sortedMomsList = useMemo(() => {
+    return [...birds]
+      .filter(b => !b.isGhost && (b.sex === 'Female' || b.sex === 'Unknown'))
+      .map(b => {
+        const cage = cages.find(c => c.id === b.cageId);
+        return { 
+          id: b.id, 
+          name: b.name, 
+          details: `${b.species}${b.subSpecies ? ` • ${b.subSpecies}` : ''}${cage ? ` - Cage: ${cage.name}` : ''}`, 
+          bird: b,
+          cageName: cage?.name || ''
+        };
+      })
+      .sort((a, b) => {
+        if (a.cageName !== b.cageName) {
+          if (!a.cageName) return 1;
+          if (!b.cageName) return -1;
+          return a.cageName.localeCompare(b.cageName, undefined, { numeric: true, sensitivity: 'base' });
+        }
+        return a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' });
+      });
+  }, [birds, cages]);
+
+  const mutationOptions = userMutations.map(m => ({ id: m.id, name: m.name, inheritance: m.inheritance }));
+
+  const loadBirdMutations = (bird: Bird, isMale: boolean) => {
+    const visualMuts = bird.mutations || [];
+    const splitMuts = bird.splitMutations || [];
+    const loaded: ParentMutation[] = [];
+
+    visualMuts.forEach(mutName => {
+      const userMut = userMutations.find(m => m.name.toLowerCase() === mutName.toLowerCase());
+      const inheritance = (userMut?.inheritance as InheritanceType) || 'autosomal_recessive';
+      const state = (inheritance === 'autosomal_dominant' || inheritance === 'incomplete_dominant') ? 'sf' : 'visual';
+      loaded.push({
+        id: 'visual_' + mutName + '_' + Math.random().toString(36).substring(7),
+        mutationName: mutName,
+        inheritance,
+        state
+      });
+    });
+
+    splitMuts.forEach(mutName => {
+      const userMut = userMutations.find(m => m.name.toLowerCase() === mutName.toLowerCase());
+      const inheritance = (userMut?.inheritance as InheritanceType) || 'autosomal_recessive';
+      const state = 'split';
+      loaded.push({
+        id: 'split_' + mutName + '_' + Math.random().toString(36).substring(7),
+        mutationName: mutName,
+        inheritance,
+        state
+      });
+    });
+
+    return loaded;
+  };
+
+  const loadPair = (pairId: string) => {
+    setSelectedPairId(pairId);
+    if (!pairId) {
+      setSelectedDadId('');
+      setSelectedMomId('');
+      setDadMutations([]);
+      setMomMutations([]);
+      return;
+    }
+    const pair = pairs.find(p => p.id === pairId);
+    if (!pair) return;
+
+    const male = birds.find(b => b.id === pair.maleId);
+    const female = birds.find(b => b.id === pair.femaleId);
+
+    if (male) {
+      setSelectedDadId(male.id);
+      setDadMutations(loadBirdMutations(male, true));
+    } else {
+      setSelectedDadId('');
+      setDadMutations([]);
+    }
+
+    if (female) {
+      setSelectedMomId(female.id);
+      setMomMutations(loadBirdMutations(female, false));
+    } else {
+      setSelectedMomId('');
+      setMomMutations([]);
+    }
+  };
+
+  const loadDad = (birdId: string) => {
+    setSelectedDadId(birdId);
+    setSelectedPairId(''); // Clear pair selection if changing individual
+    if (!birdId) {
+      setDadMutations([]);
+      return;
+    }
+    const bird = birds.find(b => b.id === birdId);
+    if (bird) {
+      setDadMutations(loadBirdMutations(bird, true));
+    } else {
+      setDadMutations([]);
+    }
+  };
+
+  const loadMom = (birdId: string) => {
+    setSelectedMomId(birdId);
+    setSelectedPairId(''); // Clear pair selection if changing individual
+    if (!birdId) {
+      setMomMutations([]);
+      return;
+    }
+    const bird = birds.find(b => b.id === birdId);
+    if (bird) {
+      setMomMutations(loadBirdMutations(bird, false));
+    } else {
+      setMomMutations([]);
+    }
+  };
+
+  const clearSelection = () => {
+    setSelectedPairId('');
+    setSelectedDadId('');
+    setSelectedMomId('');
+    setDadMutations([]);
+    setMomMutations([]);
+  };
 
   const addMutation = (isMale: boolean) => {
     const newMut: ParentMutation = {
@@ -169,6 +646,68 @@ export default function GeneticsCalculator({ userMutations }: { userMutations: {
       <div className="border-b border-black-800 bg-black-950 p-3 sm:p-4">
         <div className="max-w-5xl mx-auto">
           
+          {/* Quick Load from Flock */}
+          <div className="bg-zinc-900 border border-black-800 rounded-2xl p-4 mb-4 space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h4 className="font-black text-xs sm:text-sm uppercase tracking-wider text-gold-500">Quick-Load Parental Data</h4>
+                <p className="text-[10px] sm:text-xs text-black-200">Select an existing pair or individual birds to calculate their breeding genetics instantly.</p>
+              </div>
+              {(selectedPairId || selectedDadId || selectedMomId) && (
+                <button 
+                  onClick={clearSelection}
+                  className="flex items-center gap-1.5 text-xs font-bold text-red-400 hover:text-red-300 bg-red-900/15 border border-red-900/30 px-3 py-1.5 rounded-xl transition-all"
+                >
+                  <RefreshCw size={13} /> Reset / Clear Board
+                </button>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
+              {/* Load Breeding Pair */}
+              <LocalSearchableSelect
+                label="Load From Breeding Pair"
+                placeholder="-- Choose Parental Pair --"
+                value={selectedPairId}
+                onChange={loadPair}
+                options={[
+                  { id: '', name: '-- Choose Parental Pair --' },
+                  ...sortedPairsList
+                ]}
+                birds={birds}
+                cages={cages}
+              />
+
+              {/* Load Dad */}
+              <LocalSearchableSelect
+                label="Select Dad (Male)"
+                placeholder="-- Choose Male Bird --"
+                value={selectedDadId}
+                onChange={loadDad}
+                options={[
+                  { id: '', name: '-- Choose Male Bird --' },
+                  ...sortedDadsList
+                ]}
+                birds={birds}
+                cages={cages}
+              />
+
+              {/* Load Mom */}
+              <LocalSearchableSelect
+                label="Select Mom (Female)"
+                placeholder="-- Choose Female Bird --"
+                value={selectedMomId}
+                onChange={loadMom}
+                options={[
+                  { id: '', name: '-- Choose Female Bird --' },
+                  ...sortedMomsList
+                ]}
+                birds={birds}
+                cages={cages}
+              />
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4">
             
             {/* Male (Dad) */}
@@ -307,7 +846,7 @@ function MutationRow({
   onChange: (m: ParentMutation) => void;
   onRemove: () => void;
   isMale: boolean;
-  options: { id: string; name: string }[];
+  options: { id: string; name: string; inheritance?: string }[];
 }) {
   const handleInheritanceChange = (newInheritance: InheritanceType) => {
     let newState = mutation.state;
@@ -325,7 +864,19 @@ function MutationRow({
       <select 
         className="w-full min-w-0 bg-black border border-black-700 text-white text-[11px] sm:text-sm rounded-md px-1 sm:px-2 py-1.5 sm:py-2 outline-none focus:border-gold-500 truncate appearance-none sm:appearance-auto"
         value={mutation.mutationName}
-        onChange={e => onChange({ ...mutation, mutationName: e.target.value })}
+        onChange={e => {
+          const selectedName = e.target.value;
+          const userMut = options.find(o => o.name === selectedName);
+          const newInheritance = (userMut?.inheritance as InheritanceType) || mutation.inheritance;
+          let newState = mutation.state;
+          if (newInheritance === 'autosomal_dominant' || newInheritance === 'incomplete_dominant') {
+            if (newState === 'visual' || newState === 'split') newState = 'sf';
+          } else {
+            if (newState === 'sf' || newState === 'df') newState = 'visual';
+            if (!isMale && newInheritance === 'sex_linked_recessive' && newState === 'split') newState = 'visual';
+          }
+          onChange({ ...mutation, mutationName: selectedName, inheritance: newInheritance, state: newState });
+        }}
       >
         <option value="" disabled>Mutation</option>
         {options.map(o => <option key={o.id} value={o.name}>{o.name}</option>)}

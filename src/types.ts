@@ -12,6 +12,7 @@ export interface SubSpecies {
 export interface Mutation {
   id: string;
   name: string;
+  inheritance?: 'autosomal_recessive' | 'autosomal_dominant' | 'incomplete_dominant' | 'sex_linked_recessive';
 }
 
 export interface CustomStatus {
@@ -36,6 +37,7 @@ export interface UserSettings {
   femaleColor?: string;
   deleteColor?: string;
   secondaryColor?: string;
+  useDefaultData?: boolean;
 }
 
 export interface SharedItem {
@@ -95,6 +97,9 @@ export interface Transaction {
   pairId?: string;
   contactId?: string;
   description?: string;
+  recurring?: 'None' | 'Daily' | 'Weekly' | 'Monthly' | 'Yearly';
+  nextDueDate?: string;
+  recurringParentId?: string;
   uid: string;
 }
 

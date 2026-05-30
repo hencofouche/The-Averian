@@ -8,7 +8,7 @@ import {
   Tag, Calendar, ChevronDown, ChevronUp, ChevronRight, ChevronLeft, X, GitBranch,
   Image as ImageIcon, Loader2, DollarSign, TrendingUp, TrendingDown,
   Activity, ArrowUpRight, ArrowDownRight, BarChart3, PieChart as PieChartIcon,
-  Menu, Egg, LayoutGrid, Grid3x3, List as ListIcon, AlertTriangle, CreditCard, CheckCircle2, Bell, Cloud, Maximize2, Share2, Send, Printer, MoreHorizontal, Dna, Users, Palette, QrCode, Scan, FileText, ExternalLink, ArrowLeft, ArrowRightLeft, History as HistoryIcon
+  Menu, Egg, LayoutGrid, Grid3x3, List as ListIcon, AlertTriangle, CreditCard, CheckCircle2, Bell, Cloud, Maximize2, Share2, Send, Printer, MoreHorizontal, Dna, Users, Palette, QrCode, Scan, FileText, ExternalLink, ArrowLeft, ArrowRightLeft, History as HistoryIcon, RefreshCw
 } from 'lucide-react';
 import GeneticsCalculator from './components/GeneticsCalculator';
 import { ContactsView } from './components/ContactsView';
@@ -16,6 +16,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import { Scanner } from '@yudiel/react-qr-scanner';
 import { motion, AnimatePresence } from 'motion/react';
 import { generateBirdListPDF, generateCageListPDF, generatePairListPDF, generateCertificatePDF, generateQRListPDF } from './lib/pdf-engine';
+import { defaultSpecies, defaultMutations } from './lib/default-data';
 
 function ImageGallery({ imageUrls, initialIndex, onClose }: { imageUrls: string[], initialIndex: number, onClose: () => void }) {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
@@ -867,6 +868,37 @@ export default function App() {
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [userSettings, setUserSettings] = useState<UserSettings | null>(null);
   
+  const effectiveSettings = useMemo(() => {
+    if (!userSettings) return null;
+    const effective = { ...userSettings };
+    if (userSettings.useDefaultData !== false) {
+      const mergedSpeciesMap = new Map((userSettings.species || []).map(s => [s.name.toLowerCase(), s]));
+      const mergedSubspeciesMap = new Map((userSettings.subspecies || []).map(s => [s.name.toLowerCase(), s]));
+      const mergedMutationsMap = new Map((userSettings.mutations || []).map(m => [m.name.toLowerCase(), m]));
+
+      defaultSpecies.forEach(ds => {
+        if (!mergedSpeciesMap.has(ds.name.toLowerCase())) {
+          mergedSpeciesMap.set(ds.name.toLowerCase(), { id: ds.id, name: ds.name });
+        }
+        ds.subspecies.forEach(dss => {
+          if (!mergedSubspeciesMap.has(dss.name.toLowerCase())) {
+            mergedSubspeciesMap.set(dss.name.toLowerCase(), { id: dss.id, name: dss.name, speciesId: mergedSpeciesMap.get(ds.name.toLowerCase())!.id });
+          }
+        });
+      });
+      defaultMutations.forEach(dm => {
+        if (!mergedMutationsMap.has(dm.name.toLowerCase())) {
+          mergedMutationsMap.set(dm.name.toLowerCase(), { id: dm.id, name: dm.name, inheritance: dm.inheritance });
+        }
+      });
+      
+      effective.species = Array.from(mergedSpeciesMap.values());
+      effective.subspecies = Array.from(mergedSubspeciesMap.values());
+      effective.mutations = Array.from(mergedMutationsMap.values());
+    }
+    return effective;
+  }, [userSettings]);
+  
   // Pagination counts
   const [birdsLimit, setBirdsLimit] = useState(100);
   const [cagesLimit, setCagesLimit] = useState(50);
@@ -1166,6 +1198,73 @@ export default function App() {
     };
   }, [user, birdsLimit, cagesLimit, pairsLimit, breedingLimit, tasksLimit, transactionLimit, contactsLimit]);
 
+  useEffect(() => {
+    if (!user) return;
+    const processRecurring = async () => {
+      try {
+        const qRecurring = query(
+          collection(db, 'transactions'),
+          where('uid', '==', user.uid),
+          where('recurring', 'in', ['Daily', 'Weekly', 'Monthly', 'Yearly'])
+        );
+        const snapshot = await getDocs(qRecurring);
+        const now = new Date();
+        const todayStr = format(now, 'yyyy-MM-dd');
+
+        const batchReq = writeBatch(db);
+        let hasChanges = false;
+
+        snapshot.docs.forEach(docSnap => {
+          const t = { ...docSnap.data(), id: docSnap.id } as Transaction;
+          if (t.nextDueDate && t.nextDueDate <= todayStr) {
+            let nextD = parseISO(t.nextDueDate);
+            let cycles = 0;
+            // Generate up to today
+            while (format(nextD, 'yyyy-MM-dd') <= todayStr && cycles < 300) {
+              const newTransData = {
+                ...t,
+                date: format(nextD, 'yyyy-MM-dd'),
+                recurring: 'None',
+                recurringParentId: t.id
+              };
+              // @ts-ignore
+              delete newTransData.id;
+              delete newTransData.nextDueDate;
+              
+              const newDocRef = doc(collection(db, 'transactions'));
+              batchReq.set(newDocRef, newTransData);
+              hasChanges = true;
+
+              if (t.recurring === 'Daily') nextD = addDays(nextD, 1);
+              else if (t.recurring === 'Weekly') nextD = addDays(nextD, 7);
+              else if (t.recurring === 'Monthly') nextD = addMonths(nextD, 1);
+              else if (t.recurring === 'Yearly') nextD = addMonths(nextD, 12);
+              else break;
+              cycles++;
+            }
+            
+            if (cycles > 0) {
+              const parentRef = doc(db, 'transactions', t.id);
+              batchReq.update(parentRef, { nextDueDate: format(nextD, 'yyyy-MM-dd') });
+            }
+          }
+        });
+
+        if (hasChanges) {
+          await batchReq.commit();
+        }
+      } catch (err) {
+        console.error("Failed to process recurring transactions:", err);
+      }
+    };
+    
+    // Slight delay to avoid blocking initial render
+    const timeoutId = setTimeout(() => {
+      processRecurring();
+    }, 2000);
+    return () => clearTimeout(timeoutId);
+  }, [user]);
+
   const filteredItems = useMemo(() => {
     const query = searchQuery.toLowerCase();
     switch (activeTab) {
@@ -1255,6 +1354,23 @@ export default function App() {
                  (female && birdMatches(female)) ||
                  cageLabel.toLowerCase().includes(query) ||
                  (cage && cage.id.toLowerCase().includes(query));
+        }).sort((a, b) => {
+          const maleA = birds.find(x => x.id === a.maleId);
+          const femaleA = birds.find(x => x.id === a.femaleId);
+          const cageA = cages.find(c => c.id === a.cageId) || cages.find(c => c.id === maleA?.cageId) || cages.find(c => c.id === femaleA?.cageId);
+          const cageNameA = cageA ? cageA.name : 'ZZZ';
+
+          const maleB = birds.find(x => x.id === b.maleId);
+          const femaleB = birds.find(x => x.id === b.femaleId);
+          const cageB = cages.find(c => c.id === b.cageId) || cages.find(c => c.id === maleB?.cageId) || cages.find(c => c.id === femaleB?.cageId);
+          const cageNameB = cageB ? cageB.name : 'ZZZ';
+
+          if (cageNameA !== cageNameB) {
+            return cageNameA.localeCompare(cageNameB, undefined, { numeric: true, sensitivity: 'base' });
+          }
+          const labelA = `${maleA?.name || ''} x ${femaleA?.name || ''}`;
+          const labelB = `${maleB?.name || ''} x ${femaleB?.name || ''}`;
+          return labelA.localeCompare(labelB, undefined, { numeric: true, sensitivity: 'base' });
         });
       case 'breeding':
         return breedingRecords.filter(br => {
@@ -1747,21 +1863,27 @@ export default function App() {
       window.history.replaceState({}, document.title, newUrl);
     };
 
-    const handleDeleteShared = async () => {
+    const handleDeleteShared = () => {
       if (!user || user.uid !== sharedItemView.createdBy) {
         toast.error('You do not have permission to delete this shared item.');
         return;
       }
-      try {
-        await deleteDoc(doc(db, 'shared_items', sharedItemView.id));
-        toast.success('Shared item deleted successfully');
-        setSharedItemView(null);
-        const newUrl = window.location.pathname;
-        window.history.replaceState({}, document.title, newUrl);
-      } catch (e) {
-        console.error("Error deleting shared item:", e);
-        toast.error('Failed to delete shared item');
-      }
+      setDeleteConfirmation({
+        title: 'Delete Shared Link',
+        message: 'Are you sure you want to delete this shared link? Others will no longer be able to import it.',
+        onConfirm: async () => {
+          try {
+            await deleteDoc(doc(db, 'shared_items', sharedItemView.id));
+            toast.success('Shared item deleted successfully');
+            setSharedItemView(null);
+            const newUrl = window.location.pathname;
+            window.history.replaceState({}, document.title, newUrl);
+          } catch (e) {
+            console.error("Error deleting shared item:", e);
+            toast.error('Failed to delete shared item');
+          }
+        }
+      });
     };
 
     return (
@@ -1943,7 +2065,7 @@ export default function App() {
                     className="w-full bg-zinc-900 border border-black-700 text-white rounded-xl p-3 outline-none focus:border-gold-500 transition-colors"
                   >
                     <option value="">No Cage Assigned</option>
-                    {cages.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                    {[...cages].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                   </select>
                 </div>
 
@@ -2218,7 +2340,7 @@ export default function App() {
                             cages={cages}
                             viewMode={viewMode}
                             currency={userSettings?.currency}
-                            userSettings={userSettings}
+                            userSettings={effectiveSettings}
                             onBirdRef={handleBirdRef}
                             onNavigate={handleNavigate}
                             onEdit={() => { setEditingItem(bird); setIsModalOpen(true); }}
@@ -2325,7 +2447,7 @@ export default function App() {
                     )}>
                       {(filteredItems as Pair[]).length > 0 ? (
                         (filteredItems as Pair[]).map(pair => (
-                          <PairCard key={pair.id} pair={pair} male={birds.find(b => b.id === pair.maleId)} female={birds.find(b => b.id === pair.femaleId)} cages={cages} birds={birds} records={breedingRecords} currency={userSettings?.currency} viewMode={viewMode} onBirdRef={handleBirdRef} onNavigate={handleNavigate} userSettings={userSettings}
+                          <PairCard key={pair.id} pair={pair} male={birds.find(b => b.id === pair.maleId)} female={birds.find(b => b.id === pair.femaleId)} cages={cages} birds={birds} records={breedingRecords} currency={userSettings?.currency} viewMode={viewMode} onBirdRef={handleBirdRef} onNavigate={handleNavigate} userSettings={effectiveSettings}
                             onEdit={() => { setEditingItem(pair); setIsModalOpen(true); }}
                             onDelete={() => setDeleteConfirmation({ 
                               title: 'Delete Pair', 
@@ -2414,6 +2536,7 @@ export default function App() {
                     <FinancialsView 
                       transactions={filteredItems as Transaction[]} 
                       birds={birds} 
+                      pairs={pairs}
                       contacts={contacts}
                       cages={cages}
                       currency={userSettings?.currency}
@@ -2474,7 +2597,7 @@ export default function App() {
                 )}
 
                 {activeTab === 'genetics' && (
-                  <GeneticsCalculator userMutations={userSettings?.mutations || []} />
+                  <GeneticsCalculator userMutations={effectiveSettings?.mutations || []} birds={birds} pairs={pairs} cages={cages} />
                 )}
 
                 {activeTab === 'print' && (
@@ -2488,7 +2611,7 @@ export default function App() {
                     cages={cages} 
                     onBirdRef={handleBirdRef} 
                     onBack={handleGoBack} 
-                    userSettings={userSettings ?? undefined}
+                    userSettings={effectiveSettings ?? undefined}
                   />
                 )}
 
@@ -2663,7 +2786,7 @@ export default function App() {
             birds={birds} 
             pairs={pairs}
             contacts={contacts}
-            userSettings={userSettings}
+            userSettings={effectiveSettings}
             onAddSpecies={handleAddSpecies}
             onAddSubSpecies={handleAddSubSpecies}
             onAddMutation={handleAddMutation}
@@ -3861,6 +3984,7 @@ function PairCard({ pair, male, female, cages, birds, records, currency, onBirdR
 function FinancialsView({ 
   transactions, 
   birds, 
+  pairs,
   contacts,
   cages,
   currency, 
@@ -3870,6 +3994,7 @@ function FinancialsView({
 }: { 
   transactions: Transaction[], 
   birds: Bird[], 
+  pairs: Pair[],
   contacts: Contact[],
   cages: Cage[],
   currency?: string, 
@@ -4036,8 +4161,10 @@ function FinancialsView({
                 key={t.id} 
                 transaction={t} 
                 bird={birds.find(b => b.id === t.birdId)}
+                pair={pairs.find(p => p.id === t.pairId)}
                 contact={contacts.find(c => c.id === t.contactId)}
                 cages={cages}
+                birds={birds}
                 onBirdRef={onBirdRef}
                 onEdit={() => onEditTransaction(t)}
                 onDelete={() => onDeleteTransaction(t.id)}
@@ -4268,8 +4395,10 @@ function EntityStatsView({
                   key={t.id} 
                   transaction={t} 
                   bird={birds.find(b => b.id === t.birdId)}
+                  pair={pairs.find(p => p.id === t.pairId)}
                   contact={contacts.find(c => c.id === t.contactId)}
                   cages={cages}
+                  birds={birds}
                   onBirdRef={onBirdRef}
                   onEdit={() => onEditTransaction(t)}
                   onDelete={() => onDeleteTransaction(t.id)}
@@ -4364,7 +4493,7 @@ function EntityStatsView({
   );
 }
 
-function TransactionCard({ transaction, bird, contact, cages, currency, onBirdRef, onEdit, onDelete, viewMode = 'list' }: { transaction: Transaction, bird?: Bird, contact?: Contact, cages: Cage[], currency?: string, onBirdRef: (name: string) => void, onEdit: () => void, onDelete: () => void, viewMode?: 'grid-large' | 'list' }) {
+function TransactionCard({ transaction, bird, pair, contact, cages, birds, currency, onBirdRef, onEdit, onDelete, viewMode = 'list' }: { transaction: Transaction, bird?: Bird, pair?: Pair, contact?: Contact, cages: Cage[], birds?: Bird[], currency?: string, onBirdRef: (name: string) => void, onEdit: () => void, onDelete: () => void, viewMode?: 'grid-large' | 'list' }) {
   const symbol = getCurrencySymbol(currency);
   return (
     <Card className={cn(
@@ -4389,6 +4518,12 @@ function TransactionCard({ transaction, bird, contact, cages, currency, onBirdRe
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-0.5 sm:mb-1 flex-wrap">
             <p className="font-black text-white uppercase tracking-wider text-[10px] sm:text-xs truncate">{transaction.category}</p>
+            {transaction.recurring && transaction.recurring !== 'None' && (
+               <Badge variant="info" className="text-[7px] sm:text-[8px] bg-sky-500/10 text-sky-500 border-sky-500/20 flex items-center gap-1">
+                 <RefreshCw size={8} />
+                 {transaction.recurring}
+               </Badge>
+            )}
             {bird && (
               <div className="w-full mt-1">
                 <BirdCompactInfo 
@@ -4396,6 +4531,12 @@ function TransactionCard({ transaction, bird, contact, cages, currency, onBirdRe
                   cages={cages} 
                   onClick={() => onBirdRef(bird.name)}
                 />
+              </div>
+            )}
+            {pair && birds && (
+              <div className="w-full mt-1 flex items-center gap-2 text-xs font-bold text-white/70">
+                <Heart size={12} className="text-rose-500" />
+                <span>Pair: {birds.find(b => b.id === pair.maleId)?.name || 'Unknown'} x {birds.find(b => b.id === pair.femaleId)?.name || 'Unknown'}</span>
               </div>
             )}
             {contact && (
@@ -4954,7 +5095,8 @@ function TransactionForm({ user, initialData, birds, pairs, cages, contacts, cur
     birdId: '',
     pairId: '',
     contactId: '',
-    description: ''
+    description: '',
+    recurring: 'None'
   });
   const [isSaving, setIsSaving] = useState(false);
 
@@ -4969,6 +5111,19 @@ function TransactionForm({ user, initialData, birds, pairs, cages, contacts, cur
           ...formData,
           ...(initialData?.id ? {} : { uid: user.uid })
         };
+        // Setup initial nextDueDate if becoming recurring
+        if (data.recurring && data.recurring !== 'None' && !data.nextDueDate) {
+          const basedate = parseISO(data.date || format(new Date(), 'yyyy-MM-dd'));
+          let nextD = basedate;
+          if (data.recurring === 'Daily') nextD = addDays(basedate, 1);
+          if (data.recurring === 'Weekly') nextD = addDays(basedate, 7);
+          if (data.recurring === 'Monthly') nextD = addMonths(basedate, 1);
+          if (data.recurring === 'Yearly') nextD = addMonths(basedate, 12);
+          data.nextDueDate = format(nextD, 'yyyy-MM-dd');
+        } else if (data.recurring === 'None') {
+          delete data.nextDueDate;
+        }
+
         if (initialData?.id) { 
           await updateDoc(doc(db, 'transactions', initialData.id), data); 
         } 
@@ -5002,7 +5157,7 @@ function TransactionForm({ user, initialData, birds, pairs, cages, contacts, cur
           <Input type="number" step="0.01" required value={formData.amount} onChange={e => setFormData({ ...formData, amount: parseFloat(e.target.value) || 0 })} />
         </div>
       </div>
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="space-y-2">
           <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Category</label>
           <Input required placeholder="e.g. Seed, Sale, Vet" value={formData.category} onChange={e => setFormData({ ...formData, category: e.target.value })} />
@@ -5010,6 +5165,16 @@ function TransactionForm({ user, initialData, birds, pairs, cages, contacts, cur
         <div className="space-y-2">
           <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Date</label>
           <Input type="date" required value={formData.date} onChange={e => setFormData({ ...formData, date: e.target.value })} />
+        </div>
+        <div className="space-y-2">
+          <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">Recurring Schedule</label>
+          <Select value={formData.recurring || 'None'} onChange={e => setFormData({ ...formData, recurring: e.target.value as any })}>
+            <option value="None" className="bg-black text-white">None (One-time)</option>
+            <option value="Daily" className="bg-black text-white">Daily</option>
+            <option value="Weekly" className="bg-black text-white">Weekly</option>
+            <option value="Monthly" className="bg-black text-white">Monthly</option>
+            <option value="Yearly" className="bg-black text-white">Yearly</option>
+          </Select>
         </div>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -5685,7 +5850,7 @@ function SettingsView({ settings, onUpdate, allData, user, isSyncing, setDeleteC
   const [newStatus, setNewStatus] = useState('');
   const [newSubSpecies, setNewSubSpecies] = useState('');
   const [selectedSpeciesId, setSelectedSpeciesId] = useState('');
-  const [editingItem, setEditingItem] = useState<{ type: 'species' | 'subspecies' | 'mutation' | 'status', id: string, name: string } | null>(null);
+  const [editingItem, setEditingItem] = useState<{ type: 'species' | 'subspecies' | 'mutation' | 'status', id: string, name: string, inheritance?: 'autosomal_recessive' | 'autosomal_dominant' | 'incomplete_dominant' | 'sex_linked_recessive' } | null>(null);
 
   const downloadBackup = () => {
     const data = JSON.stringify(allData, null, 2);
@@ -5730,7 +5895,7 @@ function SettingsView({ settings, onUpdate, allData, user, isSyncing, setDeleteC
     } else if (editingItem.type === 'subspecies') {
       newSettings.subspecies = newSettings.subspecies.map(ss => ss.id === editingItem.id ? { ...ss, name: editingItem.name.trim() } : ss);
     } else if (editingItem.type === 'mutation') {
-      newSettings.mutations = newSettings.mutations.map(m => m.id === editingItem.id ? { ...m, name: editingItem.name.trim() } : m);
+      newSettings.mutations = newSettings.mutations.map(m => m.id === editingItem.id ? { ...m, name: editingItem.name.trim(), inheritance: editingItem.inheritance } : m);
     } else if (editingItem.type === 'status') {
       newSettings.statuses = newSettings.statuses?.map(s => s.id === editingItem.id ? { ...s, name: editingItem.name.trim() } : s) || [];
     }
@@ -5767,10 +5932,37 @@ function SettingsView({ settings, onUpdate, allData, user, isSyncing, setDeleteC
   const removeMutation = (id: string, name: string) => {
     setDeleteConfirmation({
       title: 'Delete Mutation',
-      message: `Are you sure you want to delete "${name}"?`,
-      onConfirm: () => {
-        onUpdate({ ...settings, mutations: settings.mutations.filter(m => m.id !== id) });
-        toast.success('Mutation removed');
+      message: `Are you sure you want to delete "${name}"? It will be removed from all associated birds.`,
+      onConfirm: async () => {
+        if (!user) return;
+        try {
+          const batch = writeBatch(db);
+          
+          // Filter out of settings
+          const nextMutations = settings.mutations.filter(m => m.id !== id);
+          batch.update(doc(db, 'userSettings', user.uid), {
+            mutations: nextMutations
+          });
+
+          // Remove from birds
+          const affectedBirds = (allData.birds || []).filter((b: any) => 
+            b.mutations?.includes(name) || b.splitMutations?.includes(name)
+          );
+
+          affectedBirds.forEach((b: any) => {
+            batch.update(doc(db, 'birds', b.id), {
+              mutations: b.mutations?.filter((m: string) => m !== name) || [],
+              splitMutations: b.splitMutations?.filter((m: string) => m !== name) || []
+            });
+          });
+
+          await batch.commit();
+          onUpdate({ ...settings, mutations: nextMutations });
+          toast.success('Mutation removed from settings and all associated birds');
+        } catch (e) {
+          console.error("Failed to delete mutation: ", e);
+          toast.error("Failed to remove mutation from birds or settings");
+        }
       }
     });
   };
@@ -5934,6 +6126,19 @@ function SettingsView({ settings, onUpdate, allData, user, isSyncing, setDeleteC
                 </div>
 
                 <div className="pt-4 border-t border-black-800">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-black-100 uppercase tracking-widest ml-1">Data Settings</label>
+                    <label className="flex items-center gap-2 px-3 py-3 bg-black border border-black-700 rounded-lg cursor-pointer hover:bg-zinc-800 transition-colors">
+                      <input 
+                        type="checkbox" 
+                        checked={settings.useDefaultData !== false} 
+                        onChange={e => onUpdate({ ...settings, useDefaultData: e.target.checked })} 
+                        className="rounded bg-black border-black-700 w-4 h-4 text-gold-500 focus:ring-gold-500/20"
+                      />
+                      <span className="text-sm font-bold text-white">Enable Default Master Data (Species, Mutations)</span>
+                    </label>
+                    <p className="text-xs text-black-200 ml-1">Provides a base set of standard species & mutations automatically. Includes genetic rules for the calculator if applicable.</p>
+                  </div>
                 </div>
               </div>
             </motion.div>
@@ -6074,7 +6279,7 @@ function SettingsView({ settings, onUpdate, allData, user, isSyncing, setDeleteC
                     <div key={m.id} className="p-3 bg-black border border-black-700 rounded-xl flex items-center justify-between group">
                       <span className="text-sm font-bold text-white">{m.name}</span>
                       <div className="flex items-center gap-1">
-                        <button onClick={() => setEditingItem({ type: 'mutation', id: m.id, name: m.name })} className="text-black-200 hover:text-secondary p-1.5 bg-zinc-800 rounded-lg transition-all"><Edit2 size={14} /></button>
+                        <button onClick={() => setEditingItem({ type: 'mutation', id: m.id, name: m.name, inheritance: m.inheritance })} className="text-black-200 hover:text-secondary p-1.5 bg-zinc-800 rounded-lg transition-all"><Edit2 size={14} /></button>
                         <button 
                           onClick={() => removeMutation(m.id, m.name)} 
                           className="p-1.5 rounded-lg transition-all"
@@ -6305,6 +6510,18 @@ function SettingsView({ settings, onUpdate, allData, user, isSyncing, setDeleteC
                   onKeyDown={e => e.key === 'Enter' && handleEdit()}
                   autoFocus
                 />
+                {editingItem.type === 'mutation' && (
+                  <div>
+                    <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1 mb-1 block">Inheritance</label>
+                    <Select value={editingItem.inheritance || ''} onChange={e => setEditingItem({ ...editingItem, inheritance: e.target.value as any })}>
+                      <option value="" className="bg-black text-white">None (Select in Calculator)</option>
+                      <option value="autosomal_recessive" className="bg-black text-white">Recessive</option>
+                      <option value="autosomal_dominant" className="bg-black text-white">Dominant</option>
+                      <option value="incomplete_dominant" className="bg-black text-white">Incomplete Dominant</option>
+                      <option value="sex_linked_recessive" className="bg-black text-white">Sex-linked Recessive</option>
+                    </Select>
+                  </div>
+                )}
                 <div className="flex gap-2">
                   <Button onClick={() => setEditingItem(null)} variant="ghost" className="flex-1">Cancel</Button>
                   <Button onClick={handleEdit} className="flex-1">Save Changes</Button>
@@ -6346,41 +6563,63 @@ function PrintView({ birds, pairs, cages, onBirdRef }: { birds: Bird[], pairs: P
     return [...cages].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
   }, [cages]);
 
-  const birdOptions = birds.filter(b => !b.isGhost).map(b => {
-    const cage = cages.find(c => c.id === b.cageId);
-    return { 
-      id: b.id, 
-      name: b.name, 
-      details: `${b.species}${b.subSpecies ? ` • ${b.subSpecies}` : ''}${cage ? ` - Cage: ${cage.name}` : ''}`, 
-      bird: b 
-    };
-  });
+  const birdOptions = useMemo(() => {
+    return birds.filter(b => !b.isGhost).map(b => {
+      const cage = cages.find(c => c.id === b.cageId);
+      return { 
+        id: b.id, 
+        name: b.name, 
+        details: `${b.species}${b.subSpecies ? ` • ${b.subSpecies}` : ''}${cage ? ` - Cage: ${cage.name}` : ''}`, 
+        bird: b,
+        cageName: cage?.name || ''
+      };
+    }).sort((a, b) => {
+      if (a.cageName !== b.cageName) {
+        if (!a.cageName) return 1;
+        if (!b.cageName) return -1;
+        return a.cageName.localeCompare(b.cageName, undefined, { numeric: true, sensitivity: 'base' });
+      }
+      return a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' });
+    });
+  }, [birds, cages]);
 
-  const pairOptions = pairs.filter(p => p.maleId || p.femaleId).map(p => {
-    const male = birds.find(b => b.id === p.maleId);
-    const female = birds.find(b => b.id === p.femaleId);
-    const mName = male?.name || 'Empty';
-    const fName = female?.name || 'Empty';
-    const cageId = male?.cageId || female?.cageId;
-    const cage = cages.find(c => c.id === cageId);
-    
-    const maleInfo = male ? `${male.species}${male.subSpecies ? ` (${male.subSpecies})` : ''} ${male.mutations?.join(', ')}${male.splitMutations?.length ? ` / ${male.splitMutations.join(', ')}` : ''}` : 'Empty Male';
-    const femaleInfo = female ? `${female.species}${female.subSpecies ? ` (${female.subSpecies})` : ''} ${female.mutations?.join(', ')}${female.splitMutations?.length ? ` / ${female.splitMutations.join(', ')}` : ''}` : 'Empty Female';
+  const pairOptions = useMemo(() => {
+    return pairs.filter(p => p.maleId || p.femaleId).map(p => {
+      const male = birds.find(b => b.id === p.maleId);
+      const female = birds.find(b => b.id === p.femaleId);
+      const mName = male?.name || 'Empty';
+      const fName = female?.name || 'Empty';
+      const cageId = p.cageId || male?.cageId || female?.cageId;
+      const cage = cages.find(c => c.id === cageId);
+      
+      const maleInfo = male ? `${male.species}${male.subSpecies ? ` (${male.subSpecies})` : ''} ${male.mutations?.join(', ')}${male.splitMutations?.length ? ` / ${male.splitMutations.join(', ')}` : ''}` : 'Empty Male';
+      const femaleInfo = female ? `${female.species}${female.subSpecies ? ` (${female.subSpecies})` : ''} ${female.mutations?.join(', ')}${female.splitMutations?.length ? ` / ${female.splitMutations.join(', ')}` : ''}` : 'Empty Female';
 
-    return { 
-      id: p.id, 
-      name: `Pair: ${mName} x ${fName}`, 
-      details: `M: ${maleInfo} | F: ${femaleInfo}${cage ? ` - Cage: ${cage.name}` : ''}`,
-      pair: p
-    };
-  });
+      return { 
+        id: p.id, 
+        name: `Pair: ${mName} x ${fName}`, 
+        details: `M: ${maleInfo} | F: ${femaleInfo}${cage ? ` - Cage: ${cage.name}` : ''}`,
+        pair: p,
+        cageName: cage?.name || ''
+      };
+    }).sort((a, b) => {
+      if (a.cageName !== b.cageName) {
+        if (!a.cageName) return 1;
+        if (!b.cageName) return -1;
+        return a.cageName.localeCompare(b.cageName, undefined, { numeric: true, sensitivity: 'base' });
+      }
+      return a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' });
+    });
+  }, [pairs, birds, cages]);
 
-  const cageOptions = cages.map(c => ({ 
-    id: c.id, 
-    name: c.name, 
-    details: c.location || 'No location',
-    cage: c
-  }));
+  const cageOptions = useMemo(() => {
+    return cages.map(c => ({ 
+      id: c.id, 
+      name: c.name, 
+      details: c.location || 'No location',
+      cage: c
+    })).sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
+  }, [cages]);
 
   const handlePrint = () => {
     if (printMode === 'list') {
@@ -7049,7 +7288,7 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
             onChange={(val) => setFormData({ ...formData, cageId: val })}
             options={[
               { id: '', name: 'Unassigned' },
-              ...cages.map(c => ({ id: c.id, name: c.name }))
+              ...[...cages].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })).map(c => ({ id: c.id, name: c.name }))
             ]}
           />
         </div>
@@ -7247,8 +7486,16 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
                 name: b.isGhost ? `${b.name} (Pedigree Only)` : b.name,
                 details: cage?.name || 'Unassigned',
                 subText: mutationsStr,
-                bird: b
+                bird: b,
+                cageName: cage?.name || ''
               };
+            }).sort((a, b) => {
+              if (a.cageName !== b.cageName) {
+                if (!a.cageName) return 1;
+                if (!b.cageName) return -1;
+                return a.cageName.localeCompare(b.cageName, undefined, { numeric: true, sensitivity: 'base' });
+              }
+              return a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' });
             })
           ]}
           value={formData.fatherId}
@@ -7268,8 +7515,16 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
                 name: b.isGhost ? `${b.name} (Pedigree Only)` : b.name,
                 details: cage?.name || 'Unassigned',
                 subText: mutationsStr,
-                bird: b
+                bird: b,
+                cageName: cage?.name || ''
               };
+            }).sort((a, b) => {
+              if (a.cageName !== b.cageName) {
+                if (!a.cageName) return 1;
+                if (!b.cageName) return -1;
+                return a.cageName.localeCompare(b.cageName, undefined, { numeric: true, sensitivity: 'base' });
+              }
+              return a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' });
             })
           ]}
           value={formData.motherId}
@@ -7292,8 +7547,16 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
                 name: b.isGhost ? `${b.name} (Pedigree Only)` : b.name,
                 details: cage?.name || 'Unassigned',
                 subText: mutationsStr,
-                bird: b
+                bird: b,
+                cageName: cage?.name || ''
               };
+            }).sort((a, b) => {
+              if (a.cageName !== b.cageName) {
+                if (!a.cageName) return 1;
+                if (!b.cageName) return -1;
+                return a.cageName.localeCompare(b.cageName, undefined, { numeric: true, sensitivity: 'base' });
+              }
+              return a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' });
             })
           ]}
           value={formData.mateId}
@@ -7311,8 +7574,16 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
               name: b.name,
               details: cage?.name || 'Unassigned',
               subText: mutationsStr,
-              bird: b
+              bird: b,
+              cageName: cage?.name || ''
             };
+          }).sort((a, b) => {
+            if (a.cageName !== b.cageName) {
+              if (!a.cageName) return 1;
+              if (!b.cageName) return -1;
+              return a.cageName.localeCompare(b.cageName, undefined, { numeric: true, sensitivity: 'base' });
+            }
+            return a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' });
           })}
           multi
           selectedValues={formData.offspringIds || []}
@@ -7734,8 +8005,16 @@ function PairForm({ user, initialData, birds, cages, onClose }: { user: Firebase
                 name: b.name,
                 details: cage?.name || 'Unassigned',
                 subText: mutationsStr,
-                bird: b
+                bird: b,
+                cageName: cage?.name || ''
               };
+            }).sort((a, b) => {
+              if (a.cageName !== b.cageName) {
+                if (!a.cageName) return 1;
+                if (!b.cageName) return -1;
+                return a.cageName.localeCompare(b.cageName, undefined, { numeric: true, sensitivity: 'base' });
+              }
+              return a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' });
             })
           ]}
           cages={cages}
@@ -7754,8 +8033,16 @@ function PairForm({ user, initialData, birds, cages, onClose }: { user: Firebase
                 name: b.name,
                 details: cage?.name || 'Unassigned',
                 subText: mutationsStr,
-                bird: b
+                bird: b,
+                cageName: cage?.name || ''
               };
+            }).sort((a, b) => {
+              if (a.cageName !== b.cageName) {
+                if (!a.cageName) return 1;
+                if (!b.cageName) return -1;
+                return a.cageName.localeCompare(b.cageName, undefined, { numeric: true, sensitivity: 'base' });
+              }
+              return a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' });
             })
           ]}
           cages={cages}
