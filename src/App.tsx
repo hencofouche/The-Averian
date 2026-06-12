@@ -128,6 +128,7 @@ const getCurrencySymbol = (currency?: string) => {
     case 'JPY': return '¥';
     case 'CNY': return '¥';
     case 'INR': return '₹';
+    case 'PHP': return '₱';
     case 'RUB': return '₽';
     case 'BRL': return 'R$';
     case 'MXN': return 'Mex$';
@@ -2585,6 +2586,7 @@ export default function App() {
                           catch (e) { handleFirestoreError(e, OperationType.DELETE, 'transactions'); }
                         }
                       })}
+                      userSettings={effectiveSettings ?? undefined}
                     />
                     {transactions.length >= transactionLimit && (
                       <div className="flex justify-center pt-4">
@@ -3557,7 +3559,7 @@ function BirdCard({ bird, cage, birds, cages, viewMode = 'grid-large', currency,
           </div>
           <div className={cn(effectiveViewMode === 'list' ? "flex items-center gap-2" : "space-y-0.5")}>
             <p className="text-white uppercase tracking-widest font-black text-[8px]">{tGlobal('Value')}{effectiveViewMode === 'list' ? ':' : ''}</p>
-            <p className="text-secondary font-bold flex items-center gap-1.5">{symbol}{bird.estimatedValue?.toFixed(2) || '0.00'}</p>
+            <p className="text-secondary font-bold flex items-center gap-1.5">{symbol}{(bird.estimatedValue || bird.purchasePrice || 0).toFixed(2)}</p>
           </div>
           <div className={cn(effectiveViewMode === 'list' ? "flex items-center gap-2 flex-1" : "col-span-2 space-y-1.5 pt-1 w-full")}>
               <p className="text-white uppercase tracking-widest font-black text-[8px]">{tGlobal('Mate')}{effectiveViewMode === 'list' ? ':' : ''}</p>
@@ -4026,7 +4028,8 @@ function FinancialsView({
   currency, 
   onBirdRef, 
   onEditTransaction, 
-  onDeleteTransaction
+  onDeleteTransaction,
+  userSettings
 }: { 
   transactions: Transaction[], 
   birds: Bird[], 
@@ -4036,59 +4039,228 @@ function FinancialsView({
   currency?: string, 
   onBirdRef: (name: string) => void, 
   onEditTransaction: (t: Transaction) => void, 
-  onDeleteTransaction: (id: string) => void
+  onDeleteTransaction: (id: string) => void,
+  userSettings?: UserSettings
 }) {
   const symbol = getCurrencySymbol(currency);
+  const t = (text: string) => getTranslatedLabel(text, userSettings?.language || 'en');
+  const [clickedTotal, setClickedTotal] = useState<'profit' | 'income' | 'expense' | 'stock' | null>(null);
 
   const stats = useMemo(() => {
     const income = transactions.filter(t => t.type === 'Income').reduce((acc, t) => acc + t.amount, 0);
     const expenses = transactions.filter(t => t.type === 'Expense').reduce((acc, t) => acc + t.amount, 0);
     
+    // Active stock: living birds (not sold, not deceased, not ghost)
+    const activeBirds = birds.filter(b => !b.isGhost && !b.statuses?.some(s => s === 'Sold' || s === 'Deceased'));
+    const totalStockValue = activeBirds.reduce((acc, b) => acc + (b.estimatedValue || b.purchasePrice || 0), 0);
+    const totalStockCost = activeBirds.reduce((acc, b) => acc + (b.purchasePrice || 0), 0);
+    
+    // Date tracking span
+    const dates = transactions.map(t => new Date(t.date).getTime()).filter(t => !isNaN(t));
+    const nowStamp = Date.now();
+    const minDateMs = dates.length ? Math.min(...dates) : nowStamp - (1000 * 60 * 60 * 24 * 30);
+    const daysSpan = Math.max(1, (nowStamp - minDateMs) / (1000 * 60 * 60 * 24));
+
     return {
       totalIncome: income,
       totalExpenses: expenses,
-      netProfit: income - expenses
+      netProfit: income - expenses,
+      totalStockValue,
+      totalStockCost,
+      activeBirdsCount: activeBirds.length,
+      daysSpan
     };
-  }, [transactions]);
+  }, [transactions, birds]);
+
+  const getModalContent = () => {
+    if (!clickedTotal) return null;
+
+    let modalTitle = '';
+    let overallVal = 0;
+    let description = '';
+    let showStockDetails = false;
+
+    if (clickedTotal === 'profit') {
+      modalTitle = t('Net Profit Breakdown');
+      overallVal = stats.netProfit;
+      description = t('Net Profit reflects total cash income minus total expenses recorded in your transactions.');
+    } else if (clickedTotal === 'income') {
+      modalTitle = t('Total Income Breakdown');
+      overallVal = stats.totalIncome;
+      description = t('Total Income is the sum of all sales, client rewards, and related revenues.');
+    } else if (clickedTotal === 'expense') {
+      modalTitle = t('Total Expenses Breakdown');
+      overallVal = stats.totalExpenses;
+      description = t('Total Expenses represents feed cost, equipment purchases, and bird acquisitions.');
+    } else if (clickedTotal === 'stock') {
+      modalTitle = t('Total Stock Value Breakdown');
+      overallVal = stats.totalStockValue;
+      description = t('Stock Value represents the asset valuation of your active, living breeding stock.');
+      showStockDetails = true;
+    }
+
+    const daily = overallVal / stats.daysSpan;
+    const weekly = daily * 7;
+    const monthly = daily * 30.4375;
+    const yearly = daily * 365;
+
+    return (
+      <div className="space-y-6">
+        <p className="text-xs text-white/60 leading-relaxed font-semibold bg-white/5 p-4 rounded-2xl border border-white/10">{description}</p>
+        
+        {/* Highlight Card */}
+        <div className="p-6 bg-gradient-to-br from-gold-500/10 via-transparent to-transparent border border-gold-500/20 rounded-2xl text-center space-y-1">
+          <p className="text-[10px] font-black uppercase tracking-widest text-gold-500">
+            {clickedTotal === 'stock' ? t('Current Stock Value') : t('Total Accumulation')}
+          </p>
+          <p className="text-3xl font-black text-white tracking-tighter">{symbol}{overallVal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+          {clickedTotal !== 'stock' && (
+            <p className="text-[9px] text-white/40 font-bold uppercase tracking-widest leading-none mt-2">
+              {t('Parsed over')} {stats.daysSpan.toFixed(0)} {t('days of activity')}
+            </p>
+          )}
+        </div>
+
+        {/* Breakdown Grid / Spans */}
+        {clickedTotal !== 'stock' && (
+          <div className="space-y-3">
+            <h4 className="text-[10px] font-black text-white uppercase tracking-widest ml-1">{t('Periodic Projections & Averages')}</h4>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="p-4 bg-zinc-900 border border-black-800 rounded-xl space-y-1">
+                <p className="text-[9px] text-white/50 font-black uppercase tracking-widest">{t('Daily Average')}</p>
+                <p className="text-lg font-black text-white">{symbol}{daily.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+              </div>
+              <div className="p-4 bg-zinc-900 border border-black-800 rounded-xl space-y-1">
+                <p className="text-[9px] text-white/50 font-black uppercase tracking-widest">{t('Weekly Average')}</p>
+                <p className="text-lg font-black text-white">{symbol}{weekly.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+              </div>
+              <div className="p-4 bg-zinc-900 border border-black-800 rounded-xl space-y-1">
+                <p className="text-[9px] text-white/50 font-black uppercase tracking-widest">{t('Monthly Average')}</p>
+                <p className="text-lg font-black text-white">{symbol}{monthly.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+              </div>
+              <div className="p-4 bg-zinc-900 border border-black-800 rounded-xl space-y-1">
+                <p className="text-[9px] text-white/50 font-black uppercase tracking-widest">{t('Yearly Projection')}</p>
+                <p className="text-lg font-black text-white">{symbol}{yearly.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Extra Stock Specific Stats */}
+        {showStockDetails && (
+          <div className="p-4 bg-zinc-900 border border-black-800 rounded-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-black-800 pb-2">
+              <h4 className="text-[10px] font-black text-gold-500 uppercase tracking-widest">{t('Active Inventory Metrics')}</h4>
+              <Badge className="bg-gold-500 text-black px-2 py-0.5 font-bold text-[9px] rounded-lg">{stats.activeBirdsCount} {t('Birds in Stock')}</Badge>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-3 gap-x-4 text-xs font-semibold text-white/90">
+              <div className="flex items-center justify-between sm:col-span-1">
+                <span className="text-white/40 font-bold uppercase text-[9px] tracking-widest">{t('Average Bird Value')}:</span>
+                <span className="font-extrabold">{symbol}{(stats.totalStockValue / Math.max(1, stats.activeBirdsCount)).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+              </div>
+              <div className="flex items-center justify-between sm:col-span-1">
+                <span className="text-white/40 font-bold uppercase text-[9px] tracking-widest">{t('Total Asset Cost')}:</span>
+                <span className="font-extrabold">{symbol}{stats.totalStockCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+              </div>
+              <div className="flex items-center justify-between col-span-full border-t border-black-800/50 pt-2">
+                <span className="text-white/40 font-bold uppercase text-[9px] tracking-widest">{t('Net Unrealized Appreciation')}:</span>
+                <span className="font-extrabold text-emerald-400">+{symbol}{Math.max(0, stats.totalStockValue - stats.totalStockCost).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+              </div>
+              <div className="flex items-center justify-between col-span-full">
+                <span className="text-white/40 font-bold uppercase text-[9px] tracking-widest">{t('Value Growth %')}:</span>
+                <span className="font-extrabold text-emerald-400">
+                  {stats.totalStockCost > 0 ? ((stats.totalStockValue - stats.totalStockCost) / stats.totalStockCost * 100).toFixed(1) : '0.0'}%
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <Button onClick={() => setClickedTotal(null)} className="w-full py-4 text-xs font-bold font-mono tracking-widest uppercase">
+          {t('Close Detail View')}
+        </Button>
+      </div>
+    );
+  };
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto w-full">
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 w-full">
-        <Card className="p-4 sm:p-5 bg-zinc-800 border-black-700 flex flex-col justify-between min-w-0">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 w-full">
+        {/* Net Profit Card */}
+        <Card 
+          onClick={() => setClickedTotal('profit')}
+          className="p-4 sm:p-5 bg-zinc-800 border-black-700 flex flex-col justify-between min-w-0 cursor-pointer hover:border-gold-500 hover:scale-[1.02] active:scale-[0.98] transition-all group duration-300"
+        >
           <div className="flex items-center justify-between mb-3 sm:mb-4">
-            <p className="text-[8px] sm:text-[10px] font-black text-white uppercase tracking-widest mr-2">Net Profit</p>
-            <TrendingUp size={16} className="shrink-0" style={{ color: stats.netProfit >= 0 ? '#34d399' : 'var(--theme-delete-color, #ef4444)' }} />
+            <p className="text-[8px] sm:text-[10px] font-black text-white uppercase tracking-widest mr-2">{t('Net Profit')}</p>
+            <TrendingUp size={16} className="shrink-0 transition-transform group-hover:scale-110" style={{ color: stats.netProfit >= 0 ? '#34d399' : 'var(--theme-delete-color, #ef4444)' }} />
           </div>
           <div>
             <p className="text-lg sm:text-xl md:text-2xl font-black text-white tracking-tighter break-all">{symbol}{stats.netProfit.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
-            <p className="text-[8px] sm:text-[9px] text-white/50 mt-1 font-bold uppercase tracking-tighter">Overall Performance</p>
+            <p className="text-[8px] sm:text-[9px] text-white/50 mt-1 font-bold uppercase tracking-tighter">{t('Averages & ROI Breakdown')}</p>
           </div>
         </Card>
-        <Card className="p-4 sm:p-5 bg-zinc-800 border-black-700 flex flex-col justify-between min-w-0">
+
+        {/* Total Income Card */}
+        <Card 
+          onClick={() => setClickedTotal('income')}
+          className="p-4 sm:p-5 bg-zinc-800 border-black-700 flex flex-col justify-between min-w-0 cursor-pointer hover:border-emerald-500 hover:scale-[1.02] active:scale-[0.98] transition-all group duration-300"
+        >
           <div className="flex items-center justify-between mb-3 sm:mb-4">
-            <p className="text-[8px] sm:text-[10px] font-black text-white uppercase tracking-widest mr-2">Total Income</p>
-            <ArrowUpRight size={16} className="text-emerald-400 shrink-0" />
+            <p className="text-[8px] sm:text-[10px] font-black text-white uppercase tracking-widest mr-2">{t('Total Income')}</p>
+            <ArrowUpRight size={16} className="text-emerald-400 shrink-0 transition-transform group-hover:translate-x-1 group-hover:-translate-y-1" />
           </div>
           <div>
             <p className="text-lg sm:text-xl md:text-2xl font-black text-emerald-500 tracking-tighter break-all">{symbol}{stats.totalIncome.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+            <p className="text-[8px] sm:text-[9px] text-white/50 mt-1 font-bold uppercase tracking-tighter">{t('View Period Averages')}</p>
           </div>
         </Card>
-        <Card className="p-4 sm:p-5 bg-zinc-800 border-black-700 flex flex-col justify-between min-w-0">
+
+        {/* Total Expenses Card */}
+        <Card 
+          onClick={() => setClickedTotal('expense')}
+          className="p-4 sm:p-5 bg-zinc-800 border-black-700 flex flex-col justify-between min-w-0 cursor-pointer hover:border-red-500 hover:scale-[1.02] active:scale-[0.98] transition-all group duration-300"
+        >
           <div className="flex items-center justify-between mb-3 sm:mb-4">
-            <p className="text-[8px] sm:text-[10px] font-black text-white uppercase tracking-widest mr-2">Total Expenses</p>
-            <ArrowDownRight size={16} className="shrink-0" style={{ color: 'var(--theme-delete-color, #ef4444)' }} />
+            <p className="text-[8px] sm:text-[10px] font-black text-white uppercase tracking-widest mr-2">{t('Total Expenses')}</p>
+            <ArrowDownRight size={16} className="shrink-0 transition-transform group-hover:translate-x-1 group-hover:translate-y-1" style={{ color: 'var(--theme-delete-color, #ef4444)' }} />
           </div>
           <div>
             <p className="text-lg sm:text-xl md:text-2xl font-black tracking-tighter break-all" style={{ color: 'var(--theme-delete-color, #ef4444)' }}>{symbol}{stats.totalExpenses.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+            <p className="text-[8px] sm:text-[9px] text-white/50 mt-1 font-bold uppercase tracking-tighter">{t('View Period Averages')}</p>
+          </div>
+        </Card>
+
+        {/* Total Stock Value Card */}
+        <Card 
+          onClick={() => setClickedTotal('stock')}
+          className="p-4 sm:p-5 bg-zinc-800 border-black-700 flex flex-col justify-between min-w-0 cursor-pointer hover:border-sky-500 hover:scale-[1.02] active:scale-[0.98] transition-all group duration-300"
+        >
+          <div className="flex items-center justify-between mb-3 sm:mb-4">
+            <p className="text-[8px] sm:text-[10px] font-black text-white uppercase tracking-widest mr-2">{t('Total Stock Value')}</p>
+            <BirdIcon size={16} className="text-sky-400 shrink-0 transition-transform group-hover:scale-110" />
+          </div>
+          <div>
+            <p className="text-lg sm:text-xl md:text-2xl font-black text-sky-400 tracking-tighter break-all">{symbol}{stats.totalStockValue.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+            <p className="text-[8px] sm:text-[9px] text-white/50 mt-1 font-bold uppercase tracking-tighter">{t('Active Valuation Details')}</p>
           </div>
         </Card>
       </div>
 
+      {/* Breakdown Details Modal */}
+      <Modal 
+        isOpen={clickedTotal !== null} 
+        onClose={() => setClickedTotal(null)} 
+        title={clickedTotal === 'profit' ? t('Net Profit Breakdown') : clickedTotal === 'income' ? t('Total Income Breakdown') : clickedTotal === 'expense' ? t('Total Expenses Breakdown') : t('Total Stock Value Breakdown')}
+      >
+        {getModalContent()}
+      </Modal>
+
       {/* Transactions List */}
       <div className="flex flex-col space-y-4 w-full">
         <div className="flex items-center justify-between">
-          <h3 className="font-black text-white uppercase tracking-widest text-sm">Recent Transactions</h3>
+          <h3 className="font-black text-white uppercase tracking-widest text-sm">{t('Recent Transactions')}</h3>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 w-full">
           {transactions.map(t => (
@@ -4110,7 +4282,7 @@ function FinancialsView({
           {transactions.length === 0 && (
             <div className="col-span-full text-center py-12 bg-black/50 border border-dashed border-black-700 rounded-2xl">
               <Activity size={32} className="mx-auto text-white mb-2" />
-              <p className="text-white text-sm font-bold uppercase tracking-widest">No transactions found</p>
+              <p className="text-white text-sm font-bold uppercase tracking-widest">{t('No transactions found')}</p>
             </div>
           )}
         </div>
@@ -4211,7 +4383,7 @@ function EntityStatsView({
             return b.id === pair?.maleId || b.id === pair?.femaleId;
           })
         : birds;
-    const birdValue = relevantBirds.reduce((acc, b) => acc + (b.estimatedValue || 0), 0);
+    const birdValue = relevantBirds.reduce((acc, b) => acc + (b.estimatedValue || b.purchasePrice || 0), 0);
     const birdCost = relevantBirds.reduce((acc, b) => acc + (b.purchasePrice || 0), 0);
     
     const totalEggs = filteredBreedingRecords.reduce((acc, r) => acc + (r.eggsLaid || 0), 0);
@@ -4224,7 +4396,7 @@ function EntityStatsView({
       netProfit: income - expenses,
       totalBirdValue: birdValue,
       totalBirdCost: birdCost,
-      inventoryValue: birdValue - birdCost,
+      inventoryValue: birdValue,
       totalEggs,
       totalHatched,
       totalWeaned,
@@ -4305,7 +4477,7 @@ function EntityStatsView({
               </div>
               <div className="min-w-0">
                 <p className="text-lg xl:text-xl font-black text-sky-500 tracking-tighter break-all mb-1">{symbol}{stats.inventoryValue.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
-                <p className="text-[7px] text-white/40 font-bold uppercase tracking-widest leading-tight">Est. {symbol}{stats.totalBirdValue.toFixed(0)} - Cost {symbol}{stats.totalBirdCost.toFixed(0)}</p>
+                <p className="text-[7px] text-white/40 font-bold uppercase tracking-widest leading-tight">{tGlobal('Purchase Price')}: {symbol}{stats.totalBirdCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
               </div>
             </Card>
           </div>
@@ -6212,6 +6384,7 @@ function SettingsView({ settings, onUpdate, allData, user, isSyncing, setDeleteC
                       <option value="JPY">Japanese Yen (¥)</option>
                       <option value="CNY">Chinese Yuan (¥)</option>
                       <option value="INR">Indian Rupee (₹)</option>
+                      <option value="PHP">Philippine Peso (₱)</option>
                       <option value="RUB">Russian Ruble (₽)</option>
                       <option value="BRL">Brazilian Real (R$)</option>
                       <option value="MXN">Mexican Peso (Mex$)</option>
