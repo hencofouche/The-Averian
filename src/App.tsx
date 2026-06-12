@@ -2161,7 +2161,7 @@ export default function App() {
           
           <div className="space-y-1.5 mt-4 pt-4 border-t border-white/5 flex flex-col">
             <NavItem active={activeTab === 'tasks'} onClick={() => handleNavigate('tasks', '', null, true)} icon={<CheckSquare size={18} />} label={t("Tasks")} count={tasks.length} />
-            <NavItem active={activeTab === 'contacts'} onClick={() => handleNavigate('contacts', '', null, true)} icon={<Users size={18} />} label={t("Contacts")} count={contacts.length} />
+            <NavItem active={activeTab === 'contacts'} onClick={() => handleNavigate('contacts', '', null, true)} icon={<Users size={18} />} label={t("Contacts & Support")} count={contacts.length} />
             <NavItem active={activeTab === 'print'} onClick={() => handleNavigate('print', '', null, true)} icon={<QrCode size={18} />} label={t("Print")} count={0} />
             <NavItem active={activeTab === 'settings'} onClick={() => handleNavigate('settings', '', null, true)} icon={<Tag size={18} />} label={t("Settings")} count={0} />
           </div>
@@ -2234,7 +2234,7 @@ export default function App() {
                  activeTab === 'pairs' ? t('Pairs') :
                  activeTab === 'breeding' ? t('Breeding') :
                  activeTab === 'financials' ? t('Financials') :
-                 activeTab === 'contacts' ? t('Contacts') :
+                 activeTab === 'contacts' ? t('Contacts & Support') :
                  activeTab}
               </h2>
             </div>
@@ -2765,6 +2765,7 @@ export default function App() {
                         }
                       })}
                       symbol={getCurrencySymbol(userSettings?.currency)}
+                      user={user}
                     />
                     {contacts.length >= contactsLimit && (
                       <div className="flex justify-center pt-4">
