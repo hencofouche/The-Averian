@@ -519,5 +519,6 @@ export const defaultMutations: DefaultMutation[] = [
   { id: 'default_chestnut_flanked', name: 'Chestnut-flanked White (CFW)', inheritance: 'sex_linked_recessive' },
   { id: 'default_black_headed', name: 'Black Headed', inheritance: 'autosomal_recessive' },
   { id: 'default_yellow_headed', name: 'Yellow Headed', inheritance: 'sex_linked_recessive' },
-  { id: 'default_white_breasted', name: 'White-breasted', inheritance: 'autosomal_recessive' }
+  { id: 'default_white_breasted', name: 'White-breasted', inheritance: 'autosomal_recessive' },
+  { id: 'default_emerald_mutation', name: 'Emerald', inheritance: 'autosomal_recessive' }
 ];

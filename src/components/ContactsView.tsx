@@ -1,6 +1,6 @@
 import React from 'react';
 import { Contact, Transaction } from '../types';
-import { Users, Mail, Phone, MapPin, Edit2, Trash2, ArrowUpRight, ArrowDownRight, MessageCircle } from 'lucide-react';
+import { Users, Mail, Phone, MapPin, Edit2, Trash2, ArrowUpRight, ArrowDownRight, MessageCircle, Video, ExternalLink } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 const Card = ({ children, className, ...props }: { children: React.ReactNode, className?: string } & React.HTMLAttributes<HTMLDivElement>) => (
@@ -64,7 +64,17 @@ export function ContactsView({
               <span className="text-[10px] font-bold text-zinc-400 whitespace-nowrap">Help Desk</span>
             </div>
             
-            <div className="flex gap-1.5 ml-auto">
+            <div className="flex gap-1.5 ml-auto items-center">
+              <a 
+                href="https://www.youtube.com/playlist?list=PLtNEv-kj7DgU1j1o2HybU4Ge4NzMiSVMu" 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                className="px-2.5 py-2 text-rose-500 hover:bg-rose-500/15 bg-black/40 border border-rose-500/20 rounded-xl transition-all active:scale-95 flex items-center justify-center gap-1.5"
+                title="Video Tutorials"
+              >
+                <Video size={14} />
+                <span className="text-[9px] font-black uppercase tracking-wider">Tutorials</span>
+              </a>
               <a 
                 href="https://wa.me/27739586177" 
                 target="_blank" 
@@ -180,6 +190,24 @@ export function ContactsView({
           </div>
 
           <div className="space-y-3">
+            <div className="group flex items-center justify-between gap-2 p-2 bg-black/30 rounded-xl border border-white/5 hover:border-gold-500/20 transition-all">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="p-1.5 bg-rose-500/10 rounded-lg">
+                  <Video size={12} className="text-rose-500" />
+                </div>
+                <span className="text-[10px] font-bold text-white/70 truncate">YouTube Tutorials</span>
+              </div>
+              <a 
+                href="https://www.youtube.com/playlist?list=PLtNEv-kj7DgU1j1o2HybU4Ge4NzMiSVMu" 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                className="p-1.5 bg-rose-500/10 hover:bg-rose-500 text-rose-500 hover:text-black rounded-lg transition-all active:scale-90"
+                title="Watch Tutorials"
+              >
+                <ExternalLink size={14} />
+              </a>
+            </div>
+
             <div className="group flex items-center justify-between gap-2 p-2 bg-black/30 rounded-xl border border-white/5 hover:border-gold-500/20 transition-all">
               <div className="flex items-center gap-2 min-w-0">
                 <div className="p-1.5 bg-gold-500/10 rounded-lg">

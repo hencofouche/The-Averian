@@ -8,7 +8,8 @@ import {
   Tag, Calendar, ChevronDown, ChevronUp, ChevronRight, ChevronLeft, X, GitBranch,
   Image as ImageIcon, Loader2, DollarSign, TrendingUp, TrendingDown,
   Activity, ArrowUpRight, ArrowDownRight, BarChart3, PieChart as PieChartIcon,
-  Menu, Egg, LayoutGrid, Grid3x3, List as ListIcon, AlertTriangle, CreditCard, CheckCircle2, Bell, Cloud, Maximize2, Share2, Send, Printer, MoreHorizontal, Dna, Users, Palette, QrCode, Scan, FileText, ExternalLink, ArrowLeft, ArrowRightLeft, History as HistoryIcon, RefreshCw, UploadCloud, Eye
+  Menu, Egg, LayoutGrid, Grid3x3, List as ListIcon, AlertTriangle, CreditCard, CheckCircle2, Bell, Cloud, Maximize2, Share2, Send, Printer, MoreHorizontal, Dna, Users, Palette, QrCode, Scan, FileText, ExternalLink, ArrowLeft, ArrowRightLeft, History as HistoryIcon, RefreshCw, UploadCloud, Eye,
+  Mail, MessageCircle, Video
 } from 'lucide-react';
 import GeneticsCalculator from './components/GeneticsCalculator';
 import { ContactsView } from './components/ContactsView';
@@ -21,34 +22,78 @@ import { getTranslatedLabel, LANGUAGE_NAMES, setActiveLanguage, t as tGlobal } f
 
 function ImageGallery({ imageUrls, initialIndex, onClose }: { imageUrls: string[], initialIndex: number, onClose: () => void }) {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
+  const [touchStart, setTouchStart] = useState<number | null>(null);
+  const [touchEnd, setTouchEnd] = useState<number | null>(null);
 
-  const nextImage = (e: React.MouseEvent) => {
-    e.stopPropagation();
+  // min swipe distance in pixels
+  const minSwipeDistance = 50;
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowRight') {
+        setCurrentIndex((prev) => (prev + 1) % imageUrls.length);
+      } else if (e.key === 'ArrowLeft') {
+        setCurrentIndex((prev) => (prev - 1 + imageUrls.length) % imageUrls.length);
+      } else if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [imageUrls.length, onClose]);
+
+  const nextImage = (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
     setCurrentIndex((prev) => (prev + 1) % imageUrls.length);
   };
 
-  const prevImage = (e: React.MouseEvent) => {
-    e.stopPropagation();
+  const prevImage = (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
     setCurrentIndex((prev) => (prev - 1 + imageUrls.length) % imageUrls.length);
+  };
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    setTouchEnd(null);
+    setTouchStart(e.targetTouches[0].clientX);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    setTouchEnd(e.targetTouches[0].clientX);
+  };
+
+  const handleTouchEnd = () => {
+    if (!touchStart || !touchEnd) return;
+    const distance = touchStart - touchEnd;
+    const isLeftSwipe = distance > minSwipeDistance;
+    const isRightSwipe = distance < -minSwipeDistance;
+    if (isLeftSwipe) {
+      nextImage();
+    } else if (isRightSwipe) {
+      prevImage();
+    }
   };
 
   if (!imageUrls || imageUrls.length === 0) return null;
 
   return (
     <div 
-      className="fixed inset-0 z-[300] flex items-center justify-center bg-black/95 backdrop-blur-md p-4 sm:p-8 cursor-zoom-out"
+      className="fixed inset-0 z-[300] flex items-center justify-center bg-black/95 backdrop-blur-md p-4 sm:p-8 cursor-zoom-out select-none"
       onClick={onClose}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
     >
       <motion.div 
         initial={{ opacity: 0, scale: 0.9 }}
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.9 }}
         className="relative max-w-5xl w-full max-h-full flex items-center justify-center group"
+        onClick={(e) => e.stopPropagation()}
       >
         <img 
           src={imageUrls[currentIndex]} 
           alt={`Gallery view ${currentIndex + 1}`} 
-          className="max-w-full max-h-[90vh] object-contain rounded-2xl shadow-2xl"
+          className="max-w-full max-h-[90vh] object-contain rounded-2xl shadow-2xl cursor-default"
           referrerPolicy="no-referrer"
         />
         
@@ -56,17 +101,19 @@ function ImageGallery({ imageUrls, initialIndex, onClose }: { imageUrls: string[
           <>
             <button 
               onClick={prevImage}
-              className="absolute left-4 top-1/2 -translate-y-1/2 p-3 bg-black/50 hover:bg-black/80 text-white rounded-full backdrop-blur-md transition-all opacity-0 group-hover:opacity-100"
+              className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 p-3 bg-black/70 hover:bg-gold-500 hover:text-black text-gold-500 rounded-full backdrop-blur-md transition-all border border-gold-500/30 shadow-[0_0_15px_rgba(212,175,55,0.2)] active:scale-90 z-20"
+              aria-label="Previous image"
             >
               <ChevronLeft size={24} />
             </button>
             <button 
               onClick={nextImage}
-              className="absolute right-4 top-1/2 -translate-y-1/2 p-3 bg-black/50 hover:bg-black/80 text-white rounded-full backdrop-blur-md transition-all opacity-0 group-hover:opacity-100"
+              className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 p-3 bg-black/70 hover:bg-gold-500 hover:text-black text-gold-500 rounded-full backdrop-blur-md transition-all border border-gold-500/30 shadow-[0_0_15px_rgba(212,175,55,0.2)] active:scale-90 z-20"
+              aria-label="Next image"
             >
               <ChevronRight size={24} />
             </button>
-            <div className="absolute bottom-4 left-1/2 -translate-y-1/2 -translate-x-1/2 px-4 py-2 bg-black/50 text-white rounded-full backdrop-blur-md text-xs font-bold tracking-widest">
+            <div className="absolute bottom-4 left-1/2 -translate-y-1/2 -translate-x-1/2 px-4 py-2 bg-black/50 text-white rounded-full backdrop-blur-md text-xs font-bold tracking-widest z-20">
               {currentIndex + 1} / {imageUrls.length}
             </div>
           </>
@@ -74,7 +121,8 @@ function ImageGallery({ imageUrls, initialIndex, onClose }: { imageUrls: string[
 
         <button 
           onClick={onClose}
-          className="absolute -top-12 right-0 sm:top-4 sm:right-4 p-3 bg-black/50 hover:bg-black/80 text-white rounded-full backdrop-blur-md transition-all"
+          className="absolute -top-12 right-0 sm:top-4 sm:right-4 p-3 bg-black/50 hover:bg-gold-500 hover:text-black text-white rounded-full backdrop-blur-md transition-all z-20"
+          aria-label="Close gallery"
         >
           <X size={24} />
         </button>
@@ -886,6 +934,8 @@ export default function App() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [userSettings, setUserSettings] = useState<UserSettings | null>(null);
+  const [walkthroughStep, setWalkthroughStep] = useState<number | null>(null);
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
 
   const t = (text: string) => getTranslatedLabel(text, userSettings?.language || 'en');
 
@@ -1003,6 +1053,15 @@ export default function App() {
     });
     return unsubscribe;
   }, []);
+
+  useEffect(() => {
+    if (user && !loading) {
+      const isCompleted = localStorage.getItem('averian_welcome_completed');
+      if (!isCompleted) {
+        setWalkthroughStep(1);
+      }
+    }
+  }, [user, loading]);
 
   useEffect(() => {
     const fetchSharedItem = async () => {
@@ -2168,8 +2227,17 @@ export default function App() {
         </nav>
 
         <div className="mt-auto pt-4 border-t border-white/5 space-y-3">
+          <div className="px-1">
+            <button 
+              onClick={() => setWalkthroughStep(1)}
+              className="w-full flex items-center justify-center gap-2 py-1.5 rounded-lg border border-gold-500/10 bg-gold-500/5 hover:bg-gold-500/10 hover:border-gold-500/20 text-[8px] text-zinc-400 hover:text-gold-500 transition-all uppercase tracking-wider font-extrabold cursor-pointer"
+            >
+              👑 <span className="tracking-widest">Help & Guide Tour</span>
+            </button>
+          </div>
+
           {/* Combined Status and User Info */}
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 font-bold">
             <div 
               onClick={() => handleNavigate('subscription', '', null, true)}
               className="px-2 py-1.5 rounded-lg bg-zinc-900/50 border border-white/5 cursor-pointer hover:bg-zinc-800 transition-colors"
@@ -2862,6 +2930,260 @@ export default function App() {
             initialIndex={galleryData.index} 
             onClose={() => setGalleryData(null)} 
           />
+        )}
+
+        {walkthroughStep !== null && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/85 backdrop-blur-md"
+          >
+            {walkthroughStep === 1 && (
+              <motion.div
+                initial={{ scale: 0.95, y: 20 }}
+                animate={{ scale: 1, y: 0 }}
+                exit={{ scale: 0.95, y: 20 }}
+                transition={{ type: "spring", damping: 25, stiffness: 350 }}
+                className="w-full max-w-lg bg-zinc-950 border border-gold-500/20 rounded-3xl p-6 sm:p-8 relative overflow-hidden shadow-[0_0_50px_rgba(212,175,55,0.15)] flex flex-col items-center text-center gap-5"
+              >
+                {/* Gold Glow Aura */}
+                <div className="absolute -top-12 -left-12 w-48 h-48 bg-gold-500/10 rounded-full blur-3xl pointer-events-none" />
+                <div className="absolute -bottom-12 -right-12 w-48 h-48 bg-gold-500/5 rounded-full blur-3xl pointer-events-none" />
+
+                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-gold-500/20 to-gold-500/5 border border-gold-500/30 flex items-center justify-center text-gold-500 shadow-lg shadow-gold-500/10">
+                  <span className="text-3xl animate-bounce">👑</span>
+                </div>
+
+                <div className="space-y-2">
+                  <h3 className="text-xl sm:text-2xl font-black text-white uppercase tracking-tight">Welcome to The Averian</h3>
+                  <p className="text-xs font-bold text-gold-500/80 uppercase tracking-widest">Premium Avian Husbandry Platform</p>
+                </div>
+
+                <p className="text-xs text-zinc-400 font-medium leading-relaxed max-w-sm">
+                  We are thrilled to accompany you on your breeding journey. Before storing your critical aviary logs and records, please accept our standard Terms of Use & Breeder Disclaimer below to protect both parties:
+                </p>
+
+                {/* Terms Scrollable Text Box */}
+                <div className="w-full text-left bg-black/60 border border-zinc-800 p-4 rounded-xl max-h-36 overflow-y-auto text-zinc-400 text-[10px] space-y-2 select-text font-mono">
+                  <p className="text-white font-extrabold uppercase text-[11px] tracking-wide mb-1">TERMS OF USE & BREEDER DISCLAIMER</p>
+                  <p>1. <strong>Provided "As-Is":</strong> The Averian application, including its genetics calculators, financial estimators, and aviary tools, is provided to users strictly "as-is". No guarantees are made concerning its merchantability or fitness for breeding outcomes.</p>
+                  <p>2. <strong>Limitation of Liability:</strong> In no event shall the developers, founders, or affiliates of The Averian be liable for any direct, indirect, incidental, or consequential damages. This includes, but is not limited to: loss of livestock (birds, eggs, offspring), medical or veterinary costs, aviary financial losses, user entry errors, or inaccurate genetics predictions.</p>
+                  <p>3. <strong>Genetics Calculator Guidance:</strong> All computed mutation outcomes, inheritance models, and pairing percentages are mathematically expected probabilities. Nature is variable and actual outcomes can differ.</p>
+                  <p>4. <strong>Data Management:</strong> The user is solely responsible for maintaining accurate breeding records.</p>
+                </div>
+
+                {/* Acceptance Checkbox */}
+                <label className="flex items-start gap-2.5 text-left w-full mt-1 cursor-pointer group">
+                  <input 
+                    type="checkbox" 
+                    checked={acceptedTerms}
+                    onChange={(e) => setAcceptedTerms(e.target.checked)}
+                    className="mt-0.5 w-4.5 h-4.5 accent-gold-500 rounded border-zinc-800 bg-zinc-900 cursor-pointer"
+                  />
+                  <span className="text-[11px] font-bold text-zinc-300 group-hover:text-white transition-colors">
+                    I accept and agree to the Terms of Use, Privacy Policy, and Veterinary Disclaimer.
+                  </span>
+                </label>
+
+                <div className="w-full space-y-2 pt-2">
+                  <button
+                    onClick={() => {
+                      if (!acceptedTerms) {
+                        toast.error("Please accept the Terms of Use and Disclaimer to continue.");
+                        return;
+                      }
+                      setWalkthroughStep(2);
+                    }}
+                    disabled={!acceptedTerms}
+                    className={`w-full py-3.5 bg-gold-500 hover:bg-gold-600 active:scale-[0.98] text-black font-black uppercase text-xs tracking-widest rounded-xl transition-all shadow-lg shadow-gold-500/20 cursor-pointer flex items-center justify-center gap-2 ${!acceptedTerms ? 'opacity-40 cursor-not-allowed filter grayscale' : ''}`}
+                  >
+                    Accept & Continue
+                  </button>
+                  <button
+                    onClick={() => {
+                      toast.info("Terms must be accepted to use The Averian. You can review this anytime.");
+                    }}
+                    className="w-full py-1.5 text-zinc-600 hover:text-zinc-500 font-bold uppercase text-[9px] tracking-widest transition-colors cursor-pointer"
+                  >
+                    Why do I need to agree?
+                  </button>
+                </div>
+              </motion.div>
+            )}
+
+            {walkthroughStep === 2 && (
+              <motion.div
+                initial={{ scale: 0.95, y: 20 }}
+                animate={{ scale: 1, y: 0 }}
+                exit={{ scale: 0.95, y: 20 }}
+                transition={{ type: "spring", damping: 25, stiffness: 350 }}
+                className="w-full max-w-lg bg-zinc-950 border border-gold-500/30 rounded-3xl p-6 sm:p-8 relative overflow-hidden shadow-[0_0_60px_rgba(212,175,55,0.25)] flex flex-col gap-6 text-center items-center"
+              >
+                {/* Visual Aura */}
+                <div className="absolute -top-12 -right-12 w-48 h-48 bg-gold-500/10 rounded-full blur-3xl pointer-events-none" />
+                <div className="absolute -bottom-12 -left-12 w-48 h-48 bg-rose-500/5 rounded-full blur-3xl pointer-events-none" />
+
+                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-amber-500/20 to-gold-500/5 border border-gold-500/40 flex items-center justify-center text-gold-400 shadow-xl">
+                  <CreditCard size={32} className="animate-pulse" />
+                </div>
+
+                <div className="space-y-1">
+                  <h3 className="text-xl sm:text-2xl font-black text-white uppercase tracking-tight">Your 1-Month Free Trial Is Active!</h3>
+                  <p className="text-[10px] font-black text-gold-500 uppercase tracking-widest">Premium Yearly Membership Trial</p>
+                </div>
+
+                <div className="space-y-4 max-w-md text-zinc-300">
+                  <p className="text-xs sm:text-sm font-medium leading-relaxed">
+                    You will be given a <strong className="text-gold-400">1-Month Free Trial</strong> to fully experience our first-class breeder management tools. Afterward, you will need to buy a yearly membership to continue tracking records.
+                  </p>
+
+                  <div className="p-4 bg-gold-500/5 rounded-2xl border border-gold-500/20 text-xs text-gold-200/90 leading-relaxed font-bold italic shadow-inner">
+                    "This helps us deliver the best world class support and up-to-date features and store your information securely and encrypted for your eyes only online."
+                  </div>
+                </div>
+
+                {/* HIGHLIGHTED YEARLY MEMBERSHIP BUTTON */}
+                <div className="w-full pt-1">
+                  <button
+                    onClick={() => {
+                      setActiveTab('subscription');
+                      setWalkthroughStep(3);
+                      toast.success("Navigated to subscription area! Let's preview your plan details.");
+                    }}
+                    className="w-full py-4.5 bg-gradient-to-r from-amber-500 via-gold-500 to-yellow-400 hover:from-amber-600 hover:to-yellow-500 text-black font-black uppercase text-xs tracking-widest rounded-xl transition-all shadow-[0_0_30px_rgba(212,175,55,0.4)] border-2 border-white/20 active:scale-95 cursor-pointer relative group overflow-hidden"
+                  >
+                    <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300" />
+                    <span className="relative z-10 flex items-center justify-center gap-2">
+                      👑 HIGHLIGHTED MEMBERSHIP PLAN 👑
+                    </span>
+                  </button>
+                  <p className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest mt-1.5 animate-pulse">Click directly to explore secure payment & subscription setups</p>
+                </div>
+
+                <div className="w-full flex justify-between gap-3 border-t border-white/5 pt-4">
+                  <button
+                    onClick={() => setWalkthroughStep(1)}
+                    className="px-4 py-2 text-zinc-400 hover:text-white font-black uppercase text-[10px] tracking-widest transition-colors cursor-pointer"
+                  >
+                    Back
+                  </button>
+                  <button
+                    onClick={() => setWalkthroughStep(3)}
+                    className="px-5 py-2.5 bg-white/5 hover:bg-white/10 text-white font-black uppercase text-[10px] tracking-widest rounded-lg border border-white/10 transition-all cursor-pointer"
+                  >
+                    Next: Support Guide
+                  </button>
+                </div>
+              </motion.div>
+            )}
+
+            {walkthroughStep === 3 && (
+              <motion.div
+                initial={{ scale: 0.95, y: 20 }}
+                animate={{ scale: 1, y: 0 }}
+                exit={{ scale: 0.95, y: 20 }}
+                transition={{ type: "spring", damping: 25, stiffness: 350 }}
+                className="w-full max-w-lg bg-zinc-950 border border-gold-500/30 rounded-3xl p-6 sm:p-8 relative overflow-hidden shadow-[0_0_50px_rgba(212,175,55,0.2)] flex flex-col gap-6"
+              >
+                {/* Crimson & Gold Aura */}
+                <div className="absolute -top-12 -right-12 w-48 h-48 bg-rose-500/10 rounded-full blur-3xl pointer-events-none" />
+                <div className="absolute -bottom-12 -left-12 w-48 h-48 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+
+                <div className="flex items-center gap-4 border-b border-white/5 pb-4">
+                  <div className="w-12 h-12 rounded-xl bg-gold-500/10 border border-gold-500/30 flex items-center justify-center text-gold-500 shrink-0">
+                    <Info size={20} />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-black text-white uppercase tracking-tight">Need Help & Support?</h3>
+                    <p className="text-[10px] font-bold text-gold-500/80 uppercase tracking-wider">Official Service Desk Contacts</p>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <p className="text-xs text-zinc-400 font-medium leading-relaxed">
+                    We have pinned this support card under the <strong className="text-white">Contacts & Support</strong> tab where you can access these 24/7 details:
+                  </p>
+
+                  <div className="space-y-2 pt-1">
+                    {/* WhatsApp Support Item */}
+                    <a
+                      href="https://wa.me/27739586177"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="group flex items-center justify-between p-3 bg-black/40 border border-white/5 hover:border-emerald-500/30 rounded-2xl transition-all hover:bg-zinc-900/60"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-emerald-500/10 rounded-xl text-emerald-500 group-hover:bg-emerald-500 group-hover:text-black transition-all">
+                          <MessageCircle size={16} />
+                        </div>
+                        <div className="text-left">
+                          <p className="text-[11px] font-black uppercase text-white/90">WhatsApp Support</p>
+                          <p className="text-[9px] text-zinc-500 font-bold">+27 73 958 6177</p>
+                        </div>
+                      </div>
+                      <span className="text-[8px] font-black uppercase bg-emerald-500/10 text-emerald-500 group-hover:bg-emerald-500 group-hover:text-black px-2 py-1 rounded-md transition-all">Chat Live</span>
+                    </a>
+
+                    {/* Email Support Item */}
+                    <a
+                      href="mailto:theaveriansupport@gmail.com"
+                      className="group flex items-center justify-between p-3 bg-black/40 border border-white/5 hover:border-gold-500/30 rounded-2xl transition-all hover:bg-zinc-900/60"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-gold-500/10 rounded-xl text-gold-500 group-hover:bg-gold-500 group-hover:text-black transition-all">
+                          <Mail size={16} />
+                        </div>
+                        <div className="text-left">
+                          <p className="text-[11px] font-black uppercase text-white/90">Email Support</p>
+                          <p className="text-[9px] text-zinc-500 font-bold">theaveriansupport@gmail.com</p>
+                        </div>
+                      </div>
+                      <span className="text-[8px] font-black uppercase bg-gold-500/10 text-gold-500 group-hover:bg-gold-500 group-hover:text-black px-2 py-1 rounded-md transition-all">Send Mail</span>
+                    </a>
+
+                    {/* YouTube Video Playlist Support Item */}
+                    <a
+                      href="https://www.youtube.com/playlist?list=PLtNEv-kj7DgU1j1o2HybU4Ge4NzMiSVMu"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="group flex items-center justify-between p-3 bg-black/40 border border-white/5 hover:border-rose-500/30 rounded-2xl transition-all hover:bg-zinc-900/60"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-rose-500/10 rounded-xl text-rose-500 group-hover:bg-rose-500 group-hover:text-black transition-all">
+                          <Video size={16} />
+                        </div>
+                        <div className="text-left">
+                          <p className="text-[11px] font-black uppercase text-white/90">Video Tutorials</p>
+                          <p className="text-[9px] text-zinc-500 font-bold">Watch Playlist on YouTube</p>
+                        </div>
+                      </div>
+                      <span className="text-[8px] font-black uppercase bg-rose-500/10 text-rose-500 group-hover:bg-rose-500 group-hover:text-black px-2 py-1 rounded-md transition-all">Watch Playlist</span>
+                    </a>
+                  </div>
+                </div>
+
+                <div className="flex justify-between gap-3 pt-2">
+                  <button
+                    onClick={() => setWalkthroughStep(2)}
+                    className="px-4 py-2 text-zinc-400 hover:text-white font-black uppercase text-[10px] tracking-widest transition-colors cursor-pointer"
+                  >
+                    Back
+                  </button>
+                  <button
+                    onClick={() => {
+                      localStorage.setItem('averian_welcome_completed', 'true');
+                      setWalkthroughStep(null);
+                      toast.success("Ready! Welcome to your premium breeder suite.");
+                    }}
+                    className="px-6 py-3 bg-gradient-to-r from-gold-500 to-amber-500 hover:from-gold-600 hover:to-amber-600 text-black font-black uppercase text-xs tracking-widest rounded-xl transition-all shadow-lg shadow-gold-500/20 text-center cursor-pointer flex-1"
+                  >
+                    Finish & Start Breeding
+                  </button>
+                </div>
+              </motion.div>
+            )}
+          </motion.div>
         )}
       </AnimatePresence>
 
