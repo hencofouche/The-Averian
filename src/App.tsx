@@ -155,6 +155,14 @@ import { hexToHsva, hsvaToHex } from '@uiw/color-convert';
 import { startOfDay, startOfWeek, startOfMonth, startOfYear, endOfMonth, endOfWeek, addDays, addMonths, isSameMonth, subDays, subWeeks, subMonths, subYears, isWithinInterval, parseISO } from 'date-fns';
 
 // --- Helpers ---
+const isSubscriptionExpired = (settings: UserSettings | null | undefined): boolean => {
+  if (!settings) return false;
+  if (!settings.account_expiry_date) return true;
+  const expiryDate = new Date(settings.account_expiry_date);
+  if (isNaN(expiryDate.getTime())) return true;
+  return new Date() > expiryDate;
+};
+
 const sanitizeData = (data: any) => {
   const sanitized: any = {};
   Object.keys(data).forEach(key => {
@@ -859,7 +867,7 @@ function SubscriptionGate({ settings, onRenew, children }: { settings: UserSetti
       });
       const data = await response.json();
       if (data.redirectUrl) {
-        window.location.href = data.redirectUrl;
+         window.location.href = data.redirectUrl;
       } else {
         toast.error("Payment failed: " + (data.error || "Unknown error"));
       }
@@ -868,31 +876,18 @@ function SubscriptionGate({ settings, onRenew, children }: { settings: UserSetti
     }
   };
 
-  if (isExpired) {
-    return (
-      <div className="fixed inset-0 z-[100] bg-black flex items-center justify-center p-4">
-        <div className="max-w-md w-full bg-black-900 border border-gold-500/30 rounded-3xl p-8 text-center space-y-6 shadow-2xl shadow-gold-500/10">
-          <div className="w-20 h-20 bg-gold-500/10 rounded-full flex items-center justify-center mx-auto border border-gold-500/20">
-            <CreditCard className="text-gold-500" size={40} />
-          </div>
-          <div className="space-y-2">
-            <h2 className="text-2xl font-black uppercase tracking-widest text-white">Subscription Expired</h2>
-            <p className="text-black-50 font-bold uppercase tracking-tighter text-xs">Your trial or subscription has ended. Please renew to continue managing your aviary.</p>
-          </div>
-          <div className="py-4 border-y border-black-800 space-y-1">
-            <p className="text-3xl font-black text-gold-500">R450.00</p>
-            <p className="text-[10px] font-black text-black-100 uppercase tracking-widest">Per Year</p>
-          </div>
-          <Button onClick={handlePay} className="w-full py-6 text-lg">Renew Now</Button>
-          <p className="text-[9px] font-bold text-black-200 uppercase tracking-widest">Secure payment powered by Yoco</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-[100dvh] flex flex-col">
-      {(daysLeft <= 30) && (
+      {isExpired ? (
+        <div className="bg-rose-600 text-white px-4 py-2.5 text-center text-[11px] font-black uppercase tracking-wider flex items-center justify-center gap-2 flex-shrink-0 sticky top-0 z-[60] shadow-md">
+          <AlertTriangle size={15} className="shrink-0" />
+          <span>Subscription Expired (Read-Only Mode) — You can view your entries, but adding/editing is disabled.</span>
+          <button onClick={handlePay} className="ml-4 px-3 py-1 bg-white text-rose-700 font-bold rounded-full hover:bg-zinc-100 transition-colors uppercase text-[9px] tracking-widest flex items-center gap-1 shrink-0">
+            <CreditCard size={12} />
+            Renew Now
+          </button>
+        </div>
+      ) : (daysLeft <= 30) && (
         <div className="bg-gold-500 text-black-950 px-4 py-1.5 text-center text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 flex-shrink-0 sticky top-0 z-[60]">
           <AlertTriangle size={14} />
           {daysLeft === 0 ? "Last day" : `${daysLeft} days left`} in your {daysLeft <= 30 ? 'trial' : 'subscription'}
@@ -936,6 +931,12 @@ export default function App() {
   const [userSettings, setUserSettings] = useState<UserSettings | null>(null);
   const [walkthroughStep, setWalkthroughStep] = useState<number | null>(null);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [quickAddDialog, setQuickAddDialog] = useState<{
+    type: 'mutation' | 'species' | 'subspecies';
+    name: string;
+    speciesId?: string;
+    inheritance?: 'autosomal_recessive' | 'autosomal_dominant' | 'incomplete_dominant' | 'sex_linked_recessive' | '';
+  } | null>(null);
 
   const t = (text: string) => getTranslatedLabel(text, userSettings?.language || 'en');
 
@@ -997,6 +998,11 @@ export default function App() {
 
   const handleConfirmDelete = async () => {
     if (!deleteConfirmation) return;
+    if (isSubscriptionExpired(userSettings)) {
+      toast.error("Your subscription has expired! Please renew to add or edit entries.");
+      setDeleteConfirmation(null);
+      return;
+    }
     setIsDeleting(true);
     try {
       const result = deleteConfirmation.onConfirm();
@@ -1574,29 +1580,25 @@ export default function App() {
   };
 
   const handleAddSpecies = (name: string) => {
-    if (!userSettings) return;
-    const newSpecies: Species = { id: crypto.randomUUID(), name };
-    handleUpdateSettings({
-      ...userSettings,
-      species: [...userSettings.species, newSpecies]
+    setQuickAddDialog({
+      type: 'species',
+      name,
     });
   };
 
-  const handleAddSubSpecies = (name: string, speciesId: string) => {
-    if (!userSettings) return;
-    const newSubSpecies: SubSpecies = { id: crypto.randomUUID(), name, speciesId };
-    handleUpdateSettings({
-      ...userSettings,
-      subspecies: [...userSettings.subspecies, newSubSpecies]
+  const handleAddSubSpecies = (name: string, speciesId?: string) => {
+    setQuickAddDialog({
+      type: 'subspecies',
+      name,
+      speciesId: speciesId || '',
     });
   };
 
   const handleAddMutation = (name: string) => {
-    if (!userSettings) return;
-    const newMutation: Mutation = { id: crypto.randomUUID(), name };
-    handleUpdateSettings({
-      ...userSettings,
-      mutations: [...userSettings.mutations, newMutation]
+    setQuickAddDialog({
+      type: 'mutation',
+      name,
+      inheritance: '',
     });
   };
 
@@ -2779,6 +2781,10 @@ export default function App() {
                               viewMode={viewMode}
                               onBirdRef={handleBirdRef}
                               onToggle={async () => {
+                                if (isSubscriptionExpired(userSettings)) {
+                                  toast.error("Your subscription has expired! Please renew to add or edit entries.");
+                                  return;
+                                }
                                 try {
                                   await updateDoc(doc(db, 'tasks', task.id), { 
                                     status: task.status === 'Completed' ? 'Pending' : 'Completed' 
@@ -2924,6 +2930,143 @@ export default function App() {
       />
 
       <AnimatePresence>
+        {quickAddDialog && (
+          <div className="fixed inset-0 z-[130] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-black border border-gold-500/30 p-6 rounded-3xl w-full max-w-sm shadow-2xl relative overflow-hidden"
+              style={{ backgroundColor: 'var(--theme-card-color, #121212)' }}
+            >
+              <div className="absolute -top-12 -left-12 w-32 h-32 bg-gold-500/5 rounded-full blur-2xl pointer-events-none" />
+              
+              <h4 className="text-sm font-black uppercase tracking-widest text-gold-500 mb-4 flex items-center gap-2">
+                <span>✨ Quick Add {quickAddDialog.type === 'subspecies' ? 'Sub-Species' : quickAddDialog.type === 'species' ? 'Species' : 'Mutation'}</span>
+              </h4>
+
+              <div className="space-y-4">
+                {/* Name input */}
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black text-black-200 uppercase tracking-widest ml-1">Name</label>
+                  <Input 
+                    value={quickAddDialog.name} 
+                    onChange={e => setQuickAddDialog({ ...quickAddDialog, name: e.target.value })}
+                    placeholder={`Enter ${quickAddDialog.type} name...`}
+                    onKeyDown={async e => {
+                      if (e.key === 'Enter') {
+                        document.getElementById('quick-add-submit-btn')?.click();
+                      }
+                    }}
+                    autoFocus
+                  />
+                </div>
+
+                {/* Mutation inheritance select dropdown */}
+                {quickAddDialog.type === 'mutation' && (
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-black-200 uppercase tracking-widest ml-1">Inheritance</label>
+                    <Select 
+                      value={quickAddDialog.inheritance || ''} 
+                      onChange={e => setQuickAddDialog({ ...quickAddDialog, inheritance: e.target.value as any })}
+                    >
+                      <option value="" className="bg-black text-white">None (Select in Calculator)</option>
+                      <option value="autosomal_recessive" className="bg-black text-white">Recessive</option>
+                      <option value="autosomal_dominant" className="bg-black text-white">Dominant</option>
+                      <option value="incomplete_dominant" className="bg-black text-white">Incomplete Dominant</option>
+                      <option value="sex_linked_recessive" className="bg-black text-white">Sex-linked Recessive</option>
+                    </Select>
+                  </div>
+                )}
+
+                {/* Subspecies parent species select dropdown */}
+                {quickAddDialog.type === 'subspecies' && (
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-black-200 uppercase tracking-widest ml-1">Parent Species</label>
+                    <Select 
+                      value={quickAddDialog.speciesId || ''} 
+                      onChange={e => setQuickAddDialog({ ...quickAddDialog, speciesId: e.target.value })}
+                    >
+                      <option value="" className="bg-black text-white">Select Parent Species</option>
+                      {/* Show both default and custom species! */}
+                      {(() => {
+                        const list = [...(userSettings?.species || [])];
+                        if (userSettings?.useDefaultData !== false) {
+                          defaultSpecies.forEach(ds => {
+                            if (!list.some(s => s.name.toLowerCase() === ds.name.toLowerCase() || s.id === ds.id)) {
+                              list.push({ id: ds.id, name: ds.name });
+                            }
+                          });
+                        }
+                        return list.map(s => <option key={s.id} value={s.id} className="bg-black text-white">{s.name}</option>);
+                      })()}
+                    </Select>
+                  </div>
+                )}
+
+                <div className="flex gap-2 pt-2">
+                  <Button onClick={() => setQuickAddDialog(null)} variant="ghost" className="flex-1 uppercase font-bold text-[10px] tracking-widest">
+                    Cancel
+                  </Button>
+                  <Button 
+                    id="quick-add-submit-btn"
+                    onClick={async () => {
+                      if (isSubscriptionExpired(userSettings)) {
+                        toast.error("Your subscription has expired! Please renew to add or edit entries.");
+                        setQuickAddDialog(null);
+                        return;
+                      }
+                      if (!quickAddDialog.name.trim()) {
+                        toast.error("Name is required.");
+                        return;
+                      }
+                      if (quickAddDialog.type === 'subspecies' && !quickAddDialog.speciesId) {
+                        toast.error("Parent Species is required.");
+                        return;
+                      }
+
+                      if (!userSettings) return;
+
+                      let updatedSettings = { ...userSettings };
+                      
+                      if (quickAddDialog.type === 'mutation') {
+                        const newMut: Mutation = {
+                          id: crypto.randomUUID(),
+                          name: quickAddDialog.name.trim(),
+                          inheritance: quickAddDialog.inheritance || undefined
+                        };
+                        updatedSettings.mutations = [...(userSettings.mutations || []), newMut];
+                        toast.success(`Added mutation "${quickAddDialog.name}"`);
+                      } else if (quickAddDialog.type === 'species') {
+                        const newSpec: Species = {
+                          id: crypto.randomUUID(),
+                          name: quickAddDialog.name.trim()
+                        };
+                        updatedSettings.species = [...(userSettings.species || []), newSpec];
+                        toast.success(`Added species "${quickAddDialog.name}"`);
+                      } else if (quickAddDialog.type === 'subspecies') {
+                        const newSub: SubSpecies = {
+                          id: crypto.randomUUID(),
+                          name: quickAddDialog.name.trim(),
+                          speciesId: quickAddDialog.speciesId!
+                        };
+                        updatedSettings.subspecies = [...(userSettings.subspecies || []), newSub];
+                        toast.success(`Added sub-species "${quickAddDialog.name}"`);
+                      }
+
+                      await handleUpdateSettings(updatedSettings);
+                      setQuickAddDialog(null);
+                    }} 
+                    className="flex-1 uppercase bg-gold-500 hover:bg-gold-600 text-black font-black text-[10px] tracking-widest"
+                  >
+                    Save & Add
+                  </Button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+
         {galleryData && (
           <ImageGallery 
             imageUrls={galleryData.urls} 
@@ -5385,6 +5528,7 @@ function BreedingRecordForm({ user, initialData, pairs, birds, cages, onClose, u
   const [isSaving, setIsSaving] = useState(false);
   
   const handleAddEgg = () => {
+    if (isSubscriptionExpired(userSettings)) return;
     const currentEggs = formData.eggs || [];
     const laidDate = new Date().toISOString().split('T')[0];
     
@@ -5404,6 +5548,7 @@ function BreedingRecordForm({ user, initialData, pairs, birds, cages, onClose, u
   };
 
   const updateEgg = (index: number, updates: Partial<EggType>) => {
+    if (isSubscriptionExpired(userSettings)) return;
     const newEggs = [...(formData.eggs || [])];
     newEggs[index] = { ...newEggs[index], ...updates };
     
@@ -5423,6 +5568,10 @@ function BreedingRecordForm({ user, initialData, pairs, birds, cages, onClose, u
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubscriptionExpired(userSettings)) {
+      toast.error("Your subscription has expired! Please renew to add or edit entries.");
+      return;
+    }
     if (!formData.pairId) {
       toast.error('Please select a pair.');
       return;
@@ -5460,11 +5609,19 @@ function BreedingRecordForm({ user, initialData, pairs, birds, cages, onClose, u
     processSave();
   };
 
+  const isExpired = isSubscriptionExpired(userSettings);
+
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="space-y-1">
-        <SearchableSelect 
-          label={t('Pair')}
+      {isExpired && (
+        <div className="bg-rose-500/20 text-rose-300 border border-rose-500/30 p-3 rounded-2xl text-[10px] font-black uppercase tracking-widest text-center shadow-inner">
+          ⚠️ Subscription Expired — Entry is in Read-Only Mode
+        </div>
+      )}
+      <fieldset disabled={isExpired} className="space-y-4">
+        <div className="space-y-1">
+          <SearchableSelect 
+            label={t('Pair')}
           value={formData.pairId || ''}
           onChange={(val) => setFormData({ ...formData, pairId: val })}
           options={[
@@ -5703,8 +5860,9 @@ function BreedingRecordForm({ user, initialData, pairs, birds, cages, onClose, u
           onChange={e => setFormData({ ...formData, notes: e.target.value })} 
         />
       </div>
+      </fieldset>
 
-      <Button type="submit" className="w-full py-4 text-sm uppercase tracking-widest font-black" disabled={isSaving}>
+      <Button type="submit" className="w-full py-4 text-sm uppercase tracking-widest font-black" disabled={isSaving || isExpired}>
         {isSaving ? <Loader2 className="animate-spin mr-2" size={16} /> : null}
         {(initialData && (initialData as any).id) ? t('Update Record') : t('Add Record')}
       </Button>
@@ -5730,6 +5888,10 @@ function TransactionForm({ user, initialData, birds, pairs, cages, contacts, cur
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubscriptionExpired(userSettings)) {
+      toast.error("Your subscription has expired! Please renew to add or edit entries.");
+      return;
+    }
     if (isSaving) return;
     setIsSaving(true);
     
@@ -5770,9 +5932,17 @@ function TransactionForm({ user, initialData, birds, pairs, cages, contacts, cur
 
     processSave();
   };
+  const isExpired = isSubscriptionExpired(userSettings);
+
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      <div className="grid grid-cols-2 gap-4">
+      {isExpired && (
+        <div className="bg-rose-500/20 text-rose-300 border border-rose-500/30 p-3 rounded-2xl text-[10px] font-black uppercase tracking-widest text-center shadow-inner">
+          ⚠️ Subscription Expired — Entry is in Read-Only Mode
+        </div>
+      )}
+      <fieldset disabled={isExpired} className="space-y-6">
+        <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
           <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">{t('Type')}</label>
           <Select value={formData.type} onChange={e => setFormData({ ...formData, type: e.target.value as any })}>
@@ -5864,7 +6034,8 @@ function TransactionForm({ user, initialData, birds, pairs, cages, contacts, cur
         <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">{t('Description')}</label>
         <Textarea rows={3} placeholder={t('Additional details...')} value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} />
       </div>
-      <Button type="submit" className="w-full py-4 text-sm font-bold shadow-xl shadow-gold-500/20" disabled={isSaving}>
+      </fieldset>
+      <Button type="submit" className="w-full py-4 text-sm font-bold shadow-xl shadow-gold-500/20" disabled={isSaving || isExpired}>
         {isSaving ? <Loader2 className="animate-spin mr-2" size={16} /> : null}
         {(initialData && (initialData as any).id) ? t('Update Transaction') : t('Add Transaction')}
       </Button>
@@ -5886,6 +6057,10 @@ function ContactForm({ user, initialData, onClose, userSettings }: { user: Fireb
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubscriptionExpired(userSettings)) {
+      toast.error("Your subscription has expired! Please renew to add or edit entries.");
+      return;
+    }
     if (isSaving) return;
     setIsSaving(true);
     
@@ -5913,9 +6088,17 @@ function ContactForm({ user, initialData, onClose, userSettings }: { user: Fireb
     processSave();
   };
 
+  const isExpired = isSubscriptionExpired(userSettings);
+
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      <div className="space-y-2">
+      {isExpired && (
+        <div className="bg-rose-500/20 text-rose-300 border border-rose-500/30 p-3 rounded-2xl text-[10px] font-black uppercase tracking-widest text-center shadow-inner">
+          ⚠️ Subscription Expired — Entry is in Read-Only Mode
+        </div>
+      )}
+      <fieldset disabled={isExpired} className="space-y-6">
+        <div className="space-y-2">
         <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">{t('Name')}</label>
         <Input required placeholder={t('Contact Name')} value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} />
       </div>
@@ -5945,7 +6128,8 @@ function ContactForm({ user, initialData, onClose, userSettings }: { user: Fireb
         <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">{t('Notes')}</label>
         <Textarea rows={3} placeholder={t('Additional details...')} value={formData.notes} onChange={e => setFormData({ ...formData, notes: e.target.value })} />
       </div>
-      <Button type="submit" className="w-full py-4 text-sm font-bold shadow-xl shadow-gold-500/20" disabled={isSaving}>
+      </fieldset>
+      <Button type="submit" className="w-full py-4 text-sm font-bold shadow-xl shadow-gold-500/20" disabled={isSaving || isExpired}>
         {isSaving ? <Loader2 className="animate-spin mr-2" size={16} /> : null}
         {(initialData && (initialData as any).id) ? t('Update Contact') : t('Add Contact')}
       </Button>
@@ -6476,10 +6660,23 @@ function SettingsView({ settings, onUpdate, allData, user, isSyncing, setDeleteC
   const [activeSection, setActiveSection] = useState<'general' | 'species' | 'subspecies' | 'mutations' | 'statuses' | 'data' | null>('general');
   const [newSpecies, setNewSpecies] = useState('');
   const [newMutation, setNewMutation] = useState('');
+  const [newMutationInheritance, setNewMutationInheritance] = useState<'autosomal_recessive' | 'autosomal_dominant' | 'incomplete_dominant' | 'sex_linked_recessive' | ''>('');
   const [newStatus, setNewStatus] = useState('');
   const [newSubSpecies, setNewSubSpecies] = useState('');
   const [selectedSpeciesId, setSelectedSpeciesId] = useState('');
   const [editingItem, setEditingItem] = useState<{ type: 'species' | 'subspecies' | 'mutation' | 'status', id: string, name: string, inheritance?: 'autosomal_recessive' | 'autosomal_dominant' | 'incomplete_dominant' | 'sex_linked_recessive' } | null>(null);
+
+  const availableSpecies = useMemo(() => {
+    const list = [...(settings.species || [])];
+    if (settings.useDefaultData !== false) {
+      defaultSpecies.forEach(ds => {
+        if (!list.some(s => s.name.toLowerCase() === ds.name.toLowerCase() || s.id === ds.id)) {
+          list.push({ id: ds.id, name: ds.name });
+        }
+      });
+    }
+    return list;
+  }, [settings.species, settings.useDefaultData]);
 
   const downloadBackup = () => {
     const data = JSON.stringify(allData, null, 2);
@@ -6500,8 +6697,19 @@ function SettingsView({ settings, onUpdate, allData, user, isSyncing, setDeleteC
 
   const addMutation = () => {
     if (!newMutation.trim()) return;
-    onUpdate({ ...settings, mutations: [...(settings.mutations || []), { id: crypto.randomUUID(), name: newMutation.trim() }] });
+    onUpdate({ 
+      ...settings, 
+      mutations: [
+        ...(settings.mutations || []), 
+        { 
+          id: crypto.randomUUID(), 
+          name: newMutation.trim(), 
+          inheritance: newMutationInheritance || undefined 
+        }
+      ] 
+    });
     setNewMutation('');
+    setNewMutationInheritance('');
   };
 
   const addStatus = () => {
@@ -6867,19 +7075,19 @@ function SettingsView({ settings, onUpdate, allData, user, isSyncing, setDeleteC
                     <label className="text-[10px] font-black text-black-100 uppercase tracking-widest ml-1">Parent Species</label>
                     <Select value={selectedSpeciesId} onChange={e => setSelectedSpeciesId(e.target.value)}>
                       <option value="">Select Parent Species</option>
-                      {settings.species?.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                      {availableSpecies.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                     </Select>
                   </div>
                   <div className="space-y-1">
                     <label className="text-[10px] font-black text-black-100 uppercase tracking-widest ml-1">Sub-Species Name</label>
                     <div className="flex gap-2">
-                      <Input placeholder="New sub-species name..." value={newSubSpecies} onChange={e => setNewSubSpecies(e.target.value)} onKeyDown={e => e.key === 'Enter' && addSubSpecies()} />
+                       <Input placeholder="New sub-species name..." value={newSubSpecies} onChange={e => setNewSubSpecies(e.target.value)} onKeyDown={e => e.key === 'Enter' && addSubSpecies()} />
                       <Button onClick={addSubSpecies} variant="secondary" className="px-4" disabled={!selectedSpeciesId}><Plus size={18} /></Button>
                     </div>
                   </div>
                 </div>
                 <div className="space-y-4 mt-6">
-                  {settings.species?.map(s => {
+                  {availableSpecies.map(s => {
                     const subs = settings.subspecies?.filter(ss => ss.speciesId === s.id) || [];
                     if (subs.length === 0) return null;
                     return (
@@ -6928,9 +7136,20 @@ function SettingsView({ settings, onUpdate, allData, user, isSyncing, setDeleteC
                   <h3 className="text-lg font-black uppercase tracking-widest text-gold-500">Manage Mutations</h3>
                   <Badge variant="info">{settings.mutations?.length || 0} Total</Badge>
                 </div>
-                <div className="flex gap-2">
-                  <Input placeholder="New mutation name..." value={newMutation} onChange={e => setNewMutation(e.target.value)} onKeyDown={e => e.key === 'Enter' && addMutation()} />
-                  <Button onClick={addMutation} variant="secondary" className="px-4"><Plus size={18} /></Button>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <div className="flex-1">
+                    <Input placeholder="New mutation name..." value={newMutation} onChange={e => setNewMutation(e.target.value)} onKeyDown={e => e.key === 'Enter' && addMutation()} />
+                  </div>
+                  <div className="w-full sm:w-64">
+                    <Select value={newMutationInheritance} onChange={e => setNewMutationInheritance(e.target.value as any)}>
+                      <option value="" className="bg-black text-white">None (Select in Calculator)</option>
+                      <option value="autosomal_recessive" className="bg-black text-white">Recessive</option>
+                      <option value="autosomal_dominant" className="bg-black text-white">Dominant</option>
+                      <option value="incomplete_dominant" className="bg-black text-white">Incomplete Dominant</option>
+                      <option value="sex_linked_recessive" className="bg-black text-white">Sex-linked Recessive</option>
+                    </Select>
+                  </div>
+                  <Button onClick={addMutation} variant="secondary" className="px-4 shrink-0"><Plus size={18} /></Button>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
                   {settings.mutations?.map(m => (
@@ -8108,6 +8327,10 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubscriptionExpired(userSettings)) {
+      toast.error("Your subscription has expired! Please renew to add or edit entries.");
+      return;
+    }
     if (!formData.name?.trim()) {
       toast.error('Please enter a name or ID for the bird.');
       return;
@@ -8247,9 +8470,17 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
     processSave();
   };
 
+  const isExpired = isSubscriptionExpired(userSettings);
+
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="grid grid-cols-12 gap-4">
+      {isExpired && (
+        <div className="bg-rose-500/20 text-rose-300 border border-rose-500/30 p-3 rounded-2xl text-[10px] font-black uppercase tracking-widest text-center shadow-inner">
+          ⚠️ Subscription Expired — Entry is in Read-Only Mode
+        </div>
+      )}
+      <fieldset disabled={isExpired} className="space-y-4">
+        <div className="grid grid-cols-12 gap-4">
         <div className="col-span-6 space-y-1">
           <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">{t('Ring / Name')}</label>
           <Input 
@@ -8688,7 +8919,8 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
           ))}
         </div>
       </div>
-      <Button type="submit" className="w-full py-4 text-sm uppercase tracking-widest font-black" disabled={isUploading || isSaving}>
+      </fieldset>
+      <Button type="submit" className="w-full py-4 text-sm uppercase tracking-widest font-black" disabled={isUploading || isSaving || isExpired}>
         {isSaving ? <Loader2 className="animate-spin mr-2" size={16} /> : null}
         {(initialData && initialData.id) ? 'Update' : 'Add'} Bird
       </Button>
@@ -8733,6 +8965,10 @@ function CageForm({ user, initialData, cages, onClose, userSettings }: { user: F
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubscriptionExpired(userSettings)) {
+      toast.error("Your subscription has expired! Please renew to add or edit entries.");
+      return;
+    }
     if (isUploading || isSaving) return;
     setIsSaving(true);
     setError(null);
@@ -8797,9 +9033,17 @@ function CageForm({ user, initialData, cages, onClose, userSettings }: { user: F
 
     processSave();
   };
+  const isExpired = isSubscriptionExpired(userSettings);
+
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      {!initialData && (
+      {isExpired && (
+        <div className="bg-rose-500/20 text-rose-300 border border-rose-500/30 p-3 rounded-2xl text-[10px] font-black uppercase tracking-widest text-center shadow-inner">
+          ⚠️ Subscription Expired — Entry is in Read-Only Mode
+        </div>
+      )}
+      <fieldset disabled={isExpired} className="space-y-4">
+        {!initialData && (
         <div className="flex bg-black-900 p-1 rounded-xl border border-black-800">
           <button type="button" onClick={() => setIsMultiMode(false)} className={cn("flex-1 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all", !isMultiMode ? "bg-gold-500 text-black shadow-lg shadow-gold-500/20" : "text-black-100 hover:text-white")}>{t('Single Cage')}</button>
           <button type="button" onClick={() => setIsMultiMode(true)} className={cn("flex-1 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all", isMultiMode ? "bg-gold-500 text-black shadow-lg shadow-gold-500/20" : "text-black-100 hover:text-white")}>{t('Bulk Create')}</button>
@@ -8885,7 +9129,8 @@ function CageForm({ user, initialData, cages, onClose, userSettings }: { user: F
         <div className="space-y-1"><label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">{t('Location')}</label><Input value={formData.location} onChange={e => setFormData({ ...formData, location: e.target.value })} /></div>
         <div className="space-y-1"><label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">{t('Type')}</label><Select value={formData.type} onChange={e => setFormData({ ...formData, type: e.target.value })}><option value="Standard" className="bg-black text-white">{t('Standard')}</option><option value="Breeding" className="bg-black text-white">{t('Breeding')}</option><option value="Flight" className="bg-black text-white">{t('Flight')}</option><option value="Hospital" className="bg-black text-white">{t('Hospital')}</option></Select></div>
       </div>
-      <Button type="submit" className="w-full py-4 text-sm uppercase tracking-widest font-black" disabled={isUploading || isSaving}>
+      </fieldset>
+      <Button type="submit" className="w-full py-4 text-sm uppercase tracking-widest font-black" disabled={isUploading || isSaving || isExpired}>
         {isSaving ? <Loader2 className="animate-spin mr-2" size={16} /> : null}
         {(initialData && (initialData as any).id) ? t('Update Cage') : isMultiMode ? `${t('Bulk Create')} (${Math.max(0, parseInt(multiEnd) - parseInt(multiStart) + 1 || 0)})` : t('Add Cage')}
       </Button>
@@ -8925,6 +9170,10 @@ function PairForm({ user, initialData, birds, cages, onClose, userSettings }: { 
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubscriptionExpired(userSettings)) {
+      toast.error("Your subscription has expired! Please renew to add or edit entries.");
+      return;
+    }
     if (!formData.maleId || !formData.femaleId) {
       toast.error('Please select both a male and a female bird.');
       return;
@@ -8976,9 +9225,17 @@ function PairForm({ user, initialData, birds, cages, onClose, userSettings }: { 
 
     processSave();
   };
+  const isExpired = isSubscriptionExpired(userSettings);
+
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="grid grid-cols-2 gap-4">
+      {isExpired && (
+        <div className="bg-rose-500/20 text-rose-300 border border-rose-500/30 p-3 rounded-2xl text-[10px] font-black uppercase tracking-widest text-center shadow-inner">
+          ⚠️ Subscription Expired — Entry is in Read-Only Mode
+        </div>
+      )}
+      <fieldset disabled={isExpired} className="space-y-4">
+        <div className="grid grid-cols-2 gap-4">
         <SearchableSelect 
           label={t('Male / Bird 1')}
           value={formData.maleId || ''}
@@ -9090,9 +9347,10 @@ function PairForm({ user, initialData, birds, cages, onClose, userSettings }: { 
           </div>
         )}
       </div>
+      </fieldset>
       {uploadError && <p className="text-[10px] text-red-500 mt-1 font-bold">{uploadError}</p>}
 
-      <Button type="submit" className="w-full py-4 text-sm uppercase tracking-widest font-black" disabled={isSaving || isUploading}>
+      <Button type="submit" className="w-full py-4 text-sm uppercase tracking-widest font-black" disabled={isSaving || isUploading || isExpired}>
         {isSaving ? <Loader2 className="animate-spin mr-2" size={16} /> : null}
         {(initialData && initialData.id) ? t('Update Pair') : t('Add Pair')}
       </Button>
@@ -9118,6 +9376,10 @@ function TaskForm({ user, initialData, birds, cages, onClose, userSettings }: { 
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubscriptionExpired(userSettings)) {
+      toast.error("Your subscription has expired! Please renew to add or edit entries.");
+      return;
+    }
     if (isSaving) return;
     setIsSaving(true);
     
@@ -9152,12 +9414,21 @@ function TaskForm({ user, initialData, birds, cages, onClose, userSettings }: { 
     setNewSubTask('');
   };
   const toggleBirdTag = (birdId: string) => {
+    if (isSubscriptionExpired(userSettings)) return;
     const current = formData.birdIds || [];
     setFormData({ ...formData, birdIds: current.includes(birdId) ? current.filter(id => id !== birdId) : [...current, birdId] });
   };
+  const isExpired = isSubscriptionExpired(userSettings);
+
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="space-y-1"><label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">{t('Title')}</label><Input required value={formData.title} onChange={e => setFormData({ ...formData, title: e.target.value })} /></div>
+      {isExpired && (
+        <div className="bg-rose-500/20 text-rose-300 border border-rose-500/30 p-3 rounded-2xl text-[10px] font-black uppercase tracking-widest text-center shadow-inner">
+          ⚠️ Subscription Expired — Entry is in Read-Only Mode
+        </div>
+      )}
+      <fieldset disabled={isExpired} className="space-y-4">
+        <div className="space-y-1"><label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">{t('Title')}</label><Input required value={formData.title} onChange={e => setFormData({ ...formData, title: e.target.value })} /></div>
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1"><label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">{t('Category')}</label><Input required value={formData.category} onChange={e => setFormData({ ...formData, category: e.target.value })} /></div>
         <div className="space-y-1"><label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">{t('Priority')}</label><Select value={formData.priority} onChange={e => setFormData({ ...formData, priority: e.target.value as any })}><option value="Low" className="bg-black text-white">{t('Low')}</option><option value="Medium" className="bg-black text-white">{t('Medium')}</option><option value="High" className="bg-black text-white">{t('High')}</option></Select></div>
@@ -9274,7 +9545,8 @@ function TaskForm({ user, initialData, birds, cages, onClose, userSettings }: { 
           ))}
         </div>
       </div>
-      <Button type="submit" className="w-full py-4 text-sm uppercase tracking-widest font-black" disabled={isSaving}>
+      </fieldset>
+      <Button type="submit" className="w-full py-4 text-sm uppercase tracking-widest font-black" disabled={isSaving || isExpired}>
         {isSaving ? <Loader2 className="animate-spin mr-2" size={16} /> : null}
         {(initialData && initialData.id) ? t('Update Task') : t('Add Task')}
       </Button>
