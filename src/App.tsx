@@ -14,6 +14,8 @@ import {
 import GeneticsCalculator from './components/GeneticsCalculator';
 import { ContactsView } from './components/ContactsView';
 import { QRCodeSVG } from 'qrcode.react';
+import { SubscriptionGate } from "./components/SubscriptionGate";
+import { Button, Input, Select, Card, Textarea, BirdCompactInfo, Badge } from "./components/ui";
 import { Scanner } from '@yudiel/react-qr-scanner';
 import { motion, AnimatePresence } from 'motion/react';
 import { generateBirdListPDF, generateCageListPDF, generatePairListPDF, generateCertificatePDF, generateQRListPDF } from './lib/pdf-engine';
@@ -284,101 +286,6 @@ const compressAndUploadImage = async (file: File, path: string): Promise<string>
 
 // --- UI Components ---
 
-const Button = ({ 
-  children, className, variant = 'primary', ...props 
-}: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'primary' | 'secondary' | 'danger' | 'ghost' }) => {
-  const variants = {
-    primary: 'bg-gold-500 text-black-950 hover:bg-gold-600 shadow-lg shadow-gold-500/20',
-    secondary: 'bg-zinc-800 text-gold-500 hover:bg-zinc-700 border border-gold-500/30',
-    danger: 'bg-zinc-900/80 text-white rounded-lg transition-all',
-    ghost: 'bg-transparent text-black-50 hover:bg-black-900 hover:text-gold-500',
-  };
-  
-  const customDangerStyle: React.CSSProperties = variant === 'danger' ? {
-    backgroundColor: 'color-mix(in srgb, var(--theme-delete-color, #ef4444), transparent 80%)',
-    color: 'var(--theme-delete-color, #ef4444)',
-    borderColor: 'color-mix(in srgb, var(--theme-delete-color, #ef4444), transparent 70%)',
-    borderWidth: '1px'
-  } : {};
-
-  return (
-    <button 
-      className={cn('px-4 py-2 rounded-lg font-bold transition-all flex items-center justify-center gap-2 disabled:opacity-50 active:scale-95 text-[clamp(10px,1.2vw,14px)] uppercase tracking-widest', variants[variant], className)} 
-      style={customDangerStyle}
-      {...props}
-    >
-      {children}
-    </button>
-  );
-};
-
-const Input = ({ className, id, name, ...props }: React.InputHTMLAttributes<HTMLInputElement>) => { const generatedId = React.useId(); return ( <input id={id || generatedId} name={name || id || generatedId} className={cn('w-full px-4 py-3 bg-black border border-black-700 text-white rounded-2xl focus:outline-none focus:ring-2 focus:ring-gold-500/20 focus:border-gold-500 transition-all placeholder:text-white/30 text-sm font-medium', className)} {...props} /> ); };
-
-const Select = ({ className, children, id, name, ...props }: React.SelectHTMLAttributes<HTMLSelectElement>) => { const generatedId = React.useId(); return ( <select id={id || generatedId} name={name || id || generatedId} className={cn('w-full px-4 py-3 bg-black border border-black-700 text-white rounded-2xl focus:outline-none focus:ring-2 focus:ring-gold-500/20 focus:border-gold-500 transition-all appearance-none text-sm font-medium', className)} {...props} > {children} </select> ); };
-
-const Card = ({ children, className, ...props }: { children: React.ReactNode, className?: string } & React.HTMLAttributes<HTMLDivElement>) => (
-  <div className={cn('bg-black-950 border border-black-700 rounded-2xl overflow-hidden shadow-2xl w-full', className)} {...props}>
-    {children}
-  </div>
-);
-
-const Textarea = ({ className, ...props }: React.TextareaHTMLAttributes<HTMLTextAreaElement>) => (
-  <textarea
-    className={cn(
-      "flex min-h-[80px] w-full rounded-xl border border-black-700 bg-black px-3 py-2 text-sm text-white ring-offset-black placeholder:text-zinc-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
-      className
-    )}
-    {...props}
-  />
-);
-
-const Badge = ({ children, className, variant = 'neutral' }: { children: React.ReactNode, className?: string, variant?: 'neutral' | 'success' | 'warning' | 'info' | 'destructive' | 'female' | 'male' }) => {
-  const variants = {
-    neutral: 'bg-black text-white border border-black-700',
-    success: 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30',
-    warning: 'bg-amber-500/20 text-amber-400 border border-amber-500/30',
-    info: 'bg-secondary/20 text-secondary border border-secondary/30',
-    destructive: 'bg-red-500/20 text-red-400 border border-red-500/30',
-    female: 'bg-black text-white border border-black-700',
-    male: 'bg-black text-white border border-black-700',
-  };
-
-  const customStyle: React.CSSProperties = {};
-  
-  if (variant === 'destructive') {
-    return (
-      <span 
-        className={cn("px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest border shadow-inner", className)}
-        style={{
-          backgroundColor: 'color-mix(in srgb, var(--theme-delete-color, #ef4444), transparent 80%)',
-          color: 'var(--theme-delete-color, #ef4444)',
-          borderColor: 'color-mix(in srgb, var(--theme-delete-color, #ef4444), transparent 70%)'
-        }}
-      >
-        {children}
-      </span>
-    );
-  }
-
-  if (variant === 'male') {
-    customStyle.backgroundColor = 'color-mix(in srgb, var(--theme-male-color, #3b82f6), transparent 80%)';
-    customStyle.color = 'var(--theme-male-color, #60a5fa)';
-    customStyle.borderColor = 'color-mix(in srgb, var(--theme-male-color, #3b82f6), transparent 70%)';
-  } else if (variant === 'female') {
-    customStyle.backgroundColor = 'color-mix(in srgb, var(--theme-female-color, #e11d48), transparent 80%)';
-    customStyle.color = 'var(--theme-female-color, #fb7185)';
-    customStyle.borderColor = 'color-mix(in srgb, var(--theme-female-color, #e11d48), transparent 70%)';
-  }
-
-  return (
-    <span 
-      className={cn('px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest', variants[variant], className)}
-      style={customStyle}
-    >
-      {children}
-    </span>
-  );
-};
 
 const PairCompactInfo = ({ pair, birds, cages, className, onClick }: { pair: Pair, birds: Bird[], cages: Cage[], className?: string, onClick?: () => void }) => {
   const male = birds.find(b => b.id === pair.maleId);
@@ -445,70 +352,6 @@ const PairCompactInfo = ({ pair, birds, cages, className, onClick }: { pair: Pai
       <div className="space-y-2">
         <BirdMini bird={male} label="M" isMale={true} />
         <BirdMini bird={female} label="F" isMale={false} />
-      </div>
-    </div>
-  );
-};
-
-const BirdCompactInfo = ({ bird, cages, className, onClick }: { bird: Bird, cages: Cage[], className?: string, onClick?: () => void }) => {
-  const cage = cages.find(c => c.id === bird.cageId);
-  return (
-    <div 
-      className={cn("flex flex-col gap-2 p-3 bg-zinc-900/60 rounded-xl border border-white/10 transition-all text-left w-full min-w-0", onClick && "cursor-pointer hover:bg-gold-500/10 hover:border-gold-500/30", className)}
-      onClick={(e) => {
-        if (onClick) {
-          e.stopPropagation();
-          onClick();
-        }
-      }}
-    >
-      <div className="flex items-center justify-between gap-2 border-b border-white/5 pb-1.5 mb-0.5">
-        <span className="text-[9px] font-black text-secondary uppercase tracking-widest">Bird Profile</span>
-        {cage && (
-          <span className="text-[8px] font-bold text-secondary/80 uppercase flex items-center gap-1 shrink-0 bg-secondary/5 px-1.5 py-0.5 rounded-md border border-secondary/10 truncate max-w-[120px]">
-            <Home size={8} className="shrink-0" /> <span className="truncate">{cage.name}</span>
-          </span>
-        )}
-      </div>
-      
-      <div className="flex items-center gap-2 min-w-0">
-        <div 
-          className="w-5 h-5 rounded-md flex items-center justify-center text-[10px] font-black shrink-0 border"
-          style={{
-            backgroundColor: bird.sex === 'Male' ? 'color-mix(in srgb, var(--theme-male-color, #3b82f6), transparent 80%)' : bird.sex === 'Female' ? 'color-mix(in srgb, var(--theme-female-color, #e11d48), transparent 80%)' : 'rgba(255,255,255,0.05)',
-            color: bird.sex === 'Male' ? 'var(--theme-male-color, #60a5fa)' : bird.sex === 'Female' ? 'var(--theme-female-color, #fb7185)' : 'rgba(255,255,255,0.4)',
-            borderColor: bird.sex === 'Male' ? 'color-mix(in srgb, var(--theme-male-color, #3b82f6), transparent 70%)' : bird.sex === 'Female' ? 'color-mix(in srgb, var(--theme-female-color, #e11d48), transparent 70%)' : 'rgba(255,255,255,0.1)'
-          }}
-        >
-          {bird.sex === 'Male' ? 'M' : bird.sex === 'Female' ? 'F' : '?'}
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="text-[10px] font-black text-white uppercase truncate shrink-0">{bird.name}</span>
-            <span className="text-[8px] font-bold text-white/80 uppercase truncate">
-              {bird.species}{bird.subSpecies ? ` (${bird.subSpecies})` : ''}
-            </span>
-          </div>
-          {((bird.mutations?.length || 0) > 0 || (bird.splitMutations?.length || 0) > 0 || (bird.statuses?.length || 0) > 0) ? (
-            <div className="flex flex-wrap gap-1 mt-0.5 opacity-60 scale-90 origin-left">
-              {bird.mutations?.map(m => (
-                <span key={m} className="text-[7px] px-1 bg-black/40 text-white/50 rounded-sm font-black uppercase border border-white/5">
-                  {m}
-                </span>
-              ))}
-              {bird.splitMutations?.map(m => (
-                <span key={m} className="text-[7px] px-1 bg-black/40 text-secondary/50 rounded-sm font-black uppercase italic border border-secondary/5">
-                  /{m}
-                </span>
-              ))}
-              {bird.statuses?.map(s => (
-                <span key={s} className="text-[7px] px-1 bg-blue-900/30 text-blue-300/80 rounded-sm font-black uppercase border border-blue-500/10 shadow-sm">
-                  {s}
-                </span>
-              ))}
-            </div>
-          ) : null}
-        </div>
       </div>
     </div>
   );
@@ -832,74 +675,6 @@ export const SearchableSelect = ({
   );
 };
 
-// --- Subscription Gate ---
-
-function SubscriptionGate({ settings, onRenew, children }: { settings: UserSettings | null, onRenew: () => void, children: React.ReactNode }) {
-  if (!settings) {
-    return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <Loader2 className="text-gold-500 animate-spin" size={40} />
-          <p className="text-black-100 font-black uppercase tracking-widest text-[10px]">Loading Account...</p>
-        </div>
-      </div>
-    );
-  }
-
-  const expiryDate = settings.account_expiry_date ? new Date(settings.account_expiry_date) : null;
-  const now = new Date();
-  
-  const isValidDate = expiryDate && !isNaN(expiryDate.getTime());
-  // If we have settings but no valid date, it's a data error. 
-  // We'll treat it as expired to be safe and encourage renewal/fix.
-  const isExpired = !isValidDate || now > expiryDate;
-  
-  const diffTime = isValidDate ? expiryDate.getTime() - now.getTime() : 0;
-  const daysLeft = Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
-
-  const handlePay = async () => {
-    try {
-      // Use window.location.origin to ensure we pass the correct current domain to the server
-      const response = await fetch('/api/create-checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ origin: window.location.origin })
-      });
-      const data = await response.json();
-      if (data.redirectUrl) {
-         window.location.href = data.redirectUrl;
-      } else {
-        toast.error("Payment failed: " + (data.error || "Unknown error"));
-      }
-    } catch (error: any) {
-      toast.error("Payment failed: " + error.message);
-    }
-  };
-
-  return (
-    <div className="min-h-[100dvh] flex flex-col">
-      {isExpired ? (
-        <div className="bg-rose-600 text-white px-4 py-2.5 text-center text-[11px] font-black uppercase tracking-wider flex items-center justify-center gap-2 flex-shrink-0 sticky top-0 z-[60] shadow-md">
-          <AlertTriangle size={15} className="shrink-0" />
-          <span>Subscription Expired (Read-Only Mode) — You can view your entries, but adding/editing is disabled.</span>
-          <button onClick={handlePay} className="ml-4 px-3 py-1 bg-white text-rose-700 font-bold rounded-full hover:bg-zinc-100 transition-colors uppercase text-[9px] tracking-widest flex items-center gap-1 shrink-0">
-            <CreditCard size={12} />
-            Renew Now
-          </button>
-        </div>
-      ) : (daysLeft <= 30) && (
-        <div className="bg-gold-500 text-black-950 px-4 py-1.5 text-center text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 flex-shrink-0 sticky top-0 z-[60]">
-          <AlertTriangle size={14} />
-          {daysLeft === 0 ? "Last day" : `${daysLeft} days left`} in your {daysLeft <= 30 ? 'trial' : 'subscription'}
-          <button onClick={handlePay} className="ml-4 underline hover:text-white transition-colors">Renew Now</button>
-        </div>
-      )}
-      <div className="flex-grow">
-        {children}
-      </div>
-    </div>
-  );
-}
 
 // --- Main App ---
 
