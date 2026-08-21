@@ -56,7 +56,7 @@ async function startServer() {
       res.sendFile(path.join(process.cwd(), 'dist', 'manifest.json'));
     });
 
-    app.get('*', (req, res) => {
+    app.get('*all', (req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }

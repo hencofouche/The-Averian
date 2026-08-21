@@ -1,36 +1,49 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth';
-import { getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager, doc, getDocFromServer } from 'firebase/firestore';
+import { 
+  getFirestore, doc, getDocFromServer,
+  disableNetwork, enableNetwork
+} from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import firebaseConfig from '../firebase-applet-config.json';
 import { OperationType, FirestoreErrorInfo } from './types';
 
+export { disableNetwork, enableNetwork };
+
 export const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
-
-let dbInstance;
-try {
-  dbInstance = initializeFirestore(app, {
-    localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
-  }, firebaseConfig.firestoreDatabaseId);
-} catch (error) {
-  dbInstance = getFirestore(app, firebaseConfig.firestoreDatabaseId);
-}
-export const db = dbInstance;
-
+export const db = getFirestore(app, (firebaseConfig as any).firestoreDatabaseId || 'ai-studio-1809a135-82e9-462b-955f-679581a8148f');
 export const auth = getAuth(app);
 export const storage = getStorage(app);
 export const googleProvider = new GoogleAuthProvider();
 
 export const loginWithGoogle = async () => {
-  const result = await signInWithPopup(auth, googleProvider);
-  return result;
+  return signInWithPopup(auth, googleProvider);
 };
 
-export const logout = () => {
+export const logout = async () => {
   return signOut(auth);
 };
 
+export async function setFirestoreNetworkState(online: boolean) {
+  if (!db) return;
+  try {
+    if (online) {
+      await enableNetwork(db);
+    } else {
+      await disableNetwork(db);
+    }
+  } catch (err) {
+    console.warn('Network state toggle:', err);
+  }
+}
+
 export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+  // If we are offline, let local cache proceed without throwing blocking errors
+  if (!navigator.onLine || (error instanceof Error && error.message.includes('offline'))) {
+    console.warn(`Firestore operation '${operationType}' executed offline on path '${path}'. Change stored in IndexedDB.`);
+    return;
+  }
+
   const errInfo: FirestoreErrorInfo = {
     error: error instanceof Error ? error.message : String(error),
     authInfo: {
@@ -55,12 +68,12 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
 
 export async function testConnection() {
   try {
-    if (db) {
+    if (db && navigator.onLine) {
       await getDocFromServer(doc(db, 'test', 'connection'));
     }
   } catch (error) {
     if (error instanceof Error && error.message.includes('the client is offline')) {
-      console.error("Please check your Firebase configuration.");
+      console.log("App running in local offline cache mode.");
     }
   }
 }

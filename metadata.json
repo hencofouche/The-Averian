@@ -1,5 +1,6 @@
 {
   "name": "The Averian",
-  "description": "A professional bird breeding tracker with offline support and cloud sync.",
-  "requestFramePermissions": []
+  "description": "A professional bird breeding tracker with offline support, diagnostics suite, and cost efficiency controls.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

@@ -167,6 +167,90 @@
         "createdBy": { "type": "string" }
       },
       "required": ["type", "action", "data", "createdAt", "createdBy"]
+    },
+    "SellerProfile": {
+      "title": "Seller Profile",
+      "description": "Verified seller profile for classifieds marketplace.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "sellerName": { "type": "string" },
+        "aviaryName": { "type": "string" },
+        "town": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected", "banned"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "sellerName", "town", "status"]
+    },
+    "MarketplaceListing": {
+      "title": "Marketplace Listing",
+      "description": "Classifieds for sale or wanted listings.",
+      "type": "object",
+      "properties": {
+        "type": { "type": "string", "enum": ["for_sale", "wanted"] },
+        "category": { "type": "string", "enum": ["Bird", "Pair", "Accessories", "Other"] },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "price": { "type": "number" },
+        "locationTown": { "type": "string" },
+        "deliveryOption": { "type": "string" },
+        "sellerId": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending_approval", "active", "sold", "rejected", "archived"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["type", "category", "title", "sellerId", "status"]
+    },
+    "MarketplaceReview": {
+      "title": "Marketplace Review",
+      "description": "Buyer rating and review for a completed marketplace deal.",
+      "type": "object",
+      "properties": {
+        "listingId": { "type": "string" },
+        "sellerId": { "type": "string" },
+        "buyerId": { "type": "string" },
+        "rating": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending_approval", "approved", "rejected"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["listingId", "sellerId", "buyerId", "rating", "status"]
+    },
+    "WikiSpecies": {
+      "title": "Wiki Species",
+      "description": "Wiki dynamic species care guide and listing entry.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "subspecies": { "type": "array", "items": { "type": "object" } },
+        "description": { "type": "string" },
+        "incubationDays": { "type": "number" },
+        "clutchSize": { "type": "string" },
+        "diet": { "type": "string" },
+        "nesting": { "type": "string" },
+        "imageUrl": { "type": "string" }
+      },
+      "required": ["name", "subspecies"]
+    },
+    "WikiMutation": {
+      "title": "Wiki Mutation",
+      "description": "Wiki dynamic genetic mutation entry.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "inheritance": { "type": "string", "enum": ["autosomal_recessive", "autosomal_dominant", "incomplete_dominant", "sex_linked_recessive"] },
+        "description": { "type": "string" },
+        "speciesId": { "type": "string" }
+      },
+      "required": ["name", "inheritance"]
+    },
+    "AppConfig": {
+      "title": "App Config",
+      "description": "System-wide feature flags and coming soon page settings.",
+      "type": "object",
+      "properties": {
+        "comingSoonPages": { "type": "object" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "updatedBy": { "type": "string" }
+      }
     }
   },
   "firestore": {
@@ -178,6 +262,12 @@
     "/transactions/{transactionId}": { "schema": "Transaction", "description": "Collection of financial transactions." },
     "/userSettings/{userId}": { "schema": "UserSettings", "description": "User's settings and custom data." },
     "/push_subscriptions/{subId}": { "schema": "PushSubscription", "description": "Collection of push notification subscriptions." },
-    "/shared_items/{itemId}": { "schema": "SharedItem", "description": "Collection of shared items." }
+    "/shared_items/{itemId}": { "schema": "SharedItem", "description": "Collection of shared items." },
+    "/sellerProfiles/{profileId}": { "schema": "SellerProfile", "description": "Collection of seller profiles." },
+    "/marketplaceListings/{listingId}": { "schema": "MarketplaceListing", "description": "Collection of marketplace classified listings." },
+    "/marketplaceReviews/{reviewId}": { "schema": "MarketplaceReview", "description": "Collection of buyer ratings and reviews." },
+    "/wikiSpecies/{speciesId}": { "schema": "WikiSpecies", "description": "Wiki care guides and subspecies listings." },
+    "/wikiMutations/{mutationId}": { "schema": "WikiMutation", "description": "Wiki mutation entries." },
+    "/appConfig/{configId}": { "schema": "AppConfig", "description": "System-wide feature flags and coming soon settings." }
   }
 }

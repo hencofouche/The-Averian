@@ -9,10 +9,26 @@ import {
   Image as ImageIcon, Loader2, DollarSign, TrendingUp, TrendingDown,
   Activity, ArrowUpRight, ArrowDownRight, BarChart3, PieChart as PieChartIcon,
   Menu, Egg, LayoutGrid, Grid3x3, List as ListIcon, AlertTriangle, CreditCard, CheckCircle2, Bell, Cloud, Maximize2, Share2, Send, Printer, MoreHorizontal, Dna, Users, Palette, QrCode, Scan, FileText, ExternalLink, ArrowLeft, ArrowRightLeft, History as HistoryIcon, RefreshCw, UploadCloud, Eye,
-  Mail, MessageCircle, Video
+  Mail, MessageCircle, Video, Shield, Wifi, WifiOff, Flame, ShoppingBag, Store, BookOpen, Sparkles, FileSpreadsheet
 } from 'lucide-react';
-import GeneticsCalculator from './components/GeneticsCalculator';
-import { ContactsView } from './components/ContactsView';
+import GeneticsCalculatorOriginal from './components/GeneticsCalculator';
+const GeneticsCalculator = React.memo(GeneticsCalculatorOriginal);
+import { ContactsView as ContactsViewOriginal } from './components/ContactsView';
+const ContactsView = React.memo(ContactsViewOriginal);
+import { AdminDiagnosticsView } from './components/AdminDiagnosticsView';
+import { AdminDashboardView } from './components/AdminDashboardView';
+import { MarketplaceView } from './components/MarketplaceView';
+import { WikiView } from './components/WikiView';
+import { SmartCandlingModal, computeEggTimeline, getSpeciesIncubation, SPECIES_INCUBATION_DATA } from './components/SmartCandlingModal';
+import { DigitalTransferPassportModal } from './components/DigitalTransferPassportModal';
+import { ComingSoonView } from './components/ComingSoonView';
+import { AdminPageTestingBanner } from './components/AdminPageTestingBanner';
+import { AdminComingSoonModal } from './components/AdminComingSoonModal';
+// Google Workspace native integrations removed to prevent trust-violating security warnings
+import { 
+  SellerProfile, MarketplaceListing, MarketplaceReview, 
+  AppPageId, AppComingSoonSettings, ComingSoonPageConfig 
+} from './types';
 import { QRCodeSVG } from 'qrcode.react';
 import { SubscriptionGate } from "./components/SubscriptionGate";
 import { Button, Input, Select, Card, Textarea, BirdCompactInfo, Badge } from "./components/ui";
@@ -138,7 +154,7 @@ import {
   BarChart, Bar, Cell, Legend, PieChart, Pie, AreaChart, Area
 } from 'recharts';
 import { 
-  auth, db, storage, loginWithGoogle, logout, handleFirestoreError, testConnection
+  auth, db, storage, loginWithGoogle, logout, handleFirestoreError, testConnection, setFirestoreNetworkState
 } from './firebase';
 import { 
   onAuthStateChanged, User as FirebaseUser 
@@ -147,7 +163,7 @@ import {
   collection, onSnapshot, query, where, addDoc, 
   updateDoc, deleteDoc, doc, getDocs, orderBy, setDoc, getDocFromServer, writeBatch, limit
 } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { 
   Bird, Cage, Pair, Task, Transaction, OperationType, BreedingRecord, UserSettings, Species, SubSpecies, Mutation, SharedItem, Contact, BirdDocument, Egg as EggType
 } from './types';
@@ -211,78 +227,8 @@ const generateGoogleCalendarUrl = (text: string, date: string, details: string =
   return `https://www.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(text)}&dates=${formatDate(startDate)}/${formatDate(endDate)}&details=${encodeURIComponent(details)}`;
 };
 
-const compressAndUploadImage = async (file: File, path: string): Promise<string> => {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = (event) => {
-      const img = new Image();
-      img.src = event.target?.result as string;
-      img.onload = async () => {
-        const canvas = document.createElement('canvas');
-        let width = img.width;
-        let height = img.height;
-        const MAX_WIDTH = 1200;
-        const MAX_HEIGHT = 1200;
 
-        if (width > height) {
-          if (width > MAX_WIDTH) {
-            height *= MAX_WIDTH / width;
-            width = MAX_WIDTH;
-          }
-        } else {
-          if (height > MAX_HEIGHT) {
-            width *= MAX_HEIGHT / height;
-            height = MAX_HEIGHT;
-          }
-        }
-
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        ctx?.drawImage(img, 0, 0, width, height);
-
-        // Convert to blob with quality adjustment to meet 1.5MB limit
-        let quality = 0.8;
-        let blob: Blob | null = null;
-        let mimeType = 'image/webp';
-        
-        const getBlob = (q: number, type: string): Promise<Blob | null> => 
-          new Promise(res => canvas.toBlob(b => res(b), type, q));
-
-        blob = await getBlob(quality, mimeType);
-        
-        // Fallback to jpeg if webp fails or is not supported
-        if (!blob) {
-          mimeType = 'image/jpeg';
-          blob = await getBlob(quality, mimeType);
-        }
-        
-        // If still too large, reduce quality (though 1MB is the Firestore limit, base64 adds overhead)
-        while (blob && blob.size > 0.7 * 1024 * 1024 && quality > 0.1) {
-          quality -= 0.1;
-          blob = await getBlob(quality, mimeType);
-        }
-
-        if (!blob) {
-          reject(new Error('Failed to compress image'));
-          return;
-        }
-
-        // Convert blob to base64 string for Firestore storage (bypasses Storage CORS and works offline)
-        const reader2 = new FileReader();
-        reader2.readAsDataURL(blob);
-        reader2.onloadend = () => {
-          const base64data = reader2.result as string;
-          resolve(base64data);
-        };
-        reader2.onerror = () => reject(new Error('Failed to convert image to base64'));
-      };
-      img.onerror = () => reject(new Error('Failed to load image'));
-    };
-    reader.onerror = () => reject(new Error('Failed to read file'));
-  });
-};
+import { compressAndUploadImage, deleteStorageFileIfApplicable } from "./lib/image-utils";
 
 // --- UI Components ---
 
@@ -683,14 +629,42 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [isScanModalOpen, setIsScanModalOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'birds' | 'cages' | 'pairs' | 'breeding' | 'financials' | 'tasks' | 'settings' | 'genetics' | 'contacts' | 'stats' | 'print' | 'pedigree' | 'subscription'>('birds');
+  const [activeTab, setActiveTab] = useState<'birds' | 'cages' | 'pairs' | 'breeding' | 'financials' | 'tasks' | 'settings' | 'genetics' | 'contacts' | 'stats' | 'print' | 'pedigree' | 'subscription' | 'admin' | 'marketplace' | 'wiki'>('birds');
   const [statsFilter, setStatsFilter] = useState<{ birdId?: string, pairId?: string } | null>(null);
   const [activeSubTab, setActiveSubTab] = useState<'overview' | 'pairs' | 'contacts'>('overview');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isExtrasMenuOpen, setIsExtrasMenuOpen] = useState(false);
   const [viewMode, setViewMode] = useState<'grid-large' | 'list'>('grid-large');
   const [taskViewMode, setTaskViewMode] = useState<'list' | 'calendar'>('list');
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [galleryData, setGalleryData] = useState<{ urls: string[], index: number } | null>(null);
+
+  // Offline and Network state management
+  const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
+  const [isForcedOffline, setIsForcedOffline] = useState(false);
+  const [isSyncing, setIsSyncingReal] = useState(false);
+  const syncTimeoutRef = React.useRef<any>(null);
+
+  const setIsSyncing = (val: boolean) => {
+    setIsSyncingReal(val);
+    if (val) {
+      if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
+      syncTimeoutRef.current = setTimeout(() => {
+        setIsSyncingReal(false);
+      }, 5000); // 5 seconds timeout to prevent permanent stuck sync indicators
+    } else {
+      if (syncTimeoutRef.current) {
+        clearTimeout(syncTimeoutRef.current);
+        syncTimeoutRef.current = null;
+      }
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
+    };
+  }, []);
   
   const [transferCageId, setTransferCageId] = useState('');
   const [transferImportBreeding, setTransferImportBreeding] = useState(true);
@@ -703,6 +677,8 @@ export default function App() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
+  const [wikiSpecies, setWikiSpecies] = useState<any[]>([]);
+  const [wikiMutations, setWikiMutations] = useState<any[]>([]);
   const [userSettings, setUserSettings] = useState<UserSettings | null>(null);
   const [walkthroughStep, setWalkthroughStep] = useState<number | null>(null);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
@@ -713,44 +689,7 @@ export default function App() {
     inheritance?: 'autosomal_recessive' | 'autosomal_dominant' | 'incomplete_dominant' | 'sex_linked_recessive' | '';
   } | null>(null);
 
-  const t = (text: string) => getTranslatedLabel(text, userSettings?.language || 'en');
-
-  useEffect(() => {
-    setActiveLanguage(userSettings?.language || 'en');
-  }, [userSettings?.language]);
-  
-  const effectiveSettings = useMemo(() => {
-    if (!userSettings) return null;
-    const effective = { ...userSettings };
-    if (userSettings.useDefaultData !== false) {
-      const mergedSpeciesMap = new Map((userSettings.species || []).map(s => [s.name.toLowerCase(), s]));
-      const mergedSubspeciesMap = new Map((userSettings.subspecies || []).map(s => [s.name.toLowerCase(), s]));
-      const mergedMutationsMap = new Map((userSettings.mutations || []).map(m => [m.name.toLowerCase(), m]));
-
-      defaultSpecies.forEach(ds => {
-        if (!mergedSpeciesMap.has(ds.name.toLowerCase())) {
-          mergedSpeciesMap.set(ds.name.toLowerCase(), { id: ds.id, name: ds.name });
-        }
-        ds.subspecies.forEach(dss => {
-          if (!mergedSubspeciesMap.has(dss.name.toLowerCase())) {
-            mergedSubspeciesMap.set(dss.name.toLowerCase(), { id: dss.id, name: dss.name, speciesId: mergedSpeciesMap.get(ds.name.toLowerCase())!.id });
-          }
-        });
-      });
-      defaultMutations.forEach(dm => {
-        if (!mergedMutationsMap.has(dm.name.toLowerCase())) {
-          mergedMutationsMap.set(dm.name.toLowerCase(), { id: dm.id, name: dm.name, inheritance: dm.inheritance });
-        }
-      });
-      
-      effective.species = Array.from(mergedSpeciesMap.values());
-      effective.subspecies = Array.from(mergedSubspeciesMap.values());
-      effective.mutations = Array.from(mergedMutationsMap.values());
-    }
-    return effective;
-  }, [userSettings]);
-  
-  // Pagination counts
+  // Pagination limits
   const [birdsLimit, setBirdsLimit] = useState(100);
   const [cagesLimit, setCagesLimit] = useState(50);
   const [pairsLimit, setPairsLimit] = useState(50);
@@ -771,6 +710,158 @@ export default function App() {
 
   const [isDeleting, setIsDeleting] = useState(false);
 
+  // Marketplace states
+  const [sellerProfiles, setSellerProfiles] = useState<SellerProfile[]>([]);
+  const [marketplaceListings, setMarketplaceListings] = useState<MarketplaceListing[]>([]);
+  const [marketplaceReviews, setMarketplaceReviews] = useState<MarketplaceReview[]>([]);
+
+  // Coming Soon & Feature Flag states
+  const [comingSoonSettings, setComingSoonSettings] = useState<AppComingSoonSettings>(() => {
+    try {
+      const cached = localStorage.getItem('averian_coming_soon_config');
+      return cached ? JSON.parse(cached) : { pages: {} };
+    } catch {
+      return { pages: {} };
+    }
+  });
+  const [isAdminPreviewMode, setIsAdminPreviewMode] = useState(false);
+  const [comingSoonConfigModal, setComingSoonConfigModal] = useState<{
+    isOpen: boolean;
+    pageId: AppPageId;
+    pageName: string;
+  } | null>(null);
+
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOnline(true);
+      if (!isForcedOffline) {
+        setFirestoreNetworkState(true);
+        toast.success('Internet reconnected! Cloud sync active.');
+      }
+    };
+    const handleOffline = () => {
+      setIsOnline(false);
+      toast('Operating in 100% Offline Mode. All edits are saved locally.', { icon: '📡' });
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, [isForcedOffline]);
+
+  const handleToggleForceOffline = async (forced: boolean) => {
+    setIsForcedOffline(forced);
+    await setFirestoreNetworkState(!forced);
+    if (forced) {
+      toast('Forced Offline Mode enabled (0 Network usage).', { icon: '🚫' });
+    } else {
+      toast.success('Cloud synchronization re-enabled.');
+    }
+  };
+
+  const t = (text: string) => getTranslatedLabel(text, userSettings?.language || 'en');
+
+  // Check if current user is Admin (teamotakuempire@gmail.com or clashfouche@gmail.com)
+  const isAdmin = useMemo(() => {
+    const email = user?.email?.toLowerCase().trim();
+    return email === 'teamotakuempire@gmail.com' || email === 'clashfouche@gmail.com';
+  }, [user?.email]);
+
+  const [hasRedirectedAdmin, setHasRedirectedAdmin] = useState(false);
+
+  useEffect(() => {
+    if (!user) {
+      setHasRedirectedAdmin(false);
+    }
+  }, [user]);
+
+  // Auto-switch to admin tab or reset to birds tab for non-admins
+  useEffect(() => {
+    if (user) {
+      if (isAdmin) {
+        if (!hasRedirectedAdmin) {
+          setActiveTab('admin');
+          setHasRedirectedAdmin(true);
+        }
+      } else if (activeTab === 'admin') {
+        setActiveTab('birds');
+      }
+    }
+  }, [isAdmin, user, activeTab, hasRedirectedAdmin]);
+
+  useEffect(() => {
+    setActiveLanguage(userSettings?.language || 'en');
+  }, [userSettings?.language]);
+  
+  const effectiveSettings = useMemo(() => {
+    if (!userSettings) return null;
+    const effective = { ...userSettings };
+    
+    const mergedSpeciesMap = new Map((userSettings.species || []).map(s => [s.name.toLowerCase(), s]));
+    const mergedSubspeciesMap = new Map((userSettings.subspecies || []).map(s => [s.name.toLowerCase(), s]));
+    const mergedMutationsMap = new Map((userSettings.mutations || []).map(m => [m.name.toLowerCase(), m]));
+
+    // 1. Merge default data if enabled
+    if (userSettings.useDefaultData !== false) {
+      defaultSpecies.forEach(ds => {
+        if (!mergedSpeciesMap.has(ds.name.toLowerCase())) {
+          mergedSpeciesMap.set(ds.name.toLowerCase(), { id: ds.id, name: ds.name });
+        }
+        ds.subspecies.forEach(dss => {
+          if (!mergedSubspeciesMap.has(dss.name.toLowerCase())) {
+            mergedSubspeciesMap.set(dss.name.toLowerCase(), { id: dss.id, name: dss.name, speciesId: mergedSpeciesMap.get(ds.name.toLowerCase())!.id });
+          }
+        });
+      });
+      defaultMutations.forEach(dm => {
+        if (!mergedMutationsMap.has(dm.name.toLowerCase())) {
+          mergedMutationsMap.set(dm.name.toLowerCase(), { id: dm.id, name: dm.name, inheritance: dm.inheritance });
+        }
+      });
+    }
+
+    // 2. Merge dynamic Wiki data from Firestore so it automatically populates globally
+    wikiSpecies.forEach(ws => {
+      const lowerName = ws.name.toLowerCase();
+      if (!mergedSpeciesMap.has(lowerName)) {
+        mergedSpeciesMap.set(lowerName, { id: ws.id, name: ws.name });
+      }
+      const resolvedSpeciesId = mergedSpeciesMap.get(lowerName)!.id;
+      if (ws.subspecies && Array.isArray(ws.subspecies)) {
+        ws.subspecies.forEach((sub: any) => {
+          const subLower = sub.name.toLowerCase();
+          if (!mergedSubspeciesMap.has(subLower)) {
+            mergedSubspeciesMap.set(subLower, { 
+              id: sub.id || `sub_${ws.id}_${sub.name.replace(/\s+/g, '_')}`, 
+              name: sub.name, 
+              speciesId: resolvedSpeciesId 
+            });
+          }
+        });
+      }
+    });
+
+    wikiMutations.forEach(wm => {
+      const lowerName = wm.name.toLowerCase();
+      if (!mergedMutationsMap.has(lowerName)) {
+        mergedMutationsMap.set(lowerName, { 
+          id: wm.id, 
+          name: wm.name, 
+          inheritance: wm.inheritance
+        });
+      }
+    });
+
+    effective.species = Array.from(mergedSpeciesMap.values());
+    effective.subspecies = Array.from(mergedSubspeciesMap.values());
+    effective.mutations = Array.from(mergedMutationsMap.values());
+
+    return effective;
+  }, [userSettings, wikiSpecies, wikiMutations]);
+  
   const handleConfirmDelete = async () => {
     if (!deleteConfirmation) return;
     if (isSubscriptionExpired(userSettings)) {
@@ -891,8 +982,6 @@ export default function App() {
     }
   }, [user, !!userSettings]); // Only trigger when user/settings become available, not on every update
 
-  const [isSyncing, setIsSyncing] = useState(false);
-
   useEffect(() => {
     if (!user) return;
 
@@ -951,6 +1040,47 @@ export default function App() {
       setIsSyncing(snapshot.metadata.hasPendingWrites);
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'contacts'));
 
+    // Marketplace collections (cross-user)
+    const qSellers = query(collection(db, 'sellerProfiles'), limit(100));
+    const unsubSellers = onSnapshot(qSellers, (snapshot) => {
+      setSellerProfiles(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as SellerProfile)));
+    }, (err) => handleFirestoreError(err, OperationType.LIST, 'sellerProfiles'));
+
+    const qListings = query(collection(db, 'marketplaceListings'), limit(150));
+    const unsubListings = onSnapshot(qListings, (snapshot) => {
+      setMarketplaceListings(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as MarketplaceListing)));
+    }, (err) => handleFirestoreError(err, OperationType.LIST, 'marketplaceListings'));
+
+    const qReviews = query(collection(db, 'marketplaceReviews'), limit(100));
+    const unsubReviews = onSnapshot(qReviews, (snapshot) => {
+      setMarketplaceReviews(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as MarketplaceReview)));
+    }, (err) => handleFirestoreError(err, OperationType.LIST, 'marketplaceReviews'));
+
+    const qWikiSpecies = query(collection(db, 'wikiSpecies'), limit(100));
+    const unsubWikiSpecies = onSnapshot(qWikiSpecies, (snapshot) => {
+      setWikiSpecies(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })));
+    }, (err) => console.error("Error fetching wikiSpecies:", err));
+
+    const qWikiMutations = query(collection(db, 'wikiMutations'), limit(200));
+    const unsubWikiMutations = onSnapshot(qWikiMutations, (snapshot) => {
+      setWikiMutations(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })));
+    }, (err) => console.error("Error fetching wikiMutations:", err));
+
+    // Coming Soon / Feature Flags config subscription
+    const unsubComingSoon = onSnapshot(doc(db, 'appConfig', 'comingSoon'), (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data() as AppComingSoonSettings;
+        setComingSoonSettings(data);
+        try {
+          localStorage.setItem('averian_coming_soon_config', JSON.stringify(data));
+        } catch (e) {
+          console.warn('Failed to cache coming soon config', e);
+        }
+      }
+    }, (err) => {
+      console.warn("Coming soon config sync (offline fallback):", err);
+    });
+
     const fixingSettings = new Set<string>();
 
     const docRef = doc(db, 'userSettings', user.uid);
@@ -958,6 +1088,23 @@ export default function App() {
       setIsSyncing(docSnap.metadata.hasPendingWrites);
       
       if (docSnap.metadata.fromCache && !docSnap.exists()) {
+        // In offline mode with no cached settings document yet, initialize a local fallback so the user isn't blocked on the loading spinner
+        const trialExpiry = new Date();
+        trialExpiry.setDate(trialExpiry.getDate() + 30);
+        const fallbackSettings: UserSettings = {
+          id: user.uid,
+          species: [],
+          subspecies: [],
+          mutations: [],
+          statuses: [
+            { id: 'sold-default', name: 'Sold' },
+            { id: 'deceased-default', name: 'Deceased' }
+          ],
+          uid: user.uid,
+          currency: 'ZAR',
+          account_expiry_date: trialExpiry.toISOString()
+        };
+        setUserSettings(fallbackSettings);
         return;
       }
 
@@ -1060,8 +1207,46 @@ export default function App() {
       unsubContacts();
       unsubSettings();
       unsubShared();
+      unsubSellers();
+      unsubListings();
+      unsubReviews();
+      unsubWikiSpecies();
+      unsubWikiMutations();
+      unsubComingSoon();
     };
   }, [user, birdsLimit, cagesLimit, pairsLimit, breedingLimit, tasksLimit, transactionLimit, contactsLimit]);
+
+  const handleUpdateComingSoonPageConfig = async (pageId: AppPageId, config: ComingSoonPageConfig) => {
+    const updatedPages = {
+      ...(comingSoonSettings?.pages || {}),
+      [pageId]: {
+        ...config,
+        updatedAt: new Date().toISOString(),
+        updatedBy: user?.email || 'admin'
+      }
+    };
+    const updatedSettings: AppComingSoonSettings = {
+      ...comingSoonSettings,
+      pages: updatedPages,
+      updatedAt: new Date().toISOString(),
+      updatedBy: user?.email || 'admin'
+    };
+
+    // Optimistically update local state & localStorage
+    setComingSoonSettings(updatedSettings);
+    try {
+      localStorage.setItem('averian_coming_soon_config', JSON.stringify(updatedSettings));
+    } catch (e) {}
+
+    // Persist to Firestore
+    try {
+      await setDoc(doc(db, 'appConfig', 'comingSoon'), updatedSettings, { merge: true });
+    } catch (err: any) {
+      console.error('Failed to update coming soon config in Firestore:', err);
+      toast.error('Failed to save configuration: ' + err.message);
+      throw err;
+    }
+  };
 
   useEffect(() => {
     if (!user) return;
@@ -1418,6 +1603,70 @@ export default function App() {
     }
   };
 
+  const handleEditTransaction = React.useCallback((t: Transaction) => {
+    setEditingItem(t);
+    setIsModalOpen(true);
+  }, []);
+
+  const handleDeleteTransaction = React.useCallback((id: string) => {
+    setDeleteConfirmation({
+      title: 'Delete Transaction',
+      message: 'Are you sure you want to delete this transaction? This action cannot be undone.',
+      onConfirm: async () => {
+        try { await deleteDoc(doc(db, 'transactions', id)); }
+        catch (e) { handleFirestoreError(e, OperationType.DELETE, 'transactions'); }
+      }
+    });
+  }, [handleFirestoreError]);
+
+  const handleEditBreeding = React.useCallback((r: BreedingRecord) => {
+    setEditingItem(r);
+    setIsModalOpen(true);
+  }, []);
+
+  const handleDeleteBreeding = React.useCallback((id: string) => {
+    setDeleteConfirmation({
+      title: 'Delete Breeding Record',
+      message: 'Are you sure you want to delete this breeding record? This action cannot be undone.',
+      onConfirm: async () => {
+        try { await deleteDoc(doc(db, 'breedingRecords', id)); }
+        catch (e) { handleFirestoreError(e, OperationType.DELETE, 'breedingRecords'); }
+      }
+    });
+  }, [handleFirestoreError]);
+
+  const handleNavigate = React.useCallback((tab: any, query: string = '', filter: { birdId?: string, pairId?: string } | null = null, isDirectNav: boolean = false) => {
+    if (isDirectNav) {
+      setNavigationHistory(null);
+    } else {
+      // Save current state to history if it's different
+      const isPedigreeChange = tab === 'pedigree' && activeTab === 'pedigree' && searchQuery !== query;
+      if (activeTab !== tab || isPedigreeChange || searchQuery !== query) {
+        setNavigationHistory({ tab: activeTab, query: searchQuery, filter: statsFilter });
+      }
+    }
+    setActiveTab(tab);
+    setSearchQuery(query);
+    setIsMobileMenuOpen(false);
+    setStatsFilter(filter);
+  }, [activeTab, searchQuery, statsFilter]);
+
+  const handleGoBack = React.useCallback(() => {
+    if (navigationHistory) {
+      const { tab, query, filter } = navigationHistory;
+      setActiveTab(tab as any);
+      setSearchQuery(query);
+      setStatsFilter(filter);
+      setNavigationHistory(null);
+    } else {
+      handleNavigate('birds', '', null, true);
+    }
+  }, [navigationHistory, handleNavigate]);
+
+  const handleBirdRef = React.useCallback((birdName: string) => {
+    handleNavigate('birds', birdName);
+  }, [handleNavigate]);
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-black">
@@ -1455,38 +1704,6 @@ export default function App() {
       </div>
     );
   }
-
-  const handleNavigate = (tab: any, query: string = '', filter: { birdId?: string, pairId?: string } | null = null, isDirectNav: boolean = false) => {
-    if (isDirectNav) {
-      setNavigationHistory(null);
-    } else {
-      // Save current state to history if it's different
-      const isPedigreeChange = tab === 'pedigree' && activeTab === 'pedigree' && searchQuery !== query;
-      if (activeTab !== tab || isPedigreeChange || searchQuery !== query) {
-        setNavigationHistory({ tab: activeTab, query: searchQuery, filter: statsFilter });
-      }
-    }
-    setActiveTab(tab);
-    setSearchQuery(query);
-    setIsMobileMenuOpen(false);
-    setStatsFilter(filter);
-  };
-
-  const handleGoBack = () => {
-    if (navigationHistory) {
-      const { tab, query, filter } = navigationHistory;
-      setActiveTab(tab as any);
-      setSearchQuery(query);
-      setStatsFilter(filter);
-      setNavigationHistory(null);
-    } else {
-      handleNavigate('birds', '', null, true);
-    }
-  };
-
-  const handleBirdRef = (birdName: string) => {
-    handleNavigate('birds', birdName);
-  };
 
   if (sharedItemView) {
     const data = JSON.parse(sharedItemView.data);
@@ -1960,20 +2177,64 @@ export default function App() {
     );
   }
 
+  const isCurrentTabComingSoon = activeTab !== 'admin' && activeTab !== 'subscription' && Boolean(comingSoonSettings?.pages?.[activeTab as AppPageId]?.enabled);
+  const showComingSoonSplash = isCurrentTabComingSoon && (!isAdmin || isAdminPreviewMode);
+
+  const getActivePageName = (tab: string) => {
+    switch (tab) {
+      case 'birds': return t('Birds');
+      case 'cages': return t('Cages');
+      case 'pairs': return t('Pairs');
+      case 'breeding': return t('Breeding');
+      case 'marketplace': return t('Classifieds & Marketplace');
+      case 'financials': return t('Financials');
+      case 'genetics': return t('Genetics Engine');
+      case 'wiki': return t('Wiki & Guides');
+      case 'tasks': return t('Tasks');
+      case 'contacts': return t('Contacts & Support');
+      case 'print': return t('Print Center');
+      case 'pedigree': return t('Pedigree Tree');
+      case 'stats': return t('Aviary Analytics');
+      case 'settings': return t('Settings');
+      case 'admin': return 'Averian Admin Portal';
+      default: return tab.toUpperCase();
+    }
+  };
+
+  const getActivePageIcon = (tab: string) => {
+    switch (tab) {
+      case 'birds': return <BirdIcon size={24} />;
+      case 'cages': return <Home size={24} />;
+      case 'pairs': return <Heart size={24} />;
+      case 'breeding': return <Egg size={24} />;
+      case 'marketplace': return <ShoppingBag size={24} />;
+      case 'financials': return <DollarSign size={24} />;
+      case 'genetics': return <Dna size={24} />;
+      case 'wiki': return <BookOpen size={24} />;
+      case 'tasks': return <CheckSquare size={24} />;
+      case 'contacts': return <Users size={24} />;
+      case 'print': return <QrCode size={24} />;
+      case 'pedigree': return <FileText size={24} />;
+      case 'stats': return <BarChart3 size={24} />;
+      case 'settings': return <Tag size={24} />;
+      default: return <Sparkles size={24} />;
+    }
+  };
+
   return (
     <SubscriptionGate settings={userSettings} onRenew={handleRenew}>
       <div className="bg-black text-white flex flex-col md:flex-row font-sans min-h-[100dvh]">
       {/* Mobile Overlay */}
       {isMobileMenuOpen && (
-        <div className="fixed inset-0 bg-black/80 z-40 md:hidden backdrop-blur-sm" onClick={() => setIsMobileMenuOpen(false)} />
+        <div className="fixed inset-0 bg-black/80 z-[65] xl:hidden backdrop-blur-sm" onClick={() => setIsMobileMenuOpen(false)} />
       )}
 
       {/* Sidebar */}
       <aside className={cn(
-        "fixed inset-y-0 left-0 z-50 w-64 bg-black border-r border-white/5 p-5 flex flex-col transition-transform duration-300 ease-in-out xl:sticky xl:top-0 xl:h-screen xl:translate-x-0",
+        "fixed inset-y-0 left-0 z-[70] w-64 bg-black border-r border-white/5 p-5 flex flex-col overflow-y-auto custom-scrollbar transition-transform duration-300 ease-in-out xl:sticky xl:top-0 xl:h-screen xl:translate-x-0 xl:z-40",
         isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
       )}>
-        <div className="flex items-center justify-between px-1 mb-10 shrink-0">
+        <div className="flex items-center justify-between px-1 mb-8 shrink-0">
           <div className="flex items-center gap-2.5">
             <div className="p-1.5 w-8 h-8 flex items-center justify-center bg-secondary rounded-lg text-black-950 shadow-lg shadow-secondary/20">
               <BirdIcon size={18} />
@@ -1985,25 +2246,65 @@ export default function App() {
           </button>
         </div>
 
-        <nav className="flex-1 flex flex-col justify-between pr-1 pb-4 overflow-hidden">
-          <div className="space-y-1.5 flex flex-col">
-            <NavItem active={activeTab === 'birds'} onClick={() => handleNavigate('birds', '', null, true)} icon={<BirdIcon size={18} />} label={t("Birds")} count={birds.length} />
-            <NavItem active={activeTab === 'cages'} onClick={() => handleNavigate('cages', '', null, true)} icon={<Home size={18} />} label={t("Cages")} count={cages.length} />
-            <NavItem active={activeTab === 'pairs'} onClick={() => handleNavigate('pairs', '', null, true)} icon={<Heart size={18} />} label={t("Pairs")} count={pairs.filter(p => birds.some(b => b.id === p.maleId) || birds.some(b => b.id === p.femaleId)).length} />
-            <NavItem active={activeTab === 'breeding'} onClick={() => handleNavigate('breeding', '', null, true)} icon={<Egg size={18} />} label={t("Breeding")} count={breedingRecords.length} />
-            <NavItem active={activeTab === 'financials'} onClick={() => handleNavigate('financials', '', null, true)} icon={<DollarSign size={18} />} label={t("Financials")} count={transactions.length} />
-            <NavItem active={activeTab === 'genetics'} onClick={() => handleNavigate('genetics', '', null, true)} icon={<Dna size={18} />} label={t("Genetics")} count={0} />
-          </div>
-          
-          <div className="space-y-1.5 mt-4 pt-4 border-t border-white/5 flex flex-col">
-            <NavItem active={activeTab === 'tasks'} onClick={() => handleNavigate('tasks', '', null, true)} icon={<CheckSquare size={18} />} label={t("Tasks")} count={tasks.length} />
-            <NavItem active={activeTab === 'contacts'} onClick={() => handleNavigate('contacts', '', null, true)} icon={<Users size={18} />} label={t("Contacts & Support")} count={contacts.length} />
-            <NavItem active={activeTab === 'print'} onClick={() => handleNavigate('print', '', null, true)} icon={<QrCode size={18} />} label={t("Print")} count={0} />
-            <NavItem active={activeTab === 'settings'} onClick={() => handleNavigate('settings', '', null, true)} icon={<Tag size={18} />} label={t("Settings")} count={0} />
-          </div>
+        <nav className="flex flex-col relative mb-6">
+          {!isExtrasMenuOpen ? (
+            <div className="flex flex-col">
+              <div className="space-y-1 flex flex-col">
+                <NavItem active={activeTab === 'birds'} onClick={() => handleNavigate('birds', '', null, true)} icon={<BirdIcon size={18} />} label={t("Birds")} count={birds.length} isComingSoon={Boolean(comingSoonSettings?.pages?.birds?.enabled)} isAdmin={isAdmin} />
+                <NavItem active={activeTab === 'cages'} onClick={() => handleNavigate('cages', '', null, true)} icon={<Home size={18} />} label={t("Cages")} count={cages.length} isComingSoon={Boolean(comingSoonSettings?.pages?.cages?.enabled)} isAdmin={isAdmin} />
+                <NavItem active={activeTab === 'pairs'} onClick={() => handleNavigate('pairs', '', null, true)} icon={<Heart size={18} />} label={t("Pairs")} count={pairs.filter(p => birds.some(b => b.id === p.maleId) || birds.some(b => b.id === p.femaleId)).length} isComingSoon={Boolean(comingSoonSettings?.pages?.pairs?.enabled)} isAdmin={isAdmin} />
+                <NavItem active={activeTab === 'breeding'} onClick={() => handleNavigate('breeding', '', null, true)} icon={<Egg size={18} />} label={t("Breeding")} count={breedingRecords.length} isComingSoon={Boolean(comingSoonSettings?.pages?.breeding?.enabled)} isAdmin={isAdmin} />
+                <NavItem active={activeTab === 'marketplace'} onClick={() => handleNavigate('marketplace', '', null, true)} icon={<ShoppingBag size={18} />} label={t("Classifieds")} count={marketplaceListings.filter(l => l.status === 'active').length} isComingSoon={Boolean(comingSoonSettings?.pages?.marketplace?.enabled)} isAdmin={isAdmin} />
+              </div>
+              
+              <div className="space-y-1 mt-2 pt-2 border-t border-white/5 flex flex-col shrink-0">
+                <button 
+                  onClick={() => setIsExtrasMenuOpen(true)}
+                  className="w-full flex items-center justify-between p-2 rounded-xl text-zinc-400 hover:text-white hover:bg-white/5 transition-all group"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 flex items-center justify-center rounded-lg bg-white/5 text-zinc-400 group-hover:text-white group-hover:bg-white/10 transition-colors">
+                      <LayoutGrid size={18} />
+                    </div>
+                    <span className="text-sm font-semibold">More / Extras</span>
+                  </div>
+                  <ChevronRight size={16} className="text-zinc-500 group-hover:text-white" />
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-col animate-in slide-in-from-right-4 duration-300">
+              <button 
+                onClick={() => setIsExtrasMenuOpen(false)}
+                className="w-full flex items-center gap-2 p-2 mb-2 rounded-xl text-zinc-400 hover:text-white hover:bg-white/5 transition-all text-sm font-semibold sticky top-0 bg-black z-10 border border-transparent hover:border-white/10"
+              >
+                <ChevronLeft size={18} className="text-zinc-500" />
+                Back to Main Menu
+              </button>
+
+              <div className="space-y-1 flex flex-col">
+                <NavItem active={activeTab === 'financials'} onClick={() => handleNavigate('financials', '', null, true)} icon={<DollarSign size={18} />} label={t("Financials")} count={transactions.length} isComingSoon={Boolean(comingSoonSettings?.pages?.financials?.enabled)} isAdmin={isAdmin} />
+                <NavItem active={activeTab === 'genetics'} onClick={() => handleNavigate('genetics', '', null, true)} icon={<Dna size={18} />} label={t("Genetics")} count={0} isComingSoon={Boolean(comingSoonSettings?.pages?.genetics?.enabled)} isAdmin={isAdmin} />
+                <NavItem active={activeTab === 'wiki'} onClick={() => handleNavigate('wiki', '', null, true)} icon={<BookOpen size={18} />} label={t("Wiki & Guides")} count={0} isComingSoon={Boolean(comingSoonSettings?.pages?.wiki?.enabled)} isAdmin={isAdmin} />
+                <NavItem active={activeTab === 'tasks'} onClick={() => handleNavigate('tasks', '', null, true)} icon={<CheckSquare size={18} />} label={t("Tasks")} count={tasks.length} isComingSoon={Boolean(comingSoonSettings?.pages?.tasks?.enabled)} isAdmin={isAdmin} />
+                <NavItem active={activeTab === 'contacts'} onClick={() => handleNavigate('contacts', '', null, true)} icon={<Users size={18} />} label={t("Contacts & Support")} count={contacts.length} isComingSoon={Boolean(comingSoonSettings?.pages?.contacts?.enabled)} isAdmin={isAdmin} />
+                <NavItem active={activeTab === 'print'} onClick={() => handleNavigate('print', '', null, true)} icon={<QrCode size={18} />} label={t("Print")} count={0} isComingSoon={Boolean(comingSoonSettings?.pages?.print?.enabled)} isAdmin={isAdmin} />
+                <NavItem active={activeTab === 'settings'} onClick={() => handleNavigate('settings', '', null, true)} icon={<Tag size={18} />} label={t("Settings")} count={0} isComingSoon={Boolean(comingSoonSettings?.pages?.settings?.enabled)} isAdmin={isAdmin} />
+                {isAdmin && (
+                  <NavItem 
+                    active={activeTab === 'admin'} 
+                    onClick={() => handleNavigate('admin', '', null, true)} 
+                    icon={<Shield size={18} className={activeTab === 'admin' ? "text-amber-400" : "text-amber-400/70"} />} 
+                    label="Admin Portal" 
+                    count={sellerProfiles.filter(s => s.status === 'pending').length + marketplaceListings.filter(l => l.status === 'pending_approval').length} 
+                  />
+                )}
+              </div>
+            </div>
+          )}
         </nav>
 
-        <div className="mt-auto pt-4 border-t border-white/5 space-y-3">
+        <div className="pt-4 border-t border-white/5 space-y-3">
           <div className="px-1">
             <button 
               onClick={() => setWalkthroughStep(1)}
@@ -2045,7 +2346,14 @@ export default function App() {
                 {user.photoURL ? <img src={user.photoURL} alt="" referrerPolicy="no-referrer" className="w-full h-full object-cover" /> : <User size={12} />}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-[9px] text-white/70 truncate uppercase font-bold tracking-tight">{user.email?.split('@')[0]}</p>
+                <div className="flex items-center gap-1.5">
+                  <p className="text-[9px] text-white/70 truncate uppercase font-bold tracking-tight">{user.email?.split('@')[0]}</p>
+                  {isAdmin && (
+                    <span className="text-[7px] font-black uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1 py-0.2 rounded">
+                      ADMIN
+                    </span>
+                  )}
+                </div>
               </div>
               <button 
                 onClick={logout} 
@@ -2062,7 +2370,7 @@ export default function App() {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-grow flex flex-col min-w-0 bg-black w-full">
+      <main className="flex-grow flex flex-col min-w-0 bg-black w-full overflow-x-hidden relative">
         <header className={cn("shrink-0 bg-black/80 backdrop-blur-md border-b border-black-800 px-4 xl:px-6 py-4 flex flex-col xl:flex-row xl:items-center justify-between sticky top-0 z-10 gap-4", activeTab === 'pedigree' && "hidden")}>
           <div className="flex items-center justify-between w-full xl:w-auto">
             <div className="flex items-center gap-3">
@@ -2080,10 +2388,13 @@ export default function App() {
                  activeTab === 'breeding' ? t('Breeding') :
                  activeTab === 'financials' ? t('Financials') :
                  activeTab === 'contacts' ? t('Contacts & Support') :
+                 activeTab === 'marketplace' ? t('Classifieds & Marketplace') :
+                 activeTab === 'admin' ? 'Averian Admin Portal' :
+                 activeTab === 'wiki' ? 'Wiki & Guides' :
                  activeTab}
               </h2>
             </div>
-            {activeTab !== 'settings' && activeTab !== 'genetics' && activeTab !== 'stats' && activeTab !== 'print' && (
+            {activeTab !== 'settings' && activeTab !== 'genetics' && activeTab !== 'stats' && activeTab !== 'print' && activeTab !== 'admin' && activeTab !== 'marketplace' && activeTab !== 'wiki' && !showComingSoonSplash && (
               <div className="flex gap-2 xl:hidden">
                 <Button onClick={() => setIsScanModalOpen(true)} className="py-3 px-4 text-sm font-bold bg-zinc-800 text-white hover:bg-zinc-700 hover:text-gold-500">
                   <Scan size={18} />
@@ -2106,7 +2417,7 @@ export default function App() {
                 Back to {navigationHistory.tab === 'birds' ? t('Birds') : t(navigationHistory.tab.charAt(0).toUpperCase() + navigationHistory.tab.slice(1))}
               </Button>
             )}
-            {activeTab !== 'settings' && activeTab !== 'genetics' && activeTab !== 'stats' && activeTab !== 'print' && (
+            {activeTab !== 'settings' && activeTab !== 'genetics' && activeTab !== 'stats' && activeTab !== 'print' && activeTab !== 'admin' && activeTab !== 'marketplace' && activeTab !== 'wiki' && !showComingSoonSplash && (
               <div className="relative flex-1 xl:w-64">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-black-100" size={16} />
                 <Input 
@@ -2126,7 +2437,7 @@ export default function App() {
               </div>
             )}
             
-            {activeTab === 'tasks' && (
+            {activeTab === 'tasks' && !showComingSoonSplash && (
               <div className="flex items-center bg-black-900 rounded-lg p-1 border border-black-800 shrink-0">
                 <button 
                   onClick={() => setTaskViewMode('list')}
@@ -2143,7 +2454,7 @@ export default function App() {
               </div>
             )}
             
-            {activeTab !== 'financials' && activeTab !== 'stats' && activeTab !== 'tasks' && activeTab !== 'settings' && activeTab !== 'genetics' && activeTab !== 'print' && (
+            {activeTab !== 'financials' && activeTab !== 'stats' && activeTab !== 'tasks' && activeTab !== 'settings' && activeTab !== 'genetics' && activeTab !== 'print' && activeTab !== 'wiki' && activeTab !== 'admin' && !showComingSoonSplash && (
               <div className="flex items-center bg-black-900 rounded-lg p-1 border border-black-800 shrink-0">
                 <button 
                   onClick={() => setViewMode('grid-large')}
@@ -2160,7 +2471,7 @@ export default function App() {
               </div>
             )}
             
-            {activeTab !== 'settings' && activeTab !== 'genetics' && activeTab !== 'stats' && activeTab !== 'print' && (
+            {activeTab !== 'settings' && activeTab !== 'genetics' && activeTab !== 'stats' && activeTab !== 'print' && activeTab !== 'admin' && activeTab !== 'marketplace' && activeTab !== 'wiki' && !showComingSoonSplash && (
               <div className="hidden xl:flex gap-2">
                 <Button onClick={() => setIsScanModalOpen(true)} className="py-3 px-4 text-sm font-bold uppercase tracking-widest bg-zinc-800 text-secondary border border-secondary/20 hover:bg-zinc-700">
                   <Scan size={18} />
@@ -2186,24 +2497,86 @@ export default function App() {
           </div>
         </header>
 
-        <div className={cn("custom-scrollbar", (activeTab === 'genetics' || activeTab === 'print' || activeTab === 'pedigree') ? "p-0" : "p-4 md:p-8")}>
+        {(!isOnline || isForcedOffline) && (
+          <div className="bg-amber-500/10 border-b border-amber-500/20 px-4 py-2.5 flex items-center justify-between gap-3 text-xs text-amber-200 backdrop-blur-md">
+            <div className="flex items-center gap-2.5">
+              <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+              <WifiOff size={15} className="text-amber-400 shrink-0" />
+              <span>
+                <strong className="text-amber-300">100% Offline Mode Active:</strong> All changes are safely saved locally to IndexedDB and will sync automatically when back online.
+              </span>
+            </div>
+            {isForcedOffline && (
+              <button 
+                onClick={() => handleToggleForceOffline(false)}
+                className="text-[10px] font-bold uppercase tracking-wider bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 px-3 py-1 rounded border border-amber-500/30 cursor-pointer transition-colors"
+              >
+                Reconnect Online
+              </button>
+            )}
+          </div>
+        )}
+
+        {isOnline && !isForcedOffline && isSyncing && (
+          <div className="bg-blue-500/10 border-b border-blue-500/20 px-4 py-2 flex items-center justify-between gap-3 text-xs text-blue-200 backdrop-blur-md">
+            <div className="flex items-center gap-2.5">
+              <RefreshCw size={14} className="text-blue-400 animate-spin shrink-0" />
+              <span>
+                <strong className="text-blue-300">Syncing to Cloud:</strong> Uploading your local offline changes to the database...
+              </span>
+            </div>
+            <span className="text-[10px] font-bold uppercase tracking-widest text-blue-300 bg-blue-500/20 px-2 py-0.5 rounded">
+              In Progress
+            </span>
+          </div>
+        )}
+
+        <div className={cn("custom-scrollbar", (activeTab === 'genetics' || activeTab === 'print' || activeTab === 'pedigree' || activeTab === 'marketplace' || showComingSoonSplash) ? "p-0" : "p-4 md:p-8")}>
+          {isCurrentTabComingSoon && isAdmin && !isAdminPreviewMode && (
+            <AdminPageTestingBanner
+              pageId={activeTab as AppPageId}
+              pageName={getActivePageName(activeTab)}
+              config={comingSoonSettings?.pages?.[activeTab as AppPageId]}
+              onPreviewAsUser={() => setIsAdminPreviewMode(true)}
+              onLaunchLive={() => handleUpdateComingSoonPageConfig(activeTab as AppPageId, { ...(comingSoonSettings?.pages?.[activeTab as AppPageId] || {}), enabled: false })}
+              onOpenConfigModal={() => setComingSoonConfigModal({
+                isOpen: true,
+                pageId: activeTab as AppPageId,
+                pageName: getActivePageName(activeTab)
+              })}
+            />
+          )}
+
           <AnimatePresence mode="wait">
             <motion.div
-              key={activeTab}
+              key={activeTab + (showComingSoonSplash ? '-coming-soon' : '')}
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
               transition={{ duration: 0.2 }}
             >
-              <div className={cn(
-                "grid gap-4",
-                activeTab === 'tasks' ? "max-w-4xl mx-auto w-full grid-cols-1" : 
-                activeTab === 'financials' || activeTab === 'stats' || activeTab === 'contacts' || activeTab === 'breeding' ? "grid-cols-1 w-full max-w-7xl mx-auto" :
-                activeTab === 'genetics' || activeTab === 'print' || activeTab === 'pedigree' ? "grid-cols-1 w-full" :
-                activeTab === 'settings' ? "grid-cols-1 max-w-7xl mx-auto w-full" :
-                activeTab === 'pairs' && viewMode === 'grid-large' ? "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 w-full" : viewMode === 'grid-large' ? "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 w-full" :
-                "grid-cols-1 max-w-7xl mx-auto w-full"
-              )}>
+              {showComingSoonSplash ? (
+                <ComingSoonView
+                  pageId={activeTab as AppPageId}
+                  pageName={getActivePageName(activeTab)}
+                  icon={getActivePageIcon(activeTab)}
+                  config={comingSoonSettings?.pages?.[activeTab as AppPageId]}
+                  onNavigateHome={() => handleNavigate('birds', '', null, true)}
+                  isAdmin={isAdmin}
+                  isAdminPreviewMode={isAdmin && isAdminPreviewMode}
+                  onExitAdminPreview={() => setIsAdminPreviewMode(false)}
+                  onTogglePageComingSoon={(pId, enabled) => handleUpdateComingSoonPageConfig(pId, { ...(comingSoonSettings?.pages?.[pId] || {}), enabled })}
+                />
+              ) : (
+                <div className={cn(
+                  "grid gap-4",
+                  activeTab === 'tasks' ? "max-w-4xl mx-auto w-full grid-cols-1" : 
+                  activeTab === 'financials' || activeTab === 'stats' || activeTab === 'contacts' || activeTab === 'breeding' || activeTab === 'admin' || activeTab === 'wiki' ? "grid-cols-1 w-full max-w-7xl mx-auto" :
+                  activeTab === 'genetics' || activeTab === 'print' || activeTab === 'pedigree' || activeTab === 'marketplace' ? "grid-cols-1 w-full" :
+                  activeTab === 'settings' ? "grid-cols-1 max-w-7xl mx-auto w-full" :
+                  activeTab === 'pairs' && viewMode === 'grid-large' ? "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 w-full" : viewMode === 'grid-large' ? "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 w-full" :
+                  "grid-cols-1 max-w-7xl mx-auto w-full"
+                )}>
                 {activeTab === 'birds' && (
                   <div className="col-span-full space-y-6 w-full">
                     <div className={cn(
@@ -2246,6 +2619,22 @@ export default function App() {
                                   }
 
                                   await batch.commit();
+                                  
+                                  // Clean up images from storage
+                                  if (bird.imageUrls && bird.imageUrls.length > 0) {
+                                    for (const url of bird.imageUrls) {
+                                      await deleteStorageFileIfApplicable(url);
+                                    }
+                                  } else if (bird.imageUrl) {
+                                    await deleteStorageFileIfApplicable(bird.imageUrl);
+                                  }
+                                  // Clean up documents
+                                  if (bird.documents && bird.documents.length > 0) {
+                                    for (const doc of bird.documents) {
+                                      await deleteStorageFileIfApplicable(doc.url);
+                                    }
+                                  }
+                                  
                                   toast.success('Bird and associated pair data deleted');
                                 }
                                 catch (e) { handleFirestoreError(e, OperationType.DELETE, 'birds'); }
@@ -2294,7 +2683,16 @@ export default function App() {
                               title: 'Delete Cage', 
                               message: `Are you sure you want to delete "${cage.name}"? This action cannot be undone.`,
                               onConfirm: async () => {
-                                try { await deleteDoc(doc(db, 'cages', cage.id)); }
+                                try { 
+                                  await deleteDoc(doc(db, 'cages', cage.id)); 
+                                  if (cage.imageUrls && cage.imageUrls.length > 0) {
+                                    for (const url of cage.imageUrls) {
+                                      await deleteStorageFileIfApplicable(url);
+                                    }
+                                  } else if (cage.imageUrl) {
+                                    await deleteStorageFileIfApplicable(cage.imageUrl);
+                                  }
+                                }
                                 catch (e) { handleFirestoreError(e, OperationType.DELETE, 'cages'); }
                               }
                             })}
@@ -2340,6 +2738,13 @@ export default function App() {
                                   if (pair.maleId) batch.update(doc(db, 'birds', pair.maleId), { mateId: '' });
                                   if (pair.femaleId) batch.update(doc(db, 'birds', pair.femaleId), { mateId: '' });
                                   await batch.commit();
+                                  
+                                  if (pair.imageUrls && pair.imageUrls.length > 0) {
+                                    for (const url of pair.imageUrls) {
+                                      await deleteStorageFileIfApplicable(url);
+                                    }
+                                  }
+                                  
                                   toast.success('Pair deleted and mate links removed');
                                 }
                                 catch (e) { handleFirestoreError(e, OperationType.DELETE, 'pairs'); }
@@ -2422,15 +2827,8 @@ export default function App() {
                       cages={cages}
                       currency={userSettings?.currency}
                       onBirdRef={handleBirdRef}
-                      onEditTransaction={(t) => { setEditingItem(t); setIsModalOpen(true); }}
-                      onDeleteTransaction={(id) => setDeleteConfirmation({
-                        title: 'Delete Transaction',
-                        message: 'Are you sure you want to delete this transaction? This action cannot be undone.',
-                        onConfirm: async () => {
-                          try { await deleteDoc(doc(db, 'transactions', id)); }
-                          catch (e) { handleFirestoreError(e, OperationType.DELETE, 'transactions'); }
-                        }
-                      })}
+                      onEditTransaction={handleEditTransaction}
+                      onDeleteTransaction={handleDeleteTransaction}
                       userSettings={effectiveSettings ?? undefined}
                     />
                     {transactions.length >= transactionLimit && (
@@ -2457,24 +2855,10 @@ export default function App() {
                     contacts={contacts}
                     currency={userSettings?.currency}
                     onBirdRef={handleBirdRef}
-                    onEditBreeding={(r) => { setEditingItem(r); setIsModalOpen(true); }}
-                    onDeleteBreeding={(id) => setDeleteConfirmation({
-                      title: 'Delete Breeding Record',
-                      message: 'Are you sure you want to delete this breeding record? This action cannot be undone.',
-                      onConfirm: async () => {
-                        try { await deleteDoc(doc(db, 'breedingRecords', id)); }
-                        catch (e) { handleFirestoreError(e, OperationType.DELETE, 'breedingRecords'); }
-                      }
-                    })}
-                    onEditTransaction={(t) => { setEditingItem(t); setIsModalOpen(true); }}
-                    onDeleteTransaction={(id) => setDeleteConfirmation({
-                      title: 'Delete Transaction',
-                      message: 'Are you sure you want to delete this transaction? This action cannot be undone.',
-                      onConfirm: async () => {
-                        try { await deleteDoc(doc(db, 'transactions', id)); }
-                        catch (e) { handleFirestoreError(e, OperationType.DELETE, 'transactions'); }
-                      }
-                    })}
+                    onEditBreeding={handleEditBreeding}
+                    onDeleteBreeding={handleDeleteBreeding}
+                    onEditTransaction={handleEditTransaction}
+                    onDeleteTransaction={handleDeleteTransaction}
                   />
                 )}
 
@@ -2483,7 +2867,17 @@ export default function App() {
                 )}
 
                 {activeTab === 'print' && (
-                  <PrintView birds={birds} pairs={pairs} cages={cages} onBirdRef={handleBirdRef} userSettings={effectiveSettings ?? undefined} />
+                  <PrintView 
+                    birds={birds} 
+                    pairs={pairs} 
+                    cages={cages} 
+                    breedingRecords={breedingRecords} 
+                    tasks={tasks} 
+                    transactions={transactions} 
+                    contacts={contacts} 
+                    onBirdRef={handleBirdRef} 
+                    userSettings={effectiveSettings ?? undefined} 
+                  />
                 )}
 
                 {activeTab === 'pedigree' && (
@@ -2649,7 +3043,54 @@ export default function App() {
                     onBack={handleGoBack}
                   />
                 )}
+
+                {activeTab === 'marketplace' && (
+                  <MarketplaceView 
+                    user={user}
+                    userSettings={effectiveSettings}
+                    birds={birds}
+                    pairs={pairs}
+                    cages={cages}
+                    isAdmin={isAdmin}
+                    sellerProfiles={sellerProfiles}
+                    listings={marketplaceListings}
+                    reviews={marketplaceReviews}
+                    onNavigateToBird={(birdId) => handleNavigate('birds', birdId, null, true)}
+                  />
+                )}
+
+                {activeTab === 'wiki' && (
+                  <WikiView 
+                    user={user}
+                    isAdmin={isAdmin}
+                    userSettings={effectiveSettings}
+                  />
+                )}
+
+                {activeTab === 'admin' && isAdmin && (
+                  <AdminDashboardView 
+                    user={user}
+                    userSettings={effectiveSettings}
+                    birds={birds}
+                    cages={cages}
+                    pairs={pairs}
+                    breedingRecords={breedingRecords}
+                    transactions={transactions}
+                    tasks={tasks}
+                    contacts={contacts}
+                    sellerProfiles={sellerProfiles}
+                    marketplaceListings={marketplaceListings}
+                    marketplaceReviews={marketplaceReviews}
+                    isOnline={isOnline}
+                    isForcedOffline={isForcedOffline}
+                    onToggleForceOffline={handleToggleForceOffline}
+                    comingSoonSettings={comingSoonSettings}
+                    onUpdateComingSoonPageConfig={handleUpdateComingSoonPageConfig}
+                    onNavigateToTab={(tab) => handleNavigate(tab, '', null, true)}
+                  />
+                )}
               </div>
+            )}
             </motion.div>
           </AnimatePresence>
         </div>
@@ -2841,6 +3282,7 @@ export default function App() {
             </motion.div>
           </div>
         )}
+      </AnimatePresence>
 
         {galleryData && (
           <ImageGallery 
@@ -2850,13 +3292,14 @@ export default function App() {
           />
         )}
 
-        {walkthroughStep !== null && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/85 backdrop-blur-md"
-          >
+        <AnimatePresence>
+          {walkthroughStep !== null && (
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/85 backdrop-blur-md"
+            >
             {walkthroughStep === 1 && (
               <motion.div
                 initial={{ scale: 0.95, y: 20 }}
@@ -3105,6 +3548,22 @@ export default function App() {
         )}
       </AnimatePresence>
 
+      {comingSoonConfigModal && (
+        <AdminComingSoonModal
+          isOpen={comingSoonConfigModal.isOpen}
+          pageId={comingSoonConfigModal.pageId}
+          pageName={comingSoonConfigModal.pageName}
+          initialConfig={comingSoonSettings?.pages?.[comingSoonConfigModal.pageId]}
+          onClose={() => setComingSoonConfigModal(null)}
+          onSave={async (pId, newCfg) => {
+            await handleUpdateComingSoonPageConfig(pId, newCfg);
+            toast.success(`Updated Coming Soon settings for "${comingSoonConfigModal.pageName}"`);
+          }}
+        />
+      )}
+
+
+
       <Toaster theme="dark" position="top-center" richColors />
       </div>
     </SubscriptionGate>
@@ -3113,14 +3572,41 @@ export default function App() {
 
 // --- Sub-components ---
 
-function NavItem({ active, onClick, icon, label, count }: { active: boolean, onClick: () => void, icon: React.ReactNode, label: string, count: number }) {
+function NavItem({ 
+  active, 
+  onClick, 
+  icon, 
+  label, 
+  count, 
+  isComingSoon, 
+  isAdmin 
+}: { 
+  active: boolean; 
+  onClick: () => void; 
+  icon: React.ReactNode; 
+  label: string; 
+  count: number;
+  isComingSoon?: boolean;
+  isAdmin?: boolean;
+}) {
   return (
-    <button onClick={onClick} className={cn('w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-bold transition-all group', active ? 'bg-secondary text-black-950 shadow-lg shadow-secondary/20' : 'text-black-50 hover:bg-black-900 hover:text-secondary')}>
-      <span className={cn('transition-transform group-hover:scale-110', active ? 'text-black-950' : 'text-black-100 group-hover:text-secondary')}>
+    <button onClick={onClick} className={cn('w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-bold transition-all group relative', active ? 'bg-secondary text-black-950 shadow-lg shadow-secondary/20' : 'text-black-50 hover:bg-black-900 hover:text-secondary')}>
+      <span className={cn('transition-transform group-hover:scale-110 shrink-0', active ? 'text-black-950' : 'text-black-100 group-hover:text-secondary')}>
         {icon}
       </span>
       <span className="flex-1 text-left uppercase tracking-widest text-[10px] truncate">{label}</span>
-      <span className={cn('text-[10px] px-2 py-0.5 rounded-lg font-black', active ? 'bg-black/20 text-black' : 'bg-zinc-800 text-white/50 group-hover:text-secondary')}>{count}</span>
+      {isComingSoon ? (
+        <span className={cn(
+          'text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded border shrink-0',
+          isAdmin 
+            ? 'bg-amber-500/20 text-amber-300 border-amber-500/40' 
+            : 'bg-amber-500/10 text-amber-400 border-amber-500/30'
+        )}>
+          {isAdmin ? '🚧 SOON' : 'SOON'}
+        </span>
+      ) : (
+        <span className={cn('text-[10px] px-2 py-0.5 rounded-lg font-black', active ? 'bg-black/20 text-black' : 'bg-zinc-800 text-white/50 group-hover:text-secondary')}>{count}</span>
+      )}
     </button>
   );
 }
@@ -3619,6 +4105,7 @@ function BirdCard({ bird, cage, birds, cages, viewMode = 'grid-large', currency,
   const [isExpanded, setIsExpanded] = useState(false);
   const [showGallery, setShowGallery] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [isPassportOpen, setIsPassportOpen] = useState(false);
   const [showDocs, setShowDocs] = useState(false);
   const [showActions, setShowActions] = useState(false);
   const symbol = getCurrencySymbol(currency);
@@ -3831,23 +4318,31 @@ function BirdCard({ bird, cage, birds, cages, viewMode = 'grid-large', currency,
                 <div className="flex flex-wrap items-center gap-2 pt-2">
                   <button 
                     onClick={(e) => { e.stopPropagation(); onNavigate('stats', '', { birdId: bird.id }); }} 
-                    className="flex-1 p-2 bg-secondary/10 border border-secondary/20 rounded-lg text-[10px] text-secondary font-black uppercase tracking-widest hover:bg-secondary/20 transition-colors flex items-center justify-center gap-2 min-w-[100px]"
+                    className="flex-1 p-2 bg-secondary/10 border border-secondary/20 rounded-lg text-[10px] text-secondary font-black uppercase tracking-widest hover:bg-secondary/20 transition-colors flex items-center justify-center gap-2 min-w-[90px]"
                   >
                     <Egg size={12} className="text-secondary" />
                     {tGlobal('Breeding')}
                   </button>
                   <button 
-                    onClick={handleShare} 
-                    className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-zinc-700 hover:bg-zinc-600 text-white hover:text-secondary rounded-lg transition-all border border-black-700 min-w-[100px]"
+                    onClick={(e) => { e.stopPropagation(); setIsPassportOpen(true); }} 
+                    className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-gold-500/10 hover:bg-gold-500/20 text-gold-400 rounded-lg transition-all border border-gold-500/30 min-w-[90px]"
+                    title="1-Click Digital Transfer Passport"
                   >
-                    <Share2 size={14} />
+                    <Send size={13} className="text-gold-400" />
+                    <span className="text-[9px] font-black uppercase tracking-widest">Passport</span>
+                  </button>
+                  <button 
+                    onClick={handleShare} 
+                    className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-zinc-700 hover:bg-zinc-600 text-white hover:text-secondary rounded-lg transition-all border border-black-700 min-w-[70px]"
+                  >
+                    <Share2 size={13} />
                     <span className="text-[9px] font-black uppercase tracking-widest">{tGlobal('Share')}</span>
                   </button>
                   <button 
                     onClick={(e) => { e.stopPropagation(); setShowDocs(true); }} 
-                    className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-zinc-700 hover:bg-zinc-600 text-white hover:text-secondary rounded-lg transition-all border border-black-700 min-w-[100px]"
+                    className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-zinc-700 hover:bg-zinc-600 text-white hover:text-secondary rounded-lg transition-all border border-black-700 min-w-[70px]"
                   >
-                    <FileText size={14} />
+                    <FileText size={13} />
                     <span className="text-[9px] font-black uppercase tracking-widest">{tGlobal('Docs')}</span>
                   </button>
                 </div>
@@ -3887,6 +4382,15 @@ function BirdCard({ bird, cage, birds, cages, viewMode = 'grid-large', currency,
         <Modal isOpen={isShareModalOpen} onClose={() => setIsShareModalOpen(false)} title="Share Bird"> 
           <ShareBirdModal bird={bird} mother={mother} father={father} mate={mate} offspring={offspring} cages={cages} cageName={cage?.name} onClose={() => setIsShareModalOpen(false)} /> 
         </Modal> 
+        <Modal isOpen={isPassportOpen} onClose={() => setIsPassportOpen(false)} title={`Digital Transfer Passport`}>
+          <DigitalTransferPassportModal
+            bird={bird}
+            allBirds={birds}
+            cages={cages}
+            currentUserId={user.uid}
+            onClose={() => setIsPassportOpen(false)}
+          />
+        </Modal>
         <Modal isOpen={showDocs} onClose={() => setShowDocs(false)} title={`Documents - ${bird.name}`}> 
           <BirdDocumentsModal bird={bird} onClose={() => setShowDocs(false)} user={user} /> 
         </Modal>
@@ -4038,6 +4542,7 @@ function CageCard({ cage, birds, cages, viewMode = 'grid-large', onBirdRef, onNa
 function PairCard({ pair, male, female, cages, birds, records, currency, onBirdRef, onNavigate, onEdit, onDelete, userSettings, viewMode = 'grid-large' }: { pair: Pair, male?: Bird, female?: Bird, cages: Cage[], birds: Bird[], records?: BreedingRecord[], currency?: string, onBirdRef: (name: string) => void, onNavigate: (tab: string, query?: string, filter?: any) => void, onEdit: () => void, onDelete: () => void, userSettings?: UserSettings, viewMode?: 'grid-large' | 'list' }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [isPassportOpen, setIsPassportOpen] = useState(false);
   const effectiveViewMode = (viewMode === 'list' && !isExpanded) ? 'list' : 'grid-large';
   const cage = cages.find(c => c.id === (male?.cageId || female?.cageId));
 
@@ -4212,21 +4717,29 @@ function PairCard({ pair, male, female, cages, birds, records, currency, onBirdR
             )}
           </div>
 
-          <div className="grid grid-cols-4 gap-1.5">
+          <div className="grid grid-cols-5 gap-1.5">
             <button 
               onClick={(e) => { e.stopPropagation(); onNavigate('stats', '', { pairId: pair.id }); }} 
               className="flex flex-col items-center justify-center py-2 bg-secondary/5 hover:bg-secondary/10 text-secondary rounded-xl border border-secondary/10 transition-all active:scale-95"
               title="Breeding"
             >
-              <Egg size={14} />
+              <Egg size={13} />
               <span className="text-[7px] font-black uppercase mt-1">Breeding</span>
+            </button>
+            <button 
+              onClick={(e) => { e.stopPropagation(); setIsPassportOpen(true); }} 
+              className="flex flex-col items-center justify-center py-2 bg-gold-500/10 hover:bg-gold-500/20 text-gold-400 rounded-xl border border-gold-500/30 transition-all active:scale-95"
+              title="1-Click Digital Transfer Passport"
+            >
+              <Send size={13} />
+              <span className="text-[7px] font-black uppercase mt-1">Passport</span>
             </button>
             <button 
               onClick={(e) => { e.stopPropagation(); setIsShareModalOpen(true); }} 
               className="flex flex-col items-center justify-center py-2 bg-zinc-800/50 hover:bg-zinc-700 text-white/60 rounded-xl border border-white/5 transition-all active:scale-95"
               title="Share"
             >
-              <Share2 size={14} />
+              <Share2 size={13} />
               <span className="text-[7px] font-black uppercase mt-1">Share</span>
             </button>
             <button 
@@ -4234,7 +4747,7 @@ function PairCard({ pair, male, female, cages, birds, records, currency, onBirdR
               className="flex flex-col items-center justify-center py-2 bg-zinc-800/50 hover:bg-zinc-700 text-white/60 rounded-xl border border-white/5 transition-all active:scale-95"
               title="Edit"
             >
-              <Edit2 size={14} />
+              <Edit2 size={13} />
               <span className="text-[7px] font-black uppercase mt-1">Edit</span>
             </button>
             <button 
@@ -4247,7 +4760,7 @@ function PairCard({ pair, male, female, cages, birds, records, currency, onBirdR
               }}
               title="Delete"
             >
-              <Trash2 size={14} />
+              <Trash2 size={13} />
               <span className="text-[7px] font-black uppercase mt-1">Delete</span>
             </button>
           </div>
@@ -4255,6 +4768,18 @@ function PairCard({ pair, male, female, cages, birds, records, currency, onBirdR
       </div>
       <Modal isOpen={isShareModalOpen} onClose={() => setIsShareModalOpen(false)} title="Share Pair"> 
         <SharePairModal pair={pair} male={male} female={female} birds={birds} records={records || []} onClose={() => setIsShareModalOpen(false)} /> 
+      </Modal> 
+      <Modal isOpen={isPassportOpen} onClose={() => setIsPassportOpen(false)} title={`Digital Transfer Passport - Pair`}>
+        <DigitalTransferPassportModal
+          pair={pair}
+          male={male}
+          female={female}
+          allBirds={birds}
+          cages={cages}
+          records={records || []}
+          currentUserId={pair.uid || ''}
+          onClose={() => setIsPassportOpen(false)}
+        />
       </Modal> 
     </Card>
   );
@@ -5124,7 +5649,61 @@ function TransactionCard({ transaction, bird, pair, contact, cages, birds, curre
 
 function BreedingRecordCard({ record, pair, male, female, birds, onEdit, onDelete, onBirdRef, viewMode = 'grid-large' }: { record: BreedingRecord, pair?: Pair, male?: Bird, female?: Bird, birds: Bird[], onEdit: () => void, onDelete: () => void, onBirdRef: (name: string) => void, viewMode?: 'grid-large' | 'list' }) {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [activeCandlingEgg, setActiveCandlingEgg] = useState<{ egg: EggType; index: number } | null>(null);
   const effectiveViewMode = (viewMode === 'list' && isExpanded) ? 'grid-large' : viewMode;
+
+  const species = female?.species || male?.species || '';
+  const speciesPresets = getSpeciesIncubation(species);
+
+  // Auto update egg in firestore
+  const handleUpdateCandledEgg = async (updates: Partial<EggType>) => {
+    if (!activeCandlingEgg) return;
+    const currentEggs = record.eggs || [];
+    const newEggs = [...currentEggs];
+    newEggs[activeCandlingEgg.index] = { ...newEggs[activeCandlingEgg.index], ...updates };
+
+    const laid = newEggs.length;
+    const hatched = newEggs.filter(e => ['Hatched', 'Died', 'Weaned'].includes(e.status)).length;
+    const weaned = newEggs.filter(e => e.status === 'Weaned').length;
+
+    try {
+      await updateDoc(doc(db, 'breedingRecords', record.id), {
+        eggs: newEggs,
+        eggsLaid: laid,
+        eggsHatched: hatched,
+        chicksWeaned: weaned
+      });
+    } catch (err) {
+      console.error('Failed to update candled egg:', err);
+    }
+  };
+
+  const addLocalTaskAutomatically = async (title: string, date: string, description: string = '') => {
+    const currentUser = auth.currentUser;
+    if (!currentUser) {
+      toast.error('Log in to save tasks to your Aviary Chores automatically!');
+      return;
+    }
+    try {
+      const docRef = doc(collection(db, 'tasks'));
+      await setDoc(docRef, {
+        title,
+        description,
+        status: 'Pending',
+        priority: 'Medium',
+        category: 'Incubation',
+        dueDate: date,
+        birdIds: [],
+        subTasks: [],
+        uid: currentUser.uid,
+        createdAt: new Date().toISOString()
+      });
+      toast.success('Task successfully created in your Aviary Chores!');
+    } catch (err) {
+      console.error('Failed to auto-add local task:', err);
+      toast.error('Failed to save task locally');
+    }
+  };
 
   return (
     <div className="bg-zinc-950 border border-zinc-800 rounded-2xl overflow-hidden shadow-lg transition-all duration-300 hover:border-zinc-700">
@@ -5193,7 +5772,12 @@ function BreedingRecordCard({ record, pair, male, female, birds, onEdit, onDelet
                 onClick={() => setIsExpanded(!isExpanded)}
                 className="w-full flex items-center justify-between p-3 bg-zinc-900 rounded-xl border border-zinc-800 hover:border-zinc-600 transition-colors"
               >
-                  <span className="text-xs font-bold text-white">Egg Log ({record.eggs.length})</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-white">Egg Log ({record.eggs.length})</span>
+                    <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-gold-500/10 text-gold-400 border border-gold-500/20">
+                      Smart Candling Enabled
+                    </span>
+                  </div>
                   {isExpanded ? <ChevronUp size={16} className="text-white/50" /> : <ChevronDown size={16} className="text-white/50" />}
               </button>
             )}
@@ -5202,26 +5786,56 @@ function BreedingRecordCard({ record, pair, male, female, birds, onEdit, onDelet
             {isExpanded && record.eggs && record.eggs.length > 0 && (
               <div className="space-y-3 pt-2 animate-in slide-in-from-top-2">
                  {record.eggs.map((egg, index) => {
+                   const timeline = computeEggTimeline(egg, record.incubationDays, record.ringingDays, species);
                    const expectedHatchDate = egg.laidDate ? format(addDays(parseISO(egg.laidDate), record.incubationDays || 21), 'yyyy-MM-dd') : null;
                    const ringingDate = egg.actualHatchDate ? format(addDays(parseISO(egg.actualHatchDate), record.ringingDays || 7), 'yyyy-MM-dd') : null;
 
                    return (
-                     <div key={egg.id} className="p-3 bg-black rounded-xl border border-zinc-800 space-y-3">
+                     <div key={egg.id} className="p-3.5 bg-black rounded-xl border border-zinc-800 space-y-3">
                         <div className="flex items-center justify-between">
                            <div className="flex items-center gap-3">
-                              <div className="text-xs font-mono text-white/50">#{index + 1}</div>
+                              <div className="text-xs font-mono text-white/50 font-bold">#{index + 1}</div>
                               <div className="flex flex-col">
                                 <span className="text-[8px] text-white/30 uppercase font-black tracking-widest leading-none mb-1">Laid Date</span>
                                 <span className="text-[11px] text-white font-bold">{egg.laidDate || 'Unknown'}</span>
                               </div>
                            </div>
-                           <Badge 
-                             variant={egg.status === 'Hatched' || egg.status === 'Weaned' ? 'success' : (egg.status === 'Laid' || egg.status === 'Fertile' ? 'info' : 'neutral')}
-                             className="text-[8px] font-black py-0 px-1.5"
-                           >
-                             {egg.status}
-                           </Badge>
+                           <div className="flex items-center gap-2">
+                             <button
+                               onClick={() => setActiveCandlingEgg({ egg, index })}
+                               className="px-2.5 py-1 bg-gold-500/10 hover:bg-gold-500/20 text-gold-400 border border-gold-500/30 rounded-lg text-[9px] font-black uppercase tracking-wider flex items-center gap-1 transition-colors"
+                             >
+                               <Flame size={10} />
+                               Candle / Status
+                             </button>
+                             <Badge 
+                               variant={egg.status === 'Hatched' || egg.status === 'Weaned' ? 'success' : (egg.status === 'Laid' || egg.status === 'Fertile' ? 'info' : 'neutral')}
+                               className="text-[8px] font-black py-0.5 px-2"
+                             >
+                               {egg.status}
+                             </Badge>
+                           </div>
                         </div>
+
+                        {/* Live Incubation Stage Indicator */}
+                        {timeline && (egg.status === 'Laid' || egg.status === 'Fertile') && (
+                          <div className="space-y-1.5 p-2.5 bg-zinc-900/60 rounded-xl border border-zinc-800">
+                            <div className="flex items-center justify-between text-[10px]">
+                              <span className="text-zinc-400 font-bold uppercase tracking-wider">
+                                Incubation: Day {Math.max(0, timeline.daysSinceLaid)} / {timeline.actualIncubation}d
+                              </span>
+                              <span className={cn("font-black uppercase tracking-wider", timeline.daysUntilHatch <= 0 ? "text-emerald-400" : "text-amber-400")}>
+                                {timeline.daysUntilHatch > 0 ? `${timeline.daysUntilHatch}d to hatch` : timeline.daysUntilHatch === 0 ? 'Hatching Today!' : 'Overdue'}
+                              </span>
+                            </div>
+                            <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+                              <div 
+                                className="h-full bg-gradient-to-r from-amber-500 to-emerald-500 rounded-full transition-all duration-500"
+                                style={{ width: `${timeline.progressPct}%` }}
+                              />
+                            </div>
+                          </div>
+                        )}
 
                         {(egg.status === 'Laid' || egg.status === 'Fertile') && expectedHatchDate && (
                           <div className="flex items-center justify-between p-2 bg-gold-500/5 rounded-lg border border-gold-500/10">
@@ -5232,15 +5846,24 @@ function BreedingRecordCard({ record, pair, male, female, birds, onEdit, onDelet
                                 </div>
                                 <span className="text-[11px] text-white font-mono ml-4">{expectedHatchDate}</span>
                              </div>
-                             <a 
-                               href={generateGoogleCalendarUrl(`Egg #${index + 1} Hatching`, expectedHatchDate, `Hatching reminder for Pair: ${male?.name || 'Empty'} x ${female?.name || 'Empty'}`)}
-                               target="_blank"
-                               rel="noopener noreferrer"
-                               className="p-1.5 bg-secondary/10 text-secondary hover:bg-secondary/20 rounded-md transition-colors"
-                               title="Add to Google Calendar"
+                             <button 
+                               type="button"
+                               onClick={() => {
+                                 const eventTitle = `Expected Hatch: Egg #${index + 1} (${male?.name || 'Sire'} × ${female?.name || 'Dam'})`;
+                                 const eventDate = expectedHatchDate;
+                                 const eventDesc = `Expected hatching of Egg #${index + 1} under Pair: ${male?.name || 'Sire'} x ${female?.name || 'Dam'}`;
+                                 const url = generateGoogleCalendarUrl(eventTitle, eventDate, eventDesc);
+                                 if (url) {
+                                   window.open(url, '_blank', 'noopener,noreferrer');
+                                   toast.success('Opening Google Calendar & automatically adding task locally!');
+                                 }
+                                 addLocalTaskAutomatically(eventTitle, eventDate, eventDesc);
+                               }}
+                               className="p-1.5 bg-secondary/10 text-secondary hover:bg-secondary/20 rounded-md transition-colors cursor-pointer"
+                               title="Add Hatch Reminder & Task"
                              >
                                <Bell size={12} />
-                             </a>
+                             </button>
                           </div>
                         )}
 
@@ -5253,15 +5876,24 @@ function BreedingRecordCard({ record, pair, male, female, birds, onEdit, onDelet
                                 </div>
                                 <span className="text-[11px] text-white font-mono ml-4">{ringingDate}</span>
                              </div>
-                             <a 
-                               href={generateGoogleCalendarUrl(`Egg #${index + 1} Ringing`, ringingDate, `Reminder to ring the bird from Pair: ${male?.name || 'Empty'} x ${female?.name || 'Empty'}`)}
-                               target="_blank"
-                               rel="noopener noreferrer"
-                               className="p-1.5 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 rounded-md transition-colors"
-                               title="Add to Google Calendar"
+                             <button 
+                               type="button"
+                               onClick={() => {
+                                 const eventTitle = `Ringing Reminder: Egg #${index + 1} (${male?.name || 'Sire'} × ${female?.name || 'Dam'})`;
+                                 const eventDate = ringingDate;
+                                 const eventDesc = `Ringing reminder for chick #${index + 1} of Pair: ${male?.name || 'Sire'} x ${female?.name || 'Dam'}`;
+                                 const url = generateGoogleCalendarUrl(eventTitle, eventDate, eventDesc);
+                                 if (url) {
+                                   window.open(url, '_blank', 'noopener,noreferrer');
+                                   toast.success('Opening Google Calendar & automatically adding task locally!');
+                                 }
+                                 addLocalTaskAutomatically(eventTitle, eventDate, eventDesc);
+                               }}
+                               className="p-1.5 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 rounded-md transition-colors cursor-pointer"
+                               title="Add Ringing Reminder & Task"
                              >
                                <Bell size={12} />
-                             </a>
+                             </button>
                           </div>
                         )}
                      </div>
@@ -5270,6 +5902,27 @@ function BreedingRecordCard({ record, pair, male, female, birds, onEdit, onDelet
               </div>
             )}
         </div>
+
+        {/* Smart Candling Modal */}
+        {activeCandlingEgg && (
+          <Modal
+            isOpen={!!activeCandlingEgg}
+            onClose={() => setActiveCandlingEgg(null)}
+            title={`Smart Candling & Countdown`}
+          >
+            <SmartCandlingModal
+              egg={activeCandlingEgg.egg}
+              eggIndex={activeCandlingEgg.index}
+              record={record}
+              pair={pair}
+              male={male}
+              female={female}
+              onUpdateEgg={handleUpdateCandledEgg}
+              onClose={() => setActiveCandlingEgg(null)}
+              onAddLocalTask={addLocalTaskAutomatically}
+            />
+          </Modal>
+        )}
     </div>
   );
 }
@@ -5398,7 +6051,19 @@ function BreedingRecordForm({ user, initialData, pairs, birds, cages, onClose, u
           <SearchableSelect 
             label={t('Pair')}
           value={formData.pairId || ''}
-          onChange={(val) => setFormData({ ...formData, pairId: val })}
+          onChange={(val) => {
+            const selectedPair = pairs.find(p => p.id === val);
+            const female = birds.find(b => b.id === selectedPair?.femaleId);
+            const male = birds.find(b => b.id === selectedPair?.maleId);
+            const speciesName = female?.species || male?.species || '';
+            const presets = getSpeciesIncubation(speciesName);
+            setFormData({ 
+              ...formData, 
+              pairId: val,
+              incubationDays: formData.incubationDays || presets.incubation,
+              ringingDays: formData.ringingDays || presets.ring
+            });
+          }}
           options={[
             { id: '', name: t('Select Pair') },
             ...pairs.filter(p => p.maleId || p.femaleId).map(p => {
@@ -7141,6 +7806,8 @@ function SettingsView({ settings, onUpdate, allData, user, isSyncing, setDeleteC
               </div>
             </motion.div>
           )}
+
+
         </AnimatePresence>
       </div>
 
@@ -7187,13 +7854,35 @@ function SettingsView({ settings, onUpdate, allData, user, isSyncing, setDeleteC
   );
 }
 
-function PrintView({ birds, pairs, cages, onBirdRef, userSettings }: { birds: Bird[], pairs: Pair[], cages: Cage[], onBirdRef: (name: string) => void, userSettings?: UserSettings }) {
+function PrintView({ 
+  birds, 
+  pairs, 
+  cages, 
+  breedingRecords = [], 
+  tasks = [], 
+  transactions = [], 
+  contacts = [], 
+  onBirdRef, 
+  userSettings 
+}: { 
+  birds: Bird[]; 
+  pairs: Pair[]; 
+  cages: Cage[]; 
+  breedingRecords?: BreedingRecord[]; 
+  tasks?: Task[]; 
+  transactions?: Transaction[]; 
+  contacts?: Contact[]; 
+  onBirdRef: (name: string) => void; 
+  userSettings?: UserSettings; 
+}) {
   const t = (text: string) => getTranslatedLabel(text, userSettings?.language || 'en');
   const [printMode, setPrintMode] = useState<'list' | 'qr' | 'certificate'>('list');
   const [printLayout, setPrintLayout] = useState<'vertical' | 'horizontal'>('vertical');
   const [printEmpty, setPrintEmpty] = useState(false);
   const [qrType, setQrType] = useState<'bird' | 'pair' | 'cage'>('bird');
   const [qrSelections, setQrSelections] = useState<string[]>([]);
+  const [isExportingSheets, setIsExportingSheets] = useState(false);
+  const [lastExportedSheet, setLastExportedSheet] = useState<{ id: string; url: string; title: string } | null>(null);
   
   // Custom QR scaling
   const [qrWidth, setQrWidth] = useState(50); // mm
@@ -7298,6 +7987,8 @@ function PrintView({ birds, pairs, cages, onBirdRef, userSettings }: { birds: Bi
       }
     }
   };
+
+
 
   const getQRData = (id: string) => {
      return JSON.stringify({ t: qrType === 'bird' ? 'b' : qrType === 'pair' ? 'p' : 'c', id });
@@ -7430,10 +8121,14 @@ function PrintView({ birds, pairs, cages, onBirdRef, userSettings }: { birds: Bi
             )}
           </section>
 
-          <Button onClick={handlePrint} disabled={!printEmpty && qrSelections.length === 0} className="w-full py-6 text-base font-black uppercase border-b-4 border-gold-600 shadow-gold-500/10 shadow-2xl h-auto">
-            {printMode === 'qr' ? <QrCode size={20} /> : <Printer size={20} />}
-            {printEmpty ? t('Generate Blank Template') : `${t('Generate')} ${qrSelections.length} ${t('Records')}`}
-          </Button>
+          <div className="space-y-3">
+            <Button onClick={handlePrint} disabled={!printEmpty && qrSelections.length === 0} className="w-full py-5 text-sm font-black uppercase border-b-4 border-gold-600 shadow-gold-500/10 shadow-2xl h-auto">
+              {printMode === 'qr' ? <QrCode size={20} /> : <Printer size={20} />}
+              {printEmpty ? t('Generate Blank Template') : `${t('Generate')} ${qrSelections.length} ${t('PDF Records')}`}
+            </Button>
+
+
+          </div>
         </div>
 
         {/* Right Column: Preview / Selection List */}
@@ -7661,11 +8356,16 @@ function BirdDocumentsModal({ bird, onClose, user }: { bird: Bird, onClose: () =
   const handleDelete = async (docId: string) => {
     if (!user) return;
     try {
+      const docToDelete = documents.find(d => d.id === docId);
       const updatedDocs = documents.filter(d => d.id !== docId);
 
       await updateDoc(doc(db, 'birds', bird.id), {
         documents: updatedDocs
       });
+      
+      if (docToDelete && docToDelete.url) {
+        await deleteStorageFileIfApplicable(docToDelete.url);
+      }
 
       toast.success('Document deleted from Vault');
       if (previewDoc?.id === docId) {
@@ -9140,6 +9840,7 @@ function TaskForm({ user, initialData, birds, cages, onClose, userSettings }: { 
   const [isSaving, setIsSaving] = useState(false);
   const [birdSearch, setBirdSearch] = useState('');
   const [isBirdDropdownOpen, setIsBirdDropdownOpen] = useState(false);
+  const [syncToGoogleCalendar, setSyncToGoogleCalendar] = useState(true);
 
   const filteredUnselectedBirds = birds.filter(b => {
     const cage = cages.find(c => c.id === b.cageId);
@@ -9156,6 +9857,18 @@ function TaskForm({ user, initialData, birds, cages, onClose, userSettings }: { 
       return;
     }
     if (isSaving) return;
+
+    if (syncToGoogleCalendar && formData.title && (formData.reminderDate || formData.dueDate)) {
+      try {
+        const url = getGoogleCalendarUrl(formData as Task, birds, cages);
+        if (url) {
+          window.open(url, '_blank', 'noopener,noreferrer');
+        }
+      } catch (err) {
+        console.error('Failed to open Google Calendar:', err);
+      }
+    }
+
     setIsSaving(true);
     
     const processSave = async () => {
@@ -9241,19 +9954,21 @@ function TaskForm({ user, initialData, birds, cages, onClose, userSettings }: { 
           </Select>
         </div>
       </div>
-      <p className="text-[10px] text-white/50 ml-1">{t('Sync with your Google Calendar for reliable mobile notifications.')}</p>
-        
-      {formData.title && (formData.reminderDate || formData.dueDate) && (
-        <Button 
-          type="button" 
-          variant="secondary" 
-          className="w-full mt-2 py-3 text-[10px] font-black uppercase tracking-widest border-gold-500/30 hover:border-gold-500 group" 
-          onClick={() => window.open(getGoogleCalendarUrl(formData as Task, birds, cages), '_blank')}
-        >
-          <Calendar size={14} className="mr-2 text-gold-500 group-hover:scale-110 transition-transform" />
-          {t('Add to Google Calendar')}
-        </Button>
-      )}
+      <div className="flex items-center gap-2.5 px-1.5 py-1">
+        <input 
+          type="checkbox" 
+          id="syncToGoogleCalendar"
+          checked={syncToGoogleCalendar}
+          onChange={(e) => setSyncToGoogleCalendar(e.target.checked)}
+          className="w-4 h-4 rounded border-zinc-800 bg-black text-gold-500 focus:ring-gold-500/20 cursor-pointer"
+        />
+        <div className="flex flex-col">
+          <label htmlFor="syncToGoogleCalendar" className="text-[11px] font-bold text-white/95 select-none cursor-pointer">
+            {t('Add to Google Calendar on save')}
+          </label>
+          <span className="text-[9px] text-white/40">{t('Opens calendar automatically to schedule mobile notifications.')}</span>
+        </div>
+      </div>
       <div className="space-y-2 relative">
         <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">{t('Tag Birds')}</label>
         
