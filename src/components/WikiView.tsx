@@ -24,6 +24,7 @@ interface WikiSpecies {
   id: string;
   name: string;
   subspecies: WikiSubspecies[];
+  wikipediaUrl?: string;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -85,6 +86,7 @@ export function WikiView({ user, isAdmin, userSettings }: WikiViewProps) {
 
   // Form states - Species
   const [speciesName, setSpeciesName] = useState('');
+  const [wikipediaUrl, setWikipediaUrl] = useState('');
   const [subspeciesInput, setSubspeciesInput] = useState('');
   const [subspeciesList, setSubspeciesList] = useState<WikiSubspecies[]>([]);
 
@@ -182,10 +184,12 @@ export function WikiView({ user, isAdmin, userSettings }: WikiViewProps) {
       setEditingSpecies(species);
       setSpeciesName(species.name);
       setSubspeciesList(species.subspecies || []);
+      setWikipediaUrl(species.wikipediaUrl || '');
     } else {
       setEditingSpecies(null);
       setSpeciesName('');
       setSubspeciesList([]);
+      setWikipediaUrl('');
     }
     setIsSpeciesModalOpen(true);
   };
@@ -245,6 +249,7 @@ export function WikiView({ user, isAdmin, userSettings }: WikiViewProps) {
     const payload = {
       name: speciesName.trim(),
       subspecies: subspeciesList,
+      wikipediaUrl: wikipediaUrl.trim() || null,
       updatedAt: new Date().toISOString()
     };
 
@@ -594,7 +599,14 @@ export function WikiView({ user, isAdmin, userSettings }: WikiViewProps) {
                 >
                   <div className="space-y-2">
                     <div className="flex items-start justify-between gap-2">
-                      <h3 className="text-sm font-bold text-white group-hover:text-gold-400 transition-all tracking-tight">{species.name}</h3>
+                      <h3 className="text-sm font-bold text-white group-hover:text-gold-400 transition-all tracking-tight flex items-center gap-1.5">
+                        {species.name}
+                        {species.wikipediaUrl && (
+                          <span title="Wikipedia care article linked" className="text-blue-400 hover:text-blue-300" onClick={(e) => { e.stopPropagation(); window.open(species.wikipediaUrl, '_blank'); }}>
+                            <BookOpen size={12} className="inline" />
+                          </span>
+                        )}
+                      </h3>
                       <span className="text-[10px] bg-zinc-950 px-2 py-0.5 border border-zinc-800 text-zinc-400 font-semibold rounded-lg shrink-0">
                         {species.subspecies?.length || 0} Subspecies
                       </span>
@@ -647,7 +659,21 @@ export function WikiView({ user, isAdmin, userSettings }: WikiViewProps) {
                   <ArrowLeft size={14} />
                   Back to Menu
                 </button>
-                <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">{selectedSpecies?.name}</span>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">{selectedSpecies?.name}</span>
+                  {selectedSpecies?.wikipediaUrl && (
+                    <a 
+                      href={selectedSpecies.wikipediaUrl} 
+                      target="_blank" 
+                      rel="noopener noreferrer" 
+                      onClick={(e) => e.stopPropagation()}
+                      className="text-blue-400 hover:text-blue-300 inline-flex items-center"
+                      title="View Wiki Article"
+                    >
+                      <BookOpen size={12} />
+                    </a>
+                  )}
+                </div>
               </div>
 
               {/* Quick Add Subspecies Inline (Admins Only) */}
@@ -1151,6 +1177,18 @@ export function WikiView({ user, isAdmin, userSettings }: WikiViewProps) {
                   placeholder="e.g. African Parrots, Lovebirds..."
                   value={speciesName}
                   onChange={(e) => setSpeciesName(e.target.value)}
+                  className="w-full bg-zinc-950 text-white rounded-xl border border-zinc-800 focus:outline-none focus:border-gold-500 px-3.5 py-2.5 transition-all"
+                />
+              </div>
+
+              {/* Wikipedia Link / External URL */}
+              <div className="space-y-1.5">
+                <label className="font-bold text-zinc-400">External Article / Wikipedia URL (Optional)</label>
+                <input
+                  type="url"
+                  placeholder="e.g. https://en.wikipedia.org/wiki/Cockatiel"
+                  value={wikipediaUrl}
+                  onChange={(e) => setWikipediaUrl(e.target.value)}
                   className="w-full bg-zinc-950 text-white rounded-xl border border-zinc-800 focus:outline-none focus:border-gold-500 px-3.5 py-2.5 transition-all"
                 />
               </div>

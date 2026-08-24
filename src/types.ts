@@ -248,6 +248,10 @@ export interface Cage {
   imageUrl?: string;
   imageUrls?: string[];
   uid: string;
+  width?: number;
+  height?: number;
+  depth?: number;
+  dimensionUnit?: string;
 }
 
 export interface Pair {
