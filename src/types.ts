@@ -189,6 +189,7 @@ export interface MarketplaceListing {
   imageUrls?: string[];
   birdId?: string; // If linked from inventory
   pairId?: string; // If linked from inventory
+  allowOffers?: boolean; // Allow buyers to make an offer
   status: 'pending_approval' | 'active' | 'sold' | 'rejected' | 'archived';
   rejectionReason?: string;
   soldToUserId?: string;
@@ -245,6 +246,10 @@ export interface Cage {
   location?: string;
   type?: string;
   notes?: string;
+  width?: number;
+  height?: number;
+  depth?: number;
+  dimensionUnit?: 'cm' | 'inches';
   imageUrl?: string;
   imageUrls?: string[];
   uid: string;
