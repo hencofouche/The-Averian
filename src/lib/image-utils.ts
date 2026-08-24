@@ -1,4 +1,4 @@
-import { ref, uploadBytes, uploadString, getDownloadURL, deleteObject } from 'firebase/storage';
+import { ref, deleteObject } from 'firebase/storage';
 import { storage } from '../firebase';
 
 export const deleteStorageFileIfApplicable = async (url: string) => {
@@ -8,136 +8,135 @@ export const deleteStorageFileIfApplicable = async (url: string) => {
       const fileRef = ref(storage, url);
       await deleteObject(fileRef);
     } catch (e) {
-      console.error('Failed to delete storage file:', e);
+      console.warn('Failed to delete storage file (or already removed):', e);
     }
   }
 };
 
 /**
- * Compresses an image file and uploads it to Firebase Storage (with fallback to base64 if storage is unavailable).
+ * Compresses an image client-side to a lightweight, high-resolution JPEG data URL.
+ * Runs instantly in milliseconds without network stalling or Firebase Storage timeout loops.
  */
 export const compressAndUploadImage = async (
   file: File | Blob, 
-  path: string, 
-  onProgress?: (progress: number) => void
+  _path?: string
 ): Promise<string> => {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     if (!file || !(file instanceof Blob)) {
-      return reject(new Error('Invalid file object provided'));
+      console.warn('Invalid file object provided to compressAndUploadImage');
+      return resolve('');
     }
 
+    // Safety timeout: ensure promise ALWAYS resolves within 2.5 seconds
+    const safetyTimer = setTimeout(() => {
+      console.warn('Image processing hit safety timer, resolving direct stream');
+      const fallbackReader = new FileReader();
+      fallbackReader.onload = () => resolve((fallbackReader.result as string) || '');
+      fallbackReader.onerror = () => resolve('');
+      try {
+        fallbackReader.readAsDataURL(file);
+      } catch (err) {
+        resolve('');
+      }
+    }, 2500);
+
     const reader = new FileReader();
-    reader.readAsDataURL(file);
+    
+    reader.onerror = (e) => {
+      clearTimeout(safetyTimer);
+      console.error('FileReader error:', e);
+      resolve('');
+    };
 
     reader.onload = (event) => {
-      const result = event.target?.result;
-      if (!result || typeof result !== 'string') {
-        return reject(new Error('Could not read image file data'));
+      const dataUrl = event.target?.result as string;
+      if (!dataUrl) {
+        clearTimeout(safetyTimer);
+        return resolve('');
+      }
+
+      // If SVG or tiny icon, return directly
+      if (file.type && file.type.includes('svg')) {
+        clearTimeout(safetyTimer);
+        return resolve(dataUrl);
       }
 
       const img = new Image();
-      img.crossOrigin = 'anonymous';
-      img.src = result;
-
-      img.onload = async () => {
+      
+      img.onload = () => {
         try {
-          const canvas = document.createElement('canvas');
-          let width = img.width || 800;
-          let height = img.height || 600;
-          const MAX_DIMENSION = 1280;
+          const maxDimension = 960;
+          let width = img.naturalWidth || img.width || 600;
+          let height = img.naturalHeight || img.height || 600;
 
           if (width > height) {
-            if (width > MAX_DIMENSION) {
-              height = Math.round((height * MAX_DIMENSION) / width);
-              width = MAX_DIMENSION;
+            if (width > maxDimension) {
+              height = Math.round((height * maxDimension) / width);
+              width = maxDimension;
             }
           } else {
-            if (height > MAX_DIMENSION) {
-              width = Math.round((width * MAX_DIMENSION) / height);
-              height = MAX_DIMENSION;
+            if (height > maxDimension) {
+              width = Math.round((width * maxDimension) / height);
+              height = maxDimension;
             }
           }
 
+          const canvas = document.createElement('canvas');
           canvas.width = Math.max(width, 10);
           canvas.height = Math.max(height, 10);
-          const ctx = canvas.getContext('2d', { alpha: false });
+
+          const ctx = canvas.getContext('2d');
           if (!ctx) {
-            return resolve(result);
+            clearTimeout(safetyTimer);
+            return resolve(dataUrl);
           }
 
-          // Fill white background for transparent images converted to JPEG
+          // Fill white background (handles transparent PNGs when converting to JPEG)
           ctx.fillStyle = '#FFFFFF';
           ctx.fillRect(0, 0, canvas.width, canvas.height);
           ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
-          // Get compressed Blob for binary upload
-          const blobPromise = new Promise<Blob | null>((res) => {
-            canvas.toBlob((b) => res(b), 'image/jpeg', 0.82);
-          });
-          const blob = await blobPromise;
+          // Get optimized base64 JPEG at 0.72 quality
+          let compressed = canvas.toDataURL('image/jpeg', 0.72);
 
-          const cleanPath = path ? path.replace(/^\/+|\/+$/g, '') : 'marketplace';
-          const randomSuffix = Math.random().toString(36).substring(2, 9);
-          const fileName = `${Date.now()}_${randomSuffix}.jpg`;
-          const storageRef = ref(storage, `${cleanPath}/${fileName}`);
-
-          if (blob) {
-            try {
-              const snapshot = await uploadBytes(storageRef, blob, {
-                contentType: 'image/jpeg',
-                cacheControl: 'public, max-age=31536000',
-                customMetadata: { uploadedAt: new Date().toISOString() }
-              });
-              const downloadURL = await getDownloadURL(snapshot.ref);
-              if (downloadURL) {
-                return resolve(downloadURL);
-              }
-            } catch (byteErr) {
-              console.warn('uploadBytes storage attempt failed, attempting uploadString...', byteErr);
+          // If still over 120KB, scale down slightly to keep documents light & ultra fast
+          if (compressed.length > 120000) {
+            const smallerCanvas = document.createElement('canvas');
+            smallerCanvas.width = Math.round(canvas.width * 0.7);
+            smallerCanvas.height = Math.round(canvas.height * 0.7);
+            const sCtx = smallerCanvas.getContext('2d');
+            if (sCtx) {
+              sCtx.fillStyle = '#FFFFFF';
+              sCtx.fillRect(0, 0, smallerCanvas.width, smallerCanvas.height);
+              sCtx.drawImage(canvas, 0, 0, smallerCanvas.width, smallerCanvas.height);
+              compressed = smallerCanvas.toDataURL('image/jpeg', 0.60);
             }
           }
 
-          // Fallback to uploadString
-          let base64data = canvas.toDataURL('image/jpeg', 0.80);
-          try {
-            await uploadString(storageRef, base64data, 'data_url');
-            const downloadURL = await getDownloadURL(storageRef);
-            if (downloadURL) {
-              return resolve(downloadURL);
-            }
-          } catch (stringErr) {
-            console.warn('Storage upload unavailable, falling back to optimized lightweight data URL:', stringErr);
-          }
-
-          // Final fallback: Return compact base64 data url (under 50KB to preserve Firestore document size)
-          let fallbackCanvas = canvas;
-          if (canvas.width > 800 || canvas.height > 800) {
-            fallbackCanvas = document.createElement('canvas');
-            const scale = Math.min(800 / canvas.width, 800 / canvas.height);
-            fallbackCanvas.width = Math.round(canvas.width * scale);
-            fallbackCanvas.height = Math.round(canvas.height * scale);
-            const fbCtx = fallbackCanvas.getContext('2d');
-            if (fbCtx) {
-              fbCtx.drawImage(canvas, 0, 0, fallbackCanvas.width, fallbackCanvas.height);
-            }
-          }
-          const compactBase64 = fallbackCanvas.toDataURL('image/jpeg', 0.65);
-          resolve(compactBase64);
-        } catch (err: any) {
-          console.warn('Canvas processing error, using raw file data fallback:', err);
-          resolve(result);
+          clearTimeout(safetyTimer);
+          resolve(compressed);
+        } catch (err) {
+          console.warn('Canvas processing error, using fallback data URL:', err);
+          clearTimeout(safetyTimer);
+          resolve(dataUrl);
         }
       };
 
-      img.onerror = (e) => {
-        console.warn('Image element decode error, providing raw reader result:', e);
-        resolve(result);
+      img.onerror = () => {
+        clearTimeout(safetyTimer);
+        resolve(dataUrl);
       };
+
+      img.src = dataUrl;
     };
 
-    reader.onerror = (e) => {
-      console.error('FileReader failure:', e);
-      reject(new Error('Failed to read selected image file'));
-    };
+    try {
+      reader.readAsDataURL(file);
+    } catch (err) {
+      clearTimeout(safetyTimer);
+      console.error('readAsDataURL exception:', err);
+      resolve('');
+    }
   });
 };
+

@@ -8808,17 +8808,23 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
       const urls: string[] = [];
       for (const file of files) {
         const url = await compressAndUploadImage(file, `birds/${user.uid}`);
-        urls.push(url);
+        if (url) {
+          urls.push(url);
+        }
       }
-      setFormData(prev => {
-        const existing = prev.imageUrls || [];
-        const merged = [...existing, ...urls];
-        return { ...prev, imageUrl: merged[0], imageUrls: merged };
-      });
-      setIsUploading(false);
+      if (urls.length > 0) {
+        setFormData(prev => {
+          const existing = prev.imageUrls || [];
+          const merged = [...existing, ...urls];
+          return { ...prev, imageUrl: merged[0], imageUrls: merged };
+        });
+      }
     } catch (err) {
+      console.error('Bird image processing error:', err);
       setUploadError(err instanceof Error ? err.message : 'Upload failed');
+    } finally {
       setIsUploading(false);
+      if (e.target) e.target.value = '';
     }
   };
 
@@ -9446,17 +9452,23 @@ function CageForm({ user, initialData, cages, onClose, userSettings }: { user: F
       const urls: string[] = [];
       for (const file of files) {
         const url = await compressAndUploadImage(file, `cages/${user.uid}`);
-        urls.push(url);
+        if (url) {
+          urls.push(url);
+        }
       }
-      setFormData(prev => {
-        const existing = prev.imageUrls || [];
-        const merged = [...existing, ...urls];
-        return { ...prev, imageUrl: merged[0], imageUrls: merged };
-      });
-      setIsUploading(false);
+      if (urls.length > 0) {
+        setFormData(prev => {
+          const existing = prev.imageUrls || [];
+          const merged = [...existing, ...urls];
+          return { ...prev, imageUrl: merged[0], imageUrls: merged };
+        });
+      }
     } catch (err) {
+      console.error('Cage image processing error:', err);
       setUploadError(err instanceof Error ? err.message : 'Upload failed');
+    } finally {
       setIsUploading(false);
+      if (e.target) e.target.value = '';
     }
   };
 
@@ -9695,17 +9707,23 @@ function PairForm({ user, initialData, birds, cages, onClose, userSettings }: { 
       const urls: string[] = [];
       for (const file of files) {
         const url = await compressAndUploadImage(file, `pairs/${user.uid}`);
-        urls.push(url);
+        if (url) {
+          urls.push(url);
+        }
       }
-      setFormData(prev => {
-        const existing = prev.imageUrls || [];
-        const merged = [...existing, ...urls];
-        return { ...prev, imageUrls: merged };
-      });
-      setIsUploading(false);
+      if (urls.length > 0) {
+        setFormData(prev => {
+          const existing = prev.imageUrls || [];
+          const merged = [...existing, ...urls];
+          return { ...prev, imageUrls: merged };
+        });
+      }
     } catch (err) {
+      console.error('Pair image processing error:', err);
       setUploadError(err instanceof Error ? err.message : 'Upload failed');
+    } finally {
       setIsUploading(false);
+      if (e.target) e.target.value = '';
     }
   };
 
