@@ -1,10 +1,10 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { 
   ShoppingBag, Search, Plus, Filter, CheckCircle2, AlertCircle, Clock, 
   MapPin, Phone, MessageCircle, Mail, Shield, ShieldCheck, ShieldAlert, 
   Tag, DollarSign, Calendar, ChevronDown, ChevronUp, Image as ImageIcon,
   Check, X, Star, Heart, Bird as BirdIcon, Eye, Trash2, Edit2, Send,
-  Share2, ArrowUpDown, Truck, Award, HelpCircle, UserCheck, AlertTriangle
+  Share2, ArrowUpDown, Truck, Award, HelpCircle, UserCheck, AlertTriangle, RefreshCw
 } from 'lucide-react';
 import { 
   MarketplaceListing, SellerProfile, MarketplaceReview, 
@@ -1204,26 +1204,62 @@ function ListingFormModal({
     }
   };
 
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
-    if (files.length === 0) return;
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isDragging, setIsDragging] = useState(false);
+
+  const processFiles = async (filesList: FileList | File[]) => {
+    const files = Array.from(filesList).filter(f => f.type.startsWith('image/'));
+    if (files.length === 0) {
+      toast.error('Please select valid image files (JPG, PNG, WEBP).');
+      return;
+    }
     setIsUploading(true);
     try {
       const urls: string[] = [];
       for (const file of files) {
         const url = await compressAndUploadImage(file, `marketplace/${user?.uid || 'general'}`);
-        urls.push(url);
+        if (url) urls.push(url);
       }
-      setFormData(prev => ({
-        ...prev,
-        imageUrls: [...(prev.imageUrls || []), ...urls]
-      }));
-      toast.success(`${urls.length} photo(s) uploaded successfully`);
+      if (urls.length > 0) {
+        setFormData(prev => ({
+          ...prev,
+          imageUrls: [...(prev.imageUrls || []), ...urls]
+        }));
+        toast.success(`${urls.length} photo(s) uploaded successfully!`);
+      }
     } catch (err: any) {
-      toast.error('Image upload failed: ' + err.message);
+      console.error("Marketplace upload error:", err);
+      toast.error('Image upload failed: ' + (err.message || 'Unknown error'));
     } finally {
       setIsUploading(false);
-      if (e.target) e.target.value = '';
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      processFiles(e.target.files);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      processFiles(e.dataTransfer.files);
     }
   };
 
@@ -1675,28 +1711,67 @@ function ListingFormModal({
 
           {/* Photo upload */}
           <div className="space-y-2">
-            <label className="text-xs font-medium text-zinc-400">Photos</label>
-            <div className="flex items-center gap-3">
-              <input 
-                type="file" 
-                multiple 
-                accept="image/*" 
-                onChange={handleImageUpload} 
-                className="hidden" 
-                id="marketplace-photo-upload" 
-                disabled={isUploading} 
-              />
-              <label 
-                htmlFor="marketplace-photo-upload"
-                className={cn(
-                  "flex items-center gap-2 px-4 py-2.5 bg-zinc-900 border border-zinc-800 hover:border-gold-500 rounded-xl cursor-pointer text-sm font-semibold text-white transition-all shadow-md",
-                  isUploading && "opacity-50 cursor-not-allowed"
-                )}
-              >
-                <ImageIcon size={16} className="text-gold-400" />
-                {isUploading ? 'Uploading & Compressing...' : 'Upload Photos'}
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-medium text-zinc-300">
+                Photos ({formData.imageUrls?.length || 0})
               </label>
-              <span className="text-xs text-zinc-500">Supports JPG, PNG, WEBP</span>
+              {formData.imageUrls && formData.imageUrls.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setFormData(prev => ({ ...prev, imageUrls: [] }))}
+                  className="text-[11px] text-rose-400 hover:underline"
+                >
+                  Remove all photos
+                </button>
+              )}
+            </div>
+
+            <input 
+              ref={fileInputRef}
+              type="file" 
+              multiple 
+              accept="image/*,.jpg,.jpeg,.png,.webp,.heic" 
+              onChange={handleImageUpload} 
+              className="hidden" 
+              disabled={isUploading} 
+            />
+
+            {/* Drag and Drop Zone */}
+            <div
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              onClick={() => fileInputRef.current?.click()}
+              className={cn(
+                "border-2 border-dashed rounded-2xl p-4 sm:p-5 flex flex-col items-center justify-center text-center cursor-pointer transition-all bg-zinc-900/40 hover:bg-zinc-900/70",
+                isDragging ? "border-gold-500 bg-gold-500/10 scale-[1.01]" : "border-zinc-800 hover:border-zinc-700",
+                isUploading && "opacity-60 pointer-events-none"
+              )}
+            >
+              <div className="w-10 h-10 rounded-full bg-zinc-800 flex items-center justify-center text-gold-400 mb-2">
+                {isUploading ? (
+                  <RefreshCw size={20} className="animate-spin text-gold-400" />
+                ) : (
+                  <ImageIcon size={20} />
+                )}
+              </div>
+              <p className="text-sm font-semibold text-white">
+                {isUploading ? 'Compressing & uploading photos...' : 'Click to select photos or drag & drop here'}
+              </p>
+              <p className="text-xs text-zinc-400 mt-1">
+                Supports JPG, PNG, WEBP • Multiple photos supported
+              </p>
+              <Button
+                type="button"
+                variant="secondary"
+                className="mt-3 text-xs py-1.5 px-3 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border-zinc-700"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  fileInputRef.current?.click();
+                }}
+              >
+                Choose Photos from Device
+              </Button>
             </div>
 
             {formData.imageUrls && formData.imageUrls.length > 0 && (
@@ -1704,10 +1779,19 @@ function ListingFormModal({
                 {formData.imageUrls.map((url, i) => (
                   <div key={i} className="relative w-20 h-20 rounded-xl overflow-hidden bg-zinc-900 border border-zinc-800 group shadow-md">
                     <img src={url} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                    {i === 0 && (
+                      <span className="absolute top-1 left-1 bg-gold-500 text-black text-[9px] font-extrabold px-1.5 py-0.5 rounded shadow">
+                        COVER
+                      </span>
+                    )}
                     <button
                       type="button"
-                      onClick={() => setFormData(prev => ({ ...prev, imageUrls: prev.imageUrls?.filter((_, idx) => idx !== i) }))}
-                      className="absolute inset-0 bg-black/70 flex items-center justify-center text-rose-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setFormData(prev => ({ ...prev, imageUrls: prev.imageUrls?.filter((_, idx) => idx !== i) }));
+                      }}
+                      className="absolute inset-0 bg-black/75 flex items-center justify-center text-rose-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                      title="Delete Photo"
                     >
                       <Trash2 size={18} />
                     </button>

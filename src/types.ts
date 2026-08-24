@@ -70,6 +70,12 @@ export interface UserSettings {
   currency?: string;
   language?: string;
   account_expiry_date?: string; // ISO date string
+  subscriptionPlan?: 'trial' | 'monthly' | 'yearly' | 'lifetime' | 'admin_comp' | 'free_grace';
+  subscribedAt?: string;
+  subscriptionGrantedBy?: string;
+  email?: string;
+  displayName?: string;
+  role?: 'admin' | 'user';
   themeColor?: string; // Hex color string
   textColor?: string; 
   backgroundColor?: string;
@@ -79,6 +85,37 @@ export interface UserSettings {
   deleteColor?: string;
   secondaryColor?: string;
   useDefaultData?: boolean;
+}
+
+export interface AppUserAccount {
+  uid: string;
+  email: string;
+  displayName?: string;
+  photoURL?: string;
+  aviaryName?: string;
+  role?: 'admin' | 'user';
+  account_expiry_date?: string;
+  subscriptionPlan?: string;
+  subscriptionGrantedBy?: string;
+  createdAt?: string;
+  lastLoginAt?: string;
+  updatedAt?: string;
+  notes?: string;
+  isBanned?: boolean;
+}
+
+export interface DataMigrationOptions {
+  includeBirds: boolean;
+  includeCages: boolean;
+  includePairs: boolean;
+  includeBreedingRecords: boolean;
+  includeTransactions: boolean;
+  includeTasks: boolean;
+  includeContacts: boolean;
+  includeCustomSpeciesAndMutations: boolean;
+  includeSellerProfile: boolean;
+  remapPedigrees: boolean;
+  actionType: 'copy' | 'transfer'; // 'copy' duplicates, 'transfer' reassigns / migrates
 }
 
 export interface SharedItem {

@@ -932,6 +932,20 @@ export default function App() {
       if (!isCompleted) {
         setWalkthroughStep(1);
       }
+
+      // Sync user profile to users collection for admin directory
+      const userDocRef = doc(db, 'users', user.uid);
+      const userProfileData = {
+        uid: user.uid,
+        email: user.email || '',
+        displayName: user.displayName || user.email?.split('@')[0] || 'Breeder',
+        photoURL: user.photoURL || '',
+        lastLoginAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+      setDoc(userDocRef, userProfileData, { merge: true }).catch(err => {
+        console.warn("Could not sync user profile:", err);
+      });
     }
   }, [user, loading]);
 

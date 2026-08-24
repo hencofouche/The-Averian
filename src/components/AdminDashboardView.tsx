@@ -3,7 +3,7 @@ import {
   Shield, CheckCircle2, XCircle, Clock, AlertTriangle, UserCheck, 
   ShoppingBag, Star, Activity, DollarSign, Database, Server, 
   MapPin, Phone, MessageCircle, Mail, Award, Trash2, Edit3, 
-  Check, X, RefreshCw, BarChart3, Users, Zap, Search, Eye, Sliders
+  Check, X, RefreshCw, BarChart3, Users, Zap, Search, Eye, Sliders, ChevronRight
 } from 'lucide-react';
 import { 
   SellerProfile, MarketplaceListing, MarketplaceReview, 
@@ -18,6 +18,7 @@ import { db } from '../firebase';
 import { format } from 'date-fns';
 import { AdminDiagnosticsView } from './AdminDiagnosticsView';
 import { AdminComingSoonManager } from './AdminComingSoonManager';
+import { AdminUserManagementPanel } from './AdminUserManagementPanel';
 
 interface AdminDashboardViewProps {
   user: any;
@@ -60,7 +61,7 @@ export function AdminDashboardView({
   onUpdateComingSoonPageConfig,
   onNavigateToTab
 }: AdminDashboardViewProps) {
-  const [activeTab, setActiveTab] = useState<'overview' | 'sellers' | 'listings' | 'reviews' | 'comingSoon' | 'diagnostics'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'sellers' | 'listings' | 'reviews' | 'comingSoon' | 'diagnostics'>('overview');
   
   // Rejection reason modal
   const [rejectModalData, setRejectModalData] = useState<{
@@ -222,20 +223,33 @@ export function AdminDashboardView({
         <button
           onClick={() => setActiveTab('overview')}
           className={cn(
-            "flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-black uppercase tracking-wider transition-all",
+            "flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-black uppercase tracking-wider transition-all whitespace-nowrap",
             activeTab === 'overview'
               ? "bg-gold-500 text-black shadow-lg shadow-gold-500/20"
               : "bg-zinc-900/60 text-zinc-400 hover:text-white border border-zinc-800"
           )}
         >
           <BarChart3 size={15} />
-          <span>Dashboard Overview</span>
+          <span>Overview</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('users')}
+          className={cn(
+            "flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-black uppercase tracking-wider transition-all whitespace-nowrap",
+            activeTab === 'users'
+              ? "bg-gold-500 text-black shadow-lg shadow-gold-500/20"
+              : "bg-zinc-900/60 text-zinc-400 hover:text-white border border-zinc-800"
+          )}
+        >
+          <Users size={15} />
+          <span>User Accounts & Subscriptions</span>
         </button>
 
         <button
           onClick={() => setActiveTab('sellers')}
           className={cn(
-            "flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-black uppercase tracking-wider transition-all",
+            "flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-black uppercase tracking-wider transition-all whitespace-nowrap",
             activeTab === 'sellers'
               ? "bg-gold-500 text-black shadow-lg shadow-gold-500/20"
               : "bg-zinc-900/60 text-zinc-400 hover:text-white border border-zinc-800"
@@ -323,14 +337,17 @@ export function AdminDashboardView({
         <div className="space-y-6">
           {/* Top Key Metrics */}
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-            <Card className="p-4 bg-zinc-950 border-zinc-800 space-y-2">
+            <Card 
+              onClick={() => setActiveTab('users')}
+              className="p-4 bg-zinc-950 border-zinc-800 space-y-2 cursor-pointer hover:border-gold-500/50 transition-all group"
+            >
               <div className="flex items-center justify-between text-zinc-400">
-                <span className="text-[10px] font-black uppercase tracking-wider">Registered Breeders</span>
+                <span className="text-[10px] font-black uppercase tracking-wider group-hover:text-gold-400 transition-colors">User Management</span>
                 <Users size={16} className="text-gold-400" />
               </div>
-              <p className="text-2xl font-black text-white">{sellerProfiles.length}</p>
-              <p className="text-[10px] text-emerald-400 font-bold">
-                {sellerProfiles.filter(s => s.status === 'approved').length} Verified by Admin
+              <p className="text-2xl font-black text-white">All App Accounts</p>
+              <p className="text-[10px] text-gold-400 font-bold flex items-center gap-1">
+                Manage Yearly Subs & Data Migration <ChevronRight size={12} />
               </p>
             </Card>
 
@@ -528,6 +545,18 @@ export function AdminDashboardView({
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {/* USERS & SUBSCRIPTION MANAGEMENT TAB */}
+      {activeTab === 'users' && (
+        <div className="space-y-4">
+          <AdminUserManagementPanel
+            currentUser={user}
+            onRefreshParentData={() => {
+              // Trigger any global refresh if necessary
+            }}
+          />
         </div>
       )}
 
