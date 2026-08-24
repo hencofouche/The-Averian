@@ -17,6 +17,7 @@ import { collection, doc, addDoc, updateDoc, deleteDoc, writeBatch } from 'fireb
 import { db, auth } from '../firebase';
 import { format } from 'date-fns';
 import { compressAndUploadImage } from '../lib/image-utils';
+import { defaultSpecies, defaultMutations } from '../lib/default-data';
 
 interface MarketplaceViewProps {
   user: any;
@@ -302,7 +303,7 @@ export function MarketplaceView({
           <div className="relative flex-1">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400" size={18} />
             <Input
-              placeholder="Search by species, mutation, ring number, town, aviary..."
+              placeholder="Search by species, mutation, town, aviary..."
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               className="pl-11 pr-10 py-3 text-sm bg-zinc-950 border-zinc-800 focus:border-gold-500 rounded-2xl w-full"
@@ -740,7 +741,13 @@ function ListingCard({
 
             {listing.bandingStatus && (
               <span className="text-xs font-medium px-2 py-0.5 rounded-md bg-zinc-900 border border-zinc-800 text-zinc-300">
-                {listing.bandingStatus} {listing.ringNumber ? `(#${listing.ringNumber})` : ''}
+                {listing.bandingStatus}
+              </span>
+            )}
+
+            {listing.allowOffers && (
+              <span className="text-xs font-medium px-2 py-0.5 rounded-md bg-gold-500/10 border border-gold-500/30 text-gold-400 flex items-center gap-1">
+                <Tag size={11} /> Offers Welcome
               </span>
             )}
 
@@ -1063,7 +1070,6 @@ function ListingFormModal({
     sex: 'Male',
     sexingMethod: 'DNA Sexed',
     bandingStatus: 'Closed Ring / Ringed',
-    ringNumber: '',
     ageYear: '2024 Hatch',
     vetChecked: false,
     price: 0,
@@ -1072,14 +1078,82 @@ function ListingFormModal({
     locationTown: sellerProfile?.town || '',
     provinceState: sellerProfile?.provinceState || '',
     deliveryOption: 'Collection or Courier',
-    imageUrls: []
+    imageUrls: [],
+    allowOffers: true
   });
 
-  const [quickSelectSource, setQuickSelectSource] = useState<'none' | 'bird' | 'pair'>('none');
   const [selectedBirdId, setSelectedBirdId] = useState('');
   const [selectedPairId, setSelectedPairId] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+
+  // Species, Sub-Species & Mutations management
+  const [isCustomSpecies, setIsCustomSpecies] = useState(false);
+  const [isCustomSubSpecies, setIsCustomSubSpecies] = useState(false);
+  const [mutationSearch, setMutationSearch] = useState('');
+  const [customMutationInput, setCustomMutationInput] = useState('');
+
+  const allSpeciesList = useMemo(() => {
+    const custom = (userSettings?.species || []).map(s => ({
+      id: s.id,
+      name: s.name,
+      subspecies: (userSettings?.subspecies || []).filter(sub => sub.speciesId === s.id).map(sub => ({ id: sub.id, name: sub.name }))
+    }));
+    const defaultList = defaultSpecies.map(ds => ({
+      id: ds.id,
+      name: ds.name,
+      subspecies: ds.subspecies || []
+    }));
+    const map = new Map<string, { id: string; name: string; subspecies: { id: string; name: string }[] }>();
+    defaultList.forEach(s => map.set(s.name.toLowerCase(), s));
+    custom.forEach(s => map.set(s.name.toLowerCase(), s));
+    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [userSettings]);
+
+  const currentSpeciesObj = useMemo(() => {
+    if (!formData.species) return null;
+    return allSpeciesList.find(s => s.name.toLowerCase() === formData.species?.toLowerCase()) || null;
+  }, [allSpeciesList, formData.species]);
+
+  const availableSubspecies = useMemo(() => {
+    return currentSpeciesObj?.subspecies || [];
+  }, [currentSpeciesObj]);
+
+  const allMutationsList = useMemo(() => {
+    const custom = (userSettings?.mutations || []).map(m => m.name);
+    const defaults = defaultMutations.map(m => m.name);
+    const set = new Set([...defaults, ...custom]);
+    return Array.from(set).sort();
+  }, [userSettings]);
+
+  const filteredMutations = useMemo(() => {
+    if (!mutationSearch.trim()) return allMutationsList;
+    const q = mutationSearch.toLowerCase();
+    return allMutationsList.filter(m => m.toLowerCase().includes(q));
+  }, [allMutationsList, mutationSearch]);
+
+  const toggleMutation = (mName: string) => {
+    setFormData(prev => {
+      const current = prev.mutations || [];
+      if (current.includes(mName)) {
+        return { ...prev, mutations: current.filter(m => m !== mName) };
+      } else {
+        return { ...prev, mutations: [...current, mName] };
+      }
+    });
+  };
+
+  const addCustomMutation = () => {
+    if (!customMutationInput.trim()) return;
+    const trimmed = customMutationInput.trim();
+    if (!formData.mutations?.includes(trimmed)) {
+      setFormData(prev => ({
+        ...prev,
+        mutations: [...(prev.mutations || []), trimmed]
+      }));
+    }
+    setCustomMutationInput('');
+  };
 
   // Quick Select Bird Handler
   const handleSelectBird = (birdId: string) => {
@@ -1097,11 +1171,11 @@ function ListingFormModal({
         sex: b.sex === 'Male' ? 'Male' : b.sex === 'Female' ? 'Female' : 'Unsexed',
         sexingMethod: b.sexingMethod || 'DNA Sexed',
         bandingStatus: b.bandingStatus || 'Closed Ring / Ringed',
-        ringNumber: b.ringNumber || b.name,
         ageYear: b.ageYear || (b.birthDate ? format(new Date(b.birthDate), 'yyyy Hatch') : '1 Year'),
         vetChecked: b.vetChecked || false,
         price: b.estimatedValue || b.purchasePrice || 0,
-        imageUrls: b.imageUrls || (b.imageUrl ? [b.imageUrl] : [])
+        imageUrls: b.imageUrls || (b.imageUrl ? [b.imageUrl] : []),
+        allowOffers: true
       }));
     }
   };
@@ -1124,7 +1198,8 @@ function ListingFormModal({
         bandingStatus: 'Closed Ring / Ringed',
         ageYear: 'Breeding Age',
         price: (male?.estimatedValue || 0) + (female?.estimatedValue || 0),
-        imageUrls: p.imageUrls || (male?.imageUrl ? [male.imageUrl] : [])
+        imageUrls: p.imageUrls || (male?.imageUrl ? [male.imageUrl] : []),
+        allowOffers: true
       }));
     }
   };
@@ -1136,18 +1211,19 @@ function ListingFormModal({
     try {
       const urls: string[] = [];
       for (const file of files) {
-        const url = await compressAndUploadImage(file, `marketplace/${user.uid}`);
+        const url = await compressAndUploadImage(file, `marketplace/${user?.uid || 'general'}`);
         urls.push(url);
       }
       setFormData(prev => ({
         ...prev,
         imageUrls: [...(prev.imageUrls || []), ...urls]
       }));
-      toast.success('Images uploaded');
+      toast.success(`${urls.length} photo(s) uploaded successfully`);
     } catch (err: any) {
       toast.error('Image upload failed: ' + err.message);
     } finally {
       setIsUploading(false);
+      if (e.target) e.target.value = '';
     }
   };
 
@@ -1173,6 +1249,7 @@ function ListingFormModal({
         sellerPhone: sellerProfile?.phone || '',
         sellerWhatsApp: sellerProfile?.whatsapp || '',
         sellerEmail: sellerProfile?.email || user.email || '',
+        allowOffers: formData.allowOffers !== false,
         status: 'active',
         updatedAt: new Date().toISOString()
       };
@@ -1248,6 +1325,7 @@ function ListingFormModal({
         )}
 
         <form onSubmit={handleSubmit} className="space-y-5 max-h-[62vh] overflow-y-auto pr-2">
+          {/* Title & Category */}
           <div className="grid grid-cols-1 sm:grid-cols-12 gap-4">
             <div className="sm:col-span-8 space-y-1.5">
               <label className="text-xs font-medium text-zinc-400">Listing Title *</label>
@@ -1255,7 +1333,7 @@ function ListingFormModal({
                 required
                 value={formData.title}
                 onChange={e => setFormData({ ...formData, title: e.target.value })}
-                placeholder="e.g. 2024 Closed Ring Green Cheek Conure (DNA Male)"
+                placeholder={type === 'wanted' ? "e.g. Wanted: Pair of Red-Fronted Conures" : "e.g. 2024 Closed Ring Green Cheek Conure (DNA Male)"}
                 className="bg-zinc-900 border-zinc-800 text-sm"
               />
             </div>
@@ -1275,17 +1353,176 @@ function ListingFormModal({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          {/* Species & Sub-Species Selection */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-3.5 bg-zinc-900/40 rounded-2xl border border-zinc-800/80">
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-zinc-400">Species</label>
-              <Input
-                value={formData.species}
-                onChange={e => setFormData({ ...formData, species: e.target.value })}
-                placeholder="e.g. African Grey"
-                className="bg-zinc-900 border-zinc-800 text-sm"
-              />
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-medium text-zinc-300">Species</label>
+                <button
+                  type="button"
+                  onClick={() => setIsCustomSpecies(!isCustomSpecies)}
+                  className="text-[11px] text-gold-400 hover:underline"
+                >
+                  {isCustomSpecies ? 'Choose from list' : '+ Custom Species'}
+                </button>
+              </div>
+
+              {isCustomSpecies ? (
+                <Input
+                  value={formData.species || ''}
+                  onChange={e => setFormData({ ...formData, species: e.target.value, subSpecies: '' })}
+                  placeholder="Type custom species name..."
+                  className="bg-zinc-900 border-zinc-800 text-sm"
+                />
+              ) : (
+                <Select
+                  value={formData.species || ''}
+                  onChange={e => {
+                    setFormData({ ...formData, species: e.target.value, subSpecies: '' });
+                  }}
+                  className="bg-zinc-900 border-zinc-800 text-sm"
+                >
+                  <option value="">Select Species...</option>
+                  {allSpeciesList.map(s => (
+                    <option key={s.id || s.name} value={s.name}>{s.name}</option>
+                  ))}
+                </Select>
+              )}
             </div>
 
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-medium text-zinc-300">Sub-Species</label>
+                <button
+                  type="button"
+                  onClick={() => setIsCustomSubSpecies(!isCustomSubSpecies)}
+                  className="text-[11px] text-gold-400 hover:underline"
+                >
+                  {isCustomSubSpecies ? 'Choose from list' : '+ Custom Sub-species'}
+                </button>
+              </div>
+
+              {isCustomSubSpecies || availableSubspecies.length === 0 ? (
+                <Input
+                  value={formData.subSpecies || ''}
+                  onChange={e => setFormData({ ...formData, subSpecies: e.target.value })}
+                  placeholder={availableSubspecies.length === 0 ? "Type sub-species (optional)" : "Type custom sub-species..."}
+                  className="bg-zinc-900 border-zinc-800 text-sm"
+                />
+              ) : (
+                <Select
+                  value={formData.subSpecies || ''}
+                  onChange={e => setFormData({ ...formData, subSpecies: e.target.value })}
+                  className="bg-zinc-900 border-zinc-800 text-sm"
+                >
+                  <option value="">Select Sub-Species (Optional)...</option>
+                  {availableSubspecies.map(sub => (
+                    <option key={sub.id || sub.name} value={sub.name}>{sub.name}</option>
+                  ))}
+                </Select>
+              )}
+            </div>
+          </div>
+
+          {/* Mutations Selection */}
+          <div className="space-y-2 p-3.5 bg-zinc-900/40 rounded-2xl border border-zinc-800/80">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-medium text-zinc-300">
+                Mutations & Color Variations ({formData.mutations?.length || 0} selected)
+              </label>
+              {formData.mutations && formData.mutations.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setFormData({ ...formData, mutations: [] })}
+                  className="text-[11px] text-rose-400 hover:underline"
+                >
+                  Clear All
+                </button>
+              )}
+            </div>
+
+            {/* Selected Mutations Chips */}
+            {formData.mutations && formData.mutations.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 pt-1">
+                {formData.mutations.map(m => (
+                  <span
+                    key={m}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-gold-500/20 text-gold-300 border border-gold-500/40"
+                  >
+                    {m}
+                    <button
+                      type="button"
+                      onClick={() => toggleMutation(m)}
+                      className="hover:text-white"
+                    >
+                      <X size={12} />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+
+            {/* Search & Select Mutations */}
+            <div className="flex gap-2 pt-1">
+              <div className="relative flex-1">
+                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
+                <Input
+                  value={mutationSearch}
+                  onChange={e => setMutationSearch(e.target.value)}
+                  placeholder="Search mutations (e.g. Opaline, Cinnamon, Turquoise)..."
+                  className="pl-8 bg-zinc-900 border-zinc-800 text-xs py-1.5"
+                />
+              </div>
+              <div className="flex gap-1.5">
+                <Input
+                  value={customMutationInput}
+                  onChange={e => setCustomMutationInput(e.target.value)}
+                  placeholder="Custom mutation..."
+                  className="bg-zinc-900 border-zinc-800 text-xs py-1.5 max-w-[140px]"
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      addCustomMutation();
+                    }
+                  }}
+                />
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={addCustomMutation}
+                  className="px-2.5 py-1 text-xs"
+                >
+                  Add
+                </Button>
+              </div>
+            </div>
+
+            {/* Scrollable Mutation Checkbox Chips */}
+            <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto p-2 bg-zinc-950/80 rounded-xl border border-zinc-800">
+              {filteredMutations.map(m => {
+                const isSelected = formData.mutations?.includes(m);
+                return (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => toggleMutation(m)}
+                    className={cn(
+                      "text-xs px-2.5 py-1 rounded-lg border transition-all flex items-center gap-1.5",
+                      isSelected
+                        ? "bg-gold-500 text-black font-semibold border-gold-500 shadow-sm"
+                        : "bg-zinc-900/90 text-zinc-300 border-zinc-800 hover:border-zinc-700"
+                    )}
+                  >
+                    {isSelected && <Check size={12} />}
+                    {m}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Sex, Sexing, Age */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-zinc-400">Sex</label>
               <Select
@@ -1326,7 +1563,8 @@ function ListingFormModal({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+          {/* Banding & Delivery */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-zinc-400">Banding Status</label>
               <Select
@@ -1339,16 +1577,6 @@ function ListingFormModal({
                 <option value="Split Ring">Split Ring</option>
                 <option value="Non-Banded">Non-Banded</option>
               </Select>
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-zinc-400">Ring Number</label>
-              <Input
-                value={formData.ringNumber}
-                onChange={e => setFormData({ ...formData, ringNumber: e.target.value })}
-                placeholder="e.g. ZA-24-987"
-                className="bg-zinc-900 border-zinc-800 text-sm"
-              />
             </div>
 
             <div className="space-y-1.5">
@@ -1366,6 +1594,7 @@ function ListingFormModal({
             </div>
           </div>
 
+          {/* Pricing & Location */}
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-zinc-400">
@@ -1411,9 +1640,27 @@ function ListingFormModal({
                   onChange={e => setFormData({ ...formData, vetChecked: e.target.checked })}
                   className="w-4 h-4 rounded border-zinc-700 bg-zinc-900 text-emerald-500 focus:ring-emerald-500/20"
                 />
-                <span className="text-sm font-medium text-zinc-200">Vet Checked / Health Certified</span>
+                <span className="text-sm font-medium text-zinc-200">Vet Checked</span>
               </label>
             </div>
+          </div>
+
+          {/* Allow Offers Toggle */}
+          <div className="p-4 bg-gold-500/10 border border-gold-500/30 rounded-2xl flex items-center justify-between">
+            <div className="space-y-0.5">
+              <label className="text-sm font-semibold text-gold-300 flex items-center gap-2 cursor-pointer">
+                <Tag size={16} /> Allow Buyers to Make an Offer
+              </label>
+              <p className="text-xs text-zinc-400">
+                Allows interested buyers to propose custom price offers when inquiring about this listing.
+              </p>
+            </div>
+            <input
+              type="checkbox"
+              checked={formData.allowOffers !== false}
+              onChange={e => setFormData({ ...formData, allowOffers: e.target.checked })}
+              className="w-5 h-5 rounded border-zinc-700 bg-zinc-900 text-gold-500 focus:ring-gold-500/20 cursor-pointer"
+            />
           </div>
 
           <div className="space-y-1.5">
@@ -1430,23 +1677,32 @@ function ListingFormModal({
           <div className="space-y-2">
             <label className="text-xs font-medium text-zinc-400">Photos</label>
             <div className="flex items-center gap-3">
-              <input type="file" multiple accept="image/*" onChange={handleImageUpload} className="hidden" id="marketplace-photo-upload" disabled={isUploading} />
+              <input 
+                type="file" 
+                multiple 
+                accept="image/*" 
+                onChange={handleImageUpload} 
+                className="hidden" 
+                id="marketplace-photo-upload" 
+                disabled={isUploading} 
+              />
               <label 
                 htmlFor="marketplace-photo-upload"
                 className={cn(
-                  "flex items-center gap-2 px-4 py-2 bg-zinc-900 border border-zinc-800 hover:border-gold-500 rounded-xl cursor-pointer text-sm font-semibold text-white transition-all",
+                  "flex items-center gap-2 px-4 py-2.5 bg-zinc-900 border border-zinc-800 hover:border-gold-500 rounded-xl cursor-pointer text-sm font-semibold text-white transition-all shadow-md",
                   isUploading && "opacity-50 cursor-not-allowed"
                 )}
               >
-                <ImageIcon size={16} />
-                {isUploading ? 'Uploading...' : 'Upload Photos'}
+                <ImageIcon size={16} className="text-gold-400" />
+                {isUploading ? 'Uploading & Compressing...' : 'Upload Photos'}
               </label>
+              <span className="text-xs text-zinc-500">Supports JPG, PNG, WEBP</span>
             </div>
 
             {formData.imageUrls && formData.imageUrls.length > 0 && (
-              <div className="flex flex-wrap gap-2 pt-2">
+              <div className="flex flex-wrap gap-2.5 pt-2">
                 {formData.imageUrls.map((url, i) => (
-                  <div key={i} className="relative w-20 h-20 rounded-xl overflow-hidden bg-zinc-900 border border-zinc-800 group">
+                  <div key={i} className="relative w-20 h-20 rounded-xl overflow-hidden bg-zinc-900 border border-zinc-800 group shadow-md">
                     <img src={url} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                     <button
                       type="button"
@@ -1465,7 +1721,7 @@ function ListingFormModal({
             <Button type="button" variant="secondary" onClick={onClose} className="text-sm font-semibold">
               Cancel
             </Button>
-            <Button type="submit" disabled={isSaving} className="text-sm font-semibold bg-gold-500 text-black hover:bg-gold-400">
+            <Button type="submit" disabled={isSaving || isUploading} className="text-sm font-semibold bg-gold-500 text-black hover:bg-gold-400">
               {isSaving ? 'Publishing...' : initialData ? 'Save Changes' : 'Publish Listing'}
             </Button>
           </div>
@@ -1492,16 +1748,90 @@ function ListingDetailModal({
   onLeaveReview: () => void;
 }) {
   const isForSale = listing.type === 'for_sale';
-  const whatsappUrl = listing.sellerWhatsApp 
-    ? `https://wa.me/${listing.sellerWhatsApp.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(`Hi, I am inquiring about your Averian listing: "${listing.title}"`)}`
+  const [showOfferDrawer, setShowOfferDrawer] = useState(false);
+  const [offerPrice, setOfferPrice] = useState<string>('');
+  const [offerNote, setOfferNote] = useState<string>('');
+
+  // Structured inquiry message text generator
+  const generateInquiryMessage = (offer?: { price: string; note: string }) => {
+    let msg = `🕊️ *AVERIAN CLASSIFIEDS ${isForSale ? 'FOR SALE' : 'WANTED'} INQUIRY*\n`;
+    msg += `==============================\n`;
+    msg += `*Listing:* ${listing.title}\n`;
+    msg += `*Category:* ${listing.category}\n`;
+    if (listing.species) msg += `*Species:* ${listing.species}\n`;
+    if (listing.subSpecies) msg += `*Sub-Species:* ${listing.subSpecies}\n`;
+    if (listing.mutations && listing.mutations.length > 0) msg += `*Mutations:* ${listing.mutations.join(', ')}\n`;
+    if (listing.sex) msg += `*Sex:* ${listing.sex}\n`;
+    if (listing.sexingMethod && listing.sexingMethod !== 'Unsexed') msg += `*Sexing:* ${listing.sexingMethod}\n`;
+    if (listing.bandingStatus) msg += `*Banding:* ${listing.bandingStatus}\n`;
+    if (listing.ageYear) msg += `*Age / Year:* ${listing.ageYear}\n`;
+    msg += `*${isForSale ? 'Asking Price' : 'Target Budget'}:* ${currencySymbol}${listing.price}${listing.priceMax ? ` - ${currencySymbol}${listing.priceMax}` : ''}\n`;
+    msg += `*Delivery:* ${listing.deliveryOption}\n`;
+    msg += `*Location:* ${listing.locationTown || listing.sellerTown}\n`;
+    if (listing.sellerAviary) msg += `*Aviary:* ${listing.sellerAviary}\n`;
+    if (listing.imageUrls && listing.imageUrls.length > 0) {
+      msg += `*Image:* ${listing.imageUrls[0]}\n`;
+    }
+    msg += `==============================\n`;
+
+    if (offer && offer.price) {
+      msg += `🏷️ *MY OFFER: ${currencySymbol}${offer.price}*\n`;
+      if (offer.note) {
+        msg += `💬 *Note:* ${offer.note}\n`;
+      }
+      msg += `\nHi ${listing.sellerAviary || listing.sellerName}, I would like to make this offer on your listing!`;
+    } else {
+      msg += `\nHi ${listing.sellerAviary || listing.sellerName}, I am inquiring about your listing on Averian!`;
+    }
+    return msg;
+  };
+
+  const directWhatsappUrl = listing.sellerWhatsApp 
+    ? `https://wa.me/${listing.sellerWhatsApp.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(generateInquiryMessage())}`
     : null;
+
+  const handleSendOfferWhatsApp = () => {
+    if (!offerPrice.trim()) {
+      toast.error('Please specify your offer amount!');
+      return;
+    }
+    if (!listing.sellerWhatsApp) {
+      toast.error('Seller did not provide a WhatsApp number.');
+      return;
+    }
+    const msg = generateInquiryMessage({ price: offerPrice, note: offerNote });
+    const url = `https://wa.me/${listing.sellerWhatsApp.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(msg)}`;
+    window.open(url, '_blank');
+    setShowOfferDrawer(false);
+  };
+
+  const handleShareListing = async () => {
+    const text = generateInquiryMessage();
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: `Averian: ${listing.title}`,
+          text: text,
+          url: window.location.href
+        });
+        toast.success('Listing shared!');
+      } catch {
+        // Fallback
+        await navigator.clipboard.writeText(text);
+        toast.success('Listing info copied to clipboard!');
+      }
+    } else {
+      await navigator.clipboard.writeText(text);
+      toast.success('Listing info copied to clipboard!');
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
       <div className="w-full max-w-xl bg-zinc-950 border border-zinc-800 rounded-3xl p-6 relative overflow-hidden shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto">
         <div className="flex items-start justify-between">
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <span className={cn(
                 "text-xs font-semibold px-2 py-0.5 rounded-md",
                 isForSale ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30" : "bg-amber-500/20 text-amber-400 border border-amber-500/30"
@@ -1511,15 +1841,29 @@ function ListingDetailModal({
               <span className="text-xs font-medium px-2 py-0.5 rounded-md bg-zinc-900 border border-zinc-800 text-zinc-300">
                 {listing.category}
               </span>
+              {listing.allowOffers && (
+                <span className="text-xs font-medium px-2 py-0.5 rounded-md bg-gold-500/10 border border-gold-500/30 text-gold-400 flex items-center gap-1">
+                  <Tag size={12} /> Offers Welcome
+                </span>
+              )}
             </div>
             <h2 className="text-xl font-bold text-white mt-2">{listing.title}</h2>
             {listing.species && (
               <p className="text-sm font-medium text-gold-400 mt-0.5">{listing.species} {listing.subSpecies ? `• ${listing.subSpecies}` : ''}</p>
             )}
           </div>
-          <button onClick={onClose} className="text-zinc-500 hover:text-white p-1">
-            <X size={24} />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleShareListing}
+              className="text-zinc-400 hover:text-white p-1.5 rounded-lg hover:bg-zinc-800 transition-colors"
+              title="Share Listing"
+            >
+              <Share2 size={18} />
+            </button>
+            <button onClick={onClose} className="text-zinc-500 hover:text-white p-1">
+              <X size={24} />
+            </button>
+          </div>
         </div>
 
         {/* Gallery Preview */}
@@ -1575,12 +1919,6 @@ function ListingDetailModal({
                 <p className="font-semibold text-white mt-0.5">{listing.bandingStatus}</p>
               </div>
             )}
-            {listing.ringNumber && (
-              <div>
-                <p className="text-xs text-zinc-500 font-medium">Ring #</p>
-                <p className="font-semibold text-white mt-0.5">{listing.ringNumber}</p>
-              </div>
-            )}
             {listing.ageYear && (
               <div>
                 <p className="text-xs text-zinc-500 font-medium">Age / Year</p>
@@ -1596,6 +1934,20 @@ function ListingDetailModal({
               </div>
             )}
           </div>
+
+          {/* Mutations list */}
+          {listing.mutations && listing.mutations.length > 0 && (
+            <div className="pt-2 border-t border-zinc-800/60">
+              <p className="text-xs text-zinc-400 font-medium mb-1.5">Mutations & Color Variations:</p>
+              <div className="flex flex-wrap gap-1.5">
+                {listing.mutations.map(m => (
+                  <span key={m} className="px-2.5 py-0.5 rounded-md text-xs font-semibold bg-gold-500/10 text-gold-300 border border-gold-500/30">
+                    {m}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Description */}
@@ -1605,6 +1957,62 @@ function ListingDetailModal({
             <p className="text-sm text-zinc-300 whitespace-pre-wrap leading-relaxed bg-zinc-900/30 p-4 rounded-2xl border border-zinc-800">
               {listing.description}
             </p>
+          </div>
+        )}
+
+        {/* Make an Offer Section */}
+        {listing.allowOffers && (
+          <div className="p-4 bg-gold-500/10 border border-gold-500/30 rounded-2xl space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Tag size={18} className="text-gold-400" />
+                <h4 className="text-sm font-bold text-white">Make an Offer</h4>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowOfferDrawer(!showOfferDrawer)}
+                className="text-xs font-semibold text-gold-400 hover:underline"
+              >
+                {showOfferDrawer ? 'Hide Offer Form' : 'Open Offer Form'}
+              </button>
+            </div>
+
+            {showOfferDrawer ? (
+              <div className="space-y-3 pt-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-zinc-300">Your Offer Amount ({currencySymbol}) *</label>
+                    <Input
+                      type="number"
+                      value={offerPrice}
+                      onChange={e => setOfferPrice(e.target.value)}
+                      placeholder="e.g. 500"
+                      className="bg-zinc-900 border-zinc-800 text-sm font-bold text-gold-400"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-zinc-300">Message / Delivery terms (Optional)</label>
+                    <Input
+                      value={offerNote}
+                      onChange={e => setOfferNote(e.target.value)}
+                      placeholder="e.g. Can collect this weekend"
+                      className="bg-zinc-900 border-zinc-800 text-sm"
+                    />
+                  </div>
+                </div>
+                <Button
+                  type="button"
+                  onClick={handleSendOfferWhatsApp}
+                  className="w-full py-2.5 bg-gold-500 text-black hover:bg-gold-400 font-bold text-sm rounded-xl shadow-lg"
+                >
+                  <MessageCircle size={16} /> Send Offer to Breeder via WhatsApp
+                </Button>
+              </div>
+            ) : (
+              <p className="text-xs text-zinc-400">
+                The seller is open to price negotiations. Propose your offer to start a direct WhatsApp inquiry!
+              </p>
+            )}
           </div>
         )}
 
@@ -1632,9 +2040,9 @@ function ListingDetailModal({
 
           {/* Contact Direct Actions */}
           <div className="flex flex-col sm:flex-row gap-2 pt-3 border-t border-zinc-800">
-            {whatsappUrl && (
+            {directWhatsappUrl && (
               <a
-                href={whatsappUrl}
+                href={directWhatsappUrl}
                 target="_blank"
                 rel="noreferrer"
                 className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-black font-semibold text-sm rounded-xl transition-all shadow-lg shadow-emerald-600/20"

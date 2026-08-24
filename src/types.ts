@@ -187,6 +187,7 @@ export interface MarketplaceListing {
   sellerWhatsApp?: string;
   sellerEmail?: string;
   imageUrls?: string[];
+  allowOffers?: boolean;
   birdId?: string; // If linked from inventory
   pairId?: string; // If linked from inventory
   status: 'pending_approval' | 'active' | 'sold' | 'rejected' | 'archived';
