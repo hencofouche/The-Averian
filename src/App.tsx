@@ -4474,7 +4474,7 @@ function CageCard({ cage, birds, cages, viewMode = 'grid-large', onBirdRef, onNa
 
         <div className={cn(
           "text-[10px] sm:text-[11px]", 
-          effectiveViewMode === 'list' ? "flex flex-wrap items-center gap-6 pt-2 border-t border-black-800/50" : "grid grid-cols-2 gap-3 sm:gap-4 border-t border-black-800 pt-3 sm:pt-4"
+          effectiveViewMode === 'list' ? "flex items-center gap-6 pt-2 border-t border-black-800/50" : "grid grid-cols-2 gap-3 sm:gap-4 border-t border-black-800 pt-3 sm:pt-4"
         )}>
           <div className={cn(effectiveViewMode === 'list' ? "flex items-center gap-2" : "space-y-1")}>
             <p className="text-white uppercase tracking-widest font-black text-[9px]">Birds{effectiveViewMode === 'list' ? ':' : ''}</p>
@@ -4484,14 +4484,6 @@ function CageCard({ cage, birds, cages, viewMode = 'grid-large', onBirdRef, onNa
             <p className="text-white uppercase tracking-widest font-black text-[9px]">Type{effectiveViewMode === 'list' ? ':' : ''}</p>
             <p className="text-white font-bold">{cage.type || 'Standard'}</p>
           </div>
-          {cage.width && cage.height && cage.depth && (
-            <div className={cn(effectiveViewMode === 'list' ? "flex items-center gap-2" : "space-y-1", "col-span-2 border-t border-zinc-900 pt-2")}>
-              <p className="text-white uppercase tracking-widest font-black text-[9px]">Dimensions{effectiveViewMode === 'list' ? ':' : ''}</p>
-              <p className="text-zinc-300 font-medium">
-                {cage.width}w x {cage.height}h x {cage.depth}d ({cage.dimensionUnit || 'cm'})
-              </p>
-            </div>
-          )}
         </div>
 
         {/* Residents List */}
@@ -9611,31 +9603,6 @@ function CageForm({ user, initialData, cages, onClose, userSettings }: { user: F
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1"><label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">{t('Location')}</label><Input value={formData.location} onChange={e => setFormData({ ...formData, location: e.target.value })} /></div>
         <div className="space-y-1"><label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">{t('Type')}</label><Select value={formData.type} onChange={e => setFormData({ ...formData, type: e.target.value })}><option value="Standard" className="bg-black text-white">{t('Standard')}</option><option value="Breeding" className="bg-black text-white">{t('Breeding')}</option><option value="Flight" className="bg-black text-white">{t('Flight')}</option><option value="Hospital" className="bg-black text-white">{t('Hospital')}</option></Select></div>
-      </div>
-
-      <div className="space-y-2 border border-zinc-800 p-3 rounded-2xl bg-black/10">
-        <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">{t('Cage Dimensions')}</label>
-        <div className="grid grid-cols-4 gap-2">
-          <div className="space-y-1">
-            <label className="text-[9px] text-zinc-400 font-bold uppercase tracking-wide">{t('Width')}</label>
-            <Input type="number" placeholder="W" value={formData.width || ''} onChange={e => setFormData({ ...formData, width: parseFloat(e.target.value) || undefined })} />
-          </div>
-          <div className="space-y-1">
-            <label className="text-[9px] text-zinc-400 font-bold uppercase tracking-wide">{t('Height')}</label>
-            <Input type="number" placeholder="H" value={formData.height || ''} onChange={e => setFormData({ ...formData, height: parseFloat(e.target.value) || undefined })} />
-          </div>
-          <div className="space-y-1">
-            <label className="text-[9px] text-zinc-400 font-bold uppercase tracking-wide">{t('Depth')}</label>
-            <Input type="number" placeholder="D" value={formData.depth || ''} onChange={e => setFormData({ ...formData, depth: parseFloat(e.target.value) || undefined })} />
-          </div>
-          <div className="space-y-1">
-            <label className="text-[9px] text-zinc-400 font-bold uppercase tracking-wide">{t('Unit')}</label>
-            <Select value={formData.dimensionUnit || 'cm'} onChange={e => setFormData({ ...formData, dimensionUnit: e.target.value as 'cm' | 'inches' })}>
-              <option value="cm" className="bg-black text-white">cm</option>
-              <option value="inches" className="bg-black text-white">inches</option>
-            </Select>
-          </div>
-        </div>
       </div>
       </fieldset>
       <Button type="submit" className="w-full py-4 text-sm uppercase tracking-widest font-black" disabled={isUploading || isSaving || isExpired}>
