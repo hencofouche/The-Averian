@@ -37,6 +37,9 @@ import { motion, AnimatePresence } from 'motion/react';
 import { generateBirdListPDF, generateCageListPDF, generatePairListPDF, generateCertificatePDF, generateQRListPDF } from './lib/pdf-engine';
 import { defaultSpecies, defaultMutations } from './lib/default-data';
 import { getTranslatedLabel, LANGUAGE_NAMES, setActiveLanguage, t as tGlobal } from './lib/translations';
+import { InstallAppButton } from './components/InstallAppButton';
+import { InstallPromptBanner } from './components/InstallPromptBanner';
+import { BannedUserScreen } from './components/BannedUserScreen';
 
 function ImageGallery({ imageUrls, initialIndex, onClose }: { imageUrls: string[], initialIndex: number, onClose: () => void }) {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
@@ -933,19 +936,25 @@ export default function App() {
         setWalkthroughStep(1);
       }
 
-      // Sync user profile to users collection for admin directory
-      const userDocRef = doc(db, 'users', user.uid);
-      const userProfileData = {
-        uid: user.uid,
-        email: user.email || '',
-        displayName: user.displayName || user.email?.split('@')[0] || 'Breeder',
-        photoURL: user.photoURL || '',
-        lastLoginAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      };
-      setDoc(userDocRef, userProfileData, { merge: true }).catch(err => {
-        console.warn("Could not sync user profile:", err);
-      });
+      // Throttle user profile sync to at most once per 12 hours per client to conserve Firestore write tier
+      const syncKey = `averian_user_synced_${user.uid}`;
+      const lastSync = localStorage.getItem(syncKey);
+      const now = Date.now();
+      if (!lastSync || (now - parseInt(lastSync, 10)) > 12 * 60 * 60 * 1000) {
+        localStorage.setItem(syncKey, now.toString());
+        const userDocRef = doc(db, 'users', user.uid);
+        const userProfileData = {
+          uid: user.uid,
+          email: user.email || '',
+          displayName: user.displayName || user.email?.split('@')[0] || 'Breeder',
+          photoURL: user.photoURL || '',
+          lastLoginAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        };
+        setDoc(userDocRef, userProfileData, { merge: true }).catch(err => {
+          console.warn("Could not sync user profile:", err);
+        });
+      }
     }
   }, [user, loading]);
 
@@ -1719,6 +1728,17 @@ export default function App() {
     );
   }
 
+  // Account Suspension / Ban Guard
+  if (!isAdmin && (userSettings?.isBanned === true || (user as any)?.isBanned === true)) {
+    return (
+      <BannedUserScreen
+        user={user}
+        userSettings={userSettings}
+        onLogout={logout}
+      />
+    );
+  }
+
   if (sharedItemView) {
     const data = JSON.parse(sharedItemView.data);
     const isTransfer = sharedItemView.action === 'transfer';
@@ -2272,6 +2292,9 @@ export default function App() {
               </div>
               
               <div className="space-y-1 mt-2 pt-2 border-t border-white/5 flex flex-col shrink-0">
+                <div className="px-1 mb-2">
+                  <InstallAppButton variant="sidebar" />
+                </div>
                 <button 
                   onClick={() => setIsExtrasMenuOpen(true)}
                   className="w-full flex items-center justify-between p-2 rounded-xl text-zinc-400 hover:text-white hover:bg-white/5 transition-all group"
@@ -2486,7 +2509,8 @@ export default function App() {
             )}
             
             {activeTab !== 'settings' && activeTab !== 'genetics' && activeTab !== 'stats' && activeTab !== 'print' && activeTab !== 'admin' && activeTab !== 'marketplace' && activeTab !== 'wiki' && !showComingSoonSplash && (
-              <div className="hidden xl:flex gap-2">
+              <div className="hidden xl:flex gap-2 items-center">
+                <InstallAppButton variant="header" />
                 <Button onClick={() => setIsScanModalOpen(true)} className="py-3 px-4 text-sm font-bold uppercase tracking-widest bg-zinc-800 text-secondary border border-secondary/20 hover:bg-zinc-700">
                   <Scan size={18} />
                   <span className="ml-2">Scan</span>
@@ -2510,6 +2534,8 @@ export default function App() {
             )}
           </div>
         </header>
+
+        <InstallPromptBanner />
 
         {(!isOnline || isForcedOffline) && (
           <div className="bg-amber-500/10 border-b border-amber-500/20 px-4 py-2.5 flex items-center justify-between gap-3 text-xs text-amber-200 backdrop-blur-md">
@@ -3078,6 +3104,8 @@ export default function App() {
                     user={user}
                     isAdmin={isAdmin}
                     userSettings={effectiveSettings}
+                    wikiSpecies={wikiSpecies}
+                    wikiMutations={wikiMutations}
                   />
                 )}
 
@@ -7453,7 +7481,12 @@ function SettingsView({ settings, onUpdate, allData, user, isSyncing, setDeleteC
                   />
                 </div>
 
-                <div className="pt-4 border-t border-black-800">
+                <div className="pt-4 border-t border-black-800 space-y-4">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-black-100 uppercase tracking-widest ml-1">Device & App Installation</label>
+                    <InstallAppButton variant="settings" showAlwaysInSettings />
+                  </div>
+
                   <div className="space-y-2">
                     <label className="text-[10px] font-black text-black-100 uppercase tracking-widest ml-1">Data Settings</label>
                     <label className="flex items-center gap-2 px-3 py-3 bg-black border border-black-700 rounded-lg cursor-pointer hover:bg-zinc-800 transition-colors">

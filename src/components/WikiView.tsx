@@ -52,6 +52,8 @@ interface WikiViewProps {
   user: any;
   isAdmin: boolean;
   userSettings?: any;
+  wikiSpecies?: any[];
+  wikiMutations?: any[];
 }
 
 // Inlined helper to handle Firestore errors in conformance with the firebase-integration skill
@@ -66,7 +68,7 @@ function handleFirestoreErrorInfo(error: unknown, opType: string, path: string) 
   }
 }
 
-export function WikiView({ user, isAdmin, userSettings }: WikiViewProps) {
+export function WikiView({ user, isAdmin, userSettings, wikiSpecies, wikiMutations }: WikiViewProps) {
   const [wikiSpeciesList, setWikiSpeciesList] = useState<WikiSpecies[]>([]);
   const [wikiMutationsList, setWikiMutationsList] = useState<WikiMutation[]>([]);
   const [activeTab, setActiveTab] = useState<'species' | 'mutations'>('species');
@@ -142,8 +144,41 @@ export function WikiView({ user, isAdmin, userSettings }: WikiViewProps) {
     }
   };
 
-  // Real-time listener for dynamic Species Wiki
+  // Sync from props if provided (avoids duplicate Firestore read costs)
   useEffect(() => {
+    if (wikiSpecies) {
+      const items: WikiSpecies[] = wikiSpecies.map(ws => ({
+        id: ws.id,
+        name: ws.name || '',
+        subspecies: Array.isArray(ws.subspecies) ? ws.subspecies : [],
+        wikipediaUrl: ws.wikipediaUrl,
+        createdAt: ws.createdAt,
+        updatedAt: ws.updatedAt
+      }));
+      setWikiSpeciesList(items.sort((a, b) => a.name.localeCompare(b.name)));
+      setIsLoading(false);
+    }
+  }, [wikiSpecies]);
+
+  useEffect(() => {
+    if (wikiMutations) {
+      const items: WikiMutation[] = wikiMutations.map(wm => ({
+        id: wm.id,
+        name: wm.name || '',
+        inheritance: wm.inheritance || 'autosomal_recessive',
+        description: wm.description,
+        speciesId: wm.speciesId,
+        referenceImages: wm.referenceImages || [],
+        createdAt: wm.createdAt,
+        updatedAt: wm.updatedAt
+      }));
+      setWikiMutationsList(items.sort((a, b) => a.name.localeCompare(b.name)));
+    }
+  }, [wikiMutations]);
+
+  // Fallback real-time listeners only if props not supplied
+  useEffect(() => {
+    if (wikiSpecies) return; // Skip if parent already manages it
     const unsub = onSnapshot(collection(db, 'wikiSpecies'), (snapshot) => {
       const items: WikiSpecies[] = [];
       snapshot.forEach((doc) => {
@@ -152,6 +187,7 @@ export function WikiView({ user, isAdmin, userSettings }: WikiViewProps) {
           id: doc.id, 
           name: data.name || '',
           subspecies: Array.isArray(data.subspecies) ? data.subspecies : [],
+          wikipediaUrl: data.wikipediaUrl,
           createdAt: data.createdAt,
           updatedAt: data.updatedAt
         });
@@ -162,10 +198,10 @@ export function WikiView({ user, isAdmin, userSettings }: WikiViewProps) {
       handleFirestoreErrorInfo(err, 'get', 'wikiSpecies');
     });
     return unsub;
-  }, []);
+  }, [wikiSpecies]);
 
-  // Real-time listener for dynamic Mutations Wiki
   useEffect(() => {
+    if (wikiMutations) return; // Skip if parent already manages it
     const unsub = onSnapshot(collection(db, 'wikiMutations'), (snapshot) => {
       const items: WikiMutation[] = [];
       snapshot.forEach((doc) => {
@@ -176,7 +212,7 @@ export function WikiView({ user, isAdmin, userSettings }: WikiViewProps) {
       handleFirestoreErrorInfo(err, 'get', 'wikiMutations');
     });
     return unsub;
-  }, []);
+  }, [wikiMutations]);
 
   // Open Species Add/Edit Form
   const handleOpenSpeciesForm = (species?: WikiSpecies) => {

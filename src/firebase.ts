@@ -1,6 +1,9 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth';
 import { 
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
   getFirestore, doc, getDocFromServer,
   disableNetwork, enableNetwork
 } from 'firebase/firestore';
@@ -11,7 +14,21 @@ import { OperationType, FirestoreErrorInfo } from './types';
 export { disableNetwork, enableNetwork };
 
 export const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
-export const db = getFirestore(app, (firebaseConfig as any).firestoreDatabaseId || 'ai-studio-1809a135-82e9-462b-955f-679581a8148f');
+
+const firestoreDbId = (firebaseConfig as any).firestoreDatabaseId || 'ai-studio-1809a135-82e9-462b-955f-679581a8148f';
+
+let firestoreInstance;
+try {
+  firestoreInstance = initializeFirestore(app, {
+    localCache: persistentLocalCache({
+      tabManager: persistentMultipleTabManager()
+    })
+  }, firestoreDbId);
+} catch (e) {
+  firestoreInstance = getFirestore(app, firestoreDbId);
+}
+
+export const db = firestoreInstance;
 export const auth = getAuth(app);
 export const storage = getStorage(app);
 export const googleProvider = new GoogleAuthProvider();

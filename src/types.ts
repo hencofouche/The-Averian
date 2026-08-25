@@ -85,6 +85,10 @@ export interface UserSettings {
   deleteColor?: string;
   secondaryColor?: string;
   useDefaultData?: boolean;
+  isBanned?: boolean;
+  banReason?: string;
+  bannedAt?: string;
+  bannedBy?: string;
 }
 
 export interface AppUserAccount {
@@ -102,6 +106,9 @@ export interface AppUserAccount {
   updatedAt?: string;
   notes?: string;
   isBanned?: boolean;
+  banReason?: string;
+  bannedAt?: string;
+  bannedBy?: string;
 }
 
 export interface DataMigrationOptions {

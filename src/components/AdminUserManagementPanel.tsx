@@ -4,7 +4,8 @@ import {
   ArrowRight, Download, Upload, Check, AlertCircle, Clock, 
   Sliders, UserCheck, CheckCircle2, ChevronRight, Eye, 
   FileJson, Sparkles, Feather, Home, Heart, FileSpreadsheet, 
-  DollarSign, CheckSquare, Layers, Lock, Unlock, Zap, X, Info
+  DollarSign, CheckSquare, Layers, Lock, Unlock, Zap, X, Info,
+  ShieldAlert, Mail, AlertTriangle, UserX
 } from 'lucide-react';
 import { 
   UserSettings, AppUserAccount, Bird, Cage, Pair, BreedingRecord, 
@@ -39,6 +40,10 @@ interface UserWithDetails {
   subscribedAt?: string;
   lastLoginAt?: string;
   createdAt?: string;
+  isBanned?: boolean;
+  banReason?: string;
+  bannedAt?: string;
+  bannedBy?: string;
   birdCount?: number;
   cageCount?: number;
   pairCount?: number;
@@ -53,10 +58,7 @@ export function AdminUserManagementPanel({
   const [usersList, setUsersList] = useState<UserWithDetails[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'expired' | 'trial' | 'yearly' | 'lifetime' | 'admins'>('all');
-  
-  // Selection for action
-  const [selectedUser, setSelectedUser] = useState<UserWithDetails | null>(null);
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'expired' | 'trial' | 'yearly' | 'lifetime' | 'banned' | 'admins'>('all');
   
   // Subscription Modal State
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
@@ -65,6 +67,12 @@ export function AdminUserManagementPanel({
   const [customDate, setCustomDate] = useState(format(addYears(new Date(), 1), 'yyyy-MM-dd'));
   const [customPlanName, setCustomPlanName] = useState('Annual Breeder Pro');
   const [isUpdatingSub, setIsUpdatingSub] = useState(false);
+
+  // Ban / Suspend Modal State
+  const [showBanModal, setShowBanModal] = useState(false);
+  const [banTargetUser, setBanTargetUser] = useState<UserWithDetails | null>(null);
+  const [banReasonInput, setBanReasonInput] = useState('');
+  const [isBanning, setIsBanning] = useState(false);
 
   // Data Migration Modal State
   const [showMigrationModal, setShowMigrationModal] = useState(false);
@@ -127,7 +135,11 @@ export function AdminUserManagementPanel({
           subscriptionGrantedBy: data.subscriptionGrantedBy,
           subscribedAt: data.subscribedAt,
           lastLoginAt: data.lastLoginAt,
-          createdAt: data.createdAt
+          createdAt: data.createdAt,
+          isBanned: data.isBanned === true,
+          banReason: data.banReason,
+          bannedAt: data.bannedAt,
+          bannedBy: data.bannedBy
         });
       });
 
@@ -137,6 +149,11 @@ export function AdminUserManagementPanel({
         const data = d.data() as UserSettings;
         const uid = data.uid || d.id;
         const existing = usersMap.get(uid);
+
+        const isBanned = data.isBanned === true || (existing && existing.isBanned === true);
+        const banReason = data.banReason || (existing ? existing.banReason : undefined);
+        const bannedAt = data.bannedAt || (existing ? existing.bannedAt : undefined);
+        const bannedBy = data.bannedBy || (existing ? existing.bannedBy : undefined);
 
         if (existing) {
           usersMap.set(uid, {
@@ -148,6 +165,10 @@ export function AdminUserManagementPanel({
             subscriptionGrantedBy: data.subscriptionGrantedBy || existing.subscriptionGrantedBy,
             subscribedAt: data.subscribedAt || existing.subscribedAt,
             role: (data.role === 'admin' || existing.role === 'admin') ? 'admin' : 'user',
+            isBanned,
+            banReason,
+            bannedAt,
+            bannedBy,
             settings: data
           });
         } else {
@@ -162,6 +183,10 @@ export function AdminUserManagementPanel({
             subscriptionPlan: data.subscriptionPlan,
             subscriptionGrantedBy: data.subscriptionGrantedBy,
             subscribedAt: data.subscribedAt,
+            isBanned,
+            banReason,
+            bannedAt,
+            bannedBy,
             settings: data
           });
         }
@@ -180,11 +205,13 @@ export function AdminUserManagementPanel({
       });
 
       const list = Array.from(usersMap.values());
-      // Sort by last login / creation / name
+      // Sort: Banned accounts flagged, Admins first, then alphabetical
       list.sort((a, b) => {
         if (a.role === 'admin' && b.role !== 'admin') return -1;
         if (b.role === 'admin' && a.role !== 'admin') return 1;
-        return a.displayName.localeCompare(b.displayName);
+        if (a.isBanned && !b.isBanned) return -1;
+        if (b.isBanned && !a.isBanned) return 1;
+        return (a.email || a.displayName).localeCompare(b.email || b.displayName);
       });
 
       setUsersList(list);
@@ -208,10 +235,13 @@ export function AdminUserManagementPanel({
     let lifetimeCount = 0;
     let yearlyCount = 0;
     let adminCount = 0;
+    let bannedCount = 0;
     const now = new Date();
 
     usersList.forEach(u => {
       if (u.role === 'admin') adminCount++;
+      if (u.isBanned) bannedCount++;
+
       if (u.subscriptionPlan === 'lifetime' || (u.account_expiry_date && new Date(u.account_expiry_date).getFullYear() > 2090)) {
         lifetimeCount++;
         activeSubCount++;
@@ -230,7 +260,7 @@ export function AdminUserManagementPanel({
       }
     });
 
-    return { total, activeSubCount, expiredCount, lifetimeCount, yearlyCount, adminCount };
+    return { total, activeSubCount, expiredCount, lifetimeCount, yearlyCount, adminCount, bannedCount };
   }, [usersList]);
 
   // Filtered Users
@@ -241,6 +271,7 @@ export function AdminUserManagementPanel({
     return usersList.filter(u => {
       // Status filter
       if (statusFilter === 'admins' && u.role !== 'admin') return false;
+      if (statusFilter === 'banned' && !u.isBanned) return false;
       if (statusFilter === 'lifetime') {
         const isLife = u.subscriptionPlan === 'lifetime' || (u.account_expiry_date && new Date(u.account_expiry_date).getFullYear() > 2090);
         if (!isLife) return false;
@@ -257,18 +288,71 @@ export function AdminUserManagementPanel({
         if (u.subscriptionPlan !== 'trial') return false;
       }
 
-      // Search query
+      // Search query (Email, Name, Aviary, UID)
       if (queryStr) {
-        const inEmail = u.email.toLowerCase().includes(queryStr);
-        const inName = u.displayName.toLowerCase().includes(queryStr);
+        const inEmail = (u.email || '').toLowerCase().includes(queryStr);
+        const inName = (u.displayName || '').toLowerCase().includes(queryStr);
         const inAviary = (u.aviaryName || '').toLowerCase().includes(queryStr);
-        const inUid = u.uid.toLowerCase().includes(queryStr);
+        const inUid = (u.uid || '').toLowerCase().includes(queryStr);
         return inEmail || inName || inAviary || inUid;
       }
 
       return true;
     });
   }, [usersList, searchQuery, statusFilter]);
+
+  // Handle Ban / Unban Action
+  const handleToggleBan = async (targetUser: UserWithDetails, ban: boolean, reason?: string) => {
+    setIsBanning(true);
+    try {
+      const banPayload = ban ? {
+        isBanned: true,
+        banReason: reason?.trim() || 'Violation of terms of service or community guidelines.',
+        bannedAt: new Date().toISOString(),
+        bannedBy: currentUser?.email || 'Admin'
+      } : {
+        isBanned: false,
+        banReason: null,
+        bannedAt: null,
+        bannedBy: null
+      };
+
+      // Update both collections for immediate effect
+      await setDoc(doc(db, 'users', targetUser.uid), banPayload, { merge: true });
+      await setDoc(doc(db, 'userSettings', targetUser.uid), banPayload, { merge: true });
+
+      // Update local state
+      setUsersList(prev => prev.map(u => {
+        if (u.uid === targetUser.uid) {
+          return {
+            ...u,
+            isBanned: ban,
+            banReason: ban ? (reason?.trim() || 'Violation of terms') : undefined,
+            bannedAt: ban ? new Date().toISOString() : undefined,
+            bannedBy: ban ? (currentUser?.email || 'Admin') : undefined,
+            settings: u.settings ? { ...u.settings, isBanned: ban, banReason: ban ? reason : undefined } : undefined
+          };
+        }
+        return u;
+      }));
+
+      if (ban) {
+        toast.success(`User ${targetUser.email} has been suspended/banned.`);
+      } else {
+        toast.success(`User ${targetUser.email} has been unbanned and restored.`);
+      }
+
+      setShowBanModal(false);
+      setBanTargetUser(null);
+      setBanReasonInput('');
+      if (onRefreshParentData) onRefreshParentData();
+    } catch (err: any) {
+      console.error("Failed to update user ban status:", err);
+      toast.error('Failed to update ban status: ' + err.message);
+    } finally {
+      setIsBanning(false);
+    }
+  };
 
   // Handle Granting / Extending Subscription
   const handleGrantSubscription = async (
@@ -338,7 +422,7 @@ export function AdminUserManagementPanel({
       }));
 
       toast.success(
-        `Subscription updated for ${targetUser.displayName || targetUser.email}! Valid until ${format(newExpiry, 'dd MMM yyyy')}`
+        `Subscription extended for ${targetUser.email}! Valid until ${format(newExpiry, 'dd MMM yyyy')}`
       );
       setShowSubscriptionModal(false);
       if (onRefreshParentData) onRefreshParentData();
@@ -411,7 +495,9 @@ export function AdminUserManagementPanel({
           email: u.email,
           displayName: u.displayName,
           account_expiry_date: u.account_expiry_date,
-          subscriptionPlan: u.subscriptionPlan
+          subscriptionPlan: u.subscriptionPlan,
+          isBanned: u.isBanned,
+          banReason: u.banReason
         },
         userSettings: settingsSnap.docs.map(d => d.data())[0] || u.settings || null,
         birds: birdsSnap.docs.map(d => ({ id: d.id, ...d.data() })),
@@ -448,12 +534,17 @@ export function AdminUserManagementPanel({
       return;
     }
     if (targetUserId.trim() === sourceUser.uid) {
-      toast.error('Source and target accounts must be different!');
+      toast.error('Source and destination accounts must be different');
       return;
     }
 
+    const targetUserObj = usersList.find(u => u.uid === targetUserId.trim() || u.email.toLowerCase() === targetUserId.trim().toLowerCase());
+    const finalTargetUid = targetUserObj ? targetUserObj.uid : targetUserId.trim();
+
     setIsMigrating(true);
-    setMigrationProgress('Initializing migration engine...');
+    setMigrationProgress('Initializing migration...');
+    setMigrationResult(null);
+
     const counts: Record<string, number> = {
       birds: 0,
       cages: 0,
@@ -465,140 +556,109 @@ export function AdminUserManagementPanel({
     };
 
     try {
-      const targetUserObj = usersList.find(u => u.uid === targetUserId.trim());
-      const targetEmail = targetUserObj?.email || targetUserId;
-
-      // 1. Remapping ID dictionaries
-      const cageIdMap = new Map<string, string>();
       const birdIdMap = new Map<string, string>();
+      const cageIdMap = new Map<string, string>();
       const pairIdMap = new Map<string, string>();
 
-      // 2. Fetch all source records
-      setMigrationProgress('Reading source account database...');
-      const [birdsSnap, cagesSnap, pairsSnap, clutchesSnap, transSnap, tasksSnap, contactsSnap, settingsSnap, sellerSnap] = await Promise.all([
-        getDocs(query(collection(db, 'birds'), where('uid', '==', sourceUser.uid))),
-        getDocs(query(collection(db, 'cages'), where('uid', '==', sourceUser.uid))),
-        getDocs(query(collection(db, 'pairs'), where('uid', '==', sourceUser.uid))),
-        getDocs(query(collection(db, 'breedingRecords'), where('uid', '==', sourceUser.uid))),
-        getDocs(query(collection(db, 'transactions'), where('uid', '==', sourceUser.uid))),
-        getDocs(query(collection(db, 'tasks'), where('uid', '==', sourceUser.uid))),
-        getDocs(query(collection(db, 'contacts'), where('uid', '==', sourceUser.uid))),
-        getDocs(query(collection(db, 'userSettings'), where('uid', '==', sourceUser.uid))),
-        getDocs(query(collection(db, 'sellerProfiles'), where('uid', '==', sourceUser.uid)))
-      ]);
-
-      // 3. Migrate Cages
-      if (migrationOptions.includeCages && !cagesSnap.empty) {
-        setMigrationProgress(`Migrating ${cagesSnap.size} cages...`);
-        for (const cDoc of cagesSnap.docs) {
-          const data = cDoc.data() as Cage;
-          const newCageRef = doc(collection(db, 'cages'));
-          cageIdMap.set(cDoc.id, newCageRef.id);
-          await setDoc(newCageRef, {
-            ...data,
-            id: newCageRef.id,
-            uid: targetUserId.trim(),
+      // 1. Cages
+      if (migrationOptions.includeCages) {
+        setMigrationProgress('Migrating aviary cages...');
+        const cagesSnap = await getDocs(query(collection(db, 'cages'), where('uid', '==', sourceUser.uid)));
+        for (const d of cagesSnap.docs) {
+          const cData = d.data();
+          const newDocRef = await addDoc(collection(db, 'cages'), {
+            ...cData,
+            uid: finalTargetUid,
             migratedFrom: sourceUser.uid,
             migratedAt: new Date().toISOString()
           });
+          cageIdMap.set(d.id, newDocRef.id);
           counts.cages++;
         }
       }
 
-      // 4. Pre-generate new Bird IDs for pedigree remapping
-      const sourceBirdDocs = birdsSnap.docs;
-      for (const bDoc of sourceBirdDocs) {
-        const newBirdRef = doc(collection(db, 'birds'));
-        birdIdMap.set(bDoc.id, newBirdRef.id);
-      }
-
-      // 5. Migrate Birds
-      if (migrationOptions.includeBirds && sourceBirdDocs.length > 0) {
-        setMigrationProgress(`Migrating ${sourceBirdDocs.length} birds & remapping pedigrees...`);
-        for (const bDoc of sourceBirdDocs) {
-          const data = bDoc.data() as Bird;
-          const newBirdId = birdIdMap.get(bDoc.id)!;
-          const newBirdRef = doc(db, 'birds', newBirdId);
-
-          // Remap parent IDs if requested
-          let motherId = data.motherId;
-          let fatherId = data.fatherId;
-          let mateId = data.mateId;
-          let cageId = data.cageId;
-          let offspringIds = data.offspringIds || [];
-
-          if (migrationOptions.remapPedigrees) {
-            if (motherId && birdIdMap.has(motherId)) motherId = birdIdMap.get(motherId);
-            if (fatherId && birdIdMap.has(fatherId)) fatherId = birdIdMap.get(fatherId);
-            if (mateId && birdIdMap.has(mateId)) mateId = birdIdMap.get(mateId);
-            if (cageId && cageIdMap.has(cageId)) cageId = cageIdMap.get(cageId);
-            offspringIds = offspringIds.map(oId => birdIdMap.get(oId) || oId);
-          }
-
-          await setDoc(newBirdRef, {
-            ...data,
-            id: newBirdId,
-            uid: targetUserId.trim(),
-            motherId: motherId || '',
-            fatherId: fatherId || '',
-            mateId: mateId || '',
-            cageId: cageId || '',
-            offspringIds,
+      // 2. Birds
+      if (migrationOptions.includeBirds) {
+        setMigrationProgress('Migrating flock records & genetic profiles...');
+        const birdsSnap = await getDocs(query(collection(db, 'birds'), where('uid', '==', sourceUser.uid)));
+        for (const d of birdsSnap.docs) {
+          const bData = d.data();
+          const remappedCageId = bData.cageId && cageIdMap.has(bData.cageId) ? cageIdMap.get(bData.cageId) : bData.cageId;
+          const newDocRef = await addDoc(collection(db, 'birds'), {
+            ...bData,
+            uid: finalTargetUid,
+            cageId: remappedCageId || null,
+            fatherId: null,
+            motherId: null,
+            mateId: null,
             migratedFrom: sourceUser.uid,
             migratedAt: new Date().toISOString()
           });
+          birdIdMap.set(d.id, newDocRef.id);
           counts.birds++;
+        }
+
+        // Remap pedigree linkages
+        if (migrationOptions.remapPedigrees && counts.birds > 0) {
+          setMigrationProgress('Remapping pedigree trees and lineage relationships...');
+          for (const d of birdsSnap.docs) {
+            const bData = d.data();
+            const newBirdId = birdIdMap.get(d.id);
+            if (!newBirdId) continue;
+
+            const remappedFather = bData.fatherId && birdIdMap.has(bData.fatherId) ? birdIdMap.get(bData.fatherId) : bData.fatherId || null;
+            const remappedMother = bData.motherId && birdIdMap.has(bData.motherId) ? birdIdMap.get(bData.motherId) : bData.motherId || null;
+            const remappedMate = bData.mateId && birdIdMap.has(bData.mateId) ? birdIdMap.get(bData.mateId) : bData.mateId || null;
+
+            if (remappedFather || remappedMother || remappedMate) {
+              await updateDoc(doc(db, 'birds', newBirdId), {
+                fatherId: remappedFather,
+                motherId: remappedMother,
+                mateId: remappedMate
+              });
+            }
+          }
         }
       }
 
-      // 6. Migrate Pairs & Breeding Clutches
-      if (migrationOptions.includePairs && !pairsSnap.empty) {
-        setMigrationProgress(`Migrating ${pairsSnap.size} breeding pairs...`);
-        for (const pDoc of pairsSnap.docs) {
-          const data = pDoc.data() as Pair;
-          const newPairRef = doc(collection(db, 'pairs'));
-          pairIdMap.set(pDoc.id, newPairRef.id);
+      // 3. Pairs
+      if (migrationOptions.includePairs) {
+        setMigrationProgress('Migrating breeding pairs...');
+        const pairsSnap = await getDocs(query(collection(db, 'pairs'), where('uid', '==', sourceUser.uid)));
+        for (const d of pairsSnap.docs) {
+          const pData = d.data();
+          const remappedMale = pData.maleId && birdIdMap.has(pData.maleId) ? birdIdMap.get(pData.maleId) : pData.maleId;
+          const remappedFemale = pData.femaleId && birdIdMap.has(pData.femaleId) ? birdIdMap.get(pData.femaleId) : pData.femaleId;
+          const remappedCage = pData.cageId && cageIdMap.has(pData.cageId) ? cageIdMap.get(pData.cageId) : pData.cageId;
 
-          const maleId = (migrationOptions.remapPedigrees && birdIdMap.has(data.maleId))
-            ? birdIdMap.get(data.maleId)!
-            : data.maleId;
-          const femaleId = (migrationOptions.remapPedigrees && birdIdMap.has(data.femaleId))
-            ? birdIdMap.get(data.femaleId)!
-            : data.femaleId;
-          const cageId = (migrationOptions.remapPedigrees && data.cageId && cageIdMap.has(data.cageId))
-            ? cageIdMap.get(data.cageId)!
-            : (data.cageId || '');
-
-          await setDoc(newPairRef, {
-            ...data,
-            id: newPairRef.id,
-            uid: targetUserId.trim(),
-            maleId,
-            femaleId,
-            cageId,
+          const newDocRef = await addDoc(collection(db, 'pairs'), {
+            ...pData,
+            uid: finalTargetUid,
+            maleId: remappedMale,
+            femaleId: remappedFemale,
+            cageId: remappedCage || null,
             migratedFrom: sourceUser.uid,
             migratedAt: new Date().toISOString()
           });
+          pairIdMap.set(d.id, newDocRef.id);
           counts.pairs++;
         }
       }
 
-      if (migrationOptions.includeBreedingRecords && !clutchesSnap.empty) {
-        setMigrationProgress(`Migrating ${clutchesSnap.size} clutch records...`);
-        for (const clDoc of clutchesSnap.docs) {
-          const data = clDoc.data() as BreedingRecord;
-          const newClutchRef = doc(collection(db, 'breedingRecords'));
-          const pairId = (migrationOptions.remapPedigrees && pairIdMap.has(data.pairId))
-            ? pairIdMap.get(data.pairId)!
-            : data.pairId;
-          const offspringIds = (data.offspringIds || []).map(oId => birdIdMap.get(oId) || oId);
+      // 4. Breeding Records / Clutches
+      if (migrationOptions.includeBreedingRecords) {
+        setMigrationProgress('Migrating clutch histories and egg logs...');
+        const clutchesSnap = await getDocs(query(collection(db, 'breedingRecords'), where('uid', '==', sourceUser.uid)));
+        for (const d of clutchesSnap.docs) {
+          const cData = d.data();
+          const remappedPair = cData.pairId && pairIdMap.has(cData.pairId) ? pairIdMap.get(cData.pairId) : cData.pairId;
+          const remappedCage = cData.cageId && cageIdMap.has(cData.cageId) ? cageIdMap.get(cData.cageId) : cData.cageId;
 
-          await setDoc(newClutchRef, {
-            ...data,
-            id: newClutchRef.id,
-            uid: targetUserId.trim(),
-            pairId,
-            offspringIds,
+          await addDoc(collection(db, 'breedingRecords'), {
+            ...cData,
+            uid: finalTargetUid,
+            pairId: remappedPair || null,
+            cageId: remappedCage || null,
             migratedFrom: sourceUser.uid,
             migratedAt: new Date().toISOString()
           });
@@ -606,19 +666,17 @@ export function AdminUserManagementPanel({
         }
       }
 
-      // 7. Migrate Financial Transactions
-      if (migrationOptions.includeTransactions && !transSnap.empty) {
-        setMigrationProgress(`Migrating ${transSnap.size} financial records...`);
-        for (const tDoc of transSnap.docs) {
-          const data = tDoc.data() as Transaction;
-          const newTransRef = doc(collection(db, 'transactions'));
-          const birdId = (data.birdId && birdIdMap.has(data.birdId)) ? birdIdMap.get(data.birdId) : data.birdId;
-
-          await setDoc(newTransRef, {
-            ...data,
-            id: newTransRef.id,
-            uid: targetUserId.trim(),
-            birdId: birdId || '',
+      // 5. Financials
+      if (migrationOptions.includeTransactions) {
+        setMigrationProgress('Migrating transactions and ledger...');
+        const transSnap = await getDocs(query(collection(db, 'transactions'), where('uid', '==', sourceUser.uid)));
+        for (const d of transSnap.docs) {
+          const tData = d.data();
+          const remappedBird = tData.birdId && birdIdMap.has(tData.birdId) ? birdIdMap.get(tData.birdId) : tData.birdId;
+          await addDoc(collection(db, 'transactions'), {
+            ...tData,
+            uid: finalTargetUid,
+            birdId: remappedBird || null,
             migratedFrom: sourceUser.uid,
             migratedAt: new Date().toISOString()
           });
@@ -626,19 +684,14 @@ export function AdminUserManagementPanel({
         }
       }
 
-      // 8. Migrate Tasks
-      if (migrationOptions.includeTasks && !tasksSnap.empty) {
-        setMigrationProgress(`Migrating ${tasksSnap.size} aviary tasks...`);
-        for (const tkDoc of tasksSnap.docs) {
-          const data = tkDoc.data() as Task;
-          const newTkRef = doc(collection(db, 'tasks'));
-          const birdIds = (data.birdIds || []).map(bId => birdIdMap.get(bId) || bId);
-
-          await setDoc(newTkRef, {
-            ...data,
-            id: newTkRef.id,
-            uid: targetUserId.trim(),
-            birdIds,
+      // 6. Tasks
+      if (migrationOptions.includeTasks) {
+        setMigrationProgress('Migrating tasks...');
+        const tasksSnap = await getDocs(query(collection(db, 'tasks'), where('uid', '==', sourceUser.uid)));
+        for (const d of tasksSnap.docs) {
+          await addDoc(collection(db, 'tasks'), {
+            ...d.data(),
+            uid: finalTargetUid,
             migratedFrom: sourceUser.uid,
             migratedAt: new Date().toISOString()
           });
@@ -646,16 +699,14 @@ export function AdminUserManagementPanel({
         }
       }
 
-      // 9. Migrate Contacts
-      if (migrationOptions.includeContacts && !contactsSnap.empty) {
-        setMigrationProgress(`Migrating ${contactsSnap.size} contacts...`);
-        for (const ctDoc of contactsSnap.docs) {
-          const data = ctDoc.data() as Contact;
-          const newCtRef = doc(collection(db, 'contacts'));
-          await setDoc(newCtRef, {
-            ...data,
-            id: newCtRef.id,
-            uid: targetUserId.trim(),
+      // 7. Contacts
+      if (migrationOptions.includeContacts) {
+        setMigrationProgress('Migrating contact address book...');
+        const contactsSnap = await getDocs(query(collection(db, 'contacts'), where('uid', '==', sourceUser.uid)));
+        for (const d of contactsSnap.docs) {
+          await addDoc(collection(db, 'contacts'), {
+            ...d.data(),
+            uid: finalTargetUid,
             migratedFrom: sourceUser.uid,
             migratedAt: new Date().toISOString()
           });
@@ -663,56 +714,31 @@ export function AdminUserManagementPanel({
         }
       }
 
-      // 10. Copy Taxonomy & Settings & Subscriptions
-      if (migrationOptions.includeCustomSpeciesAndMutations && !settingsSnap.empty) {
-        setMigrationProgress('Syncing taxonomy, mutations, and subscription status...');
-        const srcSettings = settingsSnap.docs[0].data() as UserSettings;
-        const targetSettingsRef = doc(db, 'userSettings', targetUserId.trim());
-
-        await setDoc(targetSettingsRef, {
-          species: srcSettings.species || [],
-          subspecies: srcSettings.subspecies || [],
-          mutations: srcSettings.mutations || [],
-          statuses: srcSettings.statuses || [],
-          aviaryName: srcSettings.aviaryName || '',
-          currency: srcSettings.currency || 'ZAR',
-          account_expiry_date: srcSettings.account_expiry_date || sourceUser.account_expiry_date || '',
-          subscriptionPlan: srcSettings.subscriptionPlan || sourceUser.subscriptionPlan || 'yearly',
-          subscriptionGrantedBy: `Migrated from ${sourceUser.email} by Admin`,
-          uid: targetUserId.trim()
-        }, { merge: true });
-
-        // Also update users table for target
-        await setDoc(doc(db, 'users', targetUserId.trim()), {
-          account_expiry_date: srcSettings.account_expiry_date || sourceUser.account_expiry_date || '',
-          subscriptionPlan: srcSettings.subscriptionPlan || sourceUser.subscriptionPlan || 'yearly',
-          subscriptionGrantedBy: `Migrated from ${sourceUser.email} by Admin`,
-          aviaryName: srcSettings.aviaryName || '',
-          updatedAt: new Date().toISOString()
-        }, { merge: true });
-      }
-
-      // 11. Copy Seller Profile
-      if (migrationOptions.includeSellerProfile && !sellerSnap.empty) {
-        const srcSeller = sellerSnap.docs[0].data() as SellerProfile;
-        const targetSellerRef = doc(db, 'sellerProfiles', targetUserId.trim());
-        await setDoc(targetSellerRef, {
-          ...srcSeller,
-          id: targetUserId.trim(),
-          uid: targetUserId.trim(),
+      // 8. Custom Species / Mutations / Settings
+      if (migrationOptions.includeCustomSpeciesAndMutations && sourceUser.settings) {
+        setMigrationProgress('Cloning custom species, mutations & subscription tier...');
+        const s = sourceUser.settings;
+        await setDoc(doc(db, 'userSettings', finalTargetUid), {
+          species: s.species || [],
+          subspecies: s.subspecies || [],
+          mutations: s.mutations || [],
+          account_expiry_date: s.account_expiry_date || null,
+          subscriptionPlan: s.subscriptionPlan || 'standard',
+          currency: s.currency || 'USD',
+          language: s.language || 'en',
+          migratedFrom: sourceUser.uid,
           updatedAt: new Date().toISOString()
         }, { merge: true });
       }
 
       setMigrationResult({
         success: true,
-        summary: `Successfully cloned data from ${sourceUser.displayName || sourceUser.email} to ${targetEmail}!`,
+        summary: `Successfully cloned aviary records from ${sourceUser.displayName} to target user ${finalTargetUid}!`,
         counts
       });
-      toast.success(`Data migration to ${targetEmail} completed successfully!`);
-      fetchAllUsers();
+      toast.success(`Data cloning complete! Transferred ${counts.birds} birds and ${counts.cages} cages.`);
     } catch (err: any) {
-      console.error("Migration error:", err);
+      console.error("Migration failed:", err);
       toast.error('Migration failed: ' + err.message);
       setMigrationResult({
         success: false,
@@ -726,7 +752,7 @@ export function AdminUserManagementPanel({
   return (
     <div className="space-y-6">
       {/* Top Header & Stats Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
         <Card className="p-4 bg-zinc-950/80 border-zinc-800">
           <div className="flex items-center gap-2 text-zinc-400 mb-1">
             <Users size={16} className="text-gold-400" />
@@ -761,10 +787,18 @@ export function AdminUserManagementPanel({
 
         <Card className="p-4 bg-zinc-950/80 border-zinc-800">
           <div className="flex items-center gap-2 text-zinc-400 mb-1">
-            <Clock size={16} className="text-rose-400" />
+            <Clock size={16} className="text-zinc-400" />
             <span className="text-[11px] font-bold uppercase tracking-wider">Expired</span>
           </div>
-          <p className="text-2xl font-black text-rose-400">{stats.expiredCount}</p>
+          <p className="text-2xl font-black text-zinc-400">{stats.expiredCount}</p>
+        </Card>
+
+        <Card className="p-4 bg-zinc-950/80 border-rose-900/30">
+          <div className="flex items-center gap-2 text-rose-400 mb-1">
+            <ShieldAlert size={16} className="text-rose-500" />
+            <span className="text-[11px] font-bold uppercase tracking-wider">Banned</span>
+          </div>
+          <p className="text-2xl font-black text-rose-500">{stats.bannedCount}</p>
         </Card>
 
         <Card className="p-4 bg-zinc-950/80 border-zinc-800">
@@ -778,13 +812,13 @@ export function AdminUserManagementPanel({
 
       {/* Control Bar: Search, Filters, Refresh */}
       <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between">
-        <div className="flex flex-1 items-center gap-2 bg-zinc-900/90 border border-zinc-800 rounded-2xl px-3 py-2">
-          <Search size={18} className="text-zinc-400 shrink-0" />
+        <div className="flex flex-1 items-center gap-2.5 bg-zinc-900/90 border border-zinc-800 rounded-2xl px-3.5 py-2.5 shadow-inner">
+          <Search size={18} className="text-gold-400 shrink-0" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search by name, email, UID, aviary..."
+            placeholder="Search by user email, name, UID, or aviary name..."
             className="w-full bg-transparent border-none text-sm text-white focus:outline-none placeholder:text-zinc-500"
           />
           {searchQuery && (
@@ -836,10 +870,19 @@ export function AdminUserManagementPanel({
             onClick={() => setStatusFilter('expired')}
             className={cn(
               "px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all",
-              statusFilter === 'expired' ? "bg-rose-500 text-white shadow-md" : "bg-zinc-900 text-zinc-400 hover:text-rose-400"
+              statusFilter === 'expired' ? "bg-zinc-700 text-white shadow-md" : "bg-zinc-900 text-zinc-400 hover:text-zinc-200"
             )}
           >
             Expired ({stats.expiredCount})
+          </button>
+          <button
+            onClick={() => setStatusFilter('banned')}
+            className={cn(
+              "px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all",
+              statusFilter === 'banned' ? "bg-rose-600 text-white shadow-md" : "bg-zinc-900 text-zinc-400 hover:text-rose-400"
+            )}
+          >
+            Banned ({stats.bannedCount})
           </button>
           <button
             onClick={() => setStatusFilter('admins')}
@@ -883,12 +926,18 @@ export function AdminUserManagementPanel({
             return (
               <Card 
                 key={u.uid}
-                className="p-4 sm:p-5 bg-zinc-950 border-zinc-800/80 hover:border-zinc-700 transition-all rounded-2xl space-y-3"
+                className={cn(
+                  "p-4 sm:p-5 bg-zinc-950 border transition-all rounded-2xl space-y-3",
+                  u.isBanned ? "border-rose-500/40 bg-rose-950/10 hover:border-rose-500" : "border-zinc-800/80 hover:border-zinc-700"
+                )}
               >
                 <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                   {/* User Profile Info */}
                   <div className="flex items-start gap-3.5 min-w-0">
-                    <div className="w-11 h-11 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-gold-400 font-black text-sm shrink-0 overflow-hidden shadow-md">
+                    <div className={cn(
+                      "w-11 h-11 rounded-2xl flex items-center justify-center font-black text-sm shrink-0 overflow-hidden shadow-md",
+                      u.isBanned ? "bg-rose-500/20 text-rose-400 border border-rose-500/40" : "bg-zinc-900 border border-zinc-800 text-gold-400"
+                    )}>
                       {u.photoURL ? (
                         <img src={u.photoURL} alt="" className="w-full h-full object-cover" />
                       ) : (
@@ -897,15 +946,24 @@ export function AdminUserManagementPanel({
                     </div>
 
                     <div className="min-w-0 space-y-1">
+                      {/* Name and Badges */}
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-black text-white text-base truncate">
                           {u.displayName}
                         </span>
+
+                        {u.isBanned && (
+                          <span className="text-[10px] font-black uppercase tracking-wider bg-rose-600 text-white px-2 py-0.5 rounded-full flex items-center gap-1 shadow-sm">
+                            <ShieldAlert size={10} /> SUSPENDED / BANNED
+                          </span>
+                        )}
+
                         {u.role === 'admin' && (
                           <span className="text-[10px] font-black uppercase tracking-wider bg-purple-500/20 text-purple-400 border border-purple-500/30 px-2 py-0.5 rounded-full flex items-center gap-1">
                             <Shield size={10} /> ADMIN
                           </span>
                         )}
+
                         {u.sellerProfile?.status === 'approved' && (
                           <span className="text-[10px] font-black uppercase tracking-wider bg-gold-500/20 text-gold-400 border border-gold-500/30 px-2 py-0.5 rounded-full flex items-center gap-1">
                             <UserCheck size={10} /> VERIFIED SELLER
@@ -913,13 +971,31 @@ export function AdminUserManagementPanel({
                         )}
                       </div>
 
-                      <div className="flex items-center gap-3 text-xs text-zinc-400 flex-wrap">
-                        <span>{u.email}</span>
+                      {/* Prominent Email Address & UID */}
+                      <div className="flex items-center gap-2.5 text-xs flex-wrap">
+                        <div className="flex items-center gap-1.5 bg-zinc-900 border border-zinc-800 px-2.5 py-0.5 rounded-lg text-gold-300 font-semibold">
+                          <Mail size={12} className="text-gold-400" />
+                          <span>{u.email}</span>
+                          <button
+                            onClick={() => {
+                              navigator.clipboard.writeText(u.email);
+                              toast.success('Email copied to clipboard!');
+                            }}
+                            className="ml-1 text-zinc-500 hover:text-white inline-block"
+                            title="Copy user email"
+                          >
+                            <Copy size={11} />
+                          </button>
+                        </div>
+
                         {u.aviaryName && (
-                          <span className="text-zinc-500">• Aviary: <strong className="text-zinc-300">{u.aviaryName}</strong></span>
+                          <span className="text-zinc-400">
+                            Aviary: <strong className="text-white">{u.aviaryName}</strong>
+                          </span>
                         )}
-                        <span className="text-zinc-600 font-mono text-[11px]">
-                          UID: {u.uid.substring(0, 10)}...
+
+                        <span className="text-zinc-500 font-mono text-[11px]">
+                          UID: {u.uid.substring(0, 8)}...
                           <button
                             onClick={() => {
                               navigator.clipboard.writeText(u.uid);
@@ -928,10 +1004,21 @@ export function AdminUserManagementPanel({
                             className="ml-1 text-zinc-500 hover:text-white inline-block"
                             title="Copy full UID"
                           >
-                            <Copy size={11} />
+                            <Copy size={10} />
                           </button>
                         </span>
                       </div>
+
+                      {/* If Banned: Show Reason */}
+                      {u.isBanned && (
+                        <div className="text-[11px] text-rose-300 bg-rose-500/10 border border-rose-500/20 px-2.5 py-1 rounded-lg flex items-center gap-1.5 mt-1">
+                          <AlertTriangle size={12} className="text-rose-400 shrink-0" />
+                          <span><strong>Ban Reason:</strong> {u.banReason || 'Administrative suspension'}</span>
+                          {u.bannedAt && (
+                            <span className="text-rose-400/80 ml-auto">({format(new Date(u.bannedAt), 'dd MMM yyyy')})</span>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -944,7 +1031,7 @@ export function AdminUserManagementPanel({
                             <Sparkles size={12} className="mr-1" /> Lifetime Access
                           </Badge>
                         ) : isExp ? (
-                          <Badge className="bg-rose-500/20 text-rose-400 border-rose-500/30 font-black text-xs">
+                          <Badge className="bg-zinc-800 text-zinc-400 border-zinc-700 font-black text-xs">
                             <Clock size={12} className="mr-1" /> Expired
                           </Badge>
                         ) : (
@@ -969,7 +1056,7 @@ export function AdminUserManagementPanel({
                 </div>
 
                 {/* Quick Action Toolbar */}
-                <div className="pt-2 border-t border-zinc-900 flex items-center justify-between gap-2 flex-wrap">
+                <div className="pt-2.5 border-t border-zinc-900 flex items-center justify-between gap-2 flex-wrap">
                   {/* Left: Quick Subscription Grants */}
                   <div className="flex items-center gap-1.5 flex-wrap">
                     <Button
@@ -1008,8 +1095,34 @@ export function AdminUserManagementPanel({
                     </Button>
                   </div>
 
-                  {/* Right: Data Migration & Inspection */}
+                  {/* Right: Ban/Unban, Data Migration & Inspection */}
                   <div className="flex items-center gap-1.5 flex-wrap">
+                    {/* Ban / Unban Button */}
+                    {u.isBanned ? (
+                      <Button
+                        onClick={() => handleToggleBan(u, false)}
+                        disabled={isBanning}
+                        className="text-xs font-bold bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 rounded-xl px-3 py-1.5"
+                      >
+                        <Unlock size={13} className="mr-1.5 text-emerald-400" />
+                        Unban Account
+                      </Button>
+                    ) : (
+                      <Button
+                        onClick={() => {
+                          setBanTargetUser(u);
+                          setBanReasonInput('');
+                          setShowBanModal(true);
+                        }}
+                        disabled={isBanning || u.role === 'admin'}
+                        className="text-xs font-bold bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/30 rounded-xl px-3 py-1.5"
+                        title={u.role === 'admin' ? "Cannot ban administrators" : "Suspend user account"}
+                      >
+                        <Lock size={13} className="mr-1.5 text-rose-400" />
+                        Ban / Suspend
+                      </Button>
+                    )}
+
                     <Button
                       onClick={() => {
                         setSourceUser(u);
@@ -1028,7 +1141,7 @@ export function AdminUserManagementPanel({
                       className="text-xs font-bold bg-zinc-900 hover:bg-zinc-800 text-zinc-300 rounded-xl px-3 py-1.5"
                     >
                       <Eye size={13} className="mr-1.5 text-zinc-400" />
-                      Inspect Records
+                      Inspect
                     </Button>
                     <Button
                       variant="secondary"
@@ -1061,7 +1174,7 @@ export function AdminUserManagementPanel({
                   <h3 className="text-sm font-black uppercase text-white tracking-wider">
                     Manage Subscription
                   </h3>
-                  <p className="text-xs text-zinc-400">{subscriptionUser.displayName} ({subscriptionUser.email})</p>
+                  <p className="text-xs text-gold-300 font-mono">{subscriptionUser.email}</p>
                 </div>
               </div>
               <button onClick={() => setShowSubscriptionModal(false)} className="text-zinc-500 hover:text-white p-1">
@@ -1069,9 +1182,28 @@ export function AdminUserManagementPanel({
               </button>
             </div>
 
+            <div className="p-3 bg-zinc-900/80 border border-zinc-800 rounded-2xl space-y-1 text-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-zinc-400">User Account:</span>
+                <span className="font-bold text-white">{subscriptionUser.displayName}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-zinc-400">Target Email:</span>
+                <span className="font-mono text-gold-400">{subscriptionUser.email}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-zinc-400">Current Expiration:</span>
+                <span className="text-zinc-300">
+                  {subscriptionUser.account_expiry_date 
+                    ? format(new Date(subscriptionUser.account_expiry_date), 'dd MMMM yyyy') 
+                    : 'No active expiration'}
+                </span>
+              </div>
+            </div>
+
             <div className="space-y-4">
               <div className="space-y-2">
-                <label className="text-xs font-bold uppercase text-zinc-400 tracking-wider">Select Duration</label>
+                <label className="text-xs font-bold uppercase text-zinc-400 tracking-wider">Select Extension Duration</label>
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
@@ -1125,7 +1257,7 @@ export function AdminUserManagementPanel({
 
               {/* Custom Date Input if selected */}
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-zinc-400">Custom Specific Expiry Date</label>
+                <label className="text-xs font-bold text-zinc-400">Or Set Custom Expiration Date</label>
                 <Input
                   type="date"
                   value={customDate}
@@ -1154,11 +1286,16 @@ export function AdminUserManagementPanel({
                 Cancel
               </Button>
               <Button
-                onClick={() => handleGrantSubscription(subscriptionUser, subDurationType, customDate, customPlanName)}
+                onClick={() => handleGrantSubscription(
+                  subscriptionUser, 
+                  subDurationType, 
+                  subDurationType === 'custom' ? customDate : undefined,
+                  customPlanName
+                )}
                 disabled={isUpdatingSub}
-                className="text-xs font-bold bg-amber-500 text-black hover:bg-amber-400"
+                className="text-xs font-bold bg-gold-500 text-black hover:bg-gold-400"
               >
-                {isUpdatingSub ? 'Saving...' : 'Apply Subscription'}
+                {isUpdatingSub ? 'Saving...' : 'Apply Subscription Extension'}
               </Button>
             </div>
           </div>
@@ -1166,23 +1303,82 @@ export function AdminUserManagementPanel({
       )}
 
       {/* ========================================================================= */}
-      {/* 2. DATA MIGRATION & ACCOUNT CLONING MODAL */}
+      {/* 2. BAN / SUSPEND CONFIRMATION MODAL */}
+      {/* ========================================================================= */}
+      {showBanModal && banTargetUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="w-full max-w-md bg-zinc-950 border border-rose-500/40 rounded-3xl p-6 space-y-5 shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+              <div className="flex items-center gap-2.5 text-rose-400">
+                <div className="w-9 h-9 rounded-xl bg-rose-500/20 border border-rose-500/40 flex items-center justify-center">
+                  <ShieldAlert size={20} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black uppercase text-white tracking-wider">
+                    Suspend User Account
+                  </h3>
+                  <p className="text-xs text-rose-400 font-mono">{banTargetUser.email}</p>
+                </div>
+              </div>
+              <button onClick={() => setShowBanModal(false)} className="text-zinc-500 hover:text-white p-1">
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-2xl space-y-1 text-rose-200">
+                <p className="font-bold flex items-center gap-1.5">
+                  <AlertTriangle size={14} className="text-rose-400" />
+                  Warning: Immediate Access Lockout
+                </p>
+                <p className="text-[11px] text-zinc-400">
+                  Suspending this user will immediately block their access to their aviary records, pedigree charts, and marketplace features.
+                </p>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="font-bold text-zinc-300">Reason for Suspension (visible to user):</label>
+                <Textarea
+                  value={banReasonInput}
+                  onChange={(e) => setBanReasonInput(e.target.value)}
+                  placeholder="e.g. Inappropriate marketplace listings, fraudulent activity, violation of terms..."
+                  className="bg-zinc-900 border-zinc-800 text-xs min-h-[80px]"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-zinc-800">
+              <Button variant="secondary" onClick={() => setShowBanModal(false)} className="text-xs">
+                Cancel
+              </Button>
+              <Button
+                onClick={() => handleToggleBan(banTargetUser, true, banReasonInput)}
+                disabled={isBanning}
+                className="text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white"
+              >
+                {isBanning ? 'Suspending...' : 'Confirm Ban & Lock Account'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 3. DATA CLONING & MIGRATION MODAL */}
       {/* ========================================================================= */}
       {showMigrationModal && sourceUser && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm overflow-y-auto">
           <div className="w-full max-w-2xl bg-zinc-950 border border-zinc-800 rounded-3xl p-6 space-y-5 shadow-2xl my-8">
             <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
               <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-gold-500/20 text-gold-400 flex items-center justify-center">
-                  <Copy size={20} />
+                <div className="w-8 h-8 rounded-xl bg-gold-500/20 text-gold-400 flex items-center justify-center">
+                  <Copy size={18} />
                 </div>
                 <div>
                   <h3 className="text-sm font-black uppercase text-white tracking-wider">
-                    Copy / Migrate User Data & Tier
+                    Clone / Transfer Aviary Data
                   </h3>
-                  <p className="text-xs text-zinc-400">
-                    Duplicate aviary records and subscription from one account to another
-                  </p>
+                  <p className="text-xs text-zinc-400">Source: {sourceUser.displayName} ({sourceUser.email})</p>
                 </div>
               </div>
               <button onClick={() => setShowMigrationModal(false)} className="text-zinc-500 hover:text-white p-1">
@@ -1190,47 +1386,59 @@ export function AdminUserManagementPanel({
               </button>
             </div>
 
-            {/* Source & Destination Selection */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-zinc-900/50 p-4 rounded-2xl border border-zinc-800/80">
+            <div className="p-4 bg-gold-500/10 border border-gold-500/20 rounded-2xl text-xs space-y-1.5">
+              <p className="font-bold text-gold-300 flex items-center gap-1.5">
+                <Info size={14} /> Full Aviary Database Replication
+              </p>
+              <p className="text-zinc-400">
+                This tool deep-copies all flock birds, cages, breeding pairs, clutches, financial ledgers, and links to the destination user account with reconstructed pedigree IDs.
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              <label className="text-xs font-bold uppercase text-zinc-400 tracking-wider">
+                Destination Target User Account
+              </label>
               <div className="space-y-1.5">
-                <span className="text-[10px] font-black uppercase text-gold-400 tracking-wider">Source Account (Origin)</span>
-                <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl space-y-1">
-                  <p className="text-xs font-bold text-white truncate">{sourceUser.displayName}</p>
-                  <p className="text-[11px] text-zinc-400 truncate">{sourceUser.email}</p>
-                  <p className="text-[10px] text-zinc-500 font-mono">UID: {sourceUser.uid.substring(0, 14)}...</p>
-                </div>
+                <input
+                  type="text"
+                  value={targetUserId}
+                  onChange={(e) => setTargetUserId(e.target.value)}
+                  placeholder="Paste destination User UID or type target email address..."
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white placeholder:text-zinc-600 focus:outline-none focus:border-gold-500"
+                />
+                <p className="text-[11px] text-zinc-500">
+                  Tip: You can select any user from the user directory or paste their exact UID.
+                </p>
               </div>
 
-              <div className="space-y-1.5">
-                <span className="text-[10px] font-black uppercase text-emerald-400 tracking-wider">Destination Account (Target) *</span>
-                <Select
-                  value={targetUserId}
-                  onChange={(e) => setTargetUserId(e.target.value)}
-                  className="bg-zinc-900 border-zinc-800 text-xs w-full"
-                >
-                  <option value="">-- Select Target Account --</option>
-                  {usersList
-                    .filter(u => u.uid !== sourceUser.uid)
-                    .map(u => (
-                      <option key={u.uid} value={u.uid}>
-                        {u.displayName} ({u.email})
-                      </option>
-                    ))}
-                </Select>
-                <p className="text-[10px] text-zinc-500">Or paste target UID manually:</p>
-                <Input
-                  type="text"
-                  placeholder="Paste target UID directly if not in list..."
-                  value={targetUserId}
-                  onChange={(e) => setTargetUserId(e.target.value)}
-                  className="bg-zinc-900 border-zinc-800 text-xs h-8"
-                />
+              {/* Quick Select from Users List */}
+              <div className="max-h-36 overflow-y-auto space-y-1 p-2 bg-zinc-900/50 border border-zinc-800/80 rounded-xl">
+                {usersList
+                  .filter(u => u.uid !== sourceUser.uid)
+                  .slice(0, 15)
+                  .map(u => (
+                    <button
+                      key={u.uid}
+                      type="button"
+                      onClick={() => setTargetUserId(u.uid)}
+                      className={cn(
+                        "w-full text-left p-2 rounded-lg text-xs flex items-center justify-between transition-colors",
+                        targetUserId === u.uid ? "bg-gold-500/20 text-gold-300 font-bold" : "text-zinc-400 hover:bg-zinc-800 hover:text-white"
+                      )}
+                    >
+                      <span className="truncate">{u.displayName} ({u.email})</span>
+                      <span className="font-mono text-[10px] text-zinc-600 shrink-0 ml-2">{u.uid.substring(0, 6)}...</span>
+                    </button>
+                  ))}
               </div>
             </div>
 
-            {/* Checklist of what to copy */}
+            {/* Checkbox Options */}
             <div className="space-y-2">
-              <label className="text-xs font-black uppercase text-zinc-400 tracking-wider">Data to Clone & Remap</label>
+              <label className="text-xs font-bold uppercase text-zinc-400 tracking-wider">
+                Entities to Migrate
+              </label>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
                 <label className="flex items-center gap-2 p-2.5 bg-zinc-900/60 border border-zinc-800/80 rounded-xl cursor-pointer hover:bg-zinc-900">
                   <input
@@ -1239,8 +1447,8 @@ export function AdminUserManagementPanel({
                     onChange={e => setMigrationOptions(prev => ({ ...prev, includeBirds: e.target.checked }))}
                     className="rounded accent-gold-500"
                   />
-                  <Feather size={14} className="text-gold-400" />
-                  <span className="text-zinc-200">Birds & Specifications</span>
+                  <Feather size={14} className="text-amber-400" />
+                  <span className="text-zinc-200">Birds & Genetic Profiles</span>
                 </label>
 
                 <label className="flex items-center gap-2 p-2.5 bg-zinc-900/60 border border-zinc-800/80 rounded-xl cursor-pointer hover:bg-zinc-900">
@@ -1295,7 +1503,7 @@ export function AdminUserManagementPanel({
                     className="rounded accent-gold-500"
                   />
                   <Award size={14} className="text-amber-400" />
-                  <span className="text-zinc-200">Custom Species, Mutations & Subscription Tier</span>
+                  <span className="text-zinc-200">Custom Species & Subscription Tier</span>
                 </label>
               </div>
             </div>
@@ -1343,7 +1551,7 @@ export function AdminUserManagementPanel({
       )}
 
       {/* ========================================================================= */}
-      {/* 3. INSPECT USER AVIARY DATA MODAL */}
+      {/* 4. INSPECT USER AVIARY DATA MODAL */}
       {/* ========================================================================= */}
       {inspectUser && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm overflow-y-auto">
@@ -1357,7 +1565,7 @@ export function AdminUserManagementPanel({
                   <h3 className="text-sm font-black uppercase text-white tracking-wider">
                     Aviary Explorer: {inspectUser.displayName}
                   </h3>
-                  <p className="text-xs text-zinc-400">{inspectUser.email} • UID: {inspectUser.uid}</p>
+                  <p className="text-xs text-gold-300 font-mono">{inspectUser.email} • UID: {inspectUser.uid}</p>
                 </div>
               </div>
               <button onClick={() => setInspectUser(null)} className="text-zinc-500 hover:text-white p-1">
