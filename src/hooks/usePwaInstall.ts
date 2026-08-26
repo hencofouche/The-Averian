@@ -1,67 +1,94 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 
-// Custom hook to detect PWA installation capability & installed state
+declare global {
+  interface Window {
+    __pwa_deferred_prompt?: any;
+  }
+}
+
 export function usePwaInstall() {
-  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(() => {
+    if (typeof window !== 'undefined' && window.__pwa_deferred_prompt) {
+      return window.__pwa_deferred_prompt;
+    }
+    return null;
+  });
+
   const [isInstallable, setIsInstallable] = useState(false);
   const [isInstalled, setIsInstalled] = useState(false);
   const [isIos, setIsIos] = useState(false);
-  const [showIosGuide, setShowIosGuide] = useState(false);
+  const [isAndroid, setIsAndroid] = useState(false);
+  const [isChrome, setIsChrome] = useState(false);
+  const [isEdge, setIsEdge] = useState(false);
+  const [showInstallModal, setShowInstallModal] = useState(false);
 
   useEffect(() => {
-    // 1. Detect if already installed / running in standalone mode on this device
+    // 1. Detect if currently running in standalone PWA mode
     const checkStandalone = () => {
+      if (typeof window === 'undefined') return false;
       const isStandaloneMedia = window.matchMedia('(display-mode: standalone)').matches;
-      const isStandaloneMediaMinimal = window.matchMedia('(display-mode: minimal-ui)').matches;
+      const isFullscreenMedia = window.matchMedia('(display-mode: fullscreen)').matches;
+      const isMinimalUiMedia = window.matchMedia('(display-mode: minimal-ui)').matches;
       const isIosStandalone = (window.navigator as any).standalone === true;
-      const isAndroidApp = document.referrer.includes('android-app://');
-      const isMarkedInstalled = localStorage.getItem('averian_pwa_installed_on_device') === 'true';
+      const isAndroidApp = document.referrer?.includes('android-app://') || false;
 
-      if (isStandaloneMedia || isStandaloneMediaMinimal || isIosStandalone || isAndroidApp || isMarkedInstalled) {
-        setIsInstalled(true);
-        setIsInstallable(false);
-        return true;
-      }
-      return false;
+      const runningInStandalone = isStandaloneMedia || isFullscreenMedia || isMinimalUiMedia || isIosStandalone || isAndroidApp;
+      setIsInstalled(runningInStandalone);
+      return runningInStandalone;
     };
 
-    const alreadyInstalled = checkStandalone();
+    const isCurrentlyStandalone = checkStandalone();
 
-    // 2. Detect iOS environment
-    const userAgent = window.navigator.userAgent.toLowerCase();
-    const isIosDevice = /iphone|ipad|ipod/.test(userAgent);
-    setIsIos(isIosDevice);
+    // 2. Browser & OS Detection
+    if (typeof window !== 'undefined') {
+      const userAgent = window.navigator.userAgent.toLowerCase();
+      const isIosDevice = /iphone|ipad|ipod/.test(userAgent);
+      const isAndroidDevice = /android/.test(userAgent);
+      const isEdgeBrowser = /edg\//.test(userAgent);
+      const isChromeBrowser = /chrome|crios/.test(userAgent) && !isEdgeBrowser;
 
-    // If already installed on this device, no need to listen for prompt
-    if (alreadyInstalled) {
-      return;
+      setIsIos(isIosDevice);
+      setIsAndroid(isAndroidDevice);
+      setIsChrome(isChromeBrowser);
+      setIsEdge(isEdgeBrowser);
     }
 
-    // 3. Listen for browser passing 'beforeinstallprompt'
+    // If early prompt was caught in index.html
+    if (window.__pwa_deferred_prompt) {
+      setDeferredPrompt(window.__pwa_deferred_prompt);
+      setIsInstallable(true);
+    }
+
+    // 3. Event Handlers
     const handleBeforeInstallPrompt = (e: Event) => {
-      // Prevent browser's mini-infobar default
       e.preventDefault();
-      // Stash the event so it can be triggered later
+      window.__pwa_deferred_prompt = e;
       setDeferredPrompt(e);
       setIsInstallable(true);
-      console.log('[PWA] Browser passed beforeinstallprompt. Ready to install.');
     };
 
-    // 4. Listen for app completion event
+    const handlePromptReadyCustom = (e: any) => {
+      if (e.detail) {
+        setDeferredPrompt(e.detail);
+        setIsInstallable(true);
+      }
+    };
+
     const handleAppInstalled = () => {
       setIsInstalled(true);
       setIsInstallable(false);
       setDeferredPrompt(null);
-      localStorage.setItem('averian_pwa_installed_on_device', 'true');
+      window.__pwa_deferred_prompt = null;
+      setShowInstallModal(false);
       toast.success('The Averian was successfully installed on this device!');
-      console.log('[PWA] App installed successfully.');
     };
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    window.addEventListener('pwa_prompt_ready', handlePromptReadyCustom);
     window.addEventListener('appinstalled', handleAppInstalled);
 
-    // Also listen for display-mode changes (e.g. if opened in standalone window)
+    // Watch for display mode changes (e.g. if opened as standalone window)
     const mediaMatcher = window.matchMedia('(display-mode: standalone)');
     const handleMediaChange = (e: MediaQueryListEvent) => {
       if (e.matches) {
@@ -72,11 +99,12 @@ export function usePwaInstall() {
     try {
       mediaMatcher.addEventListener('change', handleMediaChange);
     } catch {
-      // Fallback for older browsers
+      // Fallback
     }
 
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      window.removeEventListener('pwa_prompt_ready', handlePromptReadyCustom);
       window.removeEventListener('appinstalled', handleAppInstalled);
       try {
         mediaMatcher.removeEventListener('change', handleMediaChange);
@@ -86,49 +114,46 @@ export function usePwaInstall() {
     };
   }, []);
 
-  // Trigger the installation flow
-  const promptInstall = async () => {
+  // Trigger the installation flow or open guide
+  const promptInstall = useCallback(async () => {
     if (isInstalled) {
-      toast.info('The Averian is already installed on this device.');
+      toast.info('The Averian is already running as an installed application.');
       return;
     }
 
-    if (deferredPrompt) {
+    const currentPrompt = deferredPrompt || window.__pwa_deferred_prompt;
+
+    if (currentPrompt && typeof currentPrompt.prompt === 'function') {
       try {
-        await deferredPrompt.prompt();
-        const choiceResult = await deferredPrompt.userChoice;
-        if (choiceResult.outcome === 'accepted') {
+        await currentPrompt.prompt();
+        const choiceResult = await currentPrompt.userChoice;
+        if (choiceResult && choiceResult.outcome === 'accepted') {
           setIsInstalled(true);
           setIsInstallable(false);
           setDeferredPrompt(null);
-          localStorage.setItem('averian_pwa_installed_on_device', 'true');
+          window.__pwa_deferred_prompt = null;
+          setShowInstallModal(false);
           toast.success('Thank you for installing The Averian!');
-        } else {
-          console.log('[PWA] User dismissed install prompt');
+          return;
         }
       } catch (err: any) {
-        console.error('[PWA] Install prompt error:', err);
+        console.warn('[PWA] Native prompt invocation error, showing installation guide:', err);
       }
-      return;
     }
 
-    if (isIos) {
-      setShowIosGuide(true);
-      return;
-    }
-
-    // Generic guide if browser didn't pass beforeinstallprompt yet
-    toast.info('To install: click the Install icon in your browser address bar or menu ("Install App" / "Add to Home screen").', {
-      duration: 6000
-    });
-  };
+    // If native prompt was not triggerable or user needs guidance, show the interactive guide
+    setShowInstallModal(true);
+  }, [deferredPrompt, isInstalled]);
 
   return {
     isInstallable,
     isInstalled,
     isIos,
-    showIosGuide,
-    setShowIosGuide,
+    isAndroid,
+    isChrome,
+    isEdge,
+    showInstallModal,
+    setShowInstallModal,
     promptInstall
   };
 }

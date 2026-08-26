@@ -10,6 +10,15 @@
     <meta name="theme-color" content="#eab308" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <script>
+      // Early capture of beforeinstallprompt for PWA installation
+      window.__pwa_deferred_prompt = null;
+      window.addEventListener('beforeinstallprompt', function(e) {
+        e.preventDefault();
+        window.__pwa_deferred_prompt = e;
+        window.dispatchEvent(new CustomEvent('pwa_prompt_ready', { detail: e }));
+      });
+    </script>
     <script src="https://js.yoco.com/sdk/v1/yoco-sdk-web.js"></script>
   </head>
   <body>

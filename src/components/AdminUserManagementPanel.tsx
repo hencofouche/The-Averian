@@ -122,10 +122,11 @@ export function AdminUserManagementPanel({
 
       usersSnap.forEach((d) => {
         const data = d.data();
+        const email = data.email || '';
         usersMap.set(d.id, {
           uid: d.id,
-          email: data.email || 'No email',
-          displayName: data.displayName || data.email?.split('@')[0] || 'Breeder',
+          email: email,
+          displayName: data.displayName || (email ? email.split('@')[0] : '') || 'Breeder',
           photoURL: data.photoURL,
           role: data.role === 'admin' ? 'admin' : 'user',
           aviaryName: data.aviaryName,
@@ -154,10 +155,13 @@ export function AdminUserManagementPanel({
         const banReason = data.banReason || (existing ? existing.banReason : undefined);
         const bannedAt = data.bannedAt || (existing ? existing.bannedAt : undefined);
         const bannedBy = data.bannedBy || (existing ? existing.bannedBy : undefined);
+        const email = existing?.email || data.email || '';
 
         if (existing) {
           usersMap.set(uid, {
             ...existing,
+            email: email,
+            displayName: existing.displayName || data.displayName || (email ? email.split('@')[0] : '') || data.aviaryName || 'Breeder',
             aviaryName: existing.aviaryName || data.aviaryName,
             currency: existing.currency || data.currency,
             account_expiry_date: data.account_expiry_date || existing.account_expiry_date,
@@ -174,8 +178,8 @@ export function AdminUserManagementPanel({
         } else {
           usersMap.set(uid, {
             uid,
-            email: data.email || `user_${uid.substring(0, 6)}@app.user`,
-            displayName: data.displayName || data.aviaryName || 'Breeder',
+            email: email,
+            displayName: data.displayName || (email ? email.split('@')[0] : '') || data.aviaryName || 'Breeder',
             role: data.role === 'admin' ? 'admin' : 'user',
             aviaryName: data.aviaryName,
             currency: data.currency,
@@ -199,6 +203,9 @@ export function AdminUserManagementPanel({
         if (data.uid && usersMap.has(data.uid)) {
           const u = usersMap.get(data.uid)!;
           u.sellerProfile = { id: d.id, ...data };
+          if (!u.email && (data.email || (data as any).contactEmail)) {
+            u.email = data.email || (data as any).contactEmail;
+          }
           if (!u.displayName && data.sellerName) u.displayName = data.sellerName;
           if (!u.aviaryName && data.aviaryName) u.aviaryName = data.aviaryName;
         }
@@ -971,22 +978,29 @@ export function AdminUserManagementPanel({
                         )}
                       </div>
 
-                      {/* Prominent Email Address & UID */}
+                      {/* Prominent Real Email Address & UID */}
                       <div className="flex items-center gap-2.5 text-xs flex-wrap">
-                        <div className="flex items-center gap-1.5 bg-zinc-900 border border-zinc-800 px-2.5 py-0.5 rounded-lg text-gold-300 font-semibold">
-                          <Mail size={12} className="text-gold-400" />
-                          <span>{u.email}</span>
-                          <button
-                            onClick={() => {
-                              navigator.clipboard.writeText(u.email);
-                              toast.success('Email copied to clipboard!');
-                            }}
-                            className="ml-1 text-zinc-500 hover:text-white inline-block"
-                            title="Copy user email"
-                          >
-                            <Copy size={11} />
-                          </button>
-                        </div>
+                        {u.email ? (
+                          <div className="flex items-center gap-1.5 bg-zinc-900 border border-zinc-800 px-2.5 py-0.5 rounded-lg text-gold-300 font-semibold">
+                            <Mail size={12} className="text-gold-400" />
+                            <span>{u.email}</span>
+                            <button
+                              onClick={() => {
+                                navigator.clipboard.writeText(u.email);
+                                toast.success('Email copied to clipboard!');
+                              }}
+                              className="ml-1 text-zinc-500 hover:text-white inline-block"
+                              title="Copy user email"
+                            >
+                              <Copy size={11} />
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1.5 bg-zinc-900/60 border border-dashed border-zinc-800 px-2.5 py-0.5 rounded-lg text-zinc-500 font-medium">
+                            <Mail size={12} className="text-zinc-600" />
+                            <span className="italic">No registered email</span>
+                          </div>
+                        )}
 
                         {u.aviaryName && (
                           <span className="text-zinc-400">

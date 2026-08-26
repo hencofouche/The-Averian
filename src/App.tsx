@@ -936,25 +936,29 @@ export default function App() {
         setWalkthroughStep(1);
       }
 
-      // Throttle user profile sync to at most once per 12 hours per client to conserve Firestore write tier
-      const syncKey = `averian_user_synced_${user.uid}`;
-      const lastSync = localStorage.getItem(syncKey);
-      const now = Date.now();
-      if (!lastSync || (now - parseInt(lastSync, 10)) > 12 * 60 * 60 * 1000) {
-        localStorage.setItem(syncKey, now.toString());
-        const userDocRef = doc(db, 'users', user.uid);
-        const userProfileData = {
-          uid: user.uid,
-          email: user.email || '',
-          displayName: user.displayName || user.email?.split('@')[0] || 'Breeder',
-          photoURL: user.photoURL || '',
-          lastLoginAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        };
-        setDoc(userDocRef, userProfileData, { merge: true }).catch(err => {
-          console.warn("Could not sync user profile:", err);
-        });
-      }
+      // Sync user profile immediately whenever user logs in or is present
+      const userDocRef = doc(db, 'users', user.uid);
+      const userSettingsDocRef = doc(db, 'userSettings', user.uid);
+      const userProfileData = {
+        uid: user.uid,
+        email: user.email || '',
+        displayName: user.displayName || user.email?.split('@')[0] || 'Breeder',
+        photoURL: user.photoURL || '',
+        lastLoginAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+      
+      setDoc(userDocRef, userProfileData, { merge: true }).catch(err => {
+        console.warn("Could not sync user profile:", err);
+      });
+
+      setDoc(userSettingsDocRef, {
+        uid: user.uid,
+        email: user.email || '',
+        displayName: user.displayName || user.email?.split('@')[0] || 'Breeder'
+      }, { merge: true }).catch(err => {
+        console.warn("Could not sync userSettings email:", err);
+      });
     }
   }, [user, loading]);
 
@@ -1207,6 +1211,8 @@ export default function App() {
             { id: crypto.randomUUID(), name: 'Deceased' }
           ],
           uid: user.uid,
+          email: user.email || '',
+          displayName: user.displayName || user.email?.split('@')[0] || 'Breeder',
           currency: 'ZAR',
           account_expiry_date: trialExpiry.toISOString()
         };
@@ -2432,12 +2438,13 @@ export default function App() {
               </h2>
             </div>
             {activeTab !== 'settings' && activeTab !== 'genetics' && activeTab !== 'stats' && activeTab !== 'print' && activeTab !== 'admin' && activeTab !== 'marketplace' && activeTab !== 'wiki' && !showComingSoonSplash && (
-              <div className="flex gap-2 xl:hidden">
-                <Button onClick={() => setIsScanModalOpen(true)} className="py-3 px-4 text-sm font-bold bg-zinc-800 text-white hover:bg-zinc-700 hover:text-gold-500">
-                  <Scan size={18} />
+              <div className="flex items-center gap-1.5 xl:hidden">
+                <InstallAppButton variant="header-mobile" />
+                <Button onClick={() => setIsScanModalOpen(true)} className="py-2.5 px-3 text-sm font-bold bg-zinc-800 text-white hover:bg-zinc-700 hover:text-gold-500">
+                  <Scan size={16} />
                 </Button>
-                <Button onClick={() => { setEditingItem(null); setIsModalOpen(true); }} className="py-3 px-4 text-sm font-bold">
-                  <Plus size={18} />
+                <Button onClick={() => { setEditingItem(null); setIsModalOpen(true); }} className="py-2.5 px-3 text-sm font-bold">
+                  <Plus size={16} />
                 </Button>
               </div>
             )}
