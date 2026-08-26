@@ -126,11 +126,14 @@ service cloud.firestore {
 
     function isAdmin() {
       return isAuthenticated() &&
-        (request.auth.token.email == "clashfouche@gmail.com" || 
-         request.auth.token.email == "teamotakuempire@gmail.com" ||
-         request.auth.token.email == "theaveriansupport@gmail.com" ||
-         request.auth.token.email == "hencofouche8@gmail.com" ||
-         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'));
+        (('email' in request.auth.token && request.auth.token.email != null && (
+          request.auth.token.email.lower() == "clashfouche@gmail.com" || 
+          request.auth.token.email.lower() == "teamotakuempire@gmail.com" ||
+          request.auth.token.email.lower() == "theaveriansupport@gmail.com" ||
+          request.auth.token.email.lower() == "hencofouche8@gmail.com"
+        )) ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin') ||
+        (exists(/databases/$(database)/documents/admins/$(request.auth.uid))));
     }
 
     // ===============================================================
@@ -314,10 +317,8 @@ service cloud.firestore {
     }
 
     match /userSettings/{userId} {
-      allow get: if isOwner(userId) || isAdmin();
-      allow list: if isOwner(userId) || isAdmin();
-      allow create, update: if isAdmin() || (isOwner(userId) && isValidUserSettings(request.resource.data));
-      allow delete: if isOwner(userId) || isAdmin();
+      allow read: if isOwner(userId) || isAdmin();
+      allow write: if isAdmin() || (isOwner(userId) && isValidUserSettings(request.resource.data));
     }
 
     match /push_subscriptions/{subId} {
