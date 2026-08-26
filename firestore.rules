@@ -128,6 +128,8 @@ service cloud.firestore {
       return isAuthenticated() &&
         (request.auth.token.email == "clashfouche@gmail.com" || 
          request.auth.token.email == "teamotakuempire@gmail.com" ||
+         request.auth.token.email == "theaveriansupport@gmail.com" ||
+         request.auth.token.email == "hencofouche8@gmail.com" ||
          (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'));
     }
 
@@ -205,10 +207,9 @@ service cloud.firestore {
     }
 
     function isValidUserSettings(data) {
-      return hasRequiredFields(['species', 'subspecies', 'mutations', 'uid']) &&
-             data.species is list && data.species.size() < 100 &&
-             data.subspecies is list && data.subspecies.size() < 200 &&
-             data.mutations is list && data.mutations.size() < 500 &&
+      return (!('species' in data) || (data.species is list && data.species.size() < 100)) &&
+             (!('subspecies' in data) || (data.subspecies is list && data.subspecies.size() < 200)) &&
+             (!('mutations' in data) || (data.mutations is list && data.mutations.size() < 500)) &&
              (!('currency' in data) || (data.currency is string && data.currency.size() < 10)) &&
              (!('account_expiry_date' in data) || data.account_expiry_date is string);
     }
@@ -315,8 +316,7 @@ service cloud.firestore {
     match /userSettings/{userId} {
       allow get: if isOwner(userId) || isAdmin();
       allow list: if isOwner(userId) || isAdmin();
-      allow create: if (isOwner(userId) || isAdmin()) && isValidUserSettings(request.resource.data);
-      allow update: if (isOwner(userId) || isAdmin()) && isValidUserSettings(request.resource.data);
+      allow create, update: if isAdmin() || (isOwner(userId) && isValidUserSettings(request.resource.data));
       allow delete: if isOwner(userId) || isAdmin();
     }
 

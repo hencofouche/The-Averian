@@ -5,7 +5,7 @@ import {
   Sliders, UserCheck, CheckCircle2, ChevronRight, Eye, 
   FileJson, Sparkles, Feather, Home, Heart, FileSpreadsheet, 
   DollarSign, CheckSquare, Layers, Lock, Unlock, Zap, X, Info,
-  ShieldAlert, Mail, AlertTriangle, UserX
+  ShieldAlert, Mail, AlertTriangle, UserX, Trash2, HelpCircle
 } from 'lucide-react';
 import { 
   UserSettings, AppUserAccount, Bird, Cage, Pair, BreedingRecord, 
@@ -16,7 +16,7 @@ import { cn } from '../lib/utils';
 import { toast } from 'sonner';
 import { 
   collection, getDocs, doc, setDoc, updateDoc, writeBatch, 
-  query, where, addDoc 
+  query, where, addDoc, deleteDoc
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import { format, addDays, addMonths, addYears, isAfter, isBefore } from 'date-fns';
@@ -58,8 +58,13 @@ export function AdminUserManagementPanel({
   const [usersList, setUsersList] = useState<UserWithDetails[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'expired' | 'trial' | 'yearly' | 'lifetime' | 'banned' | 'admins'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'registered' | 'unregistered' | 'active' | 'expired' | 'trial' | 'yearly' | 'lifetime' | 'banned' | 'admins'>('all');
   
+  // Delete Modal State
+  const [deleteTargetUser, setDeleteTargetUser] = useState<UserWithDetails | null>(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [isDeletingUser, setIsDeletingUser] = useState(false);
+
   // Subscription Modal State
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
   const [subscriptionUser, setSubscriptionUser] = useState<UserWithDetails | null>(null);
@@ -212,13 +217,21 @@ export function AdminUserManagementPanel({
       });
 
       const list = Array.from(usersMap.values());
-      // Sort: Banned accounts flagged, Admins first, then alphabetical
+      // Sort: Admins first, then Real Registered Google Accounts (alphabetically by email), then Legacy/Ghost docs
       list.sort((a, b) => {
         if (a.role === 'admin' && b.role !== 'admin') return -1;
         if (b.role === 'admin' && a.role !== 'admin') return 1;
         if (a.isBanned && !b.isBanned) return -1;
         if (b.isBanned && !a.isBanned) return 1;
-        return (a.email || a.displayName).localeCompare(b.email || b.displayName);
+        
+        const aHasEmail = Boolean(a.email && a.email.trim());
+        const bHasEmail = Boolean(b.email && b.email.trim());
+        if (aHasEmail && !bHasEmail) return -1;
+        if (!aHasEmail && bHasEmail) return 1;
+
+        const aKey = (a.email || a.displayName || a.uid).toLowerCase();
+        const bKey = (b.email || b.displayName || b.uid).toLowerCase();
+        return aKey.localeCompare(bKey);
       });
 
       setUsersList(list);
@@ -237,6 +250,8 @@ export function AdminUserManagementPanel({
   // Quick stats
   const stats = useMemo(() => {
     const total = usersList.length;
+    let registeredCount = 0;
+    let unregisteredCount = 0;
     let activeSubCount = 0;
     let expiredCount = 0;
     let lifetimeCount = 0;
@@ -248,6 +263,11 @@ export function AdminUserManagementPanel({
     usersList.forEach(u => {
       if (u.role === 'admin') adminCount++;
       if (u.isBanned) bannedCount++;
+      if (u.email && u.email.trim()) {
+        registeredCount++;
+      } else {
+        unregisteredCount++;
+      }
 
       if (u.subscriptionPlan === 'lifetime' || (u.account_expiry_date && new Date(u.account_expiry_date).getFullYear() > 2090)) {
         lifetimeCount++;
@@ -267,7 +287,7 @@ export function AdminUserManagementPanel({
       }
     });
 
-    return { total, activeSubCount, expiredCount, lifetimeCount, yearlyCount, adminCount, bannedCount };
+    return { total, registeredCount, unregisteredCount, activeSubCount, expiredCount, lifetimeCount, yearlyCount, adminCount, bannedCount };
   }, [usersList]);
 
   // Filtered Users
@@ -277,6 +297,8 @@ export function AdminUserManagementPanel({
 
     return usersList.filter(u => {
       // Status filter
+      if (statusFilter === 'registered' && (!u.email || !u.email.trim())) return false;
+      if (statusFilter === 'unregistered' && (u.email && u.email.trim().length > 0)) return false;
       if (statusFilter === 'admins' && u.role !== 'admin') return false;
       if (statusFilter === 'banned' && !u.isBanned) return false;
       if (statusFilter === 'lifetime') {
@@ -429,7 +451,7 @@ export function AdminUserManagementPanel({
       }));
 
       toast.success(
-        `Subscription extended for ${targetUser.email}! Valid until ${format(newExpiry, 'dd MMM yyyy')}`
+        `Subscription extended for ${targetUser.email || targetUser.displayName}! Valid until ${format(newExpiry, 'dd MMM yyyy')}`
       );
       setShowSubscriptionModal(false);
       if (onRefreshParentData) onRefreshParentData();
@@ -438,6 +460,31 @@ export function AdminUserManagementPanel({
       toast.error('Failed to update subscription: ' + err.message);
     } finally {
       setIsUpdatingSub(false);
+    }
+  };
+
+  // Handle Permanent Record Deletion (Ghost / Orphan cleanup)
+  const handleDeleteUserRecord = async () => {
+    if (!deleteTargetUser) return;
+    setIsDeletingUser(true);
+    try {
+      // Delete userSettings, users, and sellerProfiles
+      await deleteDoc(doc(db, 'userSettings', deleteTargetUser.uid)).catch(() => {});
+      await deleteDoc(doc(db, 'users', deleteTargetUser.uid)).catch(() => {});
+      if (deleteTargetUser.sellerProfile?.id) {
+        await deleteDoc(doc(db, 'sellerProfiles', deleteTargetUser.sellerProfile.id)).catch(() => {});
+      }
+      
+      setUsersList(prev => prev.filter(u => u.uid !== deleteTargetUser.uid));
+      toast.success(`Account / document record (${deleteTargetUser.email || deleteTargetUser.displayName || deleteTargetUser.uid}) permanently deleted.`);
+      setShowDeleteModal(false);
+      setDeleteTargetUser(null);
+      if (onRefreshParentData) onRefreshParentData();
+    } catch (err: any) {
+      console.error("Failed to delete user record:", err);
+      toast.error('Failed to delete document: ' + err.message);
+    } finally {
+      setIsDeletingUser(false);
     }
   };
 
@@ -847,10 +894,19 @@ export function AdminUserManagementPanel({
             All ({usersList.length})
           </button>
           <button
+            onClick={() => setStatusFilter('registered')}
+            className={cn(
+              "px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all",
+              statusFilter === 'registered' ? "bg-emerald-500 text-black shadow-md" : "bg-zinc-900 text-zinc-400 hover:text-emerald-400"
+            )}
+          >
+            Google Accounts ({stats.registeredCount})
+          </button>
+          <button
             onClick={() => setStatusFilter('active')}
             className={cn(
               "px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all",
-              statusFilter === 'active' ? "bg-emerald-500 text-black shadow-md" : "bg-zinc-900 text-zinc-400 hover:text-emerald-400"
+              statusFilter === 'active' ? "bg-emerald-600 text-white shadow-md" : "bg-zinc-900 text-zinc-400 hover:text-emerald-400"
             )}
           >
             Active ({stats.activeSubCount})
@@ -882,6 +938,17 @@ export function AdminUserManagementPanel({
           >
             Expired ({stats.expiredCount})
           </button>
+          {stats.unregisteredCount > 0 && (
+            <button
+              onClick={() => setStatusFilter('unregistered')}
+              className={cn(
+                "px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all",
+                statusFilter === 'unregistered' ? "bg-amber-600 text-white shadow-md" : "bg-zinc-900 text-zinc-400 hover:text-amber-300"
+              )}
+            >
+              Legacy / Ghost Docs ({stats.unregisteredCount})
+            </button>
+          )}
           <button
             onClick={() => setStatusFilter('banned')}
             className={cn(
@@ -976,6 +1043,16 @@ export function AdminUserManagementPanel({
                             <UserCheck size={10} /> VERIFIED SELLER
                           </span>
                         )}
+
+                        {u.email ? (
+                          <span className="text-[10px] font-bold uppercase tracking-wider bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full flex items-center gap-1">
+                            <CheckCircle2 size={10} /> GOOGLE ACCOUNT
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-bold uppercase tracking-wider bg-amber-500/15 text-amber-400 border border-amber-500/30 px-2 py-0.5 rounded-full flex items-center gap-1">
+                            <HelpCircle size={10} /> LEGACY / UNLINKED DOC
+                          </span>
+                        )}
                       </div>
 
                       {/* Prominent Real Email Address & UID */}
@@ -998,7 +1075,7 @@ export function AdminUserManagementPanel({
                         ) : (
                           <div className="flex items-center gap-1.5 bg-zinc-900/60 border border-dashed border-zinc-800 px-2.5 py-0.5 rounded-lg text-zinc-500 font-medium">
                             <Mail size={12} className="text-zinc-600" />
-                            <span className="italic">No registered email</span>
+                            <span className="italic">No registered Google email</span>
                           </div>
                         )}
 
@@ -1147,7 +1224,7 @@ export function AdminUserManagementPanel({
                       className="text-xs font-bold bg-gold-500/15 hover:bg-gold-500/25 text-gold-300 border border-gold-500/30 rounded-xl px-3 py-1.5"
                     >
                       <Copy size={13} className="mr-1.5 text-gold-400" />
-                      Clone / Transfer Data...
+                      Clone Data...
                     </Button>
                     <Button
                       variant="secondary"
@@ -1164,6 +1241,18 @@ export function AdminUserManagementPanel({
                       title="Download JSON Backup"
                     >
                       <Download size={13} />
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      onClick={() => {
+                        setDeleteTargetUser(u);
+                        setShowDeleteModal(true);
+                      }}
+                      className="text-xs font-bold bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 border border-rose-800/40 rounded-xl px-2.5 py-1.5"
+                      title="Permanently remove this user record/document"
+                    >
+                      <Trash2 size={13} className="mr-1 text-rose-400" />
+                      Purge
                     </Button>
                   </div>
                 </div>
@@ -1641,6 +1730,74 @@ export function AdminUserManagementPanel({
             <div className="flex items-center justify-end pt-3 border-t border-zinc-800">
               <Button variant="secondary" onClick={() => setInspectUser(null)} className="text-xs">
                 Close Explorer
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 5. PERMANENT DELETE / PURGE MODAL */}
+      {/* ========================================================================= */}
+      {showDeleteModal && deleteTargetUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="w-full max-w-md bg-zinc-950 border border-rose-900/50 rounded-3xl p-6 space-y-5 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-rose-500/20 text-rose-400 flex items-center justify-center">
+                  <Trash2 size={20} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black uppercase text-white tracking-wider">
+                    Purge User Record
+                  </h3>
+                  <p className="text-xs text-rose-400 font-medium">Irreversible Document Removal</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => {
+                  setShowDeleteModal(false);
+                  setDeleteTargetUser(null);
+                }} 
+                className="text-zinc-500 hover:text-white p-1"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs text-zinc-300">
+              <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-2xl space-y-1">
+                <p className="font-bold text-white">Target Record:</p>
+                <p className="text-gold-400 font-semibold">{deleteTargetUser.email || 'No Email Record'}</p>
+                <p className="text-zinc-400">Name: {deleteTargetUser.displayName}</p>
+                <p className="text-zinc-500 font-mono text-[11px]">UID: {deleteTargetUser.uid}</p>
+              </div>
+
+              <p className="text-rose-300 font-semibold flex items-start gap-1.5 bg-rose-950/30 border border-rose-900/40 p-2.5 rounded-xl">
+                <AlertTriangle size={16} className="text-rose-400 shrink-0 mt-0.5" />
+                <span>
+                  This will delete this user's profile and settings documents from Firestore. If this was an orphan/test doc, it will disappear immediately.
+                </span>
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-zinc-800">
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setShowDeleteModal(false);
+                  setDeleteTargetUser(null);
+                }}
+                className="text-xs"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleDeleteUserRecord}
+                disabled={isDeletingUser}
+                className="text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white"
+              >
+                {isDeletingUser ? 'Deleting...' : 'Permanently Purge Record'}
               </Button>
             </div>
           </div>

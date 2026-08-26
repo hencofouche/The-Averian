@@ -1,17 +1,18 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth';
+import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onIdTokenChanged } from 'firebase/auth';
 import { 
   initializeFirestore,
   persistentLocalCache,
   persistentMultipleTabManager,
   getFirestore, doc, getDocFromServer,
-  disableNetwork, enableNetwork
+  disableNetwork, enableNetwork,
+  waitForPendingWrites
 } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import firebaseConfig from '../firebase-applet-config.json';
 import { OperationType, FirestoreErrorInfo } from './types';
 
-export { disableNetwork, enableNetwork };
+export { disableNetwork, enableNetwork, waitForPendingWrites };
 
 export const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
@@ -32,6 +33,55 @@ export const db = firestoreInstance;
 export const auth = getAuth(app);
 export const storage = getStorage(app);
 export const googleProvider = new GoogleAuthProvider();
+
+// Track offline sync state
+let isSyncingPendingWrites = false;
+
+// Auto-recovery on network state transitions
+if (typeof window !== 'undefined') {
+  window.addEventListener('online', async () => {
+    console.log('[Firebase Offline Engine] Network reconnected. Ensuring fresh auth token & syncing cache...');
+    try {
+      if (auth.currentUser) {
+        // Refresh token to prevent permission-denied rejection on pending offline queues
+        await auth.currentUser.getIdToken(true).catch(e => console.warn('Token refresh on reconnect:', e));
+      }
+      if (db) {
+        await enableNetwork(db).catch(() => {});
+        // Gracefully wait for pending offline queue to flush
+        if (!isSyncingPendingWrites) {
+          isSyncingPendingWrites = true;
+          waitForPendingWrites(db)
+            .then(() => {
+              console.log('[Firebase Offline Engine] All offline queued writes flushed successfully to Cloud Firestore.');
+              window.dispatchEvent(new CustomEvent('firestore_queue_synced'));
+            })
+            .catch((err) => {
+              console.warn('[Firebase Offline Engine] Some offline writes were rolled back or resolved with conflicts:', err?.message || err);
+            })
+            .finally(() => {
+              isSyncingPendingWrites = false;
+            });
+        }
+      }
+    } catch (err) {
+      console.warn('[Firebase Offline Engine] Reconnection handler warning:', err);
+    }
+  });
+
+  window.addEventListener('offline', async () => {
+    console.log('[Firebase Offline Engine] Offline mode active. Operations will be queued in IndexedDB.');
+  });
+}
+
+// Keep fresh token ready for offline/online reconciliation
+onIdTokenChanged(auth, async (user) => {
+  if (user && db && navigator.onLine) {
+    try {
+      await enableNetwork(db).catch(() => {});
+    } catch (_) {}
+  }
+});
 
 export const loginWithGoogle = async () => {
   return signInWithPopup(auth, googleProvider);
@@ -55,14 +105,31 @@ export async function setFirestoreNetworkState(online: boolean) {
 }
 
 export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
-  // If we are offline, let local cache proceed without throwing blocking errors
-  if (!navigator.onLine || (error instanceof Error && error.message.includes('offline'))) {
-    console.warn(`Firestore operation '${operationType}' executed offline on path '${path}'. Change stored in IndexedDB.`);
+  const errMsg = error instanceof Error ? error.message : String(error);
+
+  // If we are offline, or if the error is due to an offline queued write conflict, log cleanly without crashing
+  if (
+    !navigator.onLine || 
+    errMsg.includes('offline') || 
+    errMsg.includes('client is offline') ||
+    errMsg.includes('Failed to get document because the client is offline') ||
+    errMsg.includes('write-stream')
+  ) {
+    console.warn(`Firestore operation '${operationType}' queued locally in IndexedDB on path '${path}'. Network offline.`);
+    return;
+  }
+
+  // Handle transient session token expiry during offline writes gracefully
+  if (errMsg.includes('permission-denied') || errMsg.includes('unauthenticated')) {
+    console.warn(`Firestore authorization warning during '${operationType}' on '${path}': ${errMsg}. Will retry upon token refresh.`);
+    if (auth.currentUser) {
+      auth.currentUser.getIdToken(true).catch(() => {});
+    }
     return;
   }
 
   const errInfo: FirestoreErrorInfo = {
-    error: error instanceof Error ? error.message : String(error),
+    error: errMsg,
     authInfo: {
       userId: auth.currentUser?.uid,
       email: auth.currentUser?.email || undefined,

@@ -18,6 +18,7 @@ import { db, auth } from '../firebase';
 import { format } from 'date-fns';
 import { compressAndUploadImage } from '../lib/image-utils';
 import { defaultSpecies, defaultMutations } from '../lib/default-data';
+import { sanitizePhoneNumber, getWhatsAppCleanNumber, buildWhatsAppLink, isValidPhoneNumber } from '../lib/phone-utils';
 
 interface MarketplaceViewProps {
   user: any;
@@ -56,6 +57,7 @@ export function MarketplaceView({
   const [selectedSexing, setSelectedSexing] = useState<string>('All');
   const [selectedDelivery, setSelectedDelivery] = useState<string>('All');
   const [onlyVetChecked, setOnlyVetChecked] = useState(false);
+  const [includeSoldAndArchived, setIncludeSoldAndArchived] = useState(false);
   const [minPrice, setMinPrice] = useState<string>('');
   const [maxPrice, setMaxPrice] = useState<string>('');
   const [sortBy, setSortBy] = useState<'newest' | 'price_low' | 'price_high'>('newest');
@@ -103,14 +105,25 @@ export function MarketplaceView({
   // Filter listings
   const filteredListings = useMemo(() => {
     return listings.filter(l => {
+      // Check linked flock bird status
+      const linkedBird = l.birdId ? birds.find(b => b.id === l.birdId) : null;
+      const isBirdUnavailable = linkedBird && (
+        linkedBird.statuses?.some(s => s.toLowerCase() === 'sold' || s.toLowerCase() === 'deceased')
+      );
+
       // Tab matching
       if (activeTab === 'for_sale' && (l.type !== 'for_sale' || l.status === 'archived')) return false;
       if (activeTab === 'wanted' && (l.type !== 'wanted' || l.status === 'archived')) return false;
       if (activeTab === 'my_listings' && l.sellerId !== user?.uid) return false;
 
-      // Only show active listings for public browse tabs, unless it's my listings or admin
-      if (activeTab !== 'my_listings' && !isAdmin && l.status !== 'active' && l.status !== 'sold') {
-        return false;
+      // Auto-filter sold or deceased birds or archived listings from public browse
+      if (activeTab !== 'my_listings' && !isAdmin) {
+        if (!includeSoldAndArchived && (l.status === 'sold' || l.status === 'archived' || isBirdUnavailable)) {
+          return false;
+        }
+        if (l.status !== 'active' && l.status !== 'sold') {
+          return false;
+        }
       }
 
       // Search Query
@@ -163,9 +176,9 @@ export function MarketplaceView({
       return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
     });
   }, [
-    listings, activeTab, user, isAdmin, searchQuery, selectedCategory, 
+    listings, activeTab, user, isAdmin, birds, searchQuery, selectedCategory, 
     selectedSpecies, selectedBanding, selectedSexing, selectedDelivery, 
-    onlyVetChecked, selectedTown, minPrice, maxPrice, sortBy
+    onlyVetChecked, includeSoldAndArchived, selectedTown, minPrice, maxPrice, sortBy
   ]);
 
   // Handlers
@@ -459,6 +472,15 @@ export function MarketplaceView({
                 />
                 <span className="text-sm font-medium text-zinc-200">Vet Checked Only</span>
               </label>
+              <label className="flex items-center gap-2 cursor-pointer py-1 select-none">
+                <input
+                  type="checkbox"
+                  checked={includeSoldAndArchived}
+                  onChange={e => setIncludeSoldAndArchived(e.target.checked)}
+                  className="w-4 h-4 rounded border-zinc-700 bg-zinc-900 text-gold-500 focus:ring-gold-500/20"
+                />
+                <span className="text-sm font-medium text-zinc-400">Show Sold / Inactive</span>
+              </label>
               <button
                 onClick={() => {
                   setSelectedCategory('All');
@@ -468,6 +490,7 @@ export function MarketplaceView({
                   setSelectedDelivery('All');
                   setSelectedTown('All');
                   setOnlyVetChecked(false);
+                  setIncludeSoldAndArchived(false);
                   setMinPrice('');
                   setMaxPrice('');
                   setSearchQuery('');
@@ -857,17 +880,31 @@ function SellerProfileModal({
       return;
     }
 
+    const sanitizedWhatsApp = sanitizePhoneNumber(formData.whatsapp);
+    const sanitizedPhone = formData.phone ? sanitizePhoneNumber(formData.phone) : '';
+
+    if (!isValidPhoneNumber(sanitizedWhatsApp)) {
+      toast.error('Please enter a valid WhatsApp phone number with at least 9 digits.');
+      return;
+    }
+
     setIsSaving(true);
     try {
+      const payload = {
+        ...formData,
+        whatsapp: sanitizedWhatsApp,
+        phone: sanitizedPhone
+      };
+
       if (existingProfile?.id) {
         await updateDoc(doc(db, 'sellerProfiles', existingProfile.id), {
-          ...formData,
+          ...payload,
           updatedAt: new Date().toISOString()
         });
         toast.success('Seller profile updated successfully');
       } else {
         await addDoc(collection(db, 'sellerProfiles'), {
-          ...formData,
+          ...payload,
           uid: user.uid,
           status: 'pending', // Pending Admin's approval
           createdAt: new Date().toISOString(),
@@ -882,6 +919,8 @@ function SellerProfileModal({
       setIsSaving(false);
     }
   };
+
+  const previewWhatsAppUrl = formData.whatsapp ? buildWhatsAppLink(formData.whatsapp, 'Hello from The Averian marketplace!') : null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
@@ -984,14 +1023,35 @@ function SellerProfileModal({
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-zinc-400">WhatsApp Number *</label>
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-medium text-zinc-400">WhatsApp Number *</label>
+                {previewWhatsAppUrl && (
+                  <a
+                    href={previewWhatsAppUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-[10px] text-emerald-400 hover:underline flex items-center gap-1 font-semibold"
+                    title="Verify that WhatsApp opens your chat"
+                  >
+                    <MessageCircle size={10} /> Test Chat
+                  </a>
+                )}
+              </div>
               <Input
                 required
                 value={formData.whatsapp}
                 onChange={e => setFormData({ ...formData, whatsapp: e.target.value })}
-                placeholder="e.g. +27 73 123 4567"
+                onBlur={() => {
+                  if (formData.whatsapp) {
+                    setFormData(prev => ({ ...prev, whatsapp: sanitizePhoneNumber(prev.whatsapp) }));
+                  }
+                }}
+                placeholder="e.g. 082 123 4567 or +27 82..."
                 className="bg-zinc-900 border-zinc-800 text-sm"
               />
+              <p className="text-[10px] text-zinc-500">
+                Auto-formats local (082...) to international (+2782...)
+              </p>
             </div>
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-zinc-400">Contact Email</label>
@@ -1392,7 +1452,7 @@ function ListingFormModal({
                 className="text-sm bg-zinc-950 border-zinc-700 py-1.5 min-w-[150px] max-w-[200px]"
               >
                 <option value="">Select Bird...</option>
-                {birds.map(b => (
+                {birds.filter(b => !b.statuses?.some(s => s.toLowerCase() === 'sold' || s.toLowerCase() === 'deceased')).map(b => (
                   <option key={b.id} value={b.id}>{b.name} ({b.species})</option>
                 ))}
               </Select>
@@ -1958,7 +2018,7 @@ function ListingDetailModal({
   };
 
   const directWhatsappUrl = listing.sellerWhatsApp 
-    ? `https://wa.me/${listing.sellerWhatsApp.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(generateInquiryMessage())}`
+    ? buildWhatsAppLink(listing.sellerWhatsApp, generateInquiryMessage())
     : null;
 
   const handleSendOfferWhatsApp = () => {
@@ -1971,7 +2031,11 @@ function ListingDetailModal({
       return;
     }
     const msg = generateInquiryMessage({ price: offerPrice, note: offerNote });
-    const url = `https://wa.me/${listing.sellerWhatsApp.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(msg)}`;
+    const url = buildWhatsAppLink(listing.sellerWhatsApp, msg);
+    if (!url) {
+      toast.error('Invalid WhatsApp number for this seller.');
+      return;
+    }
     window.open(url, '_blank');
     setShowOfferDrawer(false);
   };

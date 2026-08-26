@@ -40,6 +40,8 @@ import { getTranslatedLabel, LANGUAGE_NAMES, setActiveLanguage, t as tGlobal } f
 import { InstallAppButton } from './components/InstallAppButton';
 import { InstallPromptBanner } from './components/InstallPromptBanner';
 import { BannedUserScreen } from './components/BannedUserScreen';
+import { useIncubationNotifications } from './hooks/useIncubationNotifications';
+import { IncubationAlertsModal } from './components/IncubationAlertsModal';
 
 function ImageGallery({ imageUrls, initialIndex, onClose }: { imageUrls: string[], initialIndex: number, onClose: () => void }) {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
@@ -733,6 +735,17 @@ export default function App() {
     pageId: AppPageId;
     pageName: string;
   } | null>(null);
+
+  // Incubation Push Notifications
+  const [isIncubationModalOpen, setIsIncubationModalOpen] = useState(false);
+  const {
+    permission: notifPermission,
+    isSupported: isNotifSupported,
+    isGranted: isNotifGranted,
+    reminders: incubationReminders,
+    enableNotifications,
+    isRequesting: isRequestingNotifs
+  } = useIncubationNotifications(breedingRecords, birds);
 
   useEffect(() => {
     const handleOnline = () => {
@@ -2439,6 +2452,23 @@ export default function App() {
             </div>
             {activeTab !== 'settings' && activeTab !== 'genetics' && activeTab !== 'stats' && activeTab !== 'print' && activeTab !== 'admin' && activeTab !== 'marketplace' && activeTab !== 'wiki' && !showComingSoonSplash && (
               <div className="flex items-center gap-1.5 xl:hidden">
+                <button
+                  onClick={() => setIsIncubationModalOpen(true)}
+                  className={cn(
+                    "p-2.5 rounded-xl border text-sm font-bold transition-all relative",
+                    incubationReminders.filter(r => r.urgency === 'urgent' || r.urgency === 'today').length > 0
+                      ? "bg-amber-500/20 border-amber-500/40 text-amber-400 animate-pulse"
+                      : "bg-zinc-800 border-zinc-700 text-zinc-300 hover:text-white"
+                  )}
+                  title="Incubation Alerts"
+                >
+                  <Bell size={16} />
+                  {incubationReminders.length > 0 && (
+                    <span className="absolute -top-1 -right-1 w-4 h-4 bg-amber-500 text-black text-[9px] font-black rounded-full flex items-center justify-center">
+                      {incubationReminders.length}
+                    </span>
+                  )}
+                </button>
                 <InstallAppButton variant="header-mobile" />
                 <Button onClick={() => setIsScanModalOpen(true)} className="py-2.5 px-3 text-sm font-bold bg-zinc-800 text-white hover:bg-zinc-700 hover:text-gold-500">
                   <Scan size={16} />
@@ -2517,6 +2547,24 @@ export default function App() {
             
             {activeTab !== 'settings' && activeTab !== 'genetics' && activeTab !== 'stats' && activeTab !== 'print' && activeTab !== 'admin' && activeTab !== 'marketplace' && activeTab !== 'wiki' && !showComingSoonSplash && (
               <div className="hidden xl:flex gap-2 items-center">
+                <button
+                  onClick={() => setIsIncubationModalOpen(true)}
+                  className={cn(
+                    "py-3 px-4 rounded-xl border text-sm font-bold flex items-center gap-2 transition-all relative cursor-pointer",
+                    incubationReminders.filter(r => r.urgency === 'urgent' || r.urgency === 'today').length > 0
+                      ? "bg-amber-500/15 border-amber-500/40 text-amber-400 shadow-lg shadow-amber-500/10"
+                      : "bg-zinc-800 border-zinc-700 text-zinc-300 hover:text-white hover:bg-zinc-700"
+                  )}
+                  title="Incubation Alerts & Egg Milestones"
+                >
+                  <Bell size={17} className={incubationReminders.some(r => r.urgency === 'today' || r.urgency === 'urgent') ? "animate-bounce" : ""} />
+                  <span>Incubation Alerts</span>
+                  {incubationReminders.length > 0 && (
+                    <span className="bg-amber-500 text-black text-[10px] font-black px-1.5 py-0.2 rounded-full">
+                      {incubationReminders.length}
+                    </span>
+                  )}
+                </button>
                 <InstallAppButton variant="header" />
                 <Button onClick={() => setIsScanModalOpen(true)} className="py-3 px-4 text-sm font-bold uppercase tracking-widest bg-zinc-800 text-secondary border border-secondary/20 hover:bg-zinc-700">
                   <Scan size={18} />
@@ -3610,6 +3658,17 @@ export default function App() {
           }}
         />
       )}
+
+      <IncubationAlertsModal
+        isOpen={isIncubationModalOpen}
+        onClose={() => setIsIncubationModalOpen(false)}
+        reminders={incubationReminders}
+        isPermissionGranted={isNotifGranted}
+        isPermissionSupported={isNotifSupported}
+        onRequestPermission={enableNotifications}
+        isRequesting={isRequestingNotifs}
+        onNavigateToBreeding={() => setActiveTab('breeding')}
+      />
 
 
 
