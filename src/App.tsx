@@ -1,3 +1,4 @@
+// Trigger Vercel rebuild to clear GitHub sync corruption
 import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { format } from 'date-fns';
@@ -10470,9 +10471,5 @@ function TaskForm({ user, initialData, birds, cages, onClose, userSettings }: { 
                 type="button" 
                 onClick={() => setFormData({ ...formData, subTasks: formData.subTasks?.filter((_, i) => i !== idx) })} 
                 className="text-white transition-colors"
-                onMouseEnter={(e) => e.currentTarget.style.color = 'var(--theme-delete-color, #ef4444)'}
-                onMouseLxœ\ÍnÂ0„ï<Å*BU=´	UQ{«z)}€M¼À
-Ç‰ì?…¼{İª"	>y¾]Í†pOÙyB	d iÑ8GVVè6$S/'Xe*Ä‡-Åíoq£Ò•C¿ƒçïà}÷ĞÂìv)åHe‡<iŞ÷Q’t×Ã±f2Ú“\ÉòÏäTSù&/Y"(zÿe@µnŒú¤îAè(Ê—ĞÔ5¹=8,vl7êÀš¼Àº²¢r`š=æ†tvfÿ‰û°—°;ÖìH·]ünáÒ÷
-5¹y?Z.QHùš-”NÍ£Acğ6dì
-8OØ²0šW„ñzrÊ:	gdÕ:˜Â
-ı.N‚G@/ZÿëöÚØ²Wè¯råï?yµ£   ÿÿ ˜Ä—¨
+                onMouseEnter={(e) => e.currentTarget.style.color = 'varxœd‘ÏnÂ0‡ï<…Å$ÚJhí°µLCÛí2ö iã‚EšV‰ËŸAß}ašhœâ/Ögë—P^aB¡FF‘•º´÷p‡ùÄŸ(hzpuJóQÖç(7˜BŒ ™³ÚZ4¼v‰<t¼×d@°]ãkzãVºÕıx÷Ãc£ë¦x”ÖÌ¥¹äñHÑ¦‹¢¨vñxUä„Z9ä3™ıÙ÷&}W§q2-û”…G[‘×ZCµ`Ü±pÔU…6“­ÌÖd–bK
+C^©ö°ŠœL5ªä@îKn|@î}W‘EÕ´ë·/ÏK©Ğ»;HC…ôŸå*2PX1î_$O`üm ‡1Iı&YÂ` rH*òc8¾+å¥°nDŞáÑ«RÿusNlÖ‰ßçWÚât{Mï  ÿÿ ÕÆ§<
