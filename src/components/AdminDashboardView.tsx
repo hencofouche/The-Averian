@@ -267,7 +267,7 @@ export function AdminDashboardView({
         <button
           onClick={() => setActiveTab('listings')}
           className={cn(
-            "flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-black uppercase tracking-wider transition-all",
+            "flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-black uppercase tracking-wider transition-all whitespace-nowrap shrink-0",
             activeTab === 'listings'
               ? "bg-gold-500 text-black shadow-lg shadow-gold-500/20"
               : "bg-zinc-900/60 text-zinc-400 hover:text-white border border-zinc-800"
@@ -285,7 +285,7 @@ export function AdminDashboardView({
         <button
           onClick={() => setActiveTab('reviews')}
           className={cn(
-            "flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-black uppercase tracking-wider transition-all",
+            "flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-black uppercase tracking-wider transition-all whitespace-nowrap shrink-0",
             activeTab === 'reviews'
               ? "bg-gold-500 text-black shadow-lg shadow-gold-500/20"
               : "bg-zinc-900/60 text-zinc-400 hover:text-white border border-zinc-800"
@@ -303,7 +303,7 @@ export function AdminDashboardView({
         <button
           onClick={() => setActiveTab('comingSoon')}
           className={cn(
-            "flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-black uppercase tracking-wider transition-all",
+            "flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-black uppercase tracking-wider transition-all whitespace-nowrap shrink-0",
             activeTab === 'comingSoon'
               ? "bg-gold-500 text-black shadow-lg shadow-gold-500/20"
               : "bg-zinc-900/60 text-zinc-400 hover:text-white border border-zinc-800"
@@ -321,7 +321,7 @@ export function AdminDashboardView({
         <button
           onClick={() => setActiveTab('diagnostics')}
           className={cn(
-            "flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-black uppercase tracking-wider transition-all",
+            "flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-black uppercase tracking-wider transition-all whitespace-nowrap shrink-0",
             activeTab === 'diagnostics'
               ? "bg-gold-500 text-black shadow-lg shadow-gold-500/20"
               : "bg-zinc-900/60 text-zinc-400 hover:text-white border border-zinc-800"

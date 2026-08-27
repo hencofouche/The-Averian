@@ -424,10 +424,10 @@ export function AdminDiagnosticsView({
       </div>
 
       {/* Sub-Navigation Tabs */}
-      <div className="flex flex-wrap items-center gap-2 border-b border-white/10 pb-3">
+      <div className="flex items-center gap-2 overflow-x-auto pb-2 border-b border-white/10 scrollbar-none">
         <button
           onClick={() => setActiveSubTab('diagnostics')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap shrink-0 ${
             activeSubTab === 'diagnostics' 
               ? 'bg-gold-500 text-black shadow-lg shadow-gold-500/20' 
               : 'bg-zinc-900 text-zinc-400 hover:text-white hover:bg-zinc-800'
@@ -439,19 +439,19 @@ export function AdminDiagnosticsView({
 
         <button
           onClick={() => setActiveSubTab('cost')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap shrink-0 ${
             activeSubTab === 'cost' 
               ? 'bg-gold-500 text-black shadow-lg shadow-gold-500/20' 
               : 'bg-zinc-900 text-zinc-400 hover:text-white hover:bg-zinc-800'
           }`}
         >
           <DollarSign size={14} />
-          <span>Vercel / Edge & Firestore Cost Monitor</span>
+          <span>Vercel / Edge & Cost Monitor</span>
         </button>
 
         <button
           onClick={() => setActiveSubTab('database')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap shrink-0 ${
             activeSubTab === 'database' 
               ? 'bg-gold-500 text-black shadow-lg shadow-gold-500/20' 
               : 'bg-zinc-900 text-zinc-400 hover:text-white hover:bg-zinc-800'
@@ -463,7 +463,7 @@ export function AdminDiagnosticsView({
 
         <button
           onClick={() => setActiveSubTab('raw')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap shrink-0 ${
             activeSubTab === 'raw' 
               ? 'bg-gold-500 text-black shadow-lg shadow-gold-500/20' 
               : 'bg-zinc-900 text-zinc-400 hover:text-white hover:bg-zinc-800'

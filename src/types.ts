@@ -45,6 +45,8 @@ export interface ComingSoonPageConfig {
   badgeText?: string;
   featuresList?: string[];
   allowAdminTesting?: boolean;
+  allowBetaTesters?: boolean;
+  allowedUserIds?: string[];
   updatedAt?: string;
   updatedBy?: string;
 }
@@ -73,6 +75,10 @@ export interface UserSettings {
   subscriptionPlan?: 'trial' | 'monthly' | 'yearly' | 'lifetime' | 'admin_comp' | 'free_grace';
   subscribedAt?: string;
   subscriptionGrantedBy?: string;
+  isBetaTester?: boolean;
+  canTestComingSoon?: boolean;
+  betaTesterGrantedBy?: string;
+  betaTesterGrantedAt?: string;
   email?: string;
   displayName?: string;
   role?: 'admin' | 'user';
@@ -101,6 +107,10 @@ export interface AppUserAccount {
   account_expiry_date?: string;
   subscriptionPlan?: string;
   subscriptionGrantedBy?: string;
+  isBetaTester?: boolean;
+  canTestComingSoon?: boolean;
+  betaTesterGrantedBy?: string;
+  betaTesterGrantedAt?: string;
   createdAt?: string;
   lastLoginAt?: string;
   updatedAt?: string;
@@ -186,6 +196,9 @@ export interface SellerProfile {
   town: string;
   provinceState?: string;
   country?: string;
+  countryCode?: string;
+  currency?: string;
+  currencyCode?: string;
   phone?: string;
   whatsapp?: string;
   email?: string;
@@ -224,9 +237,11 @@ export interface MarketplaceListing {
   price: number;
   priceMax?: number; // For wanted listings range
   currency: string;
+  currencyCode?: string;
   locationTown: string;
   provinceState?: string;
   country?: string;
+  countryCode?: string;
   deliveryOption: 'Collection Only' | 'Courier Can Be Arranged' | 'Delivery Available' | 'Collection or Courier';
   sellerId: string; // uid
   sellerName: string;

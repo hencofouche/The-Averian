@@ -29,6 +29,7 @@ export function AdminComingSoonModal({
   const [description, setDescription] = useState(initialConfig?.description || '');
   const [estimatedRelease, setEstimatedRelease] = useState(initialConfig?.estimatedRelease || 'Coming Soon');
   const [badgeText, setBadgeText] = useState(initialConfig?.badgeText || 'COMING SOON');
+  const [allowBetaTesters, setAllowBetaTesters] = useState(initialConfig?.allowBetaTesters ?? true);
   const [featuresList, setFeaturesList] = useState<string[]>(initialConfig?.featuresList || []);
   const [newFeatureInput, setNewFeatureInput] = useState('');
   const [isSaving, setIsSaving] = useState(false);
@@ -41,6 +42,7 @@ export function AdminComingSoonModal({
       setDescription(initialConfig?.description || '');
       setEstimatedRelease(initialConfig?.estimatedRelease || 'Coming Soon');
       setBadgeText(initialConfig?.badgeText || 'COMING SOON');
+      setAllowBetaTesters(initialConfig?.allowBetaTesters ?? true);
       setFeaturesList(initialConfig?.featuresList || []);
       setNewFeatureInput('');
     }
@@ -72,6 +74,7 @@ export function AdminComingSoonModal({
         badgeText: badgeText.trim() || 'COMING SOON',
         featuresList: featuresList.length > 0 ? featuresList : undefined,
         allowAdminTesting: true,
+        allowBetaTesters,
         updatedAt: new Date().toISOString()
       };
       await onSave(pageId, config);
@@ -138,6 +141,32 @@ export function AdminComingSoonModal({
             <div className="text-xs text-amber-300">
               <span className="font-bold">Admin Testing Active:</span> Because you are an administrator, you will always be able to enter and test this page even when Coming Soon is enabled.
             </div>
+          </div>
+
+          {/* Beta Tester Access Toggle */}
+          <div className="p-4 rounded-2xl bg-zinc-900/60 border border-white/5 flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-bold text-white flex items-center gap-2">
+                <Sparkles size={16} className="text-indigo-400" />
+                Allow Permitted Beta Testers
+              </p>
+              <p className="text-xs text-zinc-400">
+                Allow users who have been granted Beta Tester permissions by Admin to access and test this page.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setAllowBetaTesters(!allowBetaTesters)}
+              className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                allowBetaTesters ? 'bg-indigo-500' : 'bg-zinc-700'
+              }`}
+            >
+              <span
+                className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-black shadow-lg ring-0 transition duration-200 ease-in-out ${
+                  allowBetaTesters ? 'translate-x-5' : 'translate-x-0'
+                }`}
+              />
+            </button>
           </div>
 
           {/* Custom Details */}

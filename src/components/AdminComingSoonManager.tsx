@@ -228,11 +228,20 @@ export function AdminComingSoonManager({
                   {config?.description || page.description}
                 </p>
 
-                {/* Admin Status Note */}
+                {/* Admin Status Note & Beta Tester Note */}
                 {isComingSoon && (
-                  <div className="p-2 rounded-lg bg-zinc-900/90 border border-white/5 text-[11px] text-zinc-300 mb-4 flex items-center gap-1.5">
-                    <Shield size={12} className="text-amber-400 shrink-0" />
-                    <span>Admin test status: <strong className="text-amber-300">Active Access</strong></span>
+                  <div className="space-y-1.5 mb-4">
+                    <div className="p-2 rounded-lg bg-zinc-900/90 border border-white/5 text-[11px] text-zinc-300 flex items-center gap-1.5">
+                      <Shield size={12} className="text-amber-400 shrink-0" />
+                      <span>Admin test status: <strong className="text-amber-300">Full Access</strong></span>
+                    </div>
+
+                    {config?.allowBetaTesters !== false && (
+                      <div className="p-2 rounded-lg bg-indigo-950/40 border border-indigo-500/20 text-[11px] text-indigo-300 flex items-center gap-1.5">
+                        <Sparkles size={12} className="text-indigo-400 shrink-0" />
+                        <span>Beta Testers Early Access: <strong className="text-indigo-200">Authorized</strong></span>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

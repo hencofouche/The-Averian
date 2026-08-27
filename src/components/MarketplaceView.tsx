@@ -1,10 +1,10 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { 
   ShoppingBag, Search, Plus, Filter, CheckCircle2, AlertCircle, Clock, 
   MapPin, Phone, MessageCircle, Mail, Shield, ShieldCheck, ShieldAlert, 
   Tag, DollarSign, Calendar, ChevronDown, ChevronUp, Image as ImageIcon,
   Check, X, Star, Heart, Bird as BirdIcon, Eye, Trash2, Edit2, Send,
-  Share2, ArrowUpDown, Truck, Award, HelpCircle, UserCheck, AlertTriangle, RefreshCw, Sparkles, ExternalLink, Zap
+  Share2, ArrowUpDown, Truck, Award, HelpCircle, UserCheck, AlertTriangle, RefreshCw, Sparkles, ExternalLink, Zap, Globe
 } from 'lucide-react';
 import { DiditVerificationModal } from './DiditVerificationModal';
 import { 
@@ -20,6 +20,15 @@ import { format } from 'date-fns';
 import { compressAndUploadImage } from '../lib/image-utils';
 import { defaultSpecies, defaultMutations } from '../lib/default-data';
 import { sanitizePhoneNumber, getWhatsAppCleanNumber, buildWhatsAppLink, isValidPhoneNumber } from '../lib/phone-utils';
+import {
+  SUPPORTED_COUNTRY_MARKETPLACES,
+  DEFAULT_COUNTRY,
+  getCountryMarketplace,
+  getCurrencySymbol,
+  formatPrice,
+  convertPrice,
+  CountryMarketplaceInfo
+} from '../lib/country-marketplace';
 
 interface MarketplaceViewProps {
   user: any;
@@ -84,25 +93,67 @@ export function MarketplaceView({
 
   const isVerifiedSeller = myProfile?.status === 'approved';
 
-  // Currency symbol
-  const currencySymbol = userSettings?.currency || '$';
+  // Country Marketplace View Selection
+  const defaultCountryCode = useMemo(() => {
+    if (myProfile?.country) {
+      return getCountryMarketplace(myProfile.country).code;
+    }
+    if (userSettings?.currency) {
+      const match = SUPPORTED_COUNTRY_MARKETPLACES.find(
+        c => c.currencyCode === userSettings.currency || c.currencySymbol === userSettings.currency
+      );
+      if (match) return match.code;
+    }
+    return 'ZA';
+  }, [myProfile, userSettings]);
 
-  // Unique towns and species for filter dropdowns
+  const [selectedCountryCode, setSelectedCountryCode] = useState<string>(() => defaultCountryCode);
+  const [exchangeRates, setExchangeRates] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    fetch('https://open.er-api.com/v6/latest/ZAR')
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.rates) {
+          setExchangeRates(data.rates);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const currentViewCountry = useMemo(() => {
+    if (selectedCountryCode === 'ALL') return null;
+    return SUPPORTED_COUNTRY_MARKETPLACES.find(c => c.code === selectedCountryCode) || DEFAULT_COUNTRY;
+  }, [selectedCountryCode]);
+
+  // Dynamic currency symbol & code for active marketplace view
+  const activeCurrencySymbol = currentViewCountry ? currentViewCountry.currencySymbol : (userSettings?.currency || 'R');
+  const activeCurrencyCode = currentViewCountry ? currentViewCountry.currencyCode : 'ZAR';
+
+  // Unique towns and species for filter dropdowns (scoped to selected country if specific)
   const availableTowns = useMemo(() => {
     const towns = new Set<string>();
     listings.forEach(l => {
+      if (selectedCountryCode !== 'ALL') {
+        const listingCountry = getCountryMarketplace(l.country || l.countryCode || 'South Africa');
+        if (listingCountry.code !== selectedCountryCode) return;
+      }
       if (l.locationTown) towns.add(l.locationTown);
     });
     return Array.from(towns).sort();
-  }, [listings]);
+  }, [listings, selectedCountryCode]);
 
   const availableSpecies = useMemo(() => {
     const species = new Set<string>();
     listings.forEach(l => {
+      if (selectedCountryCode !== 'ALL') {
+        const listingCountry = getCountryMarketplace(l.country || l.countryCode || 'South Africa');
+        if (listingCountry.code !== selectedCountryCode) return;
+      }
       if (l.species) species.add(l.species);
     });
     return Array.from(species).sort();
-  }, [listings]);
+  }, [listings, selectedCountryCode]);
 
   // Filter listings
   const filteredListings = useMemo(() => {
@@ -112,6 +163,14 @@ export function MarketplaceView({
       const isBirdUnavailable = linkedBird && (
         linkedBird.statuses?.some(s => s.toLowerCase() === 'sold' || s.toLowerCase() === 'deceased')
       );
+
+      // Country Marketplace Filter (Filter to selected country unless Global/ALL is selected)
+      if (selectedCountryCode !== 'ALL') {
+        const listingCountry = getCountryMarketplace(l.country || l.countryCode || 'South Africa');
+        if (listingCountry.code !== selectedCountryCode) {
+          return false;
+        }
+      }
 
       // Tab matching
       if (activeTab === 'for_sale' && (l.type !== 'for_sale' || l.status === 'archived')) return false;
@@ -178,7 +237,7 @@ export function MarketplaceView({
       return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
     });
   }, [
-    listings, activeTab, user, isAdmin, birds, searchQuery, selectedCategory, 
+    listings, selectedCountryCode, activeTab, user, isAdmin, birds, searchQuery, selectedCategory, 
     selectedSpecies, selectedBanding, selectedSexing, selectedDelivery, 
     onlyVetChecked, includeSoldAndArchived, selectedTown, minPrice, maxPrice, sortBy
   ]);
@@ -277,6 +336,58 @@ export function MarketplaceView({
               Admin
             </Button>
           )}
+        </div>
+      </div>
+
+      {/* Country Marketplace Selector Banner */}
+      <div className="p-3.5 sm:p-4 bg-zinc-950/80 border border-zinc-800/90 rounded-2xl flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 shadow-lg">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-gold-500/10 border border-gold-500/30 flex items-center justify-center text-gold-400 shrink-0">
+            <Globe size={20} />
+          </div>
+          <div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs font-black uppercase tracking-wider text-white">
+                Marketplace Region:
+              </span>
+              {currentViewCountry ? (
+                <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-gold-500/20 text-gold-300 border border-gold-500/30 flex items-center gap-1.5">
+                  <span className="text-base">{currentViewCountry.flag}</span>
+                  <span>{currentViewCountry.name}</span>
+                  <span className="text-[10px] opacity-75">({currentViewCountry.currencyCode})</span>
+                </span>
+              ) : (
+                <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30 flex items-center gap-1.5">
+                  <span>🌐</span>
+                  <span>Global (All Countries)</span>
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-zinc-400 font-medium mt-0.5">
+              {currentViewCountry 
+                ? `Showing listings in ${currentViewCountry.flag} ${currentViewCountry.name} • Currency: ${currentViewCountry.currencyCode} (${currentViewCountry.currencySymbol})`
+                : `Showing listings from all countries • Primary Currency: ${activeCurrencyCode} (${activeCurrencySymbol})`}
+            </p>
+          </div>
+        </div>
+
+        {/* Country Switcher Dropdown */}
+        <div className="flex items-center gap-2 shrink-0">
+          <label className="text-[11px] font-bold text-zinc-400 hidden sm:inline whitespace-nowrap">
+            Switch Country:
+          </label>
+          <Select
+            value={selectedCountryCode}
+            onChange={e => setSelectedCountryCode(e.target.value)}
+            className="bg-zinc-900 border-zinc-700 text-sm font-semibold text-white rounded-xl py-2 w-full md:w-auto min-w-[210px]"
+          >
+            <option value="ALL">🌐 All Countries (Global View)</option>
+            {SUPPORTED_COUNTRY_MARKETPLACES.map(c => (
+              <option key={c.code} value={c.code}>
+                {c.flag} {c.name} ({c.currencyCode} {c.currencySymbol})
+              </option>
+            ))}
+          </Select>
         </div>
       </div>
 
@@ -443,7 +554,7 @@ export function MarketplaceView({
 
             {/* Price Range */}
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-zinc-400">Price Range ({currencySymbol})</label>
+              <label className="text-xs font-semibold text-zinc-400">Price Range ({activeCurrencySymbol})</label>
               <div className="flex items-center gap-2">
                 <Input
                   type="number"
@@ -513,7 +624,10 @@ export function MarketplaceView({
             <ListingCard
               key={listing.id}
               listing={listing}
-              currencySymbol={currencySymbol}
+              activeCountryCode={selectedCountryCode}
+              activeCurrencySymbol={activeCurrencySymbol}
+              activeCurrencyCode={activeCurrencyCode}
+              exchangeRates={exchangeRates}
               isOwner={listing.sellerId === user?.uid}
               isAdmin={isAdmin}
               onViewDetails={() => {
@@ -541,9 +655,13 @@ export function MarketplaceView({
                 {searchQuery || selectedCategory !== 'All' 
                   ? "Try clearing your filters or changing your search terms."
                   : activeTab === 'for_sale'
-                  ? "No birds currently listed for sale. Be the first verified breeder to list!"
+                  ? currentViewCountry 
+                    ? `No birds currently listed in ${currentViewCountry.flag} ${currentViewCountry.name}. Be the first verified breeder to list!`
+                    : "No birds currently listed for sale. Be the first verified breeder to list!"
                   : activeTab === 'wanted'
-                  ? "No wanted requests at the moment. Post what you are searching for!"
+                  ? currentViewCountry
+                    ? `No wanted requests in ${currentViewCountry.flag} ${currentViewCountry.name}. Post what you are searching for!`
+                    : "No wanted requests at the moment. Post what you are searching for!"
                   : "You have not published any listings yet."}
               </p>
             </div>
@@ -609,7 +727,7 @@ export function MarketplaceView({
           initialData={editingListing}
           birds={birds}
           pairs={pairs}
-          currencySymbol={currencySymbol}
+          currencySymbol={activeCurrencySymbol}
           userSettings={userSettings}
           onClose={() => {
             setIsCreateModalOpen(false);
@@ -622,7 +740,10 @@ export function MarketplaceView({
       {isContactModalOpen && selectedListing && (
         <ListingDetailModal
           listing={selectedListing}
-          currencySymbol={currencySymbol}
+          activeCountryCode={selectedCountryCode}
+          activeCurrencySymbol={activeCurrencySymbol}
+          activeCurrencyCode={activeCurrencyCode}
+          exchangeRates={exchangeRates}
           currentUserId={user?.uid}
           reviews={reviews.filter(r => r.sellerId === selectedListing.sellerId && r.status === 'approved')}
           onClose={() => {
@@ -665,7 +786,10 @@ export function MarketplaceView({
 // --- Listing Card Component ---
 function ListingCard({
   listing,
-  currencySymbol,
+  activeCountryCode,
+  activeCurrencySymbol,
+  activeCurrencyCode,
+  exchangeRates,
   isOwner,
   isAdmin,
   onViewDetails,
@@ -674,7 +798,10 @@ function ListingCard({
   onMarkSold
 }: {
   listing: MarketplaceListing;
-  currencySymbol: string;
+  activeCountryCode?: string;
+  activeCurrencySymbol: string;
+  activeCurrencyCode: string;
+  exchangeRates?: Record<string, number> | null;
   isOwner: boolean;
   isAdmin: boolean;
   onViewDetails: () => void;
@@ -685,6 +812,16 @@ function ListingCard({
   const isForSale = listing.type === 'for_sale';
   const isSold = listing.status === 'sold';
   const coverImage = listing.imageUrls?.[0] || null;
+
+  const listingCountry = getCountryMarketplace(listing.countryCode || listing.country || 'South Africa');
+  const nativeCurrencySymbol = listing.currency || listingCountry.currencySymbol || 'R';
+  const nativeCurrencyCode = listing.currencyCode || listingCountry.currencyCode || 'ZAR';
+
+  // Calculate approximate price conversion if listing currency != active view currency
+  const showConvertedPrice = activeCurrencyCode && nativeCurrencyCode !== activeCurrencyCode && exchangeRates && exchangeRates[activeCurrencyCode] && exchangeRates[nativeCurrencyCode];
+  const convertedPrice = showConvertedPrice 
+    ? convertPrice(listing.price || 0, nativeCurrencyCode, activeCurrencyCode, exchangeRates)
+    : null;
 
   return (
     <Card 
@@ -722,27 +859,36 @@ function ListingCard({
         )}
 
         {/* Badges on Image */}
-        <div className="absolute top-3 left-3 flex flex-wrap gap-2">
+        <div className="absolute top-3 left-3 flex flex-wrap gap-1.5 items-center">
           <span className={cn(
-            "text-xs font-semibold px-2 py-1 rounded-md shadow-md backdrop-blur-md",
-            isForSale ? "bg-emerald-500/90 text-black" : "bg-amber-500/90 text-black"
+            "text-xs font-semibold px-2 py-0.5 rounded-md shadow-md backdrop-blur-md",
+            isForSale ? "bg-emerald-500/90 text-black font-bold" : "bg-amber-500/90 text-black font-bold"
           )}>
             {isForSale ? 'For Sale' : 'Wanted'}
           </span>
-          <span className="text-xs font-medium px-2 py-1 rounded-md bg-black/70 text-white border border-white/10 backdrop-blur-md">
+          <span className="text-xs font-medium px-2 py-0.5 rounded-md bg-black/70 text-white border border-white/10 backdrop-blur-md">
             {listing.category}
+          </span>
+          <span className="text-xs px-2 py-0.5 rounded-md bg-zinc-900/90 text-zinc-200 border border-zinc-700/80 backdrop-blur-md flex items-center gap-1 font-semibold">
+            <span>{listingCountry.flag}</span>
+            <span>{listingCountry.code}</span>
           </span>
         </div>
 
         {/* Price Tag */}
-        <div className="absolute bottom-3 right-3 bg-black/80 border border-white/10 rounded-xl px-3 py-1.5 backdrop-blur-md text-right">
-          <p className="text-xs font-medium text-zinc-400">
-            {listing.type === 'wanted' ? 'Budget' : 'Price'}
+        <div className="absolute bottom-3 right-3 bg-black/85 border border-white/10 rounded-xl px-3 py-1.5 backdrop-blur-md text-right shadow-lg">
+          <p className="text-[10px] font-medium text-zinc-400">
+            {listing.type === 'wanted' ? 'Budget' : 'Price'} ({nativeCurrencyCode})
           </p>
           <p className="text-base font-bold text-gold-400 leading-none mt-0.5">
-            {currencySymbol}{listing.price}
-            {listing.priceMax ? ` - ${currencySymbol}${listing.priceMax}` : ''}
+            {nativeCurrencySymbol}{listing.price?.toLocaleString()}
+            {listing.priceMax ? ` - ${nativeCurrencySymbol}${listing.priceMax.toLocaleString()}` : ''}
           </p>
+          {convertedPrice !== null && (
+            <p className="text-[10px] font-semibold text-zinc-300 mt-0.5">
+              ≈ {activeCurrencySymbol}{convertedPrice.toLocaleString()} {activeCurrencyCode}
+            </p>
+          )}
         </div>
       </div>
 
@@ -762,7 +908,7 @@ function ListingCard({
           </div>
 
           {/* Key Attributes Pills */}
-          <div className="flex flex-wrap gap-2 pt-1">
+          <div className="flex flex-wrap gap-1.5 pt-1">
             {listing.sex && (
               <span className={cn(
                 "text-xs font-medium px-2 py-0.5 rounded-md border",
@@ -817,12 +963,12 @@ function ListingCard({
         {/* Footer: Seller & Location Info */}
         <div className="pt-3 border-t border-zinc-800/80 space-y-2">
           <div className="flex items-center justify-between text-xs">
-            <div className="flex items-center gap-1.5 text-zinc-300">
-              <MapPin size={14} className="text-gold-400 shrink-0" />
-              <span className="font-medium truncate max-w-[130px]">{listing.locationTown || listing.sellerTown}</span>
+            <div className="flex items-center gap-1.5 text-zinc-300 truncate mr-2">
+              <span className="text-base shrink-0">{listingCountry.flag}</span>
+              <span className="font-medium truncate">{listing.locationTown || listing.sellerTown || listingCountry.name}</span>
             </div>
             
-            <div className="flex items-center gap-1 text-emerald-400">
+            <div className="flex items-center gap-1 text-emerald-400 shrink-0">
               <ShieldCheck size={14} />
               <span className="font-semibold text-xs">Verified Breeder</span>
             </div>
@@ -881,18 +1027,37 @@ function SellerProfileModal({
   onOpenDidit?: () => void;
   onClose: () => void;
 }) {
+  const initialCountry = getCountryMarketplace(existingProfile?.countryCode || existingProfile?.country || 'South Africa');
+
   const [formData, setFormData] = useState({
     sellerName: existingProfile?.sellerName || user?.displayName || '',
     aviaryName: existingProfile?.aviaryName || '',
     town: existingProfile?.town || '',
     provinceState: existingProfile?.provinceState || '',
-    country: existingProfile?.country || 'South Africa',
+    country: existingProfile?.country || initialCountry.name,
+    countryCode: existingProfile?.countryCode || initialCountry.code,
+    currencyCode: existingProfile?.currencyCode || initialCountry.currencyCode,
     whatsapp: existingProfile?.whatsapp || '',
     phone: existingProfile?.phone || '',
     email: existingProfile?.email || user?.email || '',
     bio: existingProfile?.bio || ''
   });
   const [isSaving, setIsSaving] = useState(false);
+
+  const currentCountryConfig = useMemo(() => {
+    return getCountryMarketplace(formData.countryCode || formData.country);
+  }, [formData.countryCode, formData.country]);
+
+  const handleCountryChange = (cCode: string) => {
+    const matched = getCountryMarketplace(cCode);
+    setFormData(prev => ({
+      ...prev,
+      country: matched.name,
+      countryCode: matched.code,
+      currencyCode: matched.currencyCode,
+      provinceState: matched.regions && matched.regions.length > 0 ? matched.regions[0] : ''
+    }));
+  };
 
   const saveProfileData = async (targetStatus?: 'pending' | 'approved') => {
     if (!formData.sellerName.trim() || !formData.town.trim() || !formData.whatsapp.trim()) {
@@ -910,6 +1075,9 @@ function SellerProfileModal({
 
     const payload: any = {
       ...formData,
+      country: currentCountryConfig.name,
+      countryCode: currentCountryConfig.code,
+      currencyCode: currentCountryConfig.currencyCode,
       whatsapp: sanitizedWhatsApp,
       phone: sanitizedPhone
     };
@@ -1049,6 +1217,19 @@ function SellerProfileModal({
           </div>
         )}
 
+        {/* Country Marketplace Assignment Box */}
+        <div className="p-3 bg-gold-500/10 border border-gold-500/30 rounded-2xl flex items-center gap-3">
+          <span className="text-2xl shrink-0">{currentCountryConfig.flag}</span>
+          <div className="text-xs">
+            <p className="font-bold text-white">
+              {currentCountryConfig.flag} {currentCountryConfig.name} Marketplace ({currentCountryConfig.currencyCode} {currentCountryConfig.currencySymbol})
+            </p>
+            <p className="text-zinc-400 mt-0.5">
+              Your breeder listings and sales will be hosted in the <strong>{currentCountryConfig.name}</strong> marketplace with prices set in <strong>{currentCountryConfig.currencyCode}</strong>.
+            </p>
+          </div>
+        </div>
+
         {/* Automated Didit.me KYC Promo Box for new or unverified sellers */}
         {(!existingProfile || existingProfile.status !== 'approved') && onOpenDidit && (
           <div className="p-3.5 bg-gradient-to-r from-blue-950/40 via-cyan-950/30 to-zinc-900 border border-cyan-500/30 rounded-2xl flex items-center justify-between gap-3">
@@ -1076,6 +1257,22 @@ function SellerProfileModal({
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4 max-h-[50vh] overflow-y-auto pr-2">
+          {/* Country Selection */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-zinc-400">Country / Marketplace Region *</label>
+            <Select
+              value={formData.countryCode}
+              onChange={e => handleCountryChange(e.target.value)}
+              className="bg-zinc-900 border-zinc-800 text-sm font-semibold text-white w-full"
+            >
+              {SUPPORTED_COUNTRY_MARKETPLACES.map(c => (
+                <option key={c.code} value={c.code}>
+                  {c.flag} {c.name} — Currency: {c.currencyCode} ({c.currencySymbol})
+                </option>
+              ))}
+            </Select>
+          </div>
+
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-zinc-400">Breeder Name *</label>
@@ -1105,18 +1302,31 @@ function SellerProfileModal({
                 required
                 value={formData.town}
                 onChange={e => setFormData({ ...formData, town: e.target.value })}
-                placeholder="e.g. Pretoria, Cape Town"
+                placeholder="e.g. Pretoria, Austin, London"
                 className="bg-zinc-900 border-zinc-800 text-sm"
               />
             </div>
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-zinc-400">Province / Region</label>
-              <Input
-                value={formData.provinceState}
-                onChange={e => setFormData({ ...formData, provinceState: e.target.value })}
-                placeholder="e.g. Gauteng"
-                className="bg-zinc-900 border-zinc-800 text-sm"
-              />
+              <label className="text-xs font-medium text-zinc-400">Province / State / Region</label>
+              {currentCountryConfig.regions && currentCountryConfig.regions.length > 0 ? (
+                <Select
+                  value={formData.provinceState}
+                  onChange={e => setFormData({ ...formData, provinceState: e.target.value })}
+                  className="bg-zinc-900 border-zinc-800 text-sm"
+                >
+                  <option value="">Select State/Region</option>
+                  {currentCountryConfig.regions.map(r => (
+                    <option key={r} value={r}>{r}</option>
+                  ))}
+                </Select>
+              ) : (
+                <Input
+                  value={formData.provinceState}
+                  onChange={e => setFormData({ ...formData, provinceState: e.target.value })}
+                  placeholder="e.g. Gauteng, Texas"
+                  className="bg-zinc-900 border-zinc-800 text-sm"
+                />
+              )}
             </div>
           </div>
 
@@ -1145,11 +1355,11 @@ function SellerProfileModal({
                     setFormData(prev => ({ ...prev, whatsapp: sanitizePhoneNumber(prev.whatsapp) }));
                   }
                 }}
-                placeholder="e.g. 082 123 4567 or +27 82..."
+                placeholder={currentCountryConfig.phonePlaceholder || (currentCountryConfig.phonePrefix ? `e.g. ${currentCountryConfig.phonePrefix}...` : 'e.g. +27...')}
                 className="bg-zinc-900 border-zinc-800 text-sm"
               />
               <p className="text-[10px] text-zinc-500">
-                Auto-formats local (082...) to international (+2782...)
+                Include country code (e.g. {currentCountryConfig.phonePrefix || '+27'}...)
               </p>
             </div>
             <div className="space-y-1.5">
@@ -1223,6 +1433,10 @@ function ListingFormModal({
   userSettings: UserSettings | null;
   onClose: () => void;
 }) {
+  const sellerCountry = useMemo(() => {
+    return getCountryMarketplace(sellerProfile?.countryCode || sellerProfile?.country || 'South Africa');
+  }, [sellerProfile]);
+
   const [formData, setFormData] = useState<Partial<MarketplaceListing>>(initialData ? { ...initialData } : {
     type,
     category: 'Bird',
@@ -1239,7 +1453,10 @@ function ListingFormModal({
     vetChecked: false,
     price: 0,
     priceMax: 0,
-    currency: currencySymbol,
+    currency: sellerCountry.currencySymbol,
+    currencyCode: sellerCountry.currencyCode,
+    country: sellerCountry.name,
+    countryCode: sellerCountry.code,
     locationTown: sellerProfile?.town || '',
     provinceState: sellerProfile?.provinceState || '',
     deliveryOption: 'Collection or Courier',
@@ -1501,6 +1718,10 @@ function ListingFormModal({
         sellerPhone: sellerProfile?.phone || '',
         sellerWhatsApp: sellerProfile?.whatsapp || '',
         sellerEmail: sellerProfile?.email || user.email || '',
+        country: sellerCountry.name,
+        countryCode: sellerCountry.code,
+        currency: sellerCountry.currencySymbol,
+        currencyCode: sellerCountry.currencyCode,
         allowOffers: formData.allowOffers !== false,
         status: 'active',
         updatedAt: new Date().toISOString()
@@ -1534,14 +1755,33 @@ function ListingFormModal({
               <h3 className="text-lg font-semibold text-white">
                 {initialData ? 'Edit Listing' : type === 'for_sale' ? 'Post Bird / Pair For Sale' : 'Post Wanted Ad'}
               </h3>
-              <p className="text-xs text-zinc-400 font-medium">
-                Verified Seller: {sellerProfile?.sellerName} ({sellerProfile?.town})
+              <p className="text-xs text-zinc-400 font-medium flex items-center gap-1.5 mt-0.5">
+                <span>{sellerCountry.flag}</span>
+                <span>Verified Seller: {sellerProfile?.sellerName} ({sellerProfile?.town || sellerCountry.name})</span>
               </p>
             </div>
           </div>
           <button onClick={onClose} className="text-zinc-500 hover:text-white p-1">
             <X size={20} />
           </button>
+        </div>
+
+        {/* Verified Country Scope Notice */}
+        <div className="p-3 bg-zinc-900/80 border border-zinc-800 rounded-2xl flex items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-2.5">
+            <span className="text-xl">{sellerCountry.flag}</span>
+            <div>
+              <p className="font-bold text-white">
+                {sellerCountry.name} Marketplace ({sellerCountry.currencyCode} {sellerCountry.currencySymbol})
+              </p>
+              <p className="text-zinc-400 text-[11px]">
+                Your listing will be published in the {sellerCountry.name} country view with prices in {sellerCountry.currencyCode}.
+              </p>
+            </div>
+          </div>
+          <span className="text-[10px] font-black uppercase px-2 py-0.5 bg-gold-500/20 text-gold-300 border border-gold-500/30 rounded-md shrink-0">
+            {sellerCountry.code}
+          </span>
         </div>
 
         {/* Quick Inventory Import Bar */}
@@ -1850,7 +2090,7 @@ function ListingFormModal({
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-zinc-400">
-                {type === 'wanted' ? `Target Price (${currencySymbol})` : `Price (${currencySymbol}) *`}
+                {type === 'wanted' ? `Target Price (${sellerCountry.currencyCode} ${sellerCountry.currencySymbol})` : `Price (${sellerCountry.currencyCode} ${sellerCountry.currencySymbol}) *`}
               </label>
               <Input
                 type="number"
@@ -1863,7 +2103,7 @@ function ListingFormModal({
 
             {type === 'wanted' && (
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-zinc-400">Max Budget ({currencySymbol})</label>
+                <label className="text-xs font-medium text-zinc-400">Max Budget ({sellerCountry.currencyCode} {sellerCountry.currencySymbol})</label>
                 <Input
                   type="number"
                   value={formData.priceMax}
@@ -2070,14 +2310,20 @@ function ListingFormModal({
 // --- Listing Detail & Contact Modal ---
 function ListingDetailModal({
   listing,
-  currencySymbol,
+  activeCountryCode,
+  activeCurrencySymbol,
+  activeCurrencyCode,
+  exchangeRates,
   currentUserId,
   reviews,
   onClose,
   onLeaveReview
 }: {
   listing: MarketplaceListing;
-  currencySymbol: string;
+  activeCountryCode: string;
+  activeCurrencySymbol: string;
+  activeCurrencyCode: string;
+  exchangeRates: Record<string, number> | null;
   currentUserId?: string;
   reviews: MarketplaceReview[];
   onClose: () => void;
@@ -2088,12 +2334,32 @@ function ListingDetailModal({
   const [offerPrice, setOfferPrice] = useState<string>('');
   const [offerNote, setOfferNote] = useState<string>('');
 
+  const listingCountry = useMemo(() => {
+    return getCountryMarketplace(listing.countryCode || listing.country || 'South Africa');
+  }, [listing.countryCode, listing.country]);
+
+  const listingCurrencyCode = listing.currencyCode || listingCountry.currencyCode;
+  const listingCurrencySymbol = listing.currency || listingCountry.currencySymbol;
+  const isDifferentCurrency = listingCurrencyCode !== activeCurrencyCode;
+
+  const convertedPriceApprox = useMemo(() => {
+    if (!isDifferentCurrency || !exchangeRates) return null;
+    const fromRate = exchangeRates[listingCurrencyCode];
+    const toRate = exchangeRates[activeCurrencyCode];
+    if (!fromRate || !toRate) return null;
+
+    const inZar = listing.price / fromRate;
+    const converted = Math.round(inZar * toRate);
+    return `≈ ${activeCurrencySymbol}${converted.toLocaleString()} ${activeCurrencyCode}`;
+  }, [isDifferentCurrency, exchangeRates, listingCurrencyCode, activeCurrencyCode, activeCurrencySymbol, listing.price]);
+
   // Structured inquiry message text generator
   const generateInquiryMessage = (offer?: { price: string; note: string }) => {
     let msg = `🕊️ *AVERIAN CLASSIFIEDS ${isForSale ? 'FOR SALE' : 'WANTED'} INQUIRY*\n`;
     msg += `==============================\n`;
     msg += `*Listing:* ${listing.title}\n`;
     msg += `*Category:* ${listing.category}\n`;
+    msg += `*Country/Marketplace:* ${listingCountry.flag} ${listingCountry.name}\n`;
     if (listing.species) msg += `*Species:* ${listing.species}\n`;
     if (listing.subSpecies) msg += `*Sub-Species:* ${listing.subSpecies}\n`;
     if (listing.mutations && listing.mutations.length > 0) msg += `*Mutations:* ${listing.mutations.join(', ')}\n`;
@@ -2101,9 +2367,9 @@ function ListingDetailModal({
     if (listing.sexingMethod && listing.sexingMethod !== 'Unsexed') msg += `*Sexing:* ${listing.sexingMethod}\n`;
     if (listing.bandingStatus) msg += `*Banding:* ${listing.bandingStatus}\n`;
     if (listing.ageYear) msg += `*Age / Year:* ${listing.ageYear}\n`;
-    msg += `*${isForSale ? 'Asking Price' : 'Target Budget'}:* ${currencySymbol}${listing.price}${listing.priceMax ? ` - ${currencySymbol}${listing.priceMax}` : ''}\n`;
+    msg += `*${isForSale ? 'Asking Price' : 'Target Budget'}:* ${listingCurrencySymbol}${listing.price} ${listingCurrencyCode}${listing.priceMax ? ` - ${listingCurrencySymbol}${listing.priceMax} ${listingCurrencyCode}` : ''}\n`;
     msg += `*Delivery:* ${listing.deliveryOption}\n`;
-    msg += `*Location:* ${listing.locationTown || listing.sellerTown}\n`;
+    msg += `*Location:* ${listing.locationTown || listing.sellerTown}, ${listingCountry.name}\n`;
     if (listing.sellerAviary) msg += `*Aviary:* ${listing.sellerAviary}\n`;
     if (listing.imageUrls && listing.imageUrls.length > 0) {
       msg += `*Image:* ${listing.imageUrls[0]}\n`;
@@ -2111,7 +2377,7 @@ function ListingDetailModal({
     msg += `==============================\n`;
 
     if (offer && offer.price) {
-      msg += `🏷️ *MY OFFER: ${currencySymbol}${offer.price}*\n`;
+      msg += `🏷️ *MY OFFER: ${listingCurrencySymbol}${offer.price} ${listingCurrencyCode}*\n`;
       if (offer.note) {
         msg += `💬 *Note:* ${offer.note}\n`;
       }
@@ -2181,6 +2447,10 @@ function ListingDetailModal({
               <span className="text-xs font-medium px-2 py-0.5 rounded-md bg-zinc-900 border border-zinc-800 text-zinc-300">
                 {listing.category}
               </span>
+              <span className="text-xs font-semibold px-2 py-0.5 rounded-md bg-zinc-900 border border-zinc-800 text-zinc-200 flex items-center gap-1">
+                <span>{listingCountry.flag}</span>
+                <span>{listingCountry.name}</span>
+              </span>
               {listing.allowOffers && (
                 <span className="text-xs font-medium px-2 py-0.5 rounded-md bg-gold-500/10 border border-gold-500/30 text-gold-400 flex items-center gap-1">
                   <Tag size={12} /> Offers Welcome
@@ -2229,10 +2499,20 @@ function ListingDetailModal({
               <p className="text-xs font-medium text-zinc-400">
                 {listing.type === 'wanted' ? 'Target Budget' : 'Listing Price'}
               </p>
-              <p className="text-3xl font-bold text-gold-400 mt-1">
-                {currencySymbol}{listing.price}
-                {listing.priceMax ? ` - ${currencySymbol}${listing.priceMax}` : ''}
-              </p>
+              <div className="flex items-baseline gap-2 flex-wrap mt-1">
+                <p className="text-3xl font-bold text-gold-400">
+                  {listingCurrencySymbol}{listing.price.toLocaleString()}
+                  {listing.priceMax ? ` - ${listingCurrencySymbol}${listing.priceMax.toLocaleString()}` : ''}
+                </p>
+                <span className="text-xs font-bold text-zinc-400 px-1.5 py-0.5 bg-zinc-800 rounded">
+                  {listingCurrencyCode}
+                </span>
+                {convertedPriceApprox && (
+                  <span className="text-xs font-semibold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                    {convertedPriceApprox}
+                  </span>
+                )}
+              </div>
             </div>
             <div className="text-right">
               <p className="text-xs font-medium text-zinc-400">Delivery</p>
@@ -2321,7 +2601,7 @@ function ListingDetailModal({
               <div className="space-y-3 pt-2">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-1">
-                    <label className="text-xs font-medium text-zinc-300">Your Offer Amount ({currencySymbol}) *</label>
+                    <label className="text-xs font-medium text-zinc-300">Your Offer Amount ({listingCurrencyCode} {listingCurrencySymbol}) *</label>
                     <Input
                       type="number"
                       value={offerPrice}
@@ -2350,7 +2630,7 @@ function ListingDetailModal({
               </div>
             ) : (
               <p className="text-xs text-zinc-400">
-                The seller is open to price negotiations. Propose your offer to start a direct WhatsApp inquiry!
+                The seller is open to price negotiations in <strong>{listingCurrencyCode}</strong>. Propose your offer to start a direct WhatsApp inquiry!
               </p>
             )}
           </div>
@@ -2367,14 +2647,14 @@ function ListingDetailModal({
                 <h4 className="text-sm font-semibold text-white">
                   {listing.sellerAviary || listing.sellerName}
                 </h4>
-                <p className="text-xs text-zinc-400 font-medium flex items-center gap-1 mt-0.5">
-                  <MapPin size={12} className="text-gold-400" />
-                  {listing.locationTown || listing.sellerTown}
+                <p className="text-xs text-zinc-400 font-medium flex items-center gap-1.5 mt-0.5">
+                  <span>{listingCountry.flag}</span>
+                  <span>{listing.locationTown || listing.sellerTown || listingCountry.name}</span>
                 </p>
               </div>
             </div>
             <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-md">
-              Verified by Admin
+              Verified Breeder
             </span>
           </div>
 

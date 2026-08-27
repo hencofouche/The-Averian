@@ -38,6 +38,10 @@ interface UserWithDetails {
   subscriptionPlan?: string;
   subscriptionGrantedBy?: string;
   subscribedAt?: string;
+  isBetaTester?: boolean;
+  canTestComingSoon?: boolean;
+  betaTesterGrantedBy?: string;
+  betaTesterGrantedAt?: string;
   lastLoginAt?: string;
   createdAt?: string;
   isBanned?: boolean;
@@ -58,7 +62,7 @@ export function AdminUserManagementPanel({
   const [usersList, setUsersList] = useState<UserWithDetails[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'registered' | 'unregistered' | 'active' | 'expired' | 'trial' | 'yearly' | 'lifetime' | 'banned' | 'admins'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'testers' | 'registered' | 'unregistered' | 'active' | 'expired' | 'trial' | 'yearly' | 'lifetime' | 'banned' | 'admins'>('all');
   
   // Delete Modal State
   const [deleteTargetUser, setDeleteTargetUser] = useState<UserWithDetails | null>(null);
@@ -140,6 +144,10 @@ export function AdminUserManagementPanel({
           subscriptionPlan: data.subscriptionPlan,
           subscriptionGrantedBy: data.subscriptionGrantedBy,
           subscribedAt: data.subscribedAt,
+          isBetaTester: data.isBetaTester === true || data.canTestComingSoon === true,
+          canTestComingSoon: data.canTestComingSoon === true || data.isBetaTester === true,
+          betaTesterGrantedBy: data.betaTesterGrantedBy,
+          betaTesterGrantedAt: data.betaTesterGrantedAt,
           lastLoginAt: data.lastLoginAt,
           createdAt: data.createdAt,
           isBanned: data.isBanned === true,
@@ -161,6 +169,9 @@ export function AdminUserManagementPanel({
         const bannedAt = data.bannedAt || (existing ? existing.bannedAt : undefined);
         const bannedBy = data.bannedBy || (existing ? existing.bannedBy : undefined);
         const email = existing?.email || data.email || '';
+        const isBetaTester = data.isBetaTester === true || data.canTestComingSoon === true || (existing && existing.isBetaTester === true);
+        const betaTesterGrantedBy = data.betaTesterGrantedBy || (existing ? existing.betaTesterGrantedBy : undefined);
+        const betaTesterGrantedAt = data.betaTesterGrantedAt || (existing ? existing.betaTesterGrantedAt : undefined);
 
         if (existing) {
           usersMap.set(uid, {
@@ -173,6 +184,10 @@ export function AdminUserManagementPanel({
             subscriptionPlan: data.subscriptionPlan || existing.subscriptionPlan,
             subscriptionGrantedBy: data.subscriptionGrantedBy || existing.subscriptionGrantedBy,
             subscribedAt: data.subscribedAt || existing.subscribedAt,
+            isBetaTester,
+            canTestComingSoon: isBetaTester,
+            betaTesterGrantedBy,
+            betaTesterGrantedAt,
             role: (data.role === 'admin' || existing.role === 'admin') ? 'admin' : 'user',
             isBanned,
             banReason,
@@ -192,6 +207,10 @@ export function AdminUserManagementPanel({
             subscriptionPlan: data.subscriptionPlan,
             subscriptionGrantedBy: data.subscriptionGrantedBy,
             subscribedAt: data.subscribedAt,
+            isBetaTester,
+            canTestComingSoon: isBetaTester,
+            betaTesterGrantedBy,
+            betaTesterGrantedAt,
             isBanned,
             banReason,
             bannedAt,
@@ -258,11 +277,13 @@ export function AdminUserManagementPanel({
     let yearlyCount = 0;
     let adminCount = 0;
     let bannedCount = 0;
+    let betaTesterCount = 0;
     const now = new Date();
 
     usersList.forEach(u => {
       if (u.role === 'admin') adminCount++;
       if (u.isBanned) bannedCount++;
+      if (u.isBetaTester || u.canTestComingSoon) betaTesterCount++;
       if (u.email && u.email.trim()) {
         registeredCount++;
       } else {
@@ -287,7 +308,7 @@ export function AdminUserManagementPanel({
       }
     });
 
-    return { total, registeredCount, unregisteredCount, activeSubCount, expiredCount, lifetimeCount, yearlyCount, adminCount, bannedCount };
+    return { total, registeredCount, unregisteredCount, activeSubCount, expiredCount, lifetimeCount, yearlyCount, adminCount, bannedCount, betaTesterCount };
   }, [usersList]);
 
   // Filtered Users
@@ -297,6 +318,7 @@ export function AdminUserManagementPanel({
 
     return usersList.filter(u => {
       // Status filter
+      if (statusFilter === 'testers' && !u.isBetaTester && !u.canTestComingSoon) return false;
       if (statusFilter === 'registered' && (!u.email || !u.email.trim())) return false;
       if (statusFilter === 'unregistered' && (u.email && u.email.trim().length > 0)) return false;
       if (statusFilter === 'admins' && u.role !== 'admin') return false;
@@ -329,6 +351,61 @@ export function AdminUserManagementPanel({
       return true;
     });
   }, [usersList, searchQuery, statusFilter]);
+
+  // Handle Granting / Revoking Beta Tester Permissions
+  const handleToggleBetaTester = async (targetUser: UserWithDetails, allow: boolean) => {
+    setIsUpdatingSub(true);
+    try {
+      const nowIso = new Date().toISOString();
+      const adminEmail = currentUser?.email || 'Admin';
+
+      // Update userSettings doc
+      const settingsRef = doc(db, 'userSettings', targetUser.uid);
+      await setDoc(settingsRef, {
+        isBetaTester: allow,
+        canTestComingSoon: allow,
+        betaTesterGrantedBy: allow ? adminEmail : null,
+        betaTesterGrantedAt: allow ? nowIso : null,
+        updatedAt: nowIso
+      }, { merge: true });
+
+      // Update users doc
+      const userRef = doc(db, 'users', targetUser.uid);
+      await setDoc(userRef, {
+        isBetaTester: allow,
+        canTestComingSoon: allow,
+        betaTesterGrantedBy: allow ? adminEmail : null,
+        betaTesterGrantedAt: allow ? nowIso : null,
+        updatedAt: nowIso
+      }, { merge: true });
+
+      // Update local state
+      setUsersList(prev => prev.map(u => {
+        if (u.uid === targetUser.uid) {
+          return {
+            ...u,
+            isBetaTester: allow,
+            canTestComingSoon: allow,
+            betaTesterGrantedBy: allow ? adminEmail : undefined,
+            betaTesterGrantedAt: allow ? nowIso : undefined
+          };
+        }
+        return u;
+      }));
+
+      if (allow) {
+        toast.success(`🎉 Early Access Beta Testing granted to ${targetUser.email || targetUser.displayName}!`);
+      } else {
+        toast.success(`Early Access Beta Testing revoked from ${targetUser.email || targetUser.displayName}.`);
+      }
+      if (onRefreshParentData) onRefreshParentData();
+    } catch (err: any) {
+      console.error("Failed to update beta tester status:", err);
+      toast.error('Failed to update tester permission: ' + err.message);
+    } finally {
+      setIsUpdatingSub(false);
+    }
+  };
 
   // Handle Ban / Unban Action
   const handleToggleBan = async (targetUser: UserWithDetails, ban: boolean, reason?: string) => {
@@ -806,61 +883,69 @@ export function AdminUserManagementPanel({
   return (
     <div className="space-y-6">
       {/* Top Header & Stats Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
-        <Card className="p-4 bg-zinc-950/80 border-zinc-800">
-          <div className="flex items-center gap-2 text-zinc-400 mb-1">
-            <Users size={16} className="text-gold-400" />
-            <span className="text-[11px] font-bold uppercase tracking-wider">Total Users</span>
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2.5">
+        <Card className="p-3.5 bg-zinc-950/80 border-zinc-800">
+          <div className="flex items-center gap-1.5 text-zinc-400 mb-1">
+            <Users size={14} className="text-gold-400" />
+            <span className="text-[10px] font-bold uppercase tracking-wider">Total</span>
           </div>
-          <p className="text-2xl font-black text-white">{stats.total}</p>
+          <p className="text-xl sm:text-2xl font-black text-white">{stats.total}</p>
         </Card>
 
-        <Card className="p-4 bg-zinc-950/80 border-zinc-800">
-          <div className="flex items-center gap-2 text-zinc-400 mb-1">
-            <CheckCircle2 size={16} className="text-emerald-400" />
-            <span className="text-[11px] font-bold uppercase tracking-wider">Active Subs</span>
+        <Card className="p-3.5 bg-zinc-950/80 border-zinc-800">
+          <div className="flex items-center gap-1.5 text-zinc-400 mb-1">
+            <CheckCircle2 size={14} className="text-emerald-400" />
+            <span className="text-[10px] font-bold uppercase tracking-wider">Active Subs</span>
           </div>
-          <p className="text-2xl font-black text-emerald-400">{stats.activeSubCount}</p>
+          <p className="text-xl sm:text-2xl font-black text-emerald-400">{stats.activeSubCount}</p>
         </Card>
 
-        <Card className="p-4 bg-zinc-950/80 border-zinc-800">
-          <div className="flex items-center gap-2 text-zinc-400 mb-1">
-            <Award size={16} className="text-amber-400" />
-            <span className="text-[11px] font-bold uppercase tracking-wider">Yearly Plans</span>
+        <Card className="p-3.5 bg-zinc-950/80 border-indigo-500/30 bg-indigo-950/10">
+          <div className="flex items-center gap-1.5 text-indigo-300 mb-1">
+            <Sparkles size={14} className="text-indigo-400" />
+            <span className="text-[10px] font-bold uppercase tracking-wider">Testers</span>
           </div>
-          <p className="text-2xl font-black text-amber-400">{stats.yearlyCount}</p>
+          <p className="text-xl sm:text-2xl font-black text-indigo-400">{stats.betaTesterCount}</p>
         </Card>
 
-        <Card className="p-4 bg-zinc-950/80 border-zinc-800">
-          <div className="flex items-center gap-2 text-zinc-400 mb-1">
-            <Sparkles size={16} className="text-indigo-400" />
-            <span className="text-[11px] font-bold uppercase tracking-wider">Lifetime</span>
+        <Card className="p-3.5 bg-zinc-950/80 border-zinc-800">
+          <div className="flex items-center gap-1.5 text-zinc-400 mb-1">
+            <Award size={14} className="text-amber-400" />
+            <span className="text-[10px] font-bold uppercase tracking-wider">Yearly</span>
           </div>
-          <p className="text-2xl font-black text-indigo-400">{stats.lifetimeCount}</p>
+          <p className="text-xl sm:text-2xl font-black text-amber-400">{stats.yearlyCount}</p>
         </Card>
 
-        <Card className="p-4 bg-zinc-950/80 border-zinc-800">
-          <div className="flex items-center gap-2 text-zinc-400 mb-1">
-            <Clock size={16} className="text-zinc-400" />
-            <span className="text-[11px] font-bold uppercase tracking-wider">Expired</span>
+        <Card className="p-3.5 bg-zinc-950/80 border-zinc-800">
+          <div className="flex items-center gap-1.5 text-zinc-400 mb-1">
+            <Sparkles size={14} className="text-indigo-400" />
+            <span className="text-[10px] font-bold uppercase tracking-wider">Lifetime</span>
           </div>
-          <p className="text-2xl font-black text-zinc-400">{stats.expiredCount}</p>
+          <p className="text-xl sm:text-2xl font-black text-indigo-400">{stats.lifetimeCount}</p>
         </Card>
 
-        <Card className="p-4 bg-zinc-950/80 border-rose-900/30">
-          <div className="flex items-center gap-2 text-rose-400 mb-1">
-            <ShieldAlert size={16} className="text-rose-500" />
-            <span className="text-[11px] font-bold uppercase tracking-wider">Banned</span>
+        <Card className="p-3.5 bg-zinc-950/80 border-zinc-800">
+          <div className="flex items-center gap-1.5 text-zinc-400 mb-1">
+            <Clock size={14} className="text-zinc-400" />
+            <span className="text-[10px] font-bold uppercase tracking-wider">Expired</span>
           </div>
-          <p className="text-2xl font-black text-rose-500">{stats.bannedCount}</p>
+          <p className="text-xl sm:text-2xl font-black text-zinc-400">{stats.expiredCount}</p>
         </Card>
 
-        <Card className="p-4 bg-zinc-950/80 border-zinc-800">
-          <div className="flex items-center gap-2 text-zinc-400 mb-1">
-            <Shield size={16} className="text-purple-400" />
-            <span className="text-[11px] font-bold uppercase tracking-wider">Admins</span>
+        <Card className="p-3.5 bg-zinc-950/80 border-rose-900/30">
+          <div className="flex items-center gap-1.5 text-rose-400 mb-1">
+            <ShieldAlert size={14} className="text-rose-500" />
+            <span className="text-[10px] font-bold uppercase tracking-wider">Banned</span>
           </div>
-          <p className="text-2xl font-black text-purple-400">{stats.adminCount}</p>
+          <p className="text-xl sm:text-2xl font-black text-rose-500">{stats.bannedCount}</p>
+        </Card>
+
+        <Card className="p-3.5 bg-zinc-950/80 border-zinc-800">
+          <div className="flex items-center gap-1.5 text-zinc-400 mb-1">
+            <Shield size={14} className="text-purple-400" />
+            <span className="text-[10px] font-bold uppercase tracking-wider">Admins</span>
+          </div>
+          <p className="text-xl sm:text-2xl font-black text-purple-400">{stats.adminCount}</p>
         </Card>
       </div>
 
@@ -883,20 +968,30 @@ export function AdminUserManagementPanel({
         </div>
 
         {/* Filter Pills */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 max-w-full">
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 max-w-full scrollbar-none">
           <button
             onClick={() => setStatusFilter('all')}
             className={cn(
-              "px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all",
+              "px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all shrink-0",
               statusFilter === 'all' ? "bg-gold-500 text-black shadow-md" : "bg-zinc-900 text-zinc-400 hover:text-white"
             )}
           >
             All ({usersList.length})
           </button>
           <button
+            onClick={() => setStatusFilter('testers')}
+            className={cn(
+              "px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all shrink-0 flex items-center gap-1",
+              statusFilter === 'testers' ? "bg-indigo-500 text-white shadow-md shadow-indigo-500/20" : "bg-zinc-900 text-zinc-400 hover:text-indigo-400"
+            )}
+          >
+            <Sparkles size={12} />
+            Beta Testers ({stats.betaTesterCount})
+          </button>
+          <button
             onClick={() => setStatusFilter('registered')}
             className={cn(
-              "px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all",
+              "px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all shrink-0",
               statusFilter === 'registered' ? "bg-emerald-500 text-black shadow-md" : "bg-zinc-900 text-zinc-400 hover:text-emerald-400"
             )}
           >
@@ -905,7 +1000,7 @@ export function AdminUserManagementPanel({
           <button
             onClick={() => setStatusFilter('active')}
             className={cn(
-              "px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all",
+              "px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all shrink-0",
               statusFilter === 'active' ? "bg-emerald-600 text-white shadow-md" : "bg-zinc-900 text-zinc-400 hover:text-emerald-400"
             )}
           >
@@ -914,7 +1009,7 @@ export function AdminUserManagementPanel({
           <button
             onClick={() => setStatusFilter('yearly')}
             className={cn(
-              "px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all",
+              "px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all shrink-0",
               statusFilter === 'yearly' ? "bg-amber-500 text-black shadow-md" : "bg-zinc-900 text-zinc-400 hover:text-amber-400"
             )}
           >
@@ -923,7 +1018,7 @@ export function AdminUserManagementPanel({
           <button
             onClick={() => setStatusFilter('lifetime')}
             className={cn(
-              "px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all",
+              "px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all shrink-0",
               statusFilter === 'lifetime' ? "bg-indigo-500 text-white shadow-md" : "bg-zinc-900 text-zinc-400 hover:text-indigo-400"
             )}
           >
@@ -932,7 +1027,7 @@ export function AdminUserManagementPanel({
           <button
             onClick={() => setStatusFilter('expired')}
             className={cn(
-              "px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all",
+              "px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all shrink-0",
               statusFilter === 'expired' ? "bg-zinc-700 text-white shadow-md" : "bg-zinc-900 text-zinc-400 hover:text-zinc-200"
             )}
           >
@@ -942,7 +1037,7 @@ export function AdminUserManagementPanel({
             <button
               onClick={() => setStatusFilter('unregistered')}
               className={cn(
-                "px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all",
+                "px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all shrink-0",
                 statusFilter === 'unregistered' ? "bg-amber-600 text-white shadow-md" : "bg-zinc-900 text-zinc-400 hover:text-amber-300"
               )}
             >
@@ -952,7 +1047,7 @@ export function AdminUserManagementPanel({
           <button
             onClick={() => setStatusFilter('banned')}
             className={cn(
-              "px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all",
+              "px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all shrink-0",
               statusFilter === 'banned' ? "bg-rose-600 text-white shadow-md" : "bg-zinc-900 text-zinc-400 hover:text-rose-400"
             )}
           >
@@ -961,7 +1056,7 @@ export function AdminUserManagementPanel({
           <button
             onClick={() => setStatusFilter('admins')}
             className={cn(
-              "px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all",
+              "px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all shrink-0",
               statusFilter === 'admins' ? "bg-purple-500 text-white shadow-md" : "bg-zinc-900 text-zinc-400 hover:text-purple-400"
             )}
           >
@@ -971,7 +1066,7 @@ export function AdminUserManagementPanel({
             variant="secondary"
             onClick={fetchAllUsers}
             disabled={isLoading}
-            className="p-2 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 rounded-xl"
+            className="p-2 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 rounded-xl shrink-0"
             title="Refresh Users"
           >
             <RefreshCw size={16} className={cn(isLoading && "animate-spin text-gold-400")} />
@@ -996,13 +1091,14 @@ export function AdminUserManagementPanel({
             const isLifetime = u.subscriptionPlan === 'lifetime' || (u.account_expiry_date && new Date(u.account_expiry_date).getFullYear() > 2090);
             const isExp = u.account_expiry_date ? isBefore(new Date(u.account_expiry_date), new Date()) && !isLifetime : true;
             const expDate = u.account_expiry_date ? new Date(u.account_expiry_date) : null;
+            const isTester = u.isBetaTester === true || u.canTestComingSoon === true;
 
             return (
               <Card 
                 key={u.uid}
                 className={cn(
                   "p-4 sm:p-5 bg-zinc-950 border transition-all rounded-2xl space-y-3",
-                  u.isBanned ? "border-rose-500/40 bg-rose-950/10 hover:border-rose-500" : "border-zinc-800/80 hover:border-zinc-700"
+                  u.isBanned ? "border-rose-500/40 bg-rose-950/10 hover:border-rose-500" : (isTester ? "border-indigo-500/40 bg-indigo-950/5 hover:border-indigo-500/60" : "border-zinc-800/80 hover:border-zinc-700")
                 )}
               >
                 <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
@@ -1010,7 +1106,7 @@ export function AdminUserManagementPanel({
                   <div className="flex items-start gap-3.5 min-w-0">
                     <div className={cn(
                       "w-11 h-11 rounded-2xl flex items-center justify-center font-black text-sm shrink-0 overflow-hidden shadow-md",
-                      u.isBanned ? "bg-rose-500/20 text-rose-400 border border-rose-500/40" : "bg-zinc-900 border border-zinc-800 text-gold-400"
+                      u.isBanned ? "bg-rose-500/20 text-rose-400 border border-rose-500/40" : (isTester ? "bg-indigo-500/20 text-indigo-300 border border-indigo-500/40" : "bg-zinc-900 border border-zinc-800 text-gold-400")
                     )}>
                       {u.photoURL ? (
                         <img src={u.photoURL} alt="" className="w-full h-full object-cover" />
@@ -1025,6 +1121,12 @@ export function AdminUserManagementPanel({
                         <span className="font-black text-white text-base truncate">
                           {u.displayName}
                         </span>
+
+                        {isTester && (
+                          <span className="text-[10px] font-black uppercase tracking-wider bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 px-2 py-0.5 rounded-full flex items-center gap-1 shadow-sm">
+                            <Sparkles size={10} className="text-indigo-400" /> BETA TESTER
+                          </span>
+                        )}
 
                         {u.isBanned && (
                           <span className="text-[10px] font-black uppercase tracking-wider bg-rose-600 text-white px-2 py-0.5 rounded-full flex items-center gap-1 shadow-sm">
@@ -1148,8 +1250,24 @@ export function AdminUserManagementPanel({
 
                 {/* Quick Action Toolbar */}
                 <div className="pt-2.5 border-t border-zinc-900 flex items-center justify-between gap-2 flex-wrap">
-                  {/* Left: Quick Subscription Grants */}
+                  {/* Left: Quick Subscription Grants & Beta Tester Toggle */}
                   <div className="flex items-center gap-1.5 flex-wrap">
+                    {/* Beta Tester Toggle Button */}
+                    <Button
+                      onClick={() => handleToggleBetaTester(u, !isTester)}
+                      disabled={isUpdatingSub}
+                      className={cn(
+                        "text-xs font-bold rounded-xl px-3 py-1.5 border transition-all",
+                        isTester 
+                          ? "bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 border-indigo-500/40"
+                          : "bg-zinc-900 hover:bg-indigo-950/40 text-zinc-400 hover:text-indigo-300 border-zinc-800 hover:border-indigo-500/30"
+                      )}
+                      title={isTester ? "Revoke Early Access Beta Testing permissions" : "Grant access to test Coming Soon modules"}
+                    >
+                      <Sparkles size={13} className={cn("mr-1.5", isTester ? "text-indigo-400" : "text-zinc-500")} />
+                      {isTester ? "Beta Tester: Active" : "Grant Beta Access"}
+                    </Button>
+
                     <Button
                       onClick={() => handleGrantSubscription(u, '1year')}
                       disabled={isUpdatingSub}
