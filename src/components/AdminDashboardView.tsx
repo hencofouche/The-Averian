@@ -407,6 +407,15 @@ export function AdminDashboardView({
                         <span className="text-[9px] font-black uppercase px-2 py-0.5 bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded-md">
                           Seller Verification
                         </span>
+                        {profile.verificationMethod === 'didit' ? (
+                          <span className="text-[9px] font-black uppercase px-2 py-0.5 bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 rounded-md flex items-center gap-1">
+                            <Zap size={10} className="fill-cyan-300" /> Didit AI: {profile.diditStatus || 'Verified'}
+                          </span>
+                        ) : (
+                          <span className="text-[9px] font-bold uppercase px-2 py-0.5 bg-zinc-800 text-zinc-400 border border-zinc-700 rounded-md">
+                            Manual Request
+                          </span>
+                        )}
                         <h4 className="text-sm font-black text-white">{profile.sellerName}</h4>
                         {profile.aviaryName && (
                           <span className="text-xs text-zinc-400">({profile.aviaryName})</span>
@@ -424,6 +433,11 @@ export function AdminDashboardView({
                         {profile.email && (
                           <span className="flex items-center gap-1 text-zinc-400">
                             <Mail size={12} /> {profile.email}
+                          </span>
+                        )}
+                        {profile.diditSessionId && (
+                          <span className="text-[10px] text-cyan-400/80 font-mono">
+                            Session: {profile.diditSessionId.slice(0, 12)}...
                           </span>
                         )}
                       </div>
@@ -584,6 +598,11 @@ export function AdminDashboardView({
                       )}>
                         {profile.status}
                       </span>
+                      {profile.verificationMethod === 'didit' && (
+                        <span className="text-[8px] font-black uppercase px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
+                          Didit AI
+                        </span>
+                      )}
                     </div>
                     {profile.aviaryName && (
                       <p className="text-xs text-zinc-400">{profile.aviaryName}</p>

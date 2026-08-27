@@ -4,8 +4,9 @@ import {
   MapPin, Phone, MessageCircle, Mail, Shield, ShieldCheck, ShieldAlert, 
   Tag, DollarSign, Calendar, ChevronDown, ChevronUp, Image as ImageIcon,
   Check, X, Star, Heart, Bird as BirdIcon, Eye, Trash2, Edit2, Send,
-  Share2, ArrowUpDown, Truck, Award, HelpCircle, UserCheck, AlertTriangle, RefreshCw
+  Share2, ArrowUpDown, Truck, Award, HelpCircle, UserCheck, AlertTriangle, RefreshCw, Sparkles, ExternalLink, Zap
 } from 'lucide-react';
+import { DiditVerificationModal } from './DiditVerificationModal';
 import { 
   MarketplaceListing, SellerProfile, MarketplaceReview, 
   Bird, Pair, Cage, UserSettings 
@@ -70,6 +71,7 @@ export function MarketplaceView({
   const [selectedListing, setSelectedListing] = useState<MarketplaceListing | null>(null);
   const [isContactModalOpen, setIsContactModalOpen] = useState(false);
   const [isSellerProfileModalOpen, setIsSellerProfileModalOpen] = useState(false);
+  const [isDiditModalOpen, setIsDiditModalOpen] = useState(false);
   const [isSoldModalOpen, setIsSoldModalOpen] = useState(false);
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
   const [editingListing, setEditingListing] = useState<MarketplaceListing | null>(null);
@@ -577,7 +579,24 @@ export function MarketplaceView({
           user={user}
           existingProfile={myProfile}
           isAdmin={isAdmin}
+          onOpenDidit={() => {
+            setIsSellerProfileModalOpen(false);
+            setIsDiditModalOpen(true);
+          }}
           onClose={() => setIsSellerProfileModalOpen(false)}
+        />
+      )}
+
+      {/* Didit Automated Identity Verification Modal */}
+      {isDiditModalOpen && (
+        <DiditVerificationModal
+          user={user}
+          sellerProfile={myProfile}
+          isOpen={isDiditModalOpen}
+          onClose={() => setIsDiditModalOpen(false)}
+          onSuccess={() => {
+            setIsDiditModalOpen(false);
+          }}
         />
       )}
 
@@ -853,11 +872,13 @@ function SellerProfileModal({
   user,
   existingProfile,
   isAdmin,
+  onOpenDidit,
   onClose
 }: {
   user: any;
   existingProfile: SellerProfile | null;
   isAdmin: boolean;
+  onOpenDidit?: () => void;
   onClose: () => void;
 }) {
   const [formData, setFormData] = useState({
@@ -873,11 +894,10 @@ function SellerProfileModal({
   });
   const [isSaving, setIsSaving] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const saveProfileData = async (targetStatus?: 'pending' | 'approved') => {
     if (!formData.sellerName.trim() || !formData.town.trim() || !formData.whatsapp.trim()) {
       toast.error('Seller Name, Location/Town, and WhatsApp number are required!');
-      return;
+      return false;
     }
 
     const sanitizedWhatsApp = sanitizePhoneNumber(formData.whatsapp);
@@ -885,36 +905,61 @@ function SellerProfileModal({
 
     if (!isValidPhoneNumber(sanitizedWhatsApp)) {
       toast.error('Please enter a valid WhatsApp phone number with at least 9 digits.');
-      return;
+      return false;
     }
 
+    const payload: any = {
+      ...formData,
+      whatsapp: sanitizedWhatsApp,
+      phone: sanitizedPhone
+    };
+
+    if (targetStatus) {
+      payload.status = targetStatus;
+    }
+
+    if (existingProfile?.id) {
+      await updateDoc(doc(db, 'sellerProfiles', existingProfile.id), {
+        ...payload,
+        updatedAt: new Date().toISOString()
+      });
+    } else {
+      await addDoc(collection(db, 'sellerProfiles'), {
+        ...payload,
+        uid: user.uid,
+        status: targetStatus || 'pending',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      });
+    }
+    return true;
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     setIsSaving(true);
     try {
-      const payload = {
-        ...formData,
-        whatsapp: sanitizedWhatsApp,
-        phone: sanitizedPhone
-      };
-
-      if (existingProfile?.id) {
-        await updateDoc(doc(db, 'sellerProfiles', existingProfile.id), {
-          ...payload,
-          updatedAt: new Date().toISOString()
-        });
-        toast.success('Seller profile updated successfully');
-      } else {
-        await addDoc(collection(db, 'sellerProfiles'), {
-          ...payload,
-          uid: user.uid,
-          status: 'pending', // Pending Admin's approval
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        });
-        toast.success('Profile submitted for Admin verification!');
+      const ok = await saveProfileData();
+      if (ok) {
+        toast.success(existingProfile ? 'Seller profile updated successfully' : 'Profile submitted for Admin verification!');
+        onClose();
       }
-      onClose();
     } catch (err: any) {
       toast.error('Failed to save profile: ' + err.message);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleStartDiditVerification = async () => {
+    setIsSaving(true);
+    try {
+      const ok = await saveProfileData();
+      if (ok && onOpenDidit) {
+        onOpenDidit();
+      }
+    } catch (err: any) {
+      toast.error('Failed to save profile before verification: ' + err.message);
     } finally {
       setIsSaving(false);
     }
@@ -924,7 +969,7 @@ function SellerProfileModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-      <div className="w-full max-w-lg bg-zinc-950 border border-zinc-800 rounded-3xl p-6 relative overflow-hidden shadow-2xl space-y-6">
+      <div className="w-full max-w-lg bg-zinc-950 border border-zinc-800 rounded-3xl p-6 relative overflow-hidden shadow-2xl space-y-5">
         <div className="flex items-center justify-between border-b border-zinc-800 pb-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-gold-500/10 border border-gold-500/30 flex items-center justify-center text-gold-400">
@@ -935,7 +980,7 @@ function SellerProfileModal({
                 {existingProfile ? 'Breeder Seller Profile' : 'Register Seller Profile'}
               </h3>
               <p className="text-xs text-zinc-400 font-medium">
-                Mandatory Verification by Admin
+                Automated Didit AI Verification or Admin Review
               </p>
             </div>
           </div>
@@ -947,36 +992,90 @@ function SellerProfileModal({
         {/* Status Alert if existing */}
         {existingProfile && (
           <div className={cn(
-            "p-4 rounded-xl border flex items-center gap-3 text-sm",
+            "p-4 rounded-2xl border space-y-2 text-sm",
             existingProfile.status === 'approved' 
               ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-300"
               : existingProfile.status === 'pending'
               ? "bg-amber-500/10 border-amber-500/30 text-amber-300"
               : "bg-rose-500/10 border-rose-500/30 text-rose-300"
           )}>
-            {existingProfile.status === 'approved' ? (
-              <ShieldCheck size={20} className="shrink-0 text-emerald-400" />
-            ) : existingProfile.status === 'pending' ? (
-              <Clock size={20} className="shrink-0 text-amber-400" />
-            ) : (
-              <AlertTriangle size={20} className="shrink-0 text-rose-400" />
-            )}
-            <div className="space-y-1">
-              <p className="font-semibold text-sm">
-                Status: {existingProfile.status.charAt(0).toUpperCase() + existingProfile.status.slice(1)}
-              </p>
-              <p className="text-xs opacity-80 leading-relaxed">
-                {existingProfile.status === 'approved'
-                  ? 'Your profile is officially verified by Admin. You have full listing privileges.'
-                  : existingProfile.status === 'pending'
-                  ? 'Your profile is awaiting review and approval by Admin.'
-                  : `Reason: ${existingProfile.rejectionReason || 'Please review information and update.'}`}
-              </p>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                {existingProfile.status === 'approved' ? (
+                  <ShieldCheck size={20} className="shrink-0 text-emerald-400" />
+                ) : existingProfile.status === 'pending' ? (
+                  <Clock size={20} className="shrink-0 text-amber-400" />
+                ) : (
+                  <AlertTriangle size={20} className="shrink-0 text-rose-400" />
+                )}
+                <div>
+                  <p className="font-bold text-sm">
+                    Status: {existingProfile.status.charAt(0).toUpperCase() + existingProfile.status.slice(1)}
+                  </p>
+                  <p className="text-xs opacity-80">
+                    {existingProfile.status === 'approved'
+                      ? existingProfile.verificationMethod === 'didit'
+                        ? '⚡ Verified via Didit AI KYC (Automated Biometrics & ID Check)'
+                        : '🛡️ Verified via Averian Admin Review'
+                      : existingProfile.status === 'pending'
+                      ? 'Awaiting review. Choose instant Didit AI verification below for immediate approval.'
+                      : `Reason: ${existingProfile.rejectionReason || 'Please review and update your information.'}`}
+                  </p>
+                </div>
+              </div>
+              {existingProfile.status === 'approved' && existingProfile.verificationMethod === 'didit' && (
+                <span className="text-[10px] font-black uppercase px-2 py-0.5 bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 rounded-md">
+                  Didit KYC
+                </span>
+              )}
             </div>
+
+            {/* Quick Didit Verification Trigger if Pending */}
+            {existingProfile.status === 'pending' && onOpenDidit && (
+              <div className="pt-2 border-t border-amber-500/20 flex flex-col sm:flex-row items-center justify-between gap-2">
+                <p className="text-xs text-amber-200/90 font-medium">
+                  ⚡ Want instant approval? Skip the queue with Didit.me AI:
+                </p>
+                <Button
+                  type="button"
+                  onClick={handleStartDiditVerification}
+                  className="text-xs py-1.5 px-3 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold rounded-xl shadow-md shrink-0"
+                >
+                  <Sparkles size={13} className="mr-1" />
+                  Verify with Didit AI
+                </Button>
+              </div>
+            )}
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
+        {/* Automated Didit.me KYC Promo Box for new or unverified sellers */}
+        {(!existingProfile || existingProfile.status !== 'approved') && onOpenDidit && (
+          <div className="p-3.5 bg-gradient-to-r from-blue-950/40 via-cyan-950/30 to-zinc-900 border border-cyan-500/30 rounded-2xl flex items-center justify-between gap-3">
+            <div className="space-y-0.5">
+              <div className="flex items-center gap-1.5">
+                <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 rounded">
+                  Instant KYC
+                </span>
+                <p className="text-xs font-bold text-white">Didit.me Automated Verification</p>
+              </div>
+              <p className="text-[11px] text-zinc-400">
+                Automated 1-minute ID & biometric check. Instant breeder verified badge.
+              </p>
+            </div>
+            <Button
+              type="button"
+              onClick={handleStartDiditVerification}
+              disabled={isSaving}
+              className="text-xs font-black py-2 px-3 bg-cyan-500 text-black hover:bg-cyan-400 rounded-xl shrink-0 shadow-lg shadow-cyan-500/20"
+            >
+              <Zap size={14} className="mr-1 fill-black" />
+              Verify Now
+            </Button>
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-4 max-h-[50vh] overflow-y-auto pr-2">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-zinc-400">Breeder Name *</label>
@@ -1076,19 +1175,25 @@ function SellerProfileModal({
           </div>
 
           <div className="p-4 bg-zinc-900/60 rounded-xl border border-zinc-800 text-xs text-zinc-400 space-y-2">
-            <p className="font-semibold text-white">Disclaimer & Terms</p>
+            <p className="font-semibold text-white">Verification & Community Safety</p>
             <p className="leading-relaxed">
-              By submitting, you confirm you are an authentic breeder adhering to animal welfare standards. Averian does not process funds or charge commissions. Profiles that violate marketplace rules will be banned.
+              To protect buyers and ensure authentic aviary representation, all sellers must complete identity verification via <strong className="text-cyan-400">Didit.me automated biometric KYC</strong> or pass manual <strong className="text-gold-400">Admin review</strong>.
             </p>
           </div>
 
-          <div className="flex items-center justify-end gap-3 pt-4">
-            <Button type="button" variant="secondary" onClick={onClose} className="text-sm font-semibold">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-3 border-t border-zinc-800">
+            <Button type="button" variant="secondary" onClick={onClose} className="w-full sm:w-auto text-sm font-semibold">
               Cancel
             </Button>
-            <Button type="submit" disabled={isSaving} className="text-sm font-semibold bg-gold-500 text-black hover:bg-gold-400">
-              {isSaving ? 'Submitting...' : existingProfile ? 'Update Profile' : 'Submit for Verification'}
-            </Button>
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <Button 
+                type="submit" 
+                disabled={isSaving} 
+                className="flex-1 sm:flex-initial text-xs font-bold bg-gold-500 text-black hover:bg-gold-400 py-2.5 px-4"
+              >
+                {isSaving ? 'Submitting...' : existingProfile ? 'Save & Request Admin Review' : 'Submit for Admin Review'}
+              </Button>
+            </div>
           </div>
         </form>
       </div>

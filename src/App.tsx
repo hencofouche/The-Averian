@@ -42,6 +42,7 @@ import { InstallPromptBanner } from './components/InstallPromptBanner';
 import { BannedUserScreen } from './components/BannedUserScreen';
 import { useIncubationNotifications } from './hooks/useIncubationNotifications';
 import { IncubationAlertsModal } from './components/IncubationAlertsModal';
+import { CurrencyConverterRates } from './components/CurrencyConverterRates';
 
 function ImageGallery({ imageUrls, initialIndex, onClose }: { imageUrls: string[], initialIndex: number, onClose: () => void }) {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
@@ -6999,18 +7000,27 @@ function SubscriptionView({ settings, onRenew, onBack }: { settings: UserSetting
         <button onClick={onBack} className="p-3 bg-zinc-800 border border-black-700 rounded-xl text-white hover:bg-zinc-700 transition-colors">
           <ArrowLeft size={20} />
         </button>
-        <h2 className="text-2xl font-black uppercase tracking-widest text-gold-500">Subscription Center</h2>
+        <div>
+          <h2 className="text-2xl font-black uppercase tracking-widest text-gold-500">Subscription Center</h2>
+          <p className="text-xs text-zinc-400 font-medium">Manage your annual membership, renewals, and international currency rates</p>
+        </div>
       </div>
       
+      {/* Main Status & Pricing Card */}
       <Card className="p-6 sm:p-8 bg-black-900 border-black-800 flex flex-col md:flex-row items-center justify-between gap-6">
         <div className="flex items-center gap-6">
           <div className={cn("w-16 h-16 rounded-full flex items-center justify-center shrink-0 border", isExpired ? "bg-red-500/10 border-red-500/20 text-red-500" : "bg-emerald-500/10 border-emerald-500/20 text-emerald-500")}>
             {isExpired ? <AlertTriangle size={32} /> : <CheckCircle2 size={32} />}
           </div>
           <div>
-            <h3 className="text-xl font-black text-white uppercase tracking-widest">
-              {isExpired ? 'Expired' : daysLeft <= 30 ? 'Trial Active' : 'Active Subscription'}
-            </h3>
+            <div className="flex items-center gap-2.5">
+              <h3 className="text-xl font-black text-white uppercase tracking-widest">
+                {isExpired ? 'Expired' : daysLeft <= 30 ? 'Trial Active' : 'Active Subscription'}
+              </h3>
+              <span className="text-xs font-black uppercase px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                R450 / Year
+              </span>
+            </div>
             <p className="text-black-50 font-medium mt-1">
               {statusText}
             </p>
@@ -7026,18 +7036,75 @@ function SubscriptionView({ settings, onRenew, onBack }: { settings: UserSetting
           <Button 
             onClick={handlePay} 
             disabled={!isExpired && daysLeft > 30}
-            className="w-full md:w-48 py-4 text-sm"
+            className="w-full md:w-56 py-4 text-sm font-black uppercase tracking-wider bg-gold-500 hover:bg-gold-400 text-black shadow-lg shadow-gold-500/10"
           >
-            {isExpired ? 'Renew Now (R450)' : 'Extend 1 Year (R450)'}
+            {isExpired ? 'Renew Now (R450 / yr)' : 'Extend 1 Year (R450 / yr)'}
           </Button>
           {!isExpired && daysLeft > 30 && (
-            <p className="text-[8px] text-center text-gold-500/50 font-bold uppercase tracking-widest">
-              Available when &lt; 30 days left
+            <p className="text-[9px] text-center text-gold-500/70 font-bold uppercase tracking-widest">
+              Renewal opens when &lt; 30 days left
             </p>
           )}
-          <p className="text-[8px] text-center text-black-200 font-bold uppercase tracking-widest">Powered by Yoco</p>
+          <p className="text-[9px] text-center text-zinc-400 font-bold uppercase tracking-widest">
+            Billed in ZAR (R450) • Powered by Yoco
+          </p>
         </div>
       </Card>
+
+      {/* Currency Conversion Rate Estimator */}
+      <CurrencyConverterRates basePriceZar={450} />
+
+      {/* Plan Inclusions */}
+      <div className="bg-zinc-950/60 border border-zinc-800/80 rounded-2xl p-5 sm:p-6 space-y-4">
+        <h4 className="text-sm font-black text-white uppercase tracking-wider flex items-center gap-2">
+          <Sparkles size={16} className="text-amber-400" />
+          Everything Included In Your R450 / Year Membership
+        </h4>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-xs text-zinc-300">
+          <div className="flex items-start gap-2.5 p-3 rounded-xl bg-zinc-900/50 border border-zinc-800">
+            <CheckCircle2 size={16} className="text-emerald-400 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-bold text-white">Full Aviary Management</p>
+              <p className="text-zinc-400 text-[11px] mt-0.5">Unlimited birds, cages, pairings, and pedigree record archiving.</p>
+            </div>
+          </div>
+          <div className="flex items-start gap-2.5 p-3 rounded-xl bg-zinc-900/50 border border-zinc-800">
+            <CheckCircle2 size={16} className="text-emerald-400 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-bold text-white">Smart Candling & Alerts</p>
+              <p className="text-zinc-400 text-[11px] mt-0.5">Automated egg candling, lockdown humidity, and hatch push notifications.</p>
+            </div>
+          </div>
+          <div className="flex items-start gap-2.5 p-3 rounded-xl bg-zinc-900/50 border border-zinc-800">
+            <CheckCircle2 size={16} className="text-emerald-400 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-bold text-white">Digital Passports & QR Codes</p>
+              <p className="text-zinc-400 text-[11px] mt-0.5">Tamper-evident digital ownership transfers and printable cage cards.</p>
+            </div>
+          </div>
+          <div className="flex items-start gap-2.5 p-3 rounded-xl bg-zinc-900/50 border border-zinc-800">
+            <CheckCircle2 size={16} className="text-emerald-400 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-bold text-white">Genetics & Mutation Tools</p>
+              <p className="text-zinc-400 text-[11px] mt-0.5">Punnett square mutation calculators for autosomal, sex-linked, and splits.</p>
+            </div>
+          </div>
+          <div className="flex items-start gap-2.5 p-3 rounded-xl bg-zinc-900/50 border border-zinc-800">
+            <CheckCircle2 size={16} className="text-emerald-400 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-bold text-white">Marketplace & Classifieds</p>
+              <p className="text-zinc-400 text-[11px] mt-0.5">Verified breeder profile, direct WhatsApp inquiries, and listing management.</p>
+            </div>
+          </div>
+          <div className="flex items-start gap-2.5 p-3 rounded-xl bg-zinc-900/50 border border-zinc-800">
+            <CheckCircle2 size={16} className="text-emerald-400 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-bold text-white">Cloud Backup & Offline Sync</p>
+              <p className="text-zinc-400 text-[11px] mt-0.5">Seamless offline IndexedDB storage synchronized securely with Firestore.</p>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

@@ -194,6 +194,11 @@ export interface SellerProfile {
   rejectionReason?: string;
   verifiedBy?: string;
   verifiedAt?: string;
+  verificationMethod?: 'didit' | 'admin' | 'manual';
+  diditSessionId?: string;
+  diditSessionUrl?: string;
+  diditStatus?: string;
+  diditVerifiedAt?: string;
   rating?: number;
   reviewsCount?: number;
   createdAt: string;
