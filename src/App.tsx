@@ -781,11 +781,17 @@ export default function App() {
 
   const t = (text: string) => getTranslatedLabel(text, userSettings?.language || 'en');
 
-  // Check if current user is Admin (teamotakuempire@gmail.com or clashfouche@gmail.com)
+  // Check if current user is Admin (teamotakuempire@gmail.com, clashfouche@gmail.com, etc.)
   const isAdmin = useMemo(() => {
     const email = user?.email?.toLowerCase().trim();
-    return email === 'teamotakuempire@gmail.com' || email === 'clashfouche@gmail.com';
-  }, [user?.email]);
+    const adminEmails = [
+      'clashfouche@gmail.com',
+      'teamotakuempire@gmail.com',
+      'theaveriansupport@gmail.com',
+      'hencofouche8@gmail.com'
+    ];
+    return Boolean((email && adminEmails.includes(email)) || userSettings?.role === 'admin');
+  }, [user?.email, userSettings?.role]);
 
   const [hasRedirectedAdmin, setHasRedirectedAdmin] = useState(false);
 

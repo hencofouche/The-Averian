@@ -51,8 +51,8 @@ const DEFAULT_PAGE_DETAILS: Record<AppPageId, { title: string; subtitle: string;
   marketplace: {
     title: 'Classifieds & Aviary Marketplace',
     subtitle: 'Verified Breeder Community Hub',
-    description: 'We make vetting simple: everyone who has access must get vetted immediately. Simply accept a quick WhatsApp video call to verify you are who you are and gain immediate access to our secure community.',
-    features: ['Sell Classifieds', 'Wanted Classifieds', 'Vetted Buyers & Sellers'],
+    description: '',
+    features: ['Sell Classifieds', 'Wanted Classifieds', 'Verified Breeders'],
     estimatedRelease: 'Launching Very Soon'
   },
   financials: {
@@ -141,15 +141,10 @@ export function ComingSoonView({
 
   let title = config?.title?.trim() || defaults.title;
   let subtitle = config?.subtitle?.trim() || defaults.subtitle;
-  let description = config?.description?.trim() || defaults.description;
+  let description = config?.description !== undefined ? config.description.trim() : defaults.description;
   let estimatedRelease = config?.estimatedRelease?.trim() || defaults.estimatedRelease;
   let badgeText = config?.badgeText?.trim() || 'COMING SOON';
   let features = (config?.featuresList && config.featuresList.length > 0) ? config.featuresList : defaults.features;
-
-  if (pageId === 'marketplace') {
-    description = 'We make vetting simple: everyone who has access must get vetted immediately. Simply accept a quick WhatsApp video call to verify you are who you are and gain immediate access to our secure community.';
-    features = ['Sell Classifieds', 'Wanted Classifieds', 'Vetted Buyers & Sellers'];
-  }
 
   return (
     <div className="min-h-[75vh] flex flex-col items-center justify-center p-4 sm:p-6 md:p-10 relative select-none">
@@ -235,9 +230,13 @@ export function ComingSoonView({
         </p>
 
         {/* Description */}
-        <p className="text-zinc-400 text-sm sm:text-base leading-relaxed max-w-lg mx-auto mb-8 font-medium">
-          {description}
-        </p>
+        {description ? (
+          <p className="text-zinc-400 text-sm sm:text-base leading-relaxed max-w-lg mx-auto mb-8 font-medium">
+            {description}
+          </p>
+        ) : (
+          <div className="mb-6" />
+        )}
 
         {/* What to expect list */}
         {features && features.length > 0 && (
