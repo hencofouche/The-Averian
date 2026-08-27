@@ -47,21 +47,24 @@ import { PublicLandingPage } from './components/PublicLandingPage';
 
 function checkIsLandingInUrl() {
   if (typeof window === 'undefined') return false;
+  const path = window.location.pathname.toLowerCase();
   const params = new URLSearchParams(window.location.search);
+  const hash = window.location.hash.toLowerCase();
+  
   const page = params.get('page');
   const view = params.get('view');
   const yoco = params.get('yoco');
-  const landing = params.get('landing');
-  const pricing = params.get('pricing');
+  
   return (
+    path.includes('testsiteappyoco') ||
+    params.has('testsiteappyoco') ||
+    page === 'testsiteappyoco' ||
     page === 'landing' ||
     view === 'landing' ||
     view === 'pricing' ||
     yoco === 'verify' ||
-    landing === 'true' ||
-    pricing === 'true' ||
-    window.location.hash === '#landing' ||
-    window.location.hash === '#pricing'
+    hash === '#testsiteappyoco' ||
+    hash === '#landing'
   );
 }
 
@@ -1057,25 +1060,30 @@ export default function App() {
     fetchSharedItem();
   }, []);
 
+  // Yoco Payment Return Handler
   useEffect(() => {
-    if (!user || !userSettings) return;
+    if (typeof window === 'undefined') return;
     const params = new URLSearchParams(window.location.search);
-    if (params.get('payment') === 'success') {
-      // 1. Remove the parameter from the URL immediately to prevent re-triggers
+    const payment = params.get('payment');
+    const checkout = params.get('checkout');
+    if (payment === 'success' || checkout === 'success') {
+      sessionStorage.setItem('pending_yoco_payment_success', 'true');
       const newUrl = window.location.pathname;
       window.history.replaceState({}, document.title, newUrl);
-
-      // 2. Use a session storage flag to ensure it only happens once per session/load
-      const hasRenewed = sessionStorage.getItem('has_renewed_payment');
-      if (!hasRenewed) {
-        sessionStorage.setItem('has_renewed_payment', 'true');
-        handleRenew().catch(e => {
-          console.error("Renewal failed:", e);
-          toast.error("Failed to activate subscription. Please contact support.");
-        });
-      }
     }
-  }, [user, !!userSettings]); // Only trigger when user/settings become available, not on every update
+  }, []);
+
+  useEffect(() => {
+    if (!user || !userSettings) return;
+    const pendingPayment = sessionStorage.getItem('pending_yoco_payment_success');
+    if (pendingPayment === 'true') {
+      sessionStorage.removeItem('pending_yoco_payment_success');
+      handleRenew().catch(e => {
+        console.error("Yoco Renewal activation failed:", e);
+        toast.error("Failed to activate subscription. Please contact support.");
+      });
+    }
+  }, [user, Boolean(userSettings)]); // Only trigger when user/settings become available, not on every update
 
   useEffect(() => {
     if (!user) return;
@@ -1723,33 +1731,55 @@ export default function App() {
   };
 
   const handleRenew = async () => {
-    if (!user || !userSettings) return;
+    if (!user) return;
     
     try {
-      // Fetch latest from server to avoid race conditions
-      const docSnap = await getDocFromServer(doc(db, 'userSettings', user.uid));
-      const currentData = docSnap.exists() ? docSnap.data() as UserSettings : userSettings;
+      const docRef = doc(db, 'userSettings', user.uid);
+      const userDocRef = doc(db, 'users', user.uid);
+      const docSnap = await getDocFromServer(docRef);
+      const currentData = docSnap.exists() ? (docSnap.data() as UserSettings) : userSettings;
       
-      const currentExpiry = currentData.account_expiry_date ? new Date(currentData.account_expiry_date) : new Date();
+      const currentExpiry = (currentData && currentData.account_expiry_date) 
+        ? new Date(currentData.account_expiry_date) 
+        : new Date();
       const now = new Date();
       
-      // Prevent topping up if they already have more than 45 days left
-      const diffTime = currentExpiry.getTime() - now.getTime();
-      const daysLeft = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      const baseDate = (currentExpiry > now && currentExpiry.getFullYear() < 2090) 
+        ? currentExpiry 
+        : now;
       
-      if (daysLeft > 45) {
-        console.log("Subscription already active for more than 45 days, skipping auto-renewal.");
-        return;
-      }
+      const newExpiry = new Date(baseDate.getTime());
+      newExpiry.setFullYear(newExpiry.getFullYear() + 1);
+      const isoExpiry = newExpiry.toISOString();
+      const nowIso = new Date().toISOString();
 
-      const baseDate = currentExpiry > now ? currentExpiry : now;
-      baseDate.setFullYear(baseDate.getFullYear() + 1);
-      
-      await updateDoc(doc(db, 'userSettings', user.uid), {
-        account_expiry_date: baseDate.toISOString()
-      });
-      toast.success("Subscription activated for 1 year!");
-    } catch (e) {
+      await Promise.all([
+        setDoc(docRef, {
+          account_expiry_date: isoExpiry,
+          subscriptionPlan: 'yearly',
+          subscribedAt: nowIso,
+          lastPaymentMethod: 'Yoco Gateway (ZAR R450/yr)',
+          updatedAt: nowIso
+        }, { merge: true }),
+        setDoc(userDocRef, {
+          account_expiry_date: isoExpiry,
+          subscriptionPlan: 'yearly',
+          subscribedAt: nowIso,
+          email: user.email || '',
+          displayName: user.displayName || '',
+          updatedAt: nowIso
+        }, { merge: true })
+      ]);
+
+      setUserSettings(prev => prev ? {
+        ...prev,
+        account_expiry_date: isoExpiry,
+        subscriptionPlan: 'yearly'
+      } : prev);
+
+      toast.success(`ğŸ‰ Subscription activated for 1 year! Valid until ${format(newExpiry, 'PPP')}`);
+    } catch (e: any) {
+      console.error("Error executing handleRenew:", e);
       handleFirestoreError(e, OperationType.UPDATE, 'userSettings');
     }
   };
@@ -1861,18 +1891,7 @@ export default function App() {
             )}
           </Button>
 
-          <div className="pt-2 border-t border-zinc-800/80">
-            <button
-              onClick={() => setShowPublicLanding(true)}
-              className="w-full py-3 px-4 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-gold-500/30 text-gold-300 font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition shadow-md"
-            >
-              <ShieldCheck size={16} className="text-gold-400" />
-              Public Info & Subscription Pricing (Yoco Verification)
-            </button>
-            <p className="text-[10px] text-zinc-500 mt-2">
-              No login required to review products, pricing in ZAR (R450/yr), and merchant terms.
-            </p>
-          </div>
+
         </div>
       </div>
     );
@@ -7170,7 +7189,6 @@ function SubscriptionView({ settings, onRenew, onBack, onOpenLanding }: { settin
         <div className="w-full md:w-auto flex flex-col gap-2">
           <Button 
             onClick={handlePay} 
-            disabled={!isExpired && daysLeft > 30}
             className="w-full md:w-56 py-4 text-sm font-black uppercase tracking-wider bg-gold-500 hover:bg-gold-400 text-black shadow-lg shadow-gold-500/10"
           >
             {isExpired ? 'Renew Now (R450 / yr)' : 'Extend 1 Year (R450 / yr)'}
@@ -7190,43 +7208,45 @@ function SubscriptionView({ settings, onRenew, onBack, onOpenLanding }: { settin
       <CurrencyConverterRates basePriceZar={450} />
 
       {/* Yoco Compliance & Verification Sharing Card */}
-      <div className="bg-gradient-to-r from-amber-500/10 via-zinc-900 to-zinc-950 border border-gold-500/30 rounded-2xl p-5 sm:p-6 flex flex-col md:flex-row items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-gold-500/20 text-gold-400 flex items-center justify-center shrink-0 border border-gold-500/40">
-            <ShieldCheck size={24} />
+      {settings.role === 'admin' && (
+        <div className="bg-gradient-to-r from-amber-500/10 via-zinc-900 to-zinc-950 border border-gold-500/30 rounded-2xl p-5 sm:p-6 flex flex-col md:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-xl bg-gold-500/20 text-gold-400 flex items-center justify-center shrink-0 border border-gold-500/40">
+              <ShieldCheck size={24} />
+            </div>
+            <div>
+              <h4 className="text-sm font-black text-white uppercase tracking-wider flex items-center gap-2">
+                Yoco Gateway Public Verification Page
+              </h4>
+              <p className="text-xs text-zinc-400 mt-0.5">
+                Share our public landing page with Yoco's compliance team for payment gateway verification. No login required.
+              </p>
+            </div>
           </div>
-          <div>
-            <h4 className="text-sm font-black text-white uppercase tracking-wider flex items-center gap-2">
-              Yoco Gateway Public Verification Page
-            </h4>
-            <p className="text-xs text-zinc-400 mt-0.5">
-              Share our public landing page with Yoco's compliance team for payment gateway verification. No login required.
-            </p>
-          </div>
-        </div>
 
-        <div className="flex items-center gap-2 shrink-0 w-full md:w-auto">
-          <Button
-            onClick={onOpenLanding}
-            variant="secondary"
-            className="flex-1 md:flex-initial bg-zinc-800 hover:bg-zinc-700 text-gold-300 font-bold text-xs py-2.5 px-4 rounded-xl border border-gold-500/30"
-          >
-            <Eye size={14} />
-            Preview Landing Page
-          </Button>
-          <Button
-            onClick={() => {
-              const shareUrl = `${window.location.origin}${window.location.pathname}?page=landing`;
-              navigator.clipboard.writeText(shareUrl);
-              toast.success('Public Yoco verification link copied to clipboard!');
-            }}
-            className="flex-1 md:flex-initial bg-gold-500 hover:bg-gold-400 text-black font-bold text-xs py-2.5 px-4 rounded-xl shadow-lg shadow-gold-500/10"
-          >
-            <Copy size={14} />
-            Copy Link
-          </Button>
+          <div className="flex items-center gap-2 shrink-0 w-full md:w-auto">
+            <Button
+              onClick={onOpenLanding}
+              variant="secondary"
+              className="flex-1 md:flex-initial bg-zinc-800 hover:bg-zinc-700 text-gold-300 font-bold text-xs py-2.5 px-4 rounded-xl border border-gold-500/30"
+            >
+              <Eye size={14} />
+              Preview Landing Page
+            </Button>
+            <Button
+              onClick={() => {
+                const shareUrl = `${window.location.origin}/testsiteappyoco`;
+                navigator.clipboard.writeText(shareUrl);
+                toast.success('Public Yoco verification link copied to clipboard!');
+              }}
+              className="flex-1 md:flex-initial bg-gold-500 hover:bg-gold-400 text-black font-bold text-xs py-2.5 px-4 rounded-xl shadow-lg shadow-gold-500/10"
+            >
+              <Copy size={14} />
+              Copy Link
+            </Button>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Plan Inclusions */}
       <div className="bg-zinc-950/60 border border-zinc-800/80 rounded-2xl p-5 sm:p-6 space-y-4">
@@ -10451,9 +10471,8 @@ function TaskForm({ user, initialData, birds, cages, onClose, userSettings }: { 
                 onClick={() => setFormData({ ...formData, subTasks: formData.subTasks?.filter((_, i) => i !== idx) })} 
                 className="text-white transition-colors"
                 onMouseEnter={(e) => e.currentTarget.style.color = 'var(--theme-delete-color, #ef4444)'}
-                onMouseLeave={(e) => e.currentTarget.style.color = 'white'}
-              >
-                <Trash2 size={16} />
-              </button>
-xœlÏNÃ0Æï}
-«‡m=„‰	q€u7Äx ·I‘µ$bwèúî­Ó„Oş~¶ìOÀXË¹¦Í*AQÙ¿ÃÑ±šœÈS'Òz}0eÎ]åHr¨-2¿¡Kh«šÎZ{ubv¢ØA‚‰5²‰X¯É©-iÃMëEU6Á41VÖè²'~ÇMÚ‚Ãˆ_v¢ÑÃh\x€åk‹ÚÄÅ¹ôäPŒâ@\T‹˜¾MÙ_ß0_Áøäq Ÿ‘'!´Ï(“	œÉ+ÒEz#³égĞé(| ¯§Eº‘Ğ£Öz8%vèh6å×F÷Û÷Ùı   ÿÿ °•v-
+                onMouseLxœ\ÍnÂ0„ï<Å*BU=´	UQ{«z)}€M¼À
+Ç‰ì?…¼{İª"	>y¾]Í†pOÙyB	d iÑ8GVVè6$S/'Xe*Ä‡-Åíoq£Ò•C¿ƒçïà}÷ĞÂìv)åHe‡<iŞ÷Q’t×Ã±f2Ú“\ÉòÏäTSù&/Y"(zÿe@µnŒú¤îAè(Ê—ĞÔ5¹=8,vl7êÀš¼Àº²¢r`š=æ†tvfÿ‰û°—°;ÖìH·]ünáÒ÷
+5¹y?Z.QHùš-”NÍ£Acğ6dì
+8OØ²0šW„ñzrÊ:	gdÕ:˜Â
+ı.N‚G@/ZÿëöÚØ²Wè¯råï?yµ£   ÿÿ ˜Ä—¨
