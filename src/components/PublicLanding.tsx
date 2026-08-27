@@ -2,7 +2,9 @@ import React from 'react';
 import { Bird as BirdIcon, Shield, Cloud, QrCode, Share2, Calendar, FileText, ArrowLeft, CheckCircle2, Dna, Store, BookOpen } from 'lucide-react';
 import { Button } from './ui';
 
-export function PublicLanding({ onBack }: { onBack: () => void }) {
+import { Loader2 } from "lucide-react";
+
+export function PublicLanding({ onLogin, isLoggingIn }: { onLogin: () => void, isLoggingIn: boolean }) {
   return (
     <div className="min-h-screen bg-black text-white selection:bg-gold-500/30 selection:text-gold-200">
       {/* Header */}
@@ -14,9 +16,15 @@ export function PublicLanding({ onBack }: { onBack: () => void }) {
             </div>
             <span className="font-black text-xl tracking-tighter text-white">THE AV<span className="text-secondary">ERIAN</span></span>
           </div>
-          <Button variant="outline" onClick={onBack} className="text-sm font-medium hover:bg-white/5 hover:text-white transition-colors">
-            <ArrowLeft size={16} className="mr-2" />
-            Back to Login
+          <Button variant="default" onClick={onLogin} disabled={isLoggingIn} className="text-sm font-bold bg-secondary text-black-950 hover:bg-secondary/90 transition-colors">
+            {isLoggingIn ? (
+              <>
+                <Loader2 className="animate-spin mr-2" size={16} />
+                Signing in...
+              </>
+            ) : (
+              'Login / Sign Up'
+            )}
           </Button>
         </div>
       </header>
@@ -30,6 +38,11 @@ export function PublicLanding({ onBack }: { onBack: () => void }) {
           <p className="mt-4 max-w-2xl text-lg sm:text-xl text-black-50 mx-auto font-medium">
             The Averian is a comprehensive software solution designed for professional aviculturists, breeders, and hobbyists. We provide powerful tools to track genetics, manage breeding records, and maintain detailed aviary health logs.
           </p>
+          <div className="mt-10 flex justify-center">
+            <Button onClick={onLogin} disabled={isLoggingIn} className="px-8 py-4 text-lg font-bold bg-secondary text-black-950 hover:bg-secondary/90 transition-colors rounded-xl shadow-lg shadow-secondary/20">
+              {isLoggingIn ? 'Connecting...' : 'Get Started Now'}
+            </Button>
+          </div>
         </div>
 
         {/* Features Section */}
