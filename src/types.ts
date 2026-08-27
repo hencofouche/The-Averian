@@ -204,6 +204,7 @@ export interface SellerProfile {
   email?: string;
   bio?: string;
   status: 'pending' | 'approved' | 'rejected' | 'banned';
+  profileSetupComplete?: boolean;
   rejectionReason?: string;
   verifiedBy?: string;
   verifiedAt?: string;

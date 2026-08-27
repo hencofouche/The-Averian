@@ -63,6 +63,11 @@ export function AdminDashboardView({
 }: AdminDashboardViewProps) {
   const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'sellers' | 'listings' | 'reviews' | 'comingSoon' | 'diagnostics'>('overview');
   
+  // Lifted state to cache loaded user accounts and avoid redundant reads
+  const [cachedUsers, setCachedUsers] = useState<any[]>([]);
+  const [hasLoadedUsers, setHasLoadedUsers] = useState(false);
+  const [isLoadingUsers, setIsLoadingUsers] = useState(false);
+
   // Rejection reason modal
   const [rejectModalData, setRejectModalData] = useState<{
     type: 'seller' | 'listing' | 'review';
@@ -567,6 +572,12 @@ export function AdminDashboardView({
         <div className="space-y-4">
           <AdminUserManagementPanel
             currentUser={user}
+            cachedUsers={cachedUsers}
+            setCachedUsers={setCachedUsers}
+            hasLoadedUsers={hasLoadedUsers}
+            setHasLoadedUsers={setHasLoadedUsers}
+            isLoadingUsers={isLoadingUsers}
+            setIsLoadingUsers={setIsLoadingUsers}
             onRefreshParentData={() => {
               // Trigger any global refresh if necessary
             }}

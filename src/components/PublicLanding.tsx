@@ -14,7 +14,7 @@ export function PublicLanding({ onBack }: { onBack: () => void }) {
             </div>
             <span className="font-black text-xl tracking-tighter text-white">THE AV<span className="text-secondary">ERIAN</span></span>
           </div>
-          <Button variant="outline" onClick={onBack} className="text-sm font-medium hover:bg-white/5 hover:text-white transition-colors">
+          <Button variant="secondary" onClick={onBack} className="text-sm font-medium hover:bg-white/5 hover:text-white transition-colors">
             <ArrowLeft size={16} className="mr-2" />
             Back to Login
           </Button>

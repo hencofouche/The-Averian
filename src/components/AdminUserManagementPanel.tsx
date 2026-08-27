@@ -24,6 +24,12 @@ import { format, addDays, addMonths, addYears, isAfter, isBefore } from 'date-fn
 interface AdminUserManagementPanelProps {
   currentUser: any;
   onRefreshParentData?: () => void;
+  cachedUsers?: UserWithDetails[];
+  setCachedUsers?: React.Dispatch<React.SetStateAction<UserWithDetails[]>>;
+  hasLoadedUsers?: boolean;
+  setHasLoadedUsers?: (val: boolean) => void;
+  isLoadingUsers?: boolean;
+  setIsLoadingUsers?: (val: boolean) => void;
 }
 
 interface UserWithDetails {
@@ -57,10 +63,22 @@ interface UserWithDetails {
 
 export function AdminUserManagementPanel({
   currentUser,
-  onRefreshParentData
+  onRefreshParentData,
+  cachedUsers,
+  setCachedUsers,
+  hasLoadedUsers,
+  setHasLoadedUsers,
+  isLoadingUsers,
+  setIsLoadingUsers
 }: AdminUserManagementPanelProps) {
-  const [usersList, setUsersList] = useState<UserWithDetails[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [localUsersList, setLocalUsersList] = useState<UserWithDetails[]>([]);
+  const [localIsLoading, setLocalIsLoading] = useState(true);
+
+  const usersList = cachedUsers !== undefined ? cachedUsers : localUsersList;
+  const setUsersList = setCachedUsers !== undefined ? setCachedUsers : setLocalUsersList;
+  const isLoading = isLoadingUsers !== undefined ? isLoadingUsers : localIsLoading;
+  const setIsLoading = setIsLoadingUsers !== undefined ? setIsLoadingUsers : setLocalIsLoading;
+
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'testers' | 'registered' | 'unregistered' | 'active' | 'expired' | 'trial' | 'yearly' | 'lifetime' | 'banned' | 'admins'>('all');
   
@@ -122,7 +140,10 @@ export function AdminUserManagementPanel({
   const [isLoadingInspect, setIsLoadingInspect] = useState(false);
 
   // Load all users from Firestore
-  const fetchAllUsers = async () => {
+  const fetchAllUsers = async (forceRefetch = false) => {
+    if (hasLoadedUsers && !forceRefetch && cachedUsers !== undefined) {
+      return;
+    }
     setIsLoading(true);
     try {
       // 1. Fetch from 'users' collection
@@ -272,6 +293,9 @@ export function AdminUserManagementPanel({
       });
 
       setUsersList(list);
+      if (setHasLoadedUsers) {
+        setHasLoadedUsers(true);
+      }
     } catch (err: any) {
       console.error("Error fetching users list:", err);
       toast.error('Failed to load user accounts: ' + err.message);
@@ -281,7 +305,7 @@ export function AdminUserManagementPanel({
   };
 
   useEffect(() => {
-    fetchAllUsers();
+    fetchAllUsers(false);
   }, []);
 
   // Quick stats
@@ -553,13 +577,13 @@ export function AdminUserManagementPanel({
       const subResults = await Promise.allSettled([
         setDoc(settingsRef, {
           account_expiry_date: isoExpiry,
-          subscriptionPlan: type === 'lifetime' ? 'lifetime' : (type === '1year' ? 'yearly' : 'monthly'),
+          subscriptionPlan: type === '1year' ? 'yearly' : 'trial',
           subscribedAt: new Date().toISOString(),
           subscriptionGrantedBy: `Admin (${currentUser?.email || 'Admin'})`
         }, { merge: true }),
         setDoc(userRef, {
           account_expiry_date: isoExpiry,
-          subscriptionPlan: type === 'lifetime' ? 'lifetime' : (type === '1year' ? 'yearly' : 'monthly'),
+          subscriptionPlan: type === '1year' ? 'yearly' : 'trial',
           subscriptionGrantedBy: `Admin (${currentUser?.email || 'Admin'})`,
           updatedAt: new Date().toISOString()
         }, { merge: true })
@@ -577,7 +601,7 @@ export function AdminUserManagementPanel({
           return {
             ...u,
             account_expiry_date: isoExpiry,
-            subscriptionPlan: type === 'lifetime' ? 'lifetime' : (type === '1year' ? 'yearly' : 'monthly'),
+            subscriptionPlan: type === '1year' ? 'yearly' : 'trial',
             subscriptionGrantedBy: `Admin (${currentUser?.email || 'Admin'})`
           };
         }
@@ -1121,7 +1145,7 @@ export function AdminUserManagementPanel({
           </button>
           <Button
             variant="secondary"
-            onClick={fetchAllUsers}
+            onClick={() => fetchAllUsers(true)}
             disabled={isLoading}
             className="p-2 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 rounded-xl shrink-0"
             title="Refresh Users"
@@ -1328,7 +1352,7 @@ export function AdminUserManagementPanel({
                       {isTester ? "Beta Tester: Active" : "Grant Beta Access"}
                     </Button>
 
-                    <Button
+                     <Button
                       onClick={() => handleGrantSubscription(u, '1year')}
                       disabled={isUpdatingSub}
                       className="text-xs font-bold bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded-xl px-3 py-1.5"
@@ -1337,19 +1361,12 @@ export function AdminUserManagementPanel({
                       +1 Year Sub
                     </Button>
                     <Button
-                      onClick={() => handleGrantSubscription(u, '6months')}
+                      onClick={() => handleGrantSubscription(u, 'trial30')}
                       disabled={isUpdatingSub}
-                      className="text-xs font-bold bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border border-zinc-800 rounded-xl px-3 py-1.5"
+                      className="text-xs font-bold bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 rounded-xl px-3 py-1.5"
                     >
-                      +6 Months
-                    </Button>
-                    <Button
-                      onClick={() => handleGrantSubscription(u, 'lifetime')}
-                      disabled={isUpdatingSub}
-                      className="text-xs font-bold bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 rounded-xl px-3 py-1.5"
-                    >
-                      <Sparkles size={13} className="mr-1.5 text-indigo-400" />
-                      Lifetime
+                      <Clock size={13} className="mr-1.5 text-cyan-400" />
+                      +30 Days Trial
                     </Button>
                     <Button
                       variant="secondary"
@@ -1488,7 +1505,10 @@ export function AdminUserManagementPanel({
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
-                    onClick={() => setSubDurationType('1year')}
+                    onClick={() => {
+                      setSubDurationType('1year');
+                      setCustomPlanName('Annual Breeder Pro');
+                    }}
                     className={cn(
                       "p-3 rounded-2xl border text-left transition-all",
                       subDurationType === '1year' ? "bg-amber-500/20 border-amber-500 text-amber-300" : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-white"
@@ -1500,54 +1520,19 @@ export function AdminUserManagementPanel({
 
                   <button
                     type="button"
-                    onClick={() => setSubDurationType('6months')}
+                    onClick={() => {
+                      setSubDurationType('trial30');
+                      setCustomPlanName('30-Day Free Trial');
+                    }}
                     className={cn(
                       "p-3 rounded-2xl border text-left transition-all",
-                      subDurationType === '6months' ? "bg-amber-500/20 border-amber-500 text-amber-300" : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-white"
+                      subDurationType === 'trial30' ? "bg-cyan-500/20 border-cyan-500 text-cyan-300" : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-white"
                     )}
                   >
-                    <p className="text-xs font-black">+6 Months</p>
-                    <p className="text-[10px] text-zinc-500 mt-0.5">Half-year breeder plan</p>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setSubDurationType('1month')}
-                    className={cn(
-                      "p-3 rounded-2xl border text-left transition-all",
-                      subDurationType === '1month' ? "bg-amber-500/20 border-amber-500 text-amber-300" : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-white"
-                    )}
-                  >
-                    <p className="text-xs font-black">+1 Month</p>
-                    <p className="text-[10px] text-zinc-500 mt-0.5">30 days extension</p>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setSubDurationType('lifetime')}
-                    className={cn(
-                      "p-3 rounded-2xl border text-left transition-all",
-                      subDurationType === 'lifetime' ? "bg-indigo-500/20 border-indigo-500 text-indigo-300" : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-white"
-                    )}
-                  >
-                    <p className="text-xs font-black">Lifetime VIP</p>
-                    <p className="text-[10px] text-zinc-500 mt-0.5">Never expires (2099)</p>
+                    <p className="text-xs font-black">+30 Days Trial</p>
+                    <p className="text-[10px] text-zinc-500 mt-0.5">Extended free testing trial</p>
                   </button>
                 </div>
-              </div>
-
-              {/* Custom Date Input if selected */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-zinc-400">Or Set Custom Expiration Date</label>
-                <Input
-                  type="date"
-                  value={customDate}
-                  onChange={(e) => {
-                    setCustomDate(e.target.value);
-                    setSubDurationType('custom');
-                  }}
-                  className="bg-zinc-900 border-zinc-800 text-xs"
-                />
               </div>
 
               <div className="space-y-1.5">
@@ -1556,7 +1541,7 @@ export function AdminUserManagementPanel({
                   type="text"
                   value={customPlanName}
                   onChange={(e) => setCustomPlanName(e.target.value)}
-                  placeholder="e.g. Annual Breeder Pro, VIP Sponsor..."
+                  placeholder="e.g. Annual Breeder Pro, 30-Day Free Trial..."
                   className="bg-zinc-900 border-zinc-800 text-xs"
                 />
               </div>

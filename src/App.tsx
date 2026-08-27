@@ -181,10 +181,7 @@ import { startOfDay, startOfWeek, startOfMonth, startOfYear, endOfMonth, endOfWe
 
 // --- Helpers ---
 const ADMIN_EMAILS_LIST = [
-  'clashfouche@gmail.com',
-  'teamotakuempire@gmail.com',
-  'theaveriansupport@gmail.com',
-  'hencofouche8@gmail.com'
+  'clashfouche@gmail.com'
 ];
 
 const isSubscriptionExpired = (settings: UserSettings | null | undefined): boolean => {
@@ -801,17 +798,11 @@ export default function App() {
 
   const t = (text: string) => getTranslatedLabel(text, userSettings?.language || 'en');
 
-  // Check if current user is Admin (teamotakuempire@gmail.com, clashfouche@gmail.com, etc.)
+  // Check if current user is Admin (clashfouche@gmail.com only)
   const isAdmin = useMemo(() => {
     const email = user?.email?.toLowerCase().trim();
-    const adminEmails = [
-      'clashfouche@gmail.com',
-      'teamotakuempire@gmail.com',
-      'theaveriansupport@gmail.com',
-      'hencofouche8@gmail.com'
-    ];
-    return Boolean((email && adminEmails.includes(email)) || userSettings?.role === 'admin');
-  }, [user?.email, userSettings?.role]);
+    return email === 'clashfouche@gmail.com';
+  }, [user?.email]);
 
   const [hasRedirectedAdmin, setHasRedirectedAdmin] = useState(false);
 
@@ -1164,8 +1155,8 @@ export default function App() {
         setUserSettings(prev => {
           if (!prev) return prev;
           const isBeta = currentUserData.isBetaTester === true || currentUserData.canTestComingSoon === true;
-          const isAdminRole = currentUserData.role === 'admin' || prev.role === 'admin';
-          const isLife = currentUserData.subscriptionPlan === 'lifetime' || prev.subscriptionPlan === 'lifetime' || isBeta || isAdminRole;
+          const isAdminRole = currentUserData.role === 'admin';
+          const isLife = currentUserData.subscriptionPlan === 'lifetime' || isBeta || isAdminRole;
           
           let mergedExpiry = currentUserData.account_expiry_date || prev.account_expiry_date;
           if (isLife && (!mergedExpiry || new Date(mergedExpiry).getFullYear() < 2090)) {
@@ -1174,11 +1165,11 @@ export default function App() {
 
           return {
             ...prev,
-            isBetaTester: isBeta || prev.isBetaTester,
-            canTestComingSoon: isBeta || prev.canTestComingSoon,
-            account_expiry_date: mergedExpiry || prev.account_expiry_date,
-            subscriptionPlan: isLife ? 'lifetime' : (currentUserData.subscriptionPlan || prev.subscriptionPlan),
-            role: isAdminRole ? 'admin' : prev.role
+            isBetaTester: isBeta,
+            canTestComingSoon: isBeta,
+            account_expiry_date: mergedExpiry,
+            subscriptionPlan: isLife ? 'lifetime' : currentUserData.subscriptionPlan,
+            role: isAdminRole ? 'admin' : currentUserData.role
           };
         });
       }
@@ -1211,8 +1202,7 @@ export default function App() {
       if (docSnap.exists()) {
         const data = docSnap.data() as UserSettings;
         if (docSnap.metadata.hasPendingWrites) {
-          setUserSettings({ id: docSnap.id, ...data });
-          return;
+          // Process pending writes through the same merge logic to prevent temporary loss of merged fields
         }
 
         const userEmail = user.email?.toLowerCase().trim();

@@ -7,6 +7,7 @@ import {
   Share2, ArrowUpDown, Truck, Award, HelpCircle, UserCheck, AlertTriangle, RefreshCw, Sparkles, ExternalLink, Zap, Globe
 } from 'lucide-react';
 import { DiditVerificationModal } from './DiditVerificationModal';
+import { MarketplaceProfileSetup } from './MarketplaceProfileSetup';
 import { 
   MarketplaceListing, SellerProfile, MarketplaceReview, 
   Bird, Pair, Cage, UserSettings 
@@ -92,7 +93,11 @@ export function MarketplaceView({
   }, [sellerProfiles, user]);
 
   const isVerifiedSeller = myProfile?.status === 'approved';
-  const isVerifiedUser = isAdmin || isVerifiedSeller;
+  const isProfileComplete = useMemo(() => {
+    if (!myProfile) return false;
+    return Boolean(myProfile.profileSetupComplete || (myProfile.sellerName && myProfile.town && myProfile.whatsapp));
+  }, [myProfile]);
+  const canAccessMarketplace = isAdmin || (isVerifiedSeller && isProfileComplete);
 
   // Country Marketplace View Selection
   const defaultCountryCode = useMemo(() => {
@@ -270,7 +275,23 @@ export function MarketplaceView({
     }
   };
 
-  if (!isVerifiedUser) {
+  if (!canAccessMarketplace) {
+    if (isVerifiedSeller && !isProfileComplete) {
+      return (
+        <div className="space-y-6 max-w-[1200px] mx-auto p-4 sm:p-6 lg:p-8 w-full relative">
+          <MarketplaceProfileSetup
+            user={user}
+            existingProfile={myProfile}
+            onComplete={() => {
+              toast.success("Profile setup complete! Welcome to the marketplace.");
+            }}
+          />
+        </div>
+      );
+    }
+
+    const isPendingReview = myProfile?.status === 'pending';
+
     return (
       <div className="space-y-6 max-w-[1200px] mx-auto p-4 sm:p-6 lg:p-8 w-full relative">
         {/* Verification Gate Header / Hero Card */}
@@ -325,105 +346,55 @@ export function MarketplaceView({
 
             <div className="space-y-3">
               <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
-                Verify Your Identity to Access Marketplace
+                Verification & Community Safety
               </h1>
               <p className="text-sm text-zinc-300 leading-relaxed max-w-xl mx-auto font-normal">
-                To protect our breeder community from scams, spam, and unverified listings, all members must complete <strong className="text-cyan-400">Identity Verification</strong> before viewing listings, contacting breeders, or posting birds.
+                To protect buyers and ensure authentic aviary representation, all sellers must complete identity verification via <strong className="text-cyan-400">automated biometric ID verification</strong>
               </p>
             </div>
 
             {/* Status-dependent Notice Card */}
-            {!myProfile ? (
-              <div className="p-5 bg-gradient-to-r from-zinc-900 via-zinc-900/90 to-zinc-900/80 border border-zinc-800 rounded-2xl text-left space-y-3 shadow-xl">
-                <div className="flex items-start gap-3">
-                  <div className="p-2 bg-cyan-500/10 border border-cyan-500/30 rounded-xl text-cyan-400 shrink-0 mt-0.5">
-                    <Sparkles size={20} />
-                  </div>
-                  <div className="space-y-1">
-                    <h3 className="text-sm font-bold text-white">Instant Automated KYC via Didit.me AI</h3>
-                    <p className="text-xs text-zinc-400 leading-relaxed">
-                      Verify your identity in under 2 minutes using government ID & biometric scan. Get an instant <strong className="text-zinc-200">Vetted Breeder Badge</strong> and immediate access to the Marketplace.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="pt-2 flex flex-col sm:flex-row items-center gap-3">
-                  <Button
-                    onClick={() => setIsDiditModalOpen(true)}
-                    className="w-full sm:w-auto flex-1 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-black font-black uppercase tracking-wider text-xs py-3 px-6 shadow-xl shadow-cyan-500/20 rounded-xl"
-                  >
-                    <Zap size={16} className="fill-black mr-1.5" />
-                    Verify Identity with Didit AI
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    onClick={() => setIsSellerProfileModalOpen(true)}
-                    className="w-full sm:w-auto text-xs font-bold py-3 px-5 border-zinc-800 text-zinc-300 hover:text-white rounded-xl"
-                  >
-                    <Award size={16} className="mr-1.5 text-gold-400" />
-                    Register Breeder Profile
-                  </Button>
-                </div>
-              </div>
-            ) : myProfile.status === 'pending' ? (
+            {isPendingReview ? (
               <div className="p-5 bg-amber-500/10 border border-amber-500/30 rounded-2xl text-left space-y-3 shadow-xl">
                 <div className="flex items-start gap-3">
                   <div className="p-2 bg-amber-500/20 border border-amber-500/40 rounded-xl text-amber-400 shrink-0 mt-0.5">
                     <Clock size={20} />
                   </div>
                   <div className="space-y-1">
-                    <h3 className="text-sm font-bold text-amber-200">Profile Submitted — Manual Review Pending</h3>
+                    <h3 className="text-sm font-bold text-amber-200">Your application is being reviewed</h3>
                     <p className="text-xs text-amber-300/80 leading-relaxed">
-                      Your seller profile is currently queued for manual Admin review. Want instant access right now? Skip the manual queue with automated Didit AI verification!
+                      Our admin team is currently reviewing your biometric verification results. You will be notified and guided to set up your breeder profile once approved. Thank you for your patience!
                     </p>
                   </div>
-                </div>
-
-                <div className="pt-2 flex flex-col sm:flex-row items-center gap-3">
-                  <Button
-                    onClick={() => setIsDiditModalOpen(true)}
-                    className="w-full sm:w-auto flex-1 bg-cyan-500 hover:bg-cyan-400 text-black font-black uppercase tracking-wider text-xs py-3 px-6 shadow-xl shadow-cyan-500/20 rounded-xl"
-                  >
-                    <Sparkles size={16} className="mr-1.5" />
-                    Verify with Didit AI (Instant Access)
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    onClick={() => setIsSellerProfileModalOpen(true)}
-                    className="w-full sm:w-auto text-xs font-bold py-3 px-5 border-zinc-800 text-zinc-300 rounded-xl"
-                  >
-                    Edit Profile Details
-                  </Button>
                 </div>
               </div>
             ) : (
-              <div className="p-5 bg-rose-500/10 border border-rose-500/30 rounded-2xl text-left space-y-3 shadow-xl">
+              <div className="p-5 bg-gradient-to-r from-zinc-900 via-zinc-900/90 to-zinc-900/80 border border-zinc-800 rounded-2xl text-left space-y-3 shadow-xl">
                 <div className="flex items-start gap-3">
-                  <div className="p-2 bg-rose-500/20 border border-rose-500/40 rounded-xl text-rose-400 shrink-0 mt-0.5">
-                    <AlertTriangle size={20} />
+                  <div className="p-2 bg-cyan-500/10 border border-cyan-500/30 rounded-xl text-cyan-400 shrink-0 mt-0.5">
+                    <Sparkles size={20} />
                   </div>
                   <div className="space-y-1">
-                    <h3 className="text-sm font-bold text-rose-200">Profile Verification Issue</h3>
-                    <p className="text-xs text-rose-300/80 leading-relaxed">
-                      Reason: {myProfile.rejectionReason || 'Your previous verification request was rejected. Please re-verify via Didit AI or update your details.'}
+                    <h3 className="text-sm font-bold text-white">Biometric ID Verification</h3>
+                    <p className="text-xs text-zinc-400 leading-relaxed">
+                      Verify your identity in under 2 minutes using government ID & biometric selfie check. Securely hosted by Didit.me encryption standards.
                     </p>
                   </div>
                 </div>
 
-                <div className="pt-2 flex flex-col sm:flex-row items-center gap-3">
+                {myProfile?.status === 'rejected' && (
+                  <div className="p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl text-xs text-rose-300">
+                    <strong>Previous Application Rejected:</strong> {myProfile.rejectionReason || "Please verify with a valid clear ID document."}
+                  </div>
+                )}
+
+                <div className="pt-2">
                   <Button
                     onClick={() => setIsDiditModalOpen(true)}
-                    className="w-full sm:w-auto flex-1 bg-cyan-500 hover:bg-cyan-400 text-black font-black uppercase tracking-wider text-xs py-3 px-6 shadow-xl shadow-cyan-500/20 rounded-xl"
+                    className="w-full bg-cyan-500 hover:bg-cyan-400 text-black font-black uppercase tracking-wider text-xs py-3 px-6 shadow-xl shadow-cyan-500/20 rounded-xl"
                   >
                     <Zap size={16} className="fill-black mr-1.5" />
-                    Re-Verify Identity with Didit AI
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    onClick={() => setIsSellerProfileModalOpen(true)}
-                    className="w-full sm:w-auto text-xs font-bold py-3 px-5 border-zinc-800 text-zinc-300 rounded-xl"
-                  >
-                    Update Breeder Profile
+                    Verify Now
                   </Button>
                 </div>
               </div>
@@ -487,22 +458,9 @@ export function MarketplaceView({
           onClose={() => setIsDiditModalOpen(false)}
           onSuccess={() => {
             setIsDiditModalOpen(false);
-            toast.success('Identity verified! Full marketplace access granted.');
+            toast.success('Biometric verification submitted!');
           }}
         />
-
-        {isSellerProfileModalOpen && (
-          <SellerProfileModal
-            user={user}
-            isAdmin={isAdmin}
-            existingProfile={myProfile}
-            onClose={() => setIsSellerProfileModalOpen(false)}
-            onOpenDidit={() => {
-              setIsSellerProfileModalOpen(false);
-              setIsDiditModalOpen(true);
-            }}
-          />
-        )}
       </div>
     );
   }
