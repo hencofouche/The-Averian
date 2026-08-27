@@ -174,14 +174,32 @@ export function AdminUserManagementPanel({
         const betaTesterGrantedAt = data.betaTesterGrantedAt || (existing ? existing.betaTesterGrantedAt : undefined);
 
         if (existing) {
+          // Calculate best expiry date between existing (users col) and data (userSettings col)
+          let bestExpiry = existing.account_expiry_date;
+          if (data.account_expiry_date) {
+            if (!bestExpiry) {
+              bestExpiry = data.account_expiry_date;
+            } else {
+              const exp1 = new Date(existing.account_expiry_date);
+              const exp2 = new Date(data.account_expiry_date);
+              if (exp2.getFullYear() > 2090 || exp2 > exp1) {
+                bestExpiry = data.account_expiry_date;
+              }
+            }
+          }
+
+          const mergedSubPlan = (existing.subscriptionPlan === 'lifetime' || data.subscriptionPlan === 'lifetime') 
+            ? 'lifetime' 
+            : (existing.subscriptionPlan || data.subscriptionPlan);
+
           usersMap.set(uid, {
             ...existing,
             email: email,
             displayName: existing.displayName || data.displayName || (email ? email.split('@')[0] : '') || data.aviaryName || 'Breeder',
             aviaryName: existing.aviaryName || data.aviaryName,
             currency: existing.currency || data.currency,
-            account_expiry_date: data.account_expiry_date || existing.account_expiry_date,
-            subscriptionPlan: data.subscriptionPlan || existing.subscriptionPlan,
+            account_expiry_date: bestExpiry,
+            subscriptionPlan: mergedSubPlan,
             subscriptionGrantedBy: data.subscriptionGrantedBy || existing.subscriptionGrantedBy,
             subscribedAt: data.subscribedAt || existing.subscribedAt,
             isBetaTester,
@@ -363,21 +381,23 @@ export function AdminUserManagementPanel({
       const settingsRef = doc(db, 'userSettings', targetUser.uid);
       const userRef = doc(db, 'users', targetUser.uid);
 
+      // If granting beta access and user has no valid future expiry date, also auto-grant lifetime subscription
+      const updatePayload: any = {
+        isBetaTester: allow,
+        canTestComingSoon: allow,
+        betaTesterGrantedBy: allow ? adminEmail : null,
+        betaTesterGrantedAt: allow ? nowIso : null,
+        updatedAt: nowIso
+      };
+
+      if (allow && (!targetUser.account_expiry_date || new Date(targetUser.account_expiry_date) < new Date())) {
+        updatePayload.account_expiry_date = '2099-12-31T23:59:59.000Z';
+        updatePayload.subscriptionPlan = 'lifetime';
+      }
+
       const results = await Promise.allSettled([
-        setDoc(settingsRef, {
-          isBetaTester: allow,
-          canTestComingSoon: allow,
-          betaTesterGrantedBy: allow ? adminEmail : null,
-          betaTesterGrantedAt: allow ? nowIso : null,
-          updatedAt: nowIso
-        }, { merge: true }),
-        setDoc(userRef, {
-          isBetaTester: allow,
-          canTestComingSoon: allow,
-          betaTesterGrantedBy: allow ? adminEmail : null,
-          betaTesterGrantedAt: allow ? nowIso : null,
-          updatedAt: nowIso
-        }, { merge: true })
+        setDoc(settingsRef, updatePayload, { merge: true }),
+        setDoc(userRef, updatePayload, { merge: true })
       ]);
 
       const allRejected = results.every(r => r.status === 'rejected');
@@ -393,6 +413,8 @@ export function AdminUserManagementPanel({
             ...u,
             isBetaTester: allow,
             canTestComingSoon: allow,
+            account_expiry_date: updatePayload.account_expiry_date || u.account_expiry_date,
+            subscriptionPlan: updatePayload.subscriptionPlan || u.subscriptionPlan,
             betaTesterGrantedBy: allow ? adminEmail : undefined,
             betaTesterGrantedAt: allow ? nowIso : undefined
           };
@@ -1110,10 +1132,13 @@ export function AdminUserManagementPanel({
           </div>
         ) : (
           filteredUsers.map((u) => {
-            const isLifetime = u.subscriptionPlan === 'lifetime' || (u.account_expiry_date && new Date(u.account_expiry_date).getFullYear() > 2090);
-            const isExp = u.account_expiry_date ? isBefore(new Date(u.account_expiry_date), new Date()) && !isLifetime : true;
-            const expDate = u.account_expiry_date ? new Date(u.account_expiry_date) : null;
             const isTester = u.isBetaTester === true || u.canTestComingSoon === true;
+            const isLifetime = u.subscriptionPlan === 'lifetime' || 
+                              u.role === 'admin' || 
+                              isTester || 
+                              (u.account_expiry_date && new Date(u.account_expiry_date).getFullYear() > 2090);
+            const isExp = isLifetime ? false : (u.account_expiry_date ? isBefore(new Date(u.account_expiry_date), new Date()) : true);
+            const expDate = u.account_expiry_date ? new Date(u.account_expiry_date) : null;
 
             return (
               <Card 

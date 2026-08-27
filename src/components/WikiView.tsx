@@ -59,6 +59,14 @@ interface WikiViewProps {
 // Inlined helper to handle Firestore errors in conformance with the firebase-integration skill
 function handleFirestoreErrorInfo(error: unknown, opType: string, path: string) {
   const errMessage = error instanceof Error ? error.message : String(error);
+  if (
+    errMessage.includes('Target ID already exists') ||
+    errMessage.toLowerCase().includes('target id') ||
+    errMessage.toLowerCase().includes('target-id')
+  ) {
+    console.warn(`Firestore listener re-sync warning in WikiView (${opType} - ${path}): ${errMessage}`);
+    return;
+  }
   console.error('Firestore Error inside WikiView: ', errMessage, opType, path);
   
   if (errMessage.toLowerCase().includes('permission') || errMessage.includes('permission-denied')) {

@@ -1129,12 +1129,12 @@ export default function App() {
     const qWikiSpecies = query(collection(db, 'wikiSpecies'), limit(100));
     const unsubWikiSpecies = onSnapshot(qWikiSpecies, (snapshot) => {
       setWikiSpecies(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })));
-    }, (err) => console.error("Error fetching wikiSpecies:", err));
+    }, (err) => handleFirestoreError(err, OperationType.LIST, 'wikiSpecies'));
 
     const qWikiMutations = query(collection(db, 'wikiMutations'), limit(200));
     const unsubWikiMutations = onSnapshot(qWikiMutations, (snapshot) => {
       setWikiMutations(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })));
-    }, (err) => console.error("Error fetching wikiMutations:", err));
+    }, (err) => handleFirestoreError(err, OperationType.LIST, 'wikiMutations'));
 
     // Coming Soon / Feature Flags config subscription
     const unsubComingSoon = onSnapshot(doc(db, 'appConfig', 'comingSoon'), (docSnap) => {
@@ -1152,6 +1152,32 @@ export default function App() {
     });
 
     const fixingSettings = new Set<string>();
+
+    let currentUserData: any = null;
+    const userDocRef = doc(db, 'users', user.uid);
+    const unsubUserDoc = onSnapshot(userDocRef, (uSnap) => {
+      if (uSnap.exists()) {
+        currentUserData = uSnap.data();
+        setUserSettings(prev => {
+          if (!prev) return prev;
+          const mergedBeta = currentUserData.isBetaTester === true || currentUserData.canTestComingSoon === true || prev.isBetaTester === true || prev.canTestComingSoon === true;
+          let mergedExpiry = prev.account_expiry_date;
+          if (currentUserData.account_expiry_date) {
+            if (!mergedExpiry || new Date(currentUserData.account_expiry_date) > new Date(mergedExpiry)) {
+              mergedExpiry = currentUserData.account_expiry_date;
+            }
+          }
+          return {
+            ...prev,
+            isBetaTester: mergedBeta,
+            canTestComingSoon: mergedBeta,
+            account_expiry_date: mergedExpiry || prev.account_expiry_date,
+            subscriptionPlan: currentUserData.subscriptionPlan || prev.subscriptionPlan,
+            role: (currentUserData.role === 'admin' || prev.role === 'admin') ? 'admin' : prev.role
+          };
+        });
+      }
+    }, (err) => handleFirestoreError(err, OperationType.GET, 'users'));
 
     const docRef = doc(db, 'userSettings', user.uid);
     const unsubSettings = onSnapshot(docRef, (docSnap: any) => {
@@ -1185,8 +1211,23 @@ export default function App() {
           return;
         }
 
-        // Only update if critical fields are missing to avoid loops
-        if (!data.account_expiry_date) { 
+        const mergedBeta = data.isBetaTester === true || data.canTestComingSoon === true || (currentUserData && (currentUserData.isBetaTester === true || currentUserData.canTestComingSoon === true));
+        let effectiveExpiry = data.account_expiry_date;
+        if (currentUserData?.account_expiry_date) {
+          if (!effectiveExpiry || new Date(currentUserData.account_expiry_date) > new Date(effectiveExpiry)) {
+            effectiveExpiry = currentUserData.account_expiry_date;
+          }
+        }
+
+        const userEmail = user.email?.toLowerCase().trim();
+        const isAdminUser = Boolean(
+          (userEmail && ADMIN_EMAILS_LIST.includes(userEmail)) || 
+          data.role === 'admin' ||
+          currentUserData?.role === 'admin'
+        );
+
+        // Only initialize default expiry if missing everywhere
+        if (!effectiveExpiry) { 
           if (fixingSettings.has(user.uid)) return;
           fixingSettings.add(user.uid); 
           const trialExpiry = new Date(); 
@@ -1208,32 +1249,14 @@ export default function App() {
             currency: data.currency || 'ZAR', 
             ...data, 
             statuses: updatedStatuses,
-            account_expiry_date: trialExpiry.toISOString() 
+            isBetaTester: Boolean(mergedBeta),
+            canTestComingSoon: Boolean(mergedBeta),
+            account_expiry_date: (mergedBeta || isAdminUser) ? '2099-12-31T23:59:59.000Z' : trialExpiry.toISOString() 
           }; 
           setDoc(docRef, updated, { merge: true }).catch(e => console.error('Failed to fix settings', e)); 
           setUserSettings({ id: docSnap.id, ...updated }); 
         } else { 
-          const userEmail = user.email?.toLowerCase().trim();
-          const isAdminUser = Boolean(
-            (userEmail && ADMIN_EMAILS_LIST.includes(userEmail)) || 
-            data.role === 'admin'
-          );
-          const isLifetimeOrUnlimited = isAdminUser || 
-                                       data.subscriptionPlan === 'lifetime' || 
-                                       (data.account_expiry_date && new Date(data.account_expiry_date).getFullYear() > 2090);
-
-          const expiry = new Date(data.account_expiry_date); 
-          const maxExpiry = new Date(); 
-          maxExpiry.setFullYear(maxExpiry.getFullYear() + 2); 
-          if (!isLifetimeOrUnlimited && expiry > maxExpiry) { 
-            if (fixingSettings.has(user.uid + '_cap')) return;
-            fixingSettings.add(user.uid + '_cap'); 
-            const cappedExpiry = new Date(); 
-            cappedExpiry.setFullYear(cappedExpiry.getFullYear() + 1); 
-            const updated = { ...data, account_expiry_date: cappedExpiry.toISOString() }; 
-            setDoc(docRef, updated, { merge: true }).catch(e => console.error('Failed to cap settings', e)); 
-            setUserSettings({ id: docSnap.id, ...updated }); 
-          } else if (isAdminUser && (data.role !== 'admin' || data.subscriptionPlan !== 'lifetime')) {
+          if (isAdminUser && (data.role !== 'admin' || data.subscriptionPlan !== 'lifetime')) {
             // Auto-grant lifetime & admin role in database for admin accounts
             const adminUpdated: UserSettings = {
               ...data,
@@ -1248,15 +1271,19 @@ export default function App() {
             const existingStatusNames = (data.statuses || []).map(s => s.name);
             const missingDefaults = defaultStatuses.filter(name => !existingStatusNames.includes(name));
 
-            if (missingDefaults.length > 0) {
-              const updatedStatuses = [
-                ...(data.statuses || []),
-                ...missingDefaults.map(name => ({ id: crypto.randomUUID(), name }))
-              ];
-              setUserSettings({ id: docSnap.id, ...data, statuses: updatedStatuses });
-            } else {
-              setUserSettings({ id: docSnap.id, ...data });
-            }
+            const finalMergedSettings: UserSettings = {
+              id: docSnap.id,
+              ...data,
+              isBetaTester: Boolean(mergedBeta),
+              canTestComingSoon: Boolean(mergedBeta),
+              account_expiry_date: effectiveExpiry,
+              subscriptionPlan: (data.subscriptionPlan === 'lifetime' || currentUserData?.subscriptionPlan === 'lifetime') ? 'lifetime' : (data.subscriptionPlan || currentUserData?.subscriptionPlan),
+              statuses: missingDefaults.length > 0 
+                ? [...(data.statuses || []), ...missingDefaults.map(name => ({ id: crypto.randomUUID(), name }))]
+                : (data.statuses || [])
+            };
+
+            setUserSettings(finalMergedSettings);
           }
         }
       } else {
@@ -1286,24 +1313,25 @@ export default function App() {
     const qShared = query(collection(db, 'shared_items'), where('createdBy', '==', user.uid), limit(50));
     const unsubShared = onSnapshot(qShared, (snapshot) => {
       setAllSharedItems(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as SharedItem)));
-    }, (err) => console.error("Error fetching shared items:", err));
+    }, (err) => handleFirestoreError(err, OperationType.LIST, 'shared_items'));
 
     return () => {
-      unsubBirds();
-      unsubCages();
-      unsubPairs();
-      unsubBreeding();
-      unsubTasks();
-      unsubTransactions();
-      unsubContacts();
-      unsubSettings();
-      unsubShared();
-      unsubSellers();
-      unsubListings();
-      unsubReviews();
-      unsubWikiSpecies();
-      unsubWikiMutations();
-      unsubComingSoon();
+      try { unsubBirds(); } catch (_) {}
+      try { unsubCages(); } catch (_) {}
+      try { unsubPairs(); } catch (_) {}
+      try { unsubBreeding(); } catch (_) {}
+      try { unsubTasks(); } catch (_) {}
+      try { unsubTransactions(); } catch (_) {}
+      try { unsubContacts(); } catch (_) {}
+      try { unsubSettings(); } catch (_) {}
+      try { unsubUserDoc(); } catch (_) {}
+      try { unsubShared(); } catch (_) {}
+      try { unsubSellers(); } catch (_) {}
+      try { unsubListings(); } catch (_) {}
+      try { unsubReviews(); } catch (_) {}
+      try { unsubWikiSpecies(); } catch (_) {}
+      try { unsubWikiMutations(); } catch (_) {}
+      try { unsubComingSoon(); } catch (_) {}
     };
   }, [user, birdsLimit, cagesLimit, pairsLimit, breedingLimit, tasksLimit, transactionLimit, contactsLimit]);
 
@@ -2280,7 +2308,8 @@ export default function App() {
   }
 
   const isCurrentTabComingSoon = activeTab !== 'admin' && activeTab !== 'subscription' && Boolean(comingSoonSettings?.pages?.[activeTab as AppPageId]?.enabled);
-  const showComingSoonSplash = isCurrentTabComingSoon && (!isAdmin || isAdminPreviewMode);
+  const isBetaUser = Boolean(userSettings?.isBetaTester || userSettings?.canTestComingSoon || isAdmin);
+  const showComingSoonSplash = isCurrentTabComingSoon && (!isBetaUser || (isAdmin && isAdminPreviewMode));
 
   const getActivePageName = (tab: string) => {
     switch (tab) {

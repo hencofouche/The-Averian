@@ -128,6 +128,16 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
     return;
   }
 
+  // Handle transient listener Target ID re-sync / stream collisions gracefully
+  if (
+    errMsg.includes('Target ID already exists') ||
+    errMsg.toLowerCase().includes('target id') ||
+    errMsg.toLowerCase().includes('target-id')
+  ) {
+    console.warn(`Firestore listener re-sync warning during '${operationType}' on path '${path}': ${errMsg}`);
+    return;
+  }
+
   const errInfo: FirestoreErrorInfo = {
     error: errMsg,
     authInfo: {
@@ -147,6 +157,12 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
     path
   };
   console.error('Firestore Error: ', JSON.stringify(errInfo));
+
+  // Do not throw errors for READ / LIST / GET listeners to prevent uncaught exception loops in async snapshot callbacks
+  if (operationType === OperationType.LIST || operationType === OperationType.GET) {
+    return;
+  }
+
   throw new Error(JSON.stringify(errInfo));
 }
 
