@@ -126,14 +126,16 @@ service cloud.firestore {
 
     function isAdmin() {
       return isAuthenticated() && (
-        ('email' in request.auth.token && request.auth.token.email != null && 
-          request.auth.token.email.matches('(?i)^(clashfouche@gmail\\.com|teamotakuempire@gmail\\.com|theaveriansupport@gmail\\.com|hencofouche8@gmail\\.com)$')) ||
+        ('email' in request.auth.token && request.auth.token.email != null && (
+          request.auth.token.email.lower() == "clashfouche@gmail.com" ||
+          request.auth.token.email.lower() == "teamotakuempire@gmail.com" ||
+          request.auth.token.email.lower() == "theaveriansupport@gmail.com" ||
+          request.auth.token.email.lower() == "hencofouche8@gmail.com"
+        )) ||
         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-          'role' in get(/databases/$(database)/documents/users/$(request.auth.uid)).data && 
-          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin') ||
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', '') == 'admin') ||
         (exists(/databases/$(database)/documents/userSettings/$(request.auth.uid)) && 
-          'role' in get(/databases/$(database)/documents/userSettings/$(request.auth.uid)).data && 
-          get(/databases/$(database)/documents/userSettings/$(request.auth.uid)).data.role == 'admin') ||
+          get(/databases/$(database)/documents/userSettings/$(request.auth.uid)).data.get('role', '') == 'admin') ||
         exists(/databases/$(database)/documents/admins/$(request.auth.uid))
       );
     }

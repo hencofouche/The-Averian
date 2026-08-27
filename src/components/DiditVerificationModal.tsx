@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Shield, ShieldCheck, CheckCircle2, Sparkles, ExternalLink, RefreshCw, AlertCircle, ArrowRight, X, Lock, Check } from 'lucide-react';
 import { Button } from './ui';
 import { toast } from 'sonner';
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, updateDoc, collection, addDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { SellerProfile } from '../types';
 import { cn } from '../lib/utils';
@@ -93,7 +93,7 @@ export function DiditVerificationModal({
       const isApproved = data.status === 'Approved' || data.decision?.status === 'Approved';
 
       if (isApproved) {
-        // Update seller profile in Firestore
+        // Update or create seller profile in Firestore
         if (sellerProfile?.id) {
           await updateDoc(doc(db, 'sellerProfiles', sellerProfile.id), {
             status: 'approved',
@@ -102,6 +102,24 @@ export function DiditVerificationModal({
             diditSessionId: sessionData.sessionId,
             diditStatus: 'Approved',
             diditVerifiedAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          });
+        } else if (user) {
+          await addDoc(collection(db, 'sellerProfiles'), {
+            uid: user.uid,
+            sellerName: user.displayName || user.email?.split('@')[0] || 'Verified Breeder',
+            aviaryName: (user.displayName || 'Averian') + ' Aviary',
+            country: 'South Africa',
+            whatsapp: '',
+            phone: '',
+            email: user.email || '',
+            status: 'approved',
+            verifiedBy: 'Didit AI (Automated KYC)',
+            verificationMethod: 'didit',
+            diditSessionId: sessionData.sessionId,
+            diditStatus: 'Approved',
+            diditVerifiedAt: new Date().toISOString(),
+            createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString()
           });
         }
@@ -126,14 +144,33 @@ export function DiditVerificationModal({
   const handleSimulateInstantApproval = async () => {
     setIsPolling(true);
     try {
+      const sessionId = sessionData?.sessionId || `didit_test_${Date.now()}`;
       if (sellerProfile?.id) {
         await updateDoc(doc(db, 'sellerProfiles', sellerProfile.id), {
           status: 'approved',
           verifiedBy: 'Didit AI (Automated KYC)',
           verificationMethod: 'didit',
-          diditSessionId: sessionData?.sessionId || `didit_test_${Date.now()}`,
+          diditSessionId: sessionId,
           diditStatus: 'Approved',
           diditVerifiedAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        });
+      } else if (user) {
+        await addDoc(collection(db, 'sellerProfiles'), {
+          uid: user.uid,
+          sellerName: user.displayName || user.email?.split('@')[0] || 'Verified Breeder',
+          aviaryName: (user.displayName || 'Averian') + ' Aviary',
+          country: 'South Africa',
+          whatsapp: '',
+          phone: '',
+          email: user.email || '',
+          status: 'approved',
+          verifiedBy: 'Didit AI (Automated KYC)',
+          verificationMethod: 'didit',
+          diditSessionId: sessionId,
+          diditStatus: 'Approved',
+          diditVerifiedAt: new Date().toISOString(),
+          createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString()
         });
       }

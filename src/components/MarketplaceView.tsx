@@ -92,6 +92,7 @@ export function MarketplaceView({
   }, [sellerProfiles, user]);
 
   const isVerifiedSeller = myProfile?.status === 'approved';
+  const isVerifiedUser = isAdmin || isVerifiedSeller;
 
   // Country Marketplace View Selection
   const defaultCountryCode = useMemo(() => {
@@ -268,6 +269,243 @@ export function MarketplaceView({
       toast.error('Failed to delete listing: ' + err.message);
     }
   };
+
+  if (!isVerifiedUser) {
+    return (
+      <div className="space-y-6 max-w-[1200px] mx-auto p-4 sm:p-6 lg:p-8 w-full relative">
+        {/* Verification Gate Header / Hero Card */}
+        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-b from-zinc-900 via-zinc-950 to-black border border-zinc-800 p-6 sm:p-10 shadow-2xl space-y-8">
+          {/* Decorative background glow */}
+          <div className="absolute -top-24 -right-24 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute -bottom-24 -left-24 w-96 h-96 bg-gold-500/10 rounded-full blur-3xl pointer-events-none" />
+
+          {/* Top Lock Badge */}
+          <div className="flex items-center justify-between flex-wrap gap-4 border-b border-zinc-800/80 pb-6 relative z-10">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-cyan-500/20 via-blue-600/20 to-gold-500/20 border border-cyan-500/40 flex items-center justify-center text-cyan-400 shadow-lg shadow-cyan-500/10">
+                <ShieldCheck size={26} />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-xl font-bold text-white tracking-wide">
+                    Aviary Marketplace & Classifieds
+                  </h2>
+                  <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 flex items-center gap-1">
+                    <Zap size={11} className="fill-cyan-300" /> Identity Protected
+                  </span>
+                </div>
+                <p className="text-xs text-zinc-400 font-medium mt-0.5">
+                  Verified Breeder Community Standards & Identity Verification Required
+                </p>
+              </div>
+            </div>
+
+            {myProfile && (
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-zinc-900 border border-zinc-800 text-xs text-zinc-300">
+                <span className="text-zinc-500 font-medium">Status:</span>
+                <span className={cn(
+                  "font-bold uppercase tracking-wider px-2 py-0.5 rounded text-[10px]",
+                  myProfile.status === 'pending'
+                    ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
+                    : myProfile.status === 'rejected'
+                    ? "bg-rose-500/20 text-rose-300 border border-rose-500/30"
+                    : "bg-zinc-800 text-zinc-400"
+                )}>
+                  {myProfile.status}
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* Main Content Box */}
+          <div className="max-w-2xl mx-auto text-center space-y-6 relative z-10 py-4">
+            <div className="inline-flex items-center justify-center w-20 h-20 rounded-3xl bg-zinc-900/90 border-2 border-cyan-500/40 text-cyan-400 shadow-2xl shadow-cyan-500/20">
+              <ShieldAlert size={40} className="text-cyan-400 animate-pulse" />
+            </div>
+
+            <div className="space-y-3">
+              <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+                Verify Your Identity to Access Marketplace
+              </h1>
+              <p className="text-sm text-zinc-300 leading-relaxed max-w-xl mx-auto font-normal">
+                To protect our breeder community from scams, spam, and unverified listings, all members must complete <strong className="text-cyan-400">Identity Verification</strong> before viewing listings, contacting breeders, or posting birds.
+              </p>
+            </div>
+
+            {/* Status-dependent Notice Card */}
+            {!myProfile ? (
+              <div className="p-5 bg-gradient-to-r from-zinc-900 via-zinc-900/90 to-zinc-900/80 border border-zinc-800 rounded-2xl text-left space-y-3 shadow-xl">
+                <div className="flex items-start gap-3">
+                  <div className="p-2 bg-cyan-500/10 border border-cyan-500/30 rounded-xl text-cyan-400 shrink-0 mt-0.5">
+                    <Sparkles size={20} />
+                  </div>
+                  <div className="space-y-1">
+                    <h3 className="text-sm font-bold text-white">Instant Automated KYC via Didit.me AI</h3>
+                    <p className="text-xs text-zinc-400 leading-relaxed">
+                      Verify your identity in under 2 minutes using government ID & biometric scan. Get an instant <strong className="text-zinc-200">Verified Seller Badge</strong> and immediate access to the Marketplace.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="pt-2 flex flex-col sm:flex-row items-center gap-3">
+                  <Button
+                    onClick={() => setIsDiditModalOpen(true)}
+                    className="w-full sm:w-auto flex-1 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-black font-black uppercase tracking-wider text-xs py-3 px-6 shadow-xl shadow-cyan-500/20 rounded-xl"
+                  >
+                    <Zap size={16} className="fill-black mr-1.5" />
+                    Verify Identity with Didit AI
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    onClick={() => setIsSellerProfileModalOpen(true)}
+                    className="w-full sm:w-auto text-xs font-bold py-3 px-5 border-zinc-800 text-zinc-300 hover:text-white rounded-xl"
+                  >
+                    <Award size={16} className="mr-1.5 text-gold-400" />
+                    Register Breeder Profile
+                  </Button>
+                </div>
+              </div>
+            ) : myProfile.status === 'pending' ? (
+              <div className="p-5 bg-amber-500/10 border border-amber-500/30 rounded-2xl text-left space-y-3 shadow-xl">
+                <div className="flex items-start gap-3">
+                  <div className="p-2 bg-amber-500/20 border border-amber-500/40 rounded-xl text-amber-400 shrink-0 mt-0.5">
+                    <Clock size={20} />
+                  </div>
+                  <div className="space-y-1">
+                    <h3 className="text-sm font-bold text-amber-200">Profile Submitted — Manual Review Pending</h3>
+                    <p className="text-xs text-amber-300/80 leading-relaxed">
+                      Your seller profile is currently queued for manual Admin review. Want instant access right now? Skip the manual queue with automated Didit AI verification!
+                    </p>
+                  </div>
+                </div>
+
+                <div className="pt-2 flex flex-col sm:flex-row items-center gap-3">
+                  <Button
+                    onClick={() => setIsDiditModalOpen(true)}
+                    className="w-full sm:w-auto flex-1 bg-cyan-500 hover:bg-cyan-400 text-black font-black uppercase tracking-wider text-xs py-3 px-6 shadow-xl shadow-cyan-500/20 rounded-xl"
+                  >
+                    <Sparkles size={16} className="mr-1.5" />
+                    Verify with Didit AI (Instant Access)
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    onClick={() => setIsSellerProfileModalOpen(true)}
+                    className="w-full sm:w-auto text-xs font-bold py-3 px-5 border-zinc-800 text-zinc-300 rounded-xl"
+                  >
+                    Edit Profile Details
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="p-5 bg-rose-500/10 border border-rose-500/30 rounded-2xl text-left space-y-3 shadow-xl">
+                <div className="flex items-start gap-3">
+                  <div className="p-2 bg-rose-500/20 border border-rose-500/40 rounded-xl text-rose-400 shrink-0 mt-0.5">
+                    <AlertTriangle size={20} />
+                  </div>
+                  <div className="space-y-1">
+                    <h3 className="text-sm font-bold text-rose-200">Profile Verification Issue</h3>
+                    <p className="text-xs text-rose-300/80 leading-relaxed">
+                      Reason: {myProfile.rejectionReason || 'Your previous verification request was rejected. Please re-verify via Didit AI or update your details.'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="pt-2 flex flex-col sm:flex-row items-center gap-3">
+                  <Button
+                    onClick={() => setIsDiditModalOpen(true)}
+                    className="w-full sm:w-auto flex-1 bg-cyan-500 hover:bg-cyan-400 text-black font-black uppercase tracking-wider text-xs py-3 px-6 shadow-xl shadow-cyan-500/20 rounded-xl"
+                  >
+                    <Zap size={16} className="fill-black mr-1.5" />
+                    Re-Verify Identity with Didit AI
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    onClick={() => setIsSellerProfileModalOpen(true)}
+                    className="w-full sm:w-auto text-xs font-bold py-3 px-5 border-zinc-800 text-zinc-300 rounded-xl"
+                  >
+                    Update Breeder Profile
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Feature Checklist */}
+            <div className="pt-6 border-t border-zinc-800/80 text-left">
+              <h4 className="text-xs font-black uppercase tracking-wider text-zinc-400 mb-4 text-center">
+                What you unlock once identity is verified:
+              </h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                <div className="p-3 bg-zinc-900/60 border border-zinc-800/80 rounded-2xl flex items-center gap-3 text-zinc-300">
+                  <div className="w-8 h-8 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-500/20">
+                    <CheckCircle2 size={18} />
+                  </div>
+                  <div>
+                    <p className="font-bold text-white">Full Marketplace Access</p>
+                    <p className="text-[11px] text-zinc-400">Browse all birds, pairs, cages & wanted ads</p>
+                  </div>
+                </div>
+
+                <div className="p-3 bg-zinc-900/60 border border-zinc-800/80 rounded-2xl flex items-center gap-3 text-zinc-300">
+                  <div className="w-8 h-8 rounded-xl bg-cyan-500/10 text-cyan-400 flex items-center justify-center shrink-0 border border-cyan-500/20">
+                    <ShieldCheck size={18} />
+                  </div>
+                  <div>
+                    <p className="font-bold text-white">Verified Breeder Badge</p>
+                    <p className="text-[11px] text-zinc-400">Build 100% trust with buyers across the country</p>
+                  </div>
+                </div>
+
+                <div className="p-3 bg-zinc-900/60 border border-zinc-800/80 rounded-2xl flex items-center gap-3 text-zinc-300">
+                  <div className="w-8 h-8 rounded-xl bg-gold-500/10 text-gold-400 flex items-center justify-center shrink-0 border border-gold-500/20">
+                    <ShoppingBag size={18} />
+                  </div>
+                  <div>
+                    <p className="font-bold text-white">Post Unlimited Listings</p>
+                    <p className="text-[11px] text-zinc-400">List birds for sale or post wanted bird requests</p>
+                  </div>
+                </div>
+
+                <div className="p-3 bg-zinc-900/60 border border-zinc-800/80 rounded-2xl flex items-center gap-3 text-zinc-300">
+                  <div className="w-8 h-8 rounded-xl bg-blue-500/10 text-blue-400 flex items-center justify-center shrink-0 border border-blue-500/20">
+                    <MessageCircle size={18} />
+                  </div>
+                  <div>
+                    <p className="font-bold text-white">Direct Breeder Communication</p>
+                    <p className="text-[11px] text-zinc-400">Contact verified breeders directly via WhatsApp & Phone</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Render Modals so users can complete verification directly */}
+        <DiditVerificationModal
+          user={user}
+          sellerProfile={myProfile}
+          isOpen={isDiditModalOpen}
+          onClose={() => setIsDiditModalOpen(false)}
+          onSuccess={() => {
+            setIsDiditModalOpen(false);
+            toast.success('Identity verified! Full marketplace access granted.');
+          }}
+        />
+
+        {isSellerProfileModalOpen && (
+          <SellerProfileModal
+            user={user}
+            userSettings={userSettings}
+            existingProfile={myProfile}
+            onClose={() => setIsSellerProfileModalOpen(false)}
+            onOpenDidit={() => {
+              setIsSellerProfileModalOpen(false);
+              setIsDiditModalOpen(true);
+            }}
+          />
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 max-w-[1600px] 2xl:max-w-[1920px] mx-auto p-4 sm:p-6 lg:p-8 w-full overflow-x-hidden relative">

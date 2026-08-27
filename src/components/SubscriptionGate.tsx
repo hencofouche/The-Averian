@@ -18,11 +18,16 @@ export function SubscriptionGate({ settings, onRenew, children }: { settings: Us
   const expiryDate = settings.account_expiry_date ? new Date(settings.account_expiry_date) : null;
   const now = new Date();
   
+  const isLifetime = settings.subscriptionPlan === 'lifetime' || 
+                    settings.role === 'admin' || 
+                    settings.isBetaTester || 
+                    (expiryDate && expiryDate.getFullYear() > 2090);
+
   const isValidDate = expiryDate && !isNaN(expiryDate.getTime());
-  const isExpired = !isValidDate || now > expiryDate;
+  const isExpired = isLifetime ? false : (!isValidDate || now > expiryDate);
   
   const diffTime = isValidDate ? expiryDate.getTime() - now.getTime() : 0;
-  const daysLeft = Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
+  const daysLeft = isLifetime ? 99999 : Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
 
   const handlePay = async () => {
     try {

@@ -179,8 +179,23 @@ import { hexToHsva, hsvaToHex } from '@uiw/color-convert';
 import { startOfDay, startOfWeek, startOfMonth, startOfYear, endOfMonth, endOfWeek, addDays, addMonths, isSameMonth, subDays, subWeeks, subMonths, subYears, isWithinInterval, parseISO } from 'date-fns';
 
 // --- Helpers ---
+const ADMIN_EMAILS_LIST = [
+  'clashfouche@gmail.com',
+  'teamotakuempire@gmail.com',
+  'theaveriansupport@gmail.com',
+  'hencofouche8@gmail.com'
+];
+
 const isSubscriptionExpired = (settings: UserSettings | null | undefined): boolean => {
   if (!settings) return false;
+  if (
+    settings.role === 'admin' ||
+    settings.subscriptionPlan === 'lifetime' ||
+    settings.isBetaTester ||
+    (settings.account_expiry_date && new Date(settings.account_expiry_date).getFullYear() > 2090)
+  ) {
+    return false;
+  }
   if (!settings.account_expiry_date) return true;
   const expiryDate = new Date(settings.account_expiry_date);
   if (isNaN(expiryDate.getTime())) return true;
@@ -1190,10 +1205,19 @@ export default function App() {
           setDoc(docRef, updated, { merge: true }).catch(e => console.error('Failed to fix settings', e)); 
           setUserSettings({ id: docSnap.id, ...updated }); 
         } else { 
+          const userEmail = user.email?.toLowerCase().trim();
+          const isAdminUser = Boolean(
+            (userEmail && ADMIN_EMAILS_LIST.includes(userEmail)) || 
+            data.role === 'admin'
+          );
+          const isLifetimeOrUnlimited = isAdminUser || 
+                                       data.subscriptionPlan === 'lifetime' || 
+                                       (data.account_expiry_date && new Date(data.account_expiry_date).getFullYear() > 2090);
+
           const expiry = new Date(data.account_expiry_date); 
           const maxExpiry = new Date(); 
           maxExpiry.setFullYear(maxExpiry.getFullYear() + 2); 
-          if (expiry > maxExpiry) { 
+          if (!isLifetimeOrUnlimited && expiry > maxExpiry) { 
             if (fixingSettings.has(user.uid + '_cap')) return;
             fixingSettings.add(user.uid + '_cap'); 
             const cappedExpiry = new Date(); 
@@ -1201,6 +1225,16 @@ export default function App() {
             const updated = { ...data, account_expiry_date: cappedExpiry.toISOString() }; 
             setDoc(docRef, updated, { merge: true }).catch(e => console.error('Failed to cap settings', e)); 
             setUserSettings({ id: docSnap.id, ...updated }); 
+          } else if (isAdminUser && (data.role !== 'admin' || data.subscriptionPlan !== 'lifetime')) {
+            // Auto-grant lifetime & admin role in database for admin accounts
+            const adminUpdated: UserSettings = {
+              ...data,
+              role: 'admin',
+              subscriptionPlan: 'lifetime',
+              account_expiry_date: '2099-12-31T23:59:59.000Z'
+            };
+            setDoc(docRef, adminUpdated, { merge: true }).catch(e => console.error('Failed to update admin role in settings', e));
+            setUserSettings({ id: docSnap.id, ...adminUpdated });
           } else {
             const defaultStatuses = ['Sold', 'Deceased'];
             const existingStatusNames = (data.statuses || []).map(s => s.name);
