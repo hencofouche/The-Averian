@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bird-manager-v18';
+const CACHE_NAME = 'averian-pwa-v22';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -22,6 +22,7 @@ self.addEventListener('activate', (event) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
           if (cacheName !== CACHE_NAME) {
+            console.log('[SW] Purging legacy cache:', cacheName);
             return caches.delete(cacheName);
           }
         })
@@ -31,49 +32,70 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
+// Handle messages from the client to skip waiting or clear cache
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
+  if (event.data && event.data.type === 'CLEAR_CACHE') {
+    caches.keys().then((keys) => {
+      keys.forEach((key) => caches.delete(key));
+    });
+  }
+});
+
 self.addEventListener('fetch', (event) => {
-  // Only cache GET requests
+  // Only handle GET requests
   if (event.request.method !== 'GET') return;
   
   const url = new URL(event.request.url);
-  const isFirebaseStorage = url.hostname === 'firebasestorage.googleapis.com';
   const isSameOrigin = url.origin === self.location.origin;
-  const isHTML = event.request.headers.get('accept')?.includes('text/html');
-  const isManifest = url.pathname.endsWith('manifest.json');
+  const isCodeOrDoc = 
+    event.request.mode === 'navigate' ||
+    url.pathname.endsWith('.js') ||
+    url.pathname.endsWith('.css') ||
+    url.pathname.endsWith('.html') ||
+    url.pathname === '/' ||
+    url.pathname.endsWith('manifest.json');
 
-  // Skip cross-origin requests unless it's Firebase Storage
-  if (!isSameOrigin && !isFirebaseStorage) return;
+  // Skip cross-origin non-static requests (e.g. Firestore / APIs)
+  if (!isSameOrigin && !url.hostname.includes('firebasestorage')) return;
 
-  // Strategy: Network First for index.html and manifest.json
-  if (isHTML || isManifest) {
+  // Strategy: Network First for all HTML, JS, CSS, and manifest code assets
+  if (isCodeOrDoc) {
     event.respondWith(
       fetch(event.request)
         .then((networkResponse) => {
-          const responseToCache = networkResponse.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, responseToCache);
-          });
+          if (networkResponse && networkResponse.status === 200) {
+            const responseToCache = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put(event.request, responseToCache);
+            });
+          }
           return networkResponse;
         })
-        .catch(() => caches.match(event.request))
+        .catch(() => {
+          // If offline or network error, serve from cache
+          return caches.match(event.request);
+        })
     );
     return;
   }
 
-  // Strategy: Stale-While-Revalidate for everything else
+  // Strategy: Stale-While-Revalidate for images / static media
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
-      const fetchPromise = fetch(event.request).then((networkResponse) => {
-        if (networkResponse && networkResponse.status === 200) {
-          const responseToCache = networkResponse.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, responseToCache);
-          });
-        }
-        return networkResponse;
-      }).catch(() => {
-        // Silent catch for background fetch
-      });
+      const fetchPromise = fetch(event.request)
+        .then((networkResponse) => {
+          if (networkResponse && networkResponse.status === 200) {
+            const responseToCache = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put(event.request, responseToCache);
+            });
+          }
+          return networkResponse;
+        })
+        .catch(() => {/* Ignore background fetch failure when offline */});
 
       return cachedResponse || fetchPromise;
     })

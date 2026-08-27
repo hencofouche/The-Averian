@@ -265,59 +265,59 @@ service cloud.firestore {
     // ===============================================================
 
     match /contacts/{contactId} {
-      allow get: if isDocOwner();
+      allow get: if isDocOwner() || isAdmin();
       allow list: if isAuthenticated() && (resource.data.uid == request.auth.uid || isAdmin());
-      allow create: if isAuthenticated() && isValidContact(request.resource.data) && (uidUnchanged() || isAdmin());
-      allow update: if isDocOwner() && (isValidContact(request.resource.data) || isAdmin()) && uidNotModified();
-      allow delete: if isDocOwner();
+      allow create: if isAuthenticated() && ((isValidContact(request.resource.data) && uidUnchanged()) || isAdmin());
+      allow update: if (isDocOwner() && isValidContact(request.resource.data) && uidNotModified()) || isAdmin();
+      allow delete: if isDocOwner() || isAdmin();
     }
 
     match /birds/{birdId} {
-      allow get: if isDocOwner();
+      allow get: if isDocOwner() || isAdmin();
       allow list: if isAuthenticated() && (resource.data.uid == request.auth.uid || isAdmin());
-      allow create: if isAuthenticated() && isValidBird(request.resource.data) && (uidUnchanged() || isAdmin());
-      allow update: if isDocOwner() && (isValidBird(request.resource.data) || isAdmin()) && uidNotModified();
-      allow delete: if isDocOwner();
+      allow create: if isAuthenticated() && ((isValidBird(request.resource.data) && uidUnchanged()) || isAdmin());
+      allow update: if (isDocOwner() && isValidBird(request.resource.data) && uidNotModified()) || isAdmin();
+      allow delete: if isDocOwner() || isAdmin();
     }
 
     match /cages/{cageId} {
-      allow get: if isDocOwner();
+      allow get: if isDocOwner() || isAdmin();
       allow list: if isAuthenticated() && (resource.data.uid == request.auth.uid || isAdmin());
-      allow create: if isAuthenticated() && isValidCage(request.resource.data) && (uidUnchanged() || isAdmin());
-      allow update: if isDocOwner() && (isValidCage(request.resource.data) || isAdmin()) && uidNotModified();
-      allow delete: if isDocOwner();
+      allow create: if isAuthenticated() && ((isValidCage(request.resource.data) && uidUnchanged()) || isAdmin());
+      allow update: if (isDocOwner() && isValidCage(request.resource.data) && uidNotModified()) || isAdmin();
+      allow delete: if isDocOwner() || isAdmin();
     }
 
     match /pairs/{pairId} {
-      allow get: if isDocOwner();
+      allow get: if isDocOwner() || isAdmin();
       allow list: if isAuthenticated() && (resource.data.uid == request.auth.uid || isAdmin());
-      allow create: if isAuthenticated() && isValidPair(request.resource.data) && (uidUnchanged() || isAdmin());
-      allow update: if isDocOwner() && (isValidPair(request.resource.data) || isAdmin()) && uidNotModified();
-      allow delete: if isDocOwner();
+      allow create: if isAuthenticated() && ((isValidPair(request.resource.data) && uidUnchanged()) || isAdmin());
+      allow update: if (isDocOwner() && isValidPair(request.resource.data) && uidNotModified()) || isAdmin();
+      allow delete: if isDocOwner() || isAdmin();
     }
 
     match /breedingRecords/{recordId} {
-      allow get: if isDocOwner();
+      allow get: if isDocOwner() || isAdmin();
       allow list: if isAuthenticated() && (resource.data.uid == request.auth.uid || isAdmin());
-      allow create: if isAuthenticated() && isValidBreedingRecord(request.resource.data) && (uidUnchanged() || isAdmin());
-      allow update: if isDocOwner() && (isValidBreedingRecord(request.resource.data) || isAdmin()) && uidNotModified();
-      allow delete: if isDocOwner();
+      allow create: if isAuthenticated() && ((isValidBreedingRecord(request.resource.data) && uidUnchanged()) || isAdmin());
+      allow update: if (isDocOwner() && isValidBreedingRecord(request.resource.data) && uidNotModified()) || isAdmin();
+      allow delete: if isDocOwner() || isAdmin();
     }
 
     match /tasks/{taskId} {
-      allow get: if isDocOwner();
+      allow get: if isDocOwner() || isAdmin();
       allow list: if isAuthenticated() && (resource.data.uid == request.auth.uid || isAdmin());
-      allow create: if isAuthenticated() && isValidTask(request.resource.data) && (uidUnchanged() || isAdmin());
-      allow update: if isDocOwner() && (isValidTask(request.resource.data) || isAdmin()) && uidNotModified();
-      allow delete: if isDocOwner();
+      allow create: if isAuthenticated() && ((isValidTask(request.resource.data) && uidUnchanged()) || isAdmin());
+      allow update: if (isDocOwner() && isValidTask(request.resource.data) && uidNotModified()) || isAdmin();
+      allow delete: if isDocOwner() || isAdmin();
     }
 
     match /transactions/{transactionId} {
-      allow get: if isDocOwner();
+      allow get: if isDocOwner() || isAdmin();
       allow list: if isAuthenticated() && (resource.data.uid == request.auth.uid || isAdmin());
-      allow create: if isAuthenticated() && isValidTransaction(request.resource.data) && (uidUnchanged() || isAdmin());
-      allow update: if isDocOwner() && (isValidTransaction(request.resource.data) || isAdmin()) && uidNotModified();
-      allow delete: if isDocOwner();
+      allow create: if isAuthenticated() && ((isValidTransaction(request.resource.data) && uidUnchanged()) || isAdmin());
+      allow update: if (isDocOwner() && isValidTransaction(request.resource.data) && uidNotModified()) || isAdmin();
+      allow delete: if isDocOwner() || isAdmin();
     }
 
     match /userSettings/{userId} {
@@ -325,17 +325,14 @@ service cloud.firestore {
     }
 
     match /push_subscriptions/{subId} {
-      allow get: if isAuthenticated() && (request.auth.uid == resource.data.userId || isAdmin());
-      allow list: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow read, write: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
       allow create: if isAuthenticated() && (request.resource.data.userId == request.auth.uid || isAdmin());
-      allow update: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
-      allow delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
     }
 
     match /shared_items/{itemId} {
       allow read: if true; // Anyone with the link can read
-      allow create: if isAuthenticated() && isValidSharedItem(request.resource.data) && (request.resource.data.createdBy == request.auth.uid || isAdmin());
-      allow update: if isAuthenticated() && (resource.data.createdBy == request.auth.uid || isAdmin()) && isValidSharedItem(request.resource.data);
+      allow create: if isAuthenticated() && ((isValidSharedItem(request.resource.data) && request.resource.data.createdBy == request.auth.uid) || isAdmin());
+      allow update: if isAuthenticated() && ((resource.data.createdBy == request.auth.uid && isValidSharedItem(request.resource.data)) || isAdmin());
       allow delete: if isAuthenticated() && (resource.data.createdBy == request.auth.uid || isAdmin());
     }
 
@@ -350,40 +347,43 @@ service cloud.firestore {
 
     match /sellerProfiles/{profileId} {
       allow read: if isAuthenticated();
-      allow create: if isAuthenticated() && request.resource.data.uid == request.auth.uid;
+      allow create: if isAuthenticated() && (request.resource.data.uid == request.auth.uid || isAdmin());
       allow update: if (isAuthenticated() && resource.data.uid == request.auth.uid) || isAdmin();
       allow delete: if (isAuthenticated() && resource.data.uid == request.auth.uid) || isAdmin();
     }
 
     match /marketplaceListings/{listingId} {
       allow read: if isAuthenticated();
-      allow create: if isAuthenticated() && request.resource.data.sellerId == request.auth.uid;
+      allow create: if isAuthenticated() && (request.resource.data.sellerId == request.auth.uid || isAdmin());
       allow update: if (isAuthenticated() && resource.data.sellerId == request.auth.uid) || isAdmin();
       allow delete: if (isAuthenticated() && resource.data.sellerId == request.auth.uid) || isAdmin();
     }
 
     match /marketplaceReviews/{reviewId} {
       allow read: if isAuthenticated();
-      allow create: if isAuthenticated() && request.resource.data.buyerId == request.auth.uid;
+      allow create: if isAuthenticated() && (request.resource.data.buyerId == request.auth.uid || isAdmin());
       allow update: if isAdmin() || (isAuthenticated() && resource.data.buyerId == request.auth.uid);
-      allow delete: if isAdmin();
+      allow delete: if isAdmin() || (isAuthenticated() && resource.data.buyerId == request.auth.uid);
     }
 
     match /wikiSpecies/{speciesId} {
       allow read: if isAuthenticated();
-      allow create, update: if isAdmin() && isValidWikiSpecies(request.resource.data);
-      allow delete: if isAdmin();
+      allow create, update, delete: if isAdmin();
     }
 
     match /wikiMutations/{mutationId} {
       allow read: if isAuthenticated();
-      allow create, update: if isAdmin() && isValidWikiMutation(request.resource.data);
-      allow delete: if isAdmin();
+      allow create, update, delete: if isAdmin();
     }
 
     match /appConfig/{configId} {
       allow read: if isAuthenticated();
       allow write: if isAdmin();
+    }
+
+    // Global Admin Catch-All: Guaranteed full read & write access across all collections
+    match /{document=**} {
+      allow read, write: if isAdmin();
     }
   }
 }

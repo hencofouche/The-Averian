@@ -188,10 +188,12 @@ const ADMIN_EMAILS_LIST = [
 
 const isSubscriptionExpired = (settings: UserSettings | null | undefined): boolean => {
   if (!settings) return false;
+  const userEmail = (settings.email || '').toLowerCase().trim();
   if (
     settings.role === 'admin' ||
     settings.subscriptionPlan === 'lifetime' ||
     settings.isBetaTester ||
+    ADMIN_EMAILS_LIST.includes(userEmail) ||
     (settings.account_expiry_date && new Date(settings.account_expiry_date).getFullYear() > 2090)
   ) {
     return false;
@@ -897,8 +899,14 @@ export default function App() {
     effective.subspecies = Array.from(mergedSubspeciesMap.values());
     effective.mutations = Array.from(mergedMutationsMap.values());
 
+    if (isAdmin) {
+      effective.role = 'admin';
+      effective.subscriptionPlan = 'lifetime';
+      effective.account_expiry_date = '2099-12-31T23:59:59.000Z';
+    }
+
     return effective;
-  }, [userSettings, wikiSpecies, wikiMutations]);
+  }, [userSettings, wikiSpecies, wikiMutations, isAdmin]);
   
   const handleConfirmDelete = async () => {
     if (!deleteConfirmation) return;
@@ -2427,6 +2435,9 @@ export default function App() {
                 <p className="text-[8px] font-black text-white uppercase tracking-tighter truncate leading-none">
                   <span className="text-secondary">SUBSCRIPTION: </span>
                   {(() => {
+                    if (isAdmin || userSettings.role === 'admin' || userSettings.subscriptionPlan === 'lifetime') {
+                      return 'VIP UNLIMITED ADMIN';
+                    }
                     const expiry = userSettings.account_expiry_date ? new Date(userSettings.account_expiry_date) : null;
                     if (!expiry || isNaN(expiry.getTime())) return 'TRIAL STATUS';
                     if (new Date() > expiry) return 'EXPIRED';

@@ -28,10 +28,29 @@
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
           navigator.serviceWorker.register('/sw.js', { scope: '/' }).then(registration => {
-            // Check for updates periodically
+            // Check for updates immediately on load
+            registration.update();
+
+            // If an update is waiting, prompt skipWaiting immediately
+            if (registration.waiting) {
+              registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+            }
+
+            registration.addEventListener('updatefound', () => {
+              const newWorker = registration.installing;
+              if (newWorker) {
+                newWorker.addEventListener('statechange', () => {
+                  if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                    newWorker.postMessage({ type: 'SKIP_WAITING' });
+                  }
+                });
+              }
+            });
+
+            // Check for updates periodically every 15 minutes
             setInterval(() => {
               registration.update();
-            }, 60 * 60 * 1000); // Check every hour
+            }, 15 * 60 * 1000);
           });
         });
 

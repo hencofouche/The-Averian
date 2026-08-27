@@ -124,7 +124,7 @@ export function DiditVerificationModal({
           });
         }
         setStep('success');
-        toast.success('Identity Verified Successfully! Verified Seller Badge activated.');
+        toast.success('Identity Verified Successfully! Vetted Breeder Badge activated.');
         if (onSuccess) onSuccess();
       } else if (data.status === 'Declined' || data.decision?.status === 'Declined') {
         setErrorMessage('Verification was declined. Please ensure your photo ID is clear and unexpired.');
@@ -203,7 +203,7 @@ export function DiditVerificationModal({
                 </span>
               </div>
               <p className="text-xs text-zinc-400 font-medium mt-0.5">
-                Powered by Didit.me • Instant Verified Breeder Status
+                Powered by Didit.me • Instant Vetted Breeder Status
               </p>
             </div>
           </div>
@@ -220,7 +220,7 @@ export function DiditVerificationModal({
                 <Sparkles size={14} /> Why verify with Didit.me?
               </span>
               <p className="text-xs text-zinc-300 leading-relaxed">
-                Automated biometric and document verification gives your buyer community 100% confidence. Get your <strong className="text-white">Verified Breeder Badge</strong> instantly without waiting for manual admin approval.
+                Automated biometric and document verification gives your buyer community 100% confidence. Get your <strong className="text-white">Vetted Breeder Badge</strong> instantly without waiting for manual admin approval.
               </p>
             </div>
 
@@ -239,7 +239,7 @@ export function DiditVerificationModal({
                 </div>
                 <div className="flex items-center gap-3 p-2.5 bg-zinc-900/40 border border-zinc-800/80 rounded-xl text-zinc-300">
                   <div className="w-6 h-6 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-xs shrink-0">3</div>
-                  <span><strong>Instant Verified Seller Badge</strong> unlocked on Marketplace</span>
+                  <span><strong>Instant Vetted Breeder Badge</strong> unlocked on Marketplace</span>
                 </div>
               </div>
             </div>
@@ -353,7 +353,7 @@ export function DiditVerificationModal({
                 Identity Verified & Approved!
               </h4>
               <p className="text-xs text-zinc-400 mt-1 max-w-sm mx-auto">
-                Your breeder profile has been verified with Didit AI. The Verified Seller badge is now visible on all your marketplace listings.
+                Your breeder profile has been verified with Didit AI. The Vetted Breeder badge is now visible on all your marketplace listings.
               </p>
             </div>
             <Button

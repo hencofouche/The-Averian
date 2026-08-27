@@ -295,7 +295,7 @@ export function MarketplaceView({
                   </span>
                 </div>
                 <p className="text-xs text-zinc-400 font-medium mt-0.5">
-                  Verified Breeder Community Standards & Identity Verification Required
+                  Vetted Breeder Community Standards & Identity Verification Required
                 </p>
               </div>
             </div>
@@ -342,7 +342,7 @@ export function MarketplaceView({
                   <div className="space-y-1">
                     <h3 className="text-sm font-bold text-white">Instant Automated KYC via Didit.me AI</h3>
                     <p className="text-xs text-zinc-400 leading-relaxed">
-                      Verify your identity in under 2 minutes using government ID & biometric scan. Get an instant <strong className="text-zinc-200">Verified Seller Badge</strong> and immediate access to the Marketplace.
+                      Verify your identity in under 2 minutes using government ID & biometric scan. Get an instant <strong className="text-zinc-200">Vetted Breeder Badge</strong> and immediate access to the Marketplace.
                     </p>
                   </div>
                 </div>
@@ -450,7 +450,7 @@ export function MarketplaceView({
                     <ShieldCheck size={18} />
                   </div>
                   <div>
-                    <p className="font-bold text-white">Verified Breeder Badge</p>
+                    <p className="font-bold text-white">Vetted Breeder Badge</p>
                     <p className="text-[11px] text-zinc-400">Build 100% trust with buyers across the country</p>
                   </div>
                 </div>
@@ -471,7 +471,7 @@ export function MarketplaceView({
                   </div>
                   <div>
                     <p className="font-bold text-white">Direct Breeder Communication</p>
-                    <p className="text-[11px] text-zinc-400">Contact verified breeders directly via WhatsApp & Phone</p>
+                    <p className="text-[11px] text-zinc-400">Contact vetted breeders directly via WhatsApp & Phone</p>
                   </div>
                 </div>
               </div>
@@ -894,8 +894,8 @@ export function MarketplaceView({
                   ? "Try clearing your filters or changing your search terms."
                   : activeTab === 'for_sale'
                   ? currentViewCountry 
-                    ? `No birds currently listed in ${currentViewCountry.flag} ${currentViewCountry.name}. Be the first verified breeder to list!`
-                    : "No birds currently listed for sale. Be the first verified breeder to list!"
+                    ? `No birds currently listed in ${currentViewCountry.flag} ${currentViewCountry.name}. Be the first vetted breeder to list!`
+                    : "No birds currently listed for sale. Be the first vetted breeder to list!"
                   : activeTab === 'wanted'
                   ? currentViewCountry
                     ? `No wanted requests in ${currentViewCountry.flag} ${currentViewCountry.name}. Post what you are searching for!`
@@ -1208,7 +1208,7 @@ function ListingCard({
             
             <div className="flex items-center gap-1 text-emerald-400 shrink-0">
               <ShieldCheck size={14} />
-              <span className="font-semibold text-xs">Verified Breeder</span>
+              <span className="font-semibold text-xs">Vetted Breeder</span>
             </div>
           </div>
 
@@ -1479,7 +1479,7 @@ function SellerProfileModal({
                 <p className="text-xs font-bold text-white">Didit.me Automated Verification</p>
               </div>
               <p className="text-[11px] text-zinc-400">
-                Automated 1-minute ID & biometric check. Instant breeder verified badge.
+                Automated 1-minute ID & biometric check. Instant vetted breeder badge.
               </p>
             </div>
             <Button
@@ -1995,7 +1995,7 @@ function ListingFormModal({
               </h3>
               <p className="text-xs text-zinc-400 font-medium flex items-center gap-1.5 mt-0.5">
                 <span>{sellerCountry.flag}</span>
-                <span>Verified Seller: {sellerProfile?.sellerName} ({sellerProfile?.town || sellerCountry.name})</span>
+                <span>Vetted Breeder: {sellerProfile?.sellerName} ({sellerProfile?.town || sellerCountry.name})</span>
               </p>
             </div>
           </div>
@@ -2892,7 +2892,7 @@ function ListingDetailModal({
               </div>
             </div>
             <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-md">
-              Verified Breeder
+              Vetted Breeder
             </span>
           </div>
 
