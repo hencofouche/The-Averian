@@ -50,9 +50,9 @@ const DEFAULT_PAGE_DETAILS: Record<AppPageId, { title: string; subtitle: string;
   },
   marketplace: {
     title: 'Classifieds & Aviary Marketplace',
-    subtitle: 'Verified Breeder Community Hub',
+    subtitle: 'Vetted Breeder Community Hub',
     description: '',
-    features: ['Sell Classifieds', 'Wanted Classifieds', 'Didit.me Identity Verified Breeders'],
+    features: ['Sell Classifieds', 'Wanted Classifieds', 'Vetted Sellers, Buyers and Breeders'],
     estimatedRelease: 'Launching Very Soon'
   },
   financials: {

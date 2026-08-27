@@ -359,25 +359,32 @@ export function AdminUserManagementPanel({
       const nowIso = new Date().toISOString();
       const adminEmail = currentUser?.email || 'Admin';
 
-      // Update userSettings doc
+      // Update userSettings and users docs in parallel
       const settingsRef = doc(db, 'userSettings', targetUser.uid);
-      await setDoc(settingsRef, {
-        isBetaTester: allow,
-        canTestComingSoon: allow,
-        betaTesterGrantedBy: allow ? adminEmail : null,
-        betaTesterGrantedAt: allow ? nowIso : null,
-        updatedAt: nowIso
-      }, { merge: true });
-
-      // Update users doc
       const userRef = doc(db, 'users', targetUser.uid);
-      await setDoc(userRef, {
-        isBetaTester: allow,
-        canTestComingSoon: allow,
-        betaTesterGrantedBy: allow ? adminEmail : null,
-        betaTesterGrantedAt: allow ? nowIso : null,
-        updatedAt: nowIso
-      }, { merge: true });
+
+      const results = await Promise.allSettled([
+        setDoc(settingsRef, {
+          isBetaTester: allow,
+          canTestComingSoon: allow,
+          betaTesterGrantedBy: allow ? adminEmail : null,
+          betaTesterGrantedAt: allow ? nowIso : null,
+          updatedAt: nowIso
+        }, { merge: true }),
+        setDoc(userRef, {
+          isBetaTester: allow,
+          canTestComingSoon: allow,
+          betaTesterGrantedBy: allow ? adminEmail : null,
+          betaTesterGrantedAt: allow ? nowIso : null,
+          updatedAt: nowIso
+        }, { merge: true })
+      ]);
+
+      const allRejected = results.every(r => r.status === 'rejected');
+      if (allRejected) {
+        const firstErr = (results[0] as PromiseRejectedResult).reason;
+        throw firstErr || new Error("Permission denied updating user documents.");
+      }
 
       // Update local state
       setUsersList(prev => prev.map(u => {
@@ -401,7 +408,7 @@ export function AdminUserManagementPanel({
       if (onRefreshParentData) onRefreshParentData();
     } catch (err: any) {
       console.error("Failed to update beta tester status:", err);
-      toast.error('Failed to update tester permission: ' + err.message);
+      toast.error('Failed to update tester permission: ' + (err.message || 'Missing permissions'));
     } finally {
       setIsUpdatingSub(false);
     }
@@ -424,8 +431,16 @@ export function AdminUserManagementPanel({
       };
 
       // Update both collections for immediate effect
-      await setDoc(doc(db, 'users', targetUser.uid), banPayload, { merge: true });
-      await setDoc(doc(db, 'userSettings', targetUser.uid), banPayload, { merge: true });
+      const banResults = await Promise.allSettled([
+        setDoc(doc(db, 'users', targetUser.uid), banPayload, { merge: true }),
+        setDoc(doc(db, 'userSettings', targetUser.uid), banPayload, { merge: true })
+      ]);
+
+      const allBanRejected = banResults.every(r => r.status === 'rejected');
+      if (allBanRejected) {
+        const firstErr = (banResults[0] as PromiseRejectedResult).reason;
+        throw firstErr || new Error("Permission denied toggling ban status.");
+      }
 
       // Update local state
       setUsersList(prev => prev.map(u => {
@@ -496,23 +511,30 @@ export function AdminUserManagementPanel({
 
       const isoExpiry = newExpiry.toISOString();
 
-      // Update userSettings doc
+      // Update userSettings and users docs in parallel
       const settingsRef = doc(db, 'userSettings', targetUser.uid);
-      await setDoc(settingsRef, {
-        account_expiry_date: isoExpiry,
-        subscriptionPlan: type === 'lifetime' ? 'lifetime' : (type === '1year' ? 'yearly' : 'monthly'),
-        subscribedAt: new Date().toISOString(),
-        subscriptionGrantedBy: `Admin (${currentUser?.email || 'Admin'})`
-      }, { merge: true });
-
-      // Update users doc
       const userRef = doc(db, 'users', targetUser.uid);
-      await setDoc(userRef, {
-        account_expiry_date: isoExpiry,
-        subscriptionPlan: type === 'lifetime' ? 'lifetime' : (type === '1year' ? 'yearly' : 'monthly'),
-        subscriptionGrantedBy: `Admin (${currentUser?.email || 'Admin'})`,
-        updatedAt: new Date().toISOString()
-      }, { merge: true });
+
+      const subResults = await Promise.allSettled([
+        setDoc(settingsRef, {
+          account_expiry_date: isoExpiry,
+          subscriptionPlan: type === 'lifetime' ? 'lifetime' : (type === '1year' ? 'yearly' : 'monthly'),
+          subscribedAt: new Date().toISOString(),
+          subscriptionGrantedBy: `Admin (${currentUser?.email || 'Admin'})`
+        }, { merge: true }),
+        setDoc(userRef, {
+          account_expiry_date: isoExpiry,
+          subscriptionPlan: type === 'lifetime' ? 'lifetime' : (type === '1year' ? 'yearly' : 'monthly'),
+          subscriptionGrantedBy: `Admin (${currentUser?.email || 'Admin'})`,
+          updatedAt: new Date().toISOString()
+        }, { merge: true })
+      ]);
+
+      const allSubRejected = subResults.every(r => r.status === 'rejected');
+      if (allSubRejected) {
+        const firstErr = (subResults[0] as PromiseRejectedResult).reason;
+        throw firstErr || new Error("Permission denied updating subscription.");
+      }
 
       // Update local state
       setUsersList(prev => prev.map(u => {

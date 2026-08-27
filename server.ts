@@ -16,6 +16,18 @@ async function startServer() {
     res.json({ status: "ok" });
   });
 
+  // Version Endpoint for PWA version management & cache busting
+  app.get(["/version.json", "/api/version"], (req, res) => {
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+    res.setHeader("Pragma", "no-cache");
+    res.setHeader("Expires", "0");
+    res.json({
+      version: "1.0.25",
+      buildTime: Date.now(),
+      app: "The Averian"
+    });
+  });
+
   // Didit KYC Config & Status
   app.get("/api/didit/config", (req, res) => {
     const isConfigured = Boolean(process.env.DIDIT_API_KEY && process.env.DIDIT_WORKFLOW_ID);

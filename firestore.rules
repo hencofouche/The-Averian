@@ -124,20 +124,34 @@ service cloud.firestore {
       return dateStr is string && (dateStr == "" || dateStr.matches("^\\d{4}-\\d{2}-\\d{2}$"));
     }
 
-    function isAdmin() {
+    function isEmailAdmin() {
+      return isAuthenticated() && 
+             request.auth.token != null &&
+             'email' in request.auth.token &&
+             request.auth.token.email != null &&
+             request.auth.token.email is string &&
+             (
+               request.auth.token.email.lower() == "clashfouche@gmail.com" ||
+               request.auth.token.email.lower() == "teamotakuempire@gmail.com" ||
+               request.auth.token.email.lower() == "theaveriansupport@gmail.com" ||
+               request.auth.token.email.lower() == "hencofouche8@gmail.com"
+             );
+    }
+
+    function isDocAdmin() {
       return isAuthenticated() && (
-        ('email' in request.auth.token && request.auth.token.email != null && (
-          request.auth.token.email.lower() == "clashfouche@gmail.com" ||
-          request.auth.token.email.lower() == "teamotakuempire@gmail.com" ||
-          request.auth.token.email.lower() == "theaveriansupport@gmail.com" ||
-          request.auth.token.email.lower() == "hencofouche8@gmail.com"
-        )) ||
         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', '') == 'admin') ||
+         'role' in get(/databases/$(database)/documents/users/$(request.auth.uid)).data &&
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin') ||
         (exists(/databases/$(database)/documents/userSettings/$(request.auth.uid)) && 
-          get(/databases/$(database)/documents/userSettings/$(request.auth.uid)).data.get('role', '') == 'admin') ||
+         'role' in get(/databases/$(database)/documents/userSettings/$(request.auth.uid)).data &&
+         get(/databases/$(database)/documents/userSettings/$(request.auth.uid)).data.role == 'admin') ||
         exists(/databases/$(database)/documents/admins/$(request.auth.uid))
       );
+    }
+
+    function isAdmin() {
+      return isEmailAdmin() || isDocAdmin();
     }
 
     // ===============================================================

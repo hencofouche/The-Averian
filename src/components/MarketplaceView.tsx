@@ -494,7 +494,7 @@ export function MarketplaceView({
         {isSellerProfileModalOpen && (
           <SellerProfileModal
             user={user}
-            userSettings={userSettings}
+            isAdmin={isAdmin}
             existingProfile={myProfile}
             onClose={() => setIsSellerProfileModalOpen(false)}
             onOpenDidit={() => {
@@ -1440,7 +1440,7 @@ function SellerProfileModal({
             {existingProfile.status === 'pending' && onOpenDidit && (
               <div className="pt-2 border-t border-amber-500/20 flex flex-col sm:flex-row items-center justify-between gap-2">
                 <p className="text-xs text-amber-200/90 font-medium">
-                  ⚡ Want instant approval? Skip the queue with Didit.me AI:
+                  ⚡ Want instant approval? Skip the queue with instant verification:
                 </p>
                 <Button
                   type="button"
@@ -1448,7 +1448,7 @@ function SellerProfileModal({
                   className="text-xs py-1.5 px-3 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold rounded-xl shadow-md shrink-0"
                 >
                   <Sparkles size={13} className="mr-1" />
-                  Verify with Didit AI
+                  Verify Identity Instantly
                 </Button>
               </div>
             )}
@@ -1476,7 +1476,7 @@ function SellerProfileModal({
                 <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 rounded">
                   Instant KYC
                 </span>
-                <p className="text-xs font-bold text-white">Didit.me Automated Verification</p>
+                <p className="text-xs font-bold text-white">Instant Automated Identity Verification</p>
               </div>
               <p className="text-[11px] text-zinc-400">
                 Automated 1-minute ID & biometric check. Instant vetted breeder badge.
@@ -1625,7 +1625,7 @@ function SellerProfileModal({
           <div className="p-4 bg-zinc-900/60 rounded-xl border border-zinc-800 text-xs text-zinc-400 space-y-2">
             <p className="font-semibold text-white">Verification & Community Safety</p>
             <p className="leading-relaxed">
-              To protect buyers and ensure authentic aviary representation, all sellers must complete identity verification via <strong className="text-cyan-400">Didit.me automated biometric KYC</strong> or pass manual <strong className="text-gold-400">Admin review</strong>.
+              To protect buyers and ensure authentic aviary representation, all sellers must complete identity verification via <strong className="text-cyan-400">automated biometric ID verification</strong> or pass manual <strong className="text-gold-400">Admin review</strong>.
             </p>
           </div>
 

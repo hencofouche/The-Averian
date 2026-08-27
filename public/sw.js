@@ -1,4 +1,4 @@
-const CACHE_NAME = 'averian-pwa-v22';
+const CACHE_NAME = 'averian-pwa-v25';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -50,6 +50,12 @@ self.addEventListener('fetch', (event) => {
   
   const url = new URL(event.request.url);
   const isSameOrigin = url.origin === self.location.origin;
+
+  // Always bypass cache for version check endpoints
+  if (url.pathname.includes('version.json') || url.pathname.includes('/api/version')) {
+    return;
+  }
+
   const isCodeOrDoc = 
     event.request.mode === 'navigate' ||
     url.pathname.endsWith('.js') ||
