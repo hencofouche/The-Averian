@@ -653,6 +653,7 @@ export default function App() {
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [showPublicLanding, setShowPublicLanding] = useState(false);
   const [isScanModalOpen, setIsScanModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'birds' | 'cages' | 'pairs' | 'breeding' | 'financials' | 'tasks' | 'settings' | 'genetics' | 'contacts' | 'stats' | 'print' | 'pedigree' | 'subscription' | 'admin' | 'marketplace' | 'wiki'>('birds');
   const [statsFilter, setStatsFilter] = useState<{ birdId?: string, pairId?: string } | null>(null);
@@ -1804,7 +1805,46 @@ export default function App() {
   }
 
   if (!user) {
-    return <PublicLanding onLogin={handleLogin} isLoggingIn={isLoggingIn} />;
+    if (showPublicLanding) {
+      return <PublicLanding onBack={() => setShowPublicLanding(false)} />;
+    }
+
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-black p-4">
+        <div className="w-full max-w-md text-center space-y-8">
+          <div className="space-y-2">
+            <div className="inline-flex items-center justify-center w-20 h-20 rounded-3xl bg-secondary text-black-950 mb-4 shadow-2xl shadow-secondary/20">
+              <BirdIcon size={40} />
+            </div>
+            <h1 className="text-5xl font-black tracking-tighter text-white">THE AV<span className="text-secondary">ERIAN</span></h1>
+            <p className="text-black-50 font-medium">By The Averian</p>
+          </div>
+          <div className="space-y-4">
+            <Button 
+              onClick={handleLogin} 
+              disabled={isLoggingIn}
+              className="w-full py-4 text-lg font-bold"
+            >
+              {isLoggingIn ? (
+                <>
+                  <Loader2 className="animate-spin" size={20} />
+                  Signing in...
+                </>
+              ) : (
+                'Sign in with Google'
+              )}
+            </Button>
+            
+            <button
+              onClick={() => setShowPublicLanding(true)}
+              className="text-sm font-medium text-black-100 hover:text-white transition-colors underline-offset-4 hover:underline"
+            >
+              Learn about our business & services
+            </button>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   // Account Suspension / Ban Guard
