@@ -9,7 +9,7 @@ import {
   Image as ImageIcon, Loader2, DollarSign, TrendingUp, TrendingDown,
   Activity, ArrowUpRight, ArrowDownRight, BarChart3, PieChart as PieChartIcon,
   Menu, Egg, LayoutGrid, Grid3x3, List as ListIcon, AlertTriangle, CreditCard, CheckCircle2, Bell, Cloud, Maximize2, Share2, Send, Printer, MoreHorizontal, Dna, Users, Palette, QrCode, Scan, FileText, ExternalLink, ArrowLeft, ArrowRightLeft, History as HistoryIcon, RefreshCw, UploadCloud, Eye,
-  Mail, MessageCircle, Video, Shield, Wifi, WifiOff, Flame, ShoppingBag, Store, BookOpen, Sparkles, FileSpreadsheet
+  Mail, MessageCircle, Video, Shield, ShieldCheck, Copy, Wifi, WifiOff, Flame, ShoppingBag, Store, BookOpen, Sparkles, FileSpreadsheet
 } from 'lucide-react';
 import GeneticsCalculatorOriginal from './components/GeneticsCalculator';
 const GeneticsCalculator = React.memo(GeneticsCalculatorOriginal);
@@ -43,6 +43,27 @@ import { BannedUserScreen } from './components/BannedUserScreen';
 import { useIncubationNotifications } from './hooks/useIncubationNotifications';
 import { IncubationAlertsModal } from './components/IncubationAlertsModal';
 import { CurrencyConverterRates } from './components/CurrencyConverterRates';
+import { PublicLandingPage } from './components/PublicLandingPage';
+
+function checkIsLandingInUrl() {
+  if (typeof window === 'undefined') return false;
+  const params = new URLSearchParams(window.location.search);
+  const page = params.get('page');
+  const view = params.get('view');
+  const yoco = params.get('yoco');
+  const landing = params.get('landing');
+  const pricing = params.get('pricing');
+  return (
+    page === 'landing' ||
+    view === 'landing' ||
+    view === 'pricing' ||
+    yoco === 'verify' ||
+    landing === 'true' ||
+    pricing === 'true' ||
+    window.location.hash === '#landing' ||
+    window.location.hash === '#pricing'
+  );
+}
 
 function ImageGallery({ imageUrls, initialIndex, onClose }: { imageUrls: string[], initialIndex: number, onClose: () => void }) {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
@@ -188,12 +209,13 @@ const ADMIN_EMAILS_LIST = [
 
 const isSubscriptionExpired = (settings: UserSettings | null | undefined): boolean => {
   if (!settings) return false;
-  const userEmail = (settings.email || '').toLowerCase().trim();
+  const userEmail = (settings.email || auth.currentUser?.email || '').toLowerCase().trim();
   if (
     settings.role === 'admin' ||
     settings.subscriptionPlan === 'lifetime' ||
-    settings.isBetaTester ||
-    ADMIN_EMAILS_LIST.includes(userEmail) ||
+    settings.isBetaTester === true ||
+    settings.canTestComingSoon === true ||
+    (userEmail && ADMIN_EMAILS_LIST.includes(userEmail)) ||
     (settings.account_expiry_date && new Date(settings.account_expiry_date).getFullYear() > 2090)
   ) {
     return false;
@@ -754,6 +776,9 @@ export default function App() {
     pageName: string;
   } | null>(null);
 
+  // Public Landing / Yoco Verification Page state
+  const [showPublicLanding, setShowPublicLanding] = useState<boolean>(() => checkIsLandingInUrl());
+
   // Incubation Push Notifications
   const [isIncubationModalOpen, setIsIncubationModalOpen] = useState(false);
   const {
@@ -1160,20 +1185,22 @@ export default function App() {
         currentUserData = uSnap.data();
         setUserSettings(prev => {
           if (!prev) return prev;
-          const mergedBeta = currentUserData.isBetaTester === true || currentUserData.canTestComingSoon === true || prev.isBetaTester === true || prev.canTestComingSoon === true;
-          let mergedExpiry = prev.account_expiry_date;
-          if (currentUserData.account_expiry_date) {
-            if (!mergedExpiry || new Date(currentUserData.account_expiry_date) > new Date(mergedExpiry)) {
-              mergedExpiry = currentUserData.account_expiry_date;
-            }
+          const isBeta = currentUserData.isBetaTester === true || currentUserData.canTestComingSoon === true;
+          const isAdminRole = currentUserData.role === 'admin' || prev.role === 'admin';
+          const isLife = currentUserData.subscriptionPlan === 'lifetime' || prev.subscriptionPlan === 'lifetime' || isBeta || isAdminRole;
+          
+          let mergedExpiry = currentUserData.account_expiry_date || prev.account_expiry_date;
+          if (isLife && (!mergedExpiry || new Date(mergedExpiry).getFullYear() < 2090)) {
+            mergedExpiry = '2099-12-31T23:59:59.000Z';
           }
+
           return {
             ...prev,
-            isBetaTester: mergedBeta,
-            canTestComingSoon: mergedBeta,
+            isBetaTester: isBeta || prev.isBetaTester,
+            canTestComingSoon: isBeta || prev.canTestComingSoon,
             account_expiry_date: mergedExpiry || prev.account_expiry_date,
-            subscriptionPlan: currentUserData.subscriptionPlan || prev.subscriptionPlan,
-            role: (currentUserData.role === 'admin' || prev.role === 'admin') ? 'admin' : prev.role
+            subscriptionPlan: isLife ? 'lifetime' : (currentUserData.subscriptionPlan || prev.subscriptionPlan),
+            role: isAdminRole ? 'admin' : prev.role
           };
         });
       }
@@ -1184,7 +1211,6 @@ export default function App() {
       setIsSyncing(docSnap.metadata.hasPendingWrites);
       
       if (docSnap.metadata.fromCache && !docSnap.exists()) {
-        // In offline mode with no cached settings document yet, initialize a local fallback so the user isn't blocked on the loading spinner
         const trialExpiry = new Date();
         trialExpiry.setDate(trialExpiry.getDate() + 30);
         const fallbackSettings: UserSettings = {
@@ -1211,20 +1237,25 @@ export default function App() {
           return;
         }
 
-        const mergedBeta = data.isBetaTester === true || data.canTestComingSoon === true || (currentUserData && (currentUserData.isBetaTester === true || currentUserData.canTestComingSoon === true));
-        let effectiveExpiry = data.account_expiry_date;
-        if (currentUserData?.account_expiry_date) {
-          if (!effectiveExpiry || new Date(currentUserData.account_expiry_date) > new Date(effectiveExpiry)) {
-            effectiveExpiry = currentUserData.account_expiry_date;
-          }
-        }
-
         const userEmail = user.email?.toLowerCase().trim();
         const isAdminUser = Boolean(
           (userEmail && ADMIN_EMAILS_LIST.includes(userEmail)) || 
           data.role === 'admin' ||
           currentUserData?.role === 'admin'
         );
+        const isBeta = data.isBetaTester === true || data.canTestComingSoon === true || currentUserData?.isBetaTester === true || currentUserData?.canTestComingSoon === true;
+        const isLifePlan = data.subscriptionPlan === 'lifetime' || currentUserData?.subscriptionPlan === 'lifetime' || isBeta || isAdminUser;
+
+        let effectiveExpiry = data.account_expiry_date || currentUserData?.account_expiry_date;
+        if (currentUserData?.account_expiry_date) {
+          if (!effectiveExpiry || new Date(currentUserData.account_expiry_date) > new Date(effectiveExpiry)) {
+            effectiveExpiry = currentUserData.account_expiry_date;
+          }
+        }
+
+        if (isLifePlan && (!effectiveExpiry || new Date(effectiveExpiry).getFullYear() < 2090)) {
+          effectiveExpiry = '2099-12-31T23:59:59.000Z';
+        }
 
         // Only initialize default expiry if missing everywhere
         if (!effectiveExpiry) { 
@@ -1249,9 +1280,9 @@ export default function App() {
             currency: data.currency || 'ZAR', 
             ...data, 
             statuses: updatedStatuses,
-            isBetaTester: Boolean(mergedBeta),
-            canTestComingSoon: Boolean(mergedBeta),
-            account_expiry_date: (mergedBeta || isAdminUser) ? '2099-12-31T23:59:59.000Z' : trialExpiry.toISOString() 
+            isBetaTester: Boolean(isBeta),
+            canTestComingSoon: Boolean(isBeta),
+            account_expiry_date: isLifePlan ? '2099-12-31T23:59:59.000Z' : trialExpiry.toISOString() 
           }; 
           setDoc(docRef, updated, { merge: true }).catch(e => console.error('Failed to fix settings', e)); 
           setUserSettings({ id: docSnap.id, ...updated }); 
@@ -1274,10 +1305,11 @@ export default function App() {
             const finalMergedSettings: UserSettings = {
               id: docSnap.id,
               ...data,
-              isBetaTester: Boolean(mergedBeta),
-              canTestComingSoon: Boolean(mergedBeta),
+              role: isAdminUser ? 'admin' : (data.role || currentUserData?.role),
+              isBetaTester: Boolean(isBeta),
+              canTestComingSoon: Boolean(isBeta),
               account_expiry_date: effectiveExpiry,
-              subscriptionPlan: (data.subscriptionPlan === 'lifetime' || currentUserData?.subscriptionPlan === 'lifetime') ? 'lifetime' : (data.subscriptionPlan || currentUserData?.subscriptionPlan),
+              subscriptionPlan: isLifePlan ? 'lifetime' : (data.subscriptionPlan || currentUserData?.subscriptionPlan),
               statuses: missingDefaults.length > 0 
                 ? [...(data.statuses || []), ...missingDefaults.map(name => ({ id: crypto.randomUUID(), name }))]
                 : (data.statuses || [])
@@ -1794,10 +1826,19 @@ export default function App() {
     );
   }
 
+  // Public Landing / Yoco Verification Page Guard
+  if (showPublicLanding) {
+    return (
+      <PublicLandingPage 
+        onGoToLogin={() => setShowPublicLanding(false)} 
+      />
+    );
+  }
+
   if (!user) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-black p-4">
-        <div className="w-full max-w-md text-center space-y-8">
+        <div className="w-full max-w-md text-center space-y-6">
           <div className="space-y-2">
             <div className="inline-flex items-center justify-center w-20 h-20 rounded-3xl bg-secondary text-black-950 mb-4 shadow-2xl shadow-secondary/20">
               <BirdIcon size={40} />
@@ -1808,7 +1849,7 @@ export default function App() {
           <Button 
             onClick={handleLogin} 
             disabled={isLoggingIn}
-            className="w-full py-4 text-lg font-bold"
+            className="w-full py-4 text-lg font-bold shadow-xl shadow-gold-500/10"
           >
             {isLoggingIn ? (
               <>
@@ -1819,6 +1860,19 @@ export default function App() {
               'Sign in with Google'
             )}
           </Button>
+
+          <div className="pt-2 border-t border-zinc-800/80">
+            <button
+              onClick={() => setShowPublicLanding(true)}
+              className="w-full py-3 px-4 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-gold-500/30 text-gold-300 font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition shadow-md"
+            >
+              <ShieldCheck size={16} className="text-gold-400" />
+              Public Info & Subscription Pricing (Yoco Verification)
+            </button>
+            <p className="text-[10px] text-zinc-500 mt-2">
+              No login required to review products, pricing in ZAR (R450/yr), and merchant terms.
+            </p>
+          </div>
         </div>
       </div>
     );
@@ -3217,6 +3271,7 @@ export default function App() {
                     settings={userSettings} 
                     onRenew={handleRenew} 
                     onBack={handleGoBack}
+                    onOpenLanding={() => setShowPublicLanding(true)}
                   />
                 )}
 
@@ -7042,7 +7097,7 @@ function TaskCard({ task, birds, cages, onBirdRef, onToggle, onEdit, onDelete, v
 
 // --- Subscription View ---
 
-function SubscriptionView({ settings, onRenew, onBack }: { settings: UserSettings, onRenew: () => void, onBack: () => void }) {
+function SubscriptionView({ settings, onRenew, onBack, onOpenLanding }: { settings: UserSettings, onRenew: () => void, onBack: () => void, onOpenLanding?: () => void }) {
   const expiryDate = settings.account_expiry_date ? new Date(settings.account_expiry_date) : null;
   const now = new Date();
   const isValidDate = expiryDate && !isNaN(expiryDate.getTime());
@@ -7133,6 +7188,45 @@ function SubscriptionView({ settings, onRenew, onBack }: { settings: UserSetting
 
       {/* Currency Conversion Rate Estimator */}
       <CurrencyConverterRates basePriceZar={450} />
+
+      {/* Yoco Compliance & Verification Sharing Card */}
+      <div className="bg-gradient-to-r from-amber-500/10 via-zinc-900 to-zinc-950 border border-gold-500/30 rounded-2xl p-5 sm:p-6 flex flex-col md:flex-row items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 rounded-xl bg-gold-500/20 text-gold-400 flex items-center justify-center shrink-0 border border-gold-500/40">
+            <ShieldCheck size={24} />
+          </div>
+          <div>
+            <h4 className="text-sm font-black text-white uppercase tracking-wider flex items-center gap-2">
+              Yoco Gateway Public Verification Page
+            </h4>
+            <p className="text-xs text-zinc-400 mt-0.5">
+              Share our public landing page with Yoco's compliance team for payment gateway verification. No login required.
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 shrink-0 w-full md:w-auto">
+          <Button
+            onClick={onOpenLanding}
+            variant="secondary"
+            className="flex-1 md:flex-initial bg-zinc-800 hover:bg-zinc-700 text-gold-300 font-bold text-xs py-2.5 px-4 rounded-xl border border-gold-500/30"
+          >
+            <Eye size={14} />
+            Preview Landing Page
+          </Button>
+          <Button
+            onClick={() => {
+              const shareUrl = `${window.location.origin}${window.location.pathname}?page=landing`;
+              navigator.clipboard.writeText(shareUrl);
+              toast.success('Public Yoco verification link copied to clipboard!');
+            }}
+            className="flex-1 md:flex-initial bg-gold-500 hover:bg-gold-400 text-black font-bold text-xs py-2.5 px-4 rounded-xl shadow-lg shadow-gold-500/10"
+          >
+            <Copy size={14} />
+            Copy Link
+          </Button>
+        </div>
+      </div>
 
       {/* Plan Inclusions */}
       <div className="bg-zinc-950/60 border border-zinc-800/80 rounded-2xl p-5 sm:p-6 space-y-4">
@@ -10361,15 +10455,5 @@ function TaskForm({ user, initialData, birds, cages, onClose, userSettings }: { 
               >
                 <Trash2 size={16} />
               </button>
-            </div>
-          ))}
-        </div>
-      </div>
-      </fieldset>
-      <Button type="submit" className="w-full py-4 text-sm uppercase tracking-widest font-black" disabled={isSaving || isExpired}>
-        {isSaving ? <Loader2 className="animate-spin mr-2" size={16} /> : null}
-        {(initialData && initialData.id) ? t('Update Task') : t('Add Task')}
-      </Button>
-    </form>
-  );
-}
+xúlêœN√0∆Ô}
+´ám=Ñâ	qÄu7ƒx ∑Iëµ$çbwË˙Ó≠”ÑO˛~∂ÏO¿XÀπ¶Õ*AQŸø√—ê±öçú»S'“zê}0eŒ]ÂHr®-2ø°Kh´öŒZ{ubv¢ÿAÇâ5≤âXØ…©-i√MÎEU6¡41V÷Ë≤'~«M⁄Ç√à_vÅ¢—√h\xÄÂkã⁄ƒ≈πÙ‰På‚@\TãòæMŸ_ﬂ0_¡¯‰q†üë'!¥œ(ì	ú…+“Ez#≥Èg–È(| ØßE∫ë–£÷z8%vËh6Â◊F˜€˜Ÿê˝   ˇˇ ∞ïv-

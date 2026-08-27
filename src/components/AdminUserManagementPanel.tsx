@@ -308,7 +308,13 @@ export function AdminUserManagementPanel({
         unregisteredCount++;
       }
 
-      if (u.subscriptionPlan === 'lifetime' || (u.account_expiry_date && new Date(u.account_expiry_date).getFullYear() > 2090)) {
+      const isLifeOrAdminOrTester = u.subscriptionPlan === 'lifetime' || 
+                                     u.role === 'admin' || 
+                                     u.isBetaTester === true || 
+                                     u.canTestComingSoon === true || 
+                                     (u.account_expiry_date && new Date(u.account_expiry_date).getFullYear() > 2090);
+
+      if (isLifeOrAdminOrTester) {
         lifetimeCount++;
         activeSubCount++;
       } else if (u.account_expiry_date) {
@@ -335,6 +341,12 @@ export function AdminUserManagementPanel({
     const now = new Date();
 
     return usersList.filter(u => {
+      const isLifeOrAdminOrTester = u.subscriptionPlan === 'lifetime' || 
+                                     u.role === 'admin' || 
+                                     u.isBetaTester === true || 
+                                     u.canTestComingSoon === true || 
+                                     (u.account_expiry_date && new Date(u.account_expiry_date).getFullYear() > 2090);
+
       // Status filter
       if (statusFilter === 'testers' && !u.isBetaTester && !u.canTestComingSoon) return false;
       if (statusFilter === 'registered' && (!u.email || !u.email.trim())) return false;
@@ -342,15 +354,16 @@ export function AdminUserManagementPanel({
       if (statusFilter === 'admins' && u.role !== 'admin') return false;
       if (statusFilter === 'banned' && !u.isBanned) return false;
       if (statusFilter === 'lifetime') {
-        const isLife = u.subscriptionPlan === 'lifetime' || (u.account_expiry_date && new Date(u.account_expiry_date).getFullYear() > 2090);
-        if (!isLife) return false;
+        if (!isLifeOrAdminOrTester) return false;
       }
       if (statusFilter === 'yearly' && u.subscriptionPlan !== 'yearly' && u.subscriptionPlan !== 'annual') return false;
       if (statusFilter === 'active') {
+        if (isLifeOrAdminOrTester) return true;
         if (!u.account_expiry_date) return false;
         if (!isAfter(new Date(u.account_expiry_date), now)) return false;
       }
       if (statusFilter === 'expired') {
+        if (isLifeOrAdminOrTester) return false;
         if (u.account_expiry_date && isAfter(new Date(u.account_expiry_date), now)) return false;
       }
       if (statusFilter === 'trial') {
@@ -390,7 +403,7 @@ export function AdminUserManagementPanel({
         updatedAt: nowIso
       };
 
-      if (allow && (!targetUser.account_expiry_date || new Date(targetUser.account_expiry_date) < new Date())) {
+      if (allow) {
         updatePayload.account_expiry_date = '2099-12-31T23:59:59.000Z';
         updatePayload.subscriptionPlan = 'lifetime';
       }
