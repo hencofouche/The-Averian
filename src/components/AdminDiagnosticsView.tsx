@@ -147,7 +147,7 @@ export function AdminDiagnosticsView({
       const cacheStart = performance.now();
       // Test reading existing user settings from memory/cache
       if (user) {
-        const testCacheRef = doc(db, 'userSettings', user.uid);
+        const testCacheRef = doc(db, 'userSettings', user?.uid);
         await getDoc(testCacheRef).catch(() => null);
       }
       const cacheLatency = Math.round(performance.now() - cacheStart);
@@ -215,7 +215,7 @@ export function AdminDiagnosticsView({
           name: 'DIAG_VERIFICATION_TEST',
           species: 'Canary',
           sex: 'Unknown',
-          uid: user.uid,
+          uid: user?.uid,
           notes: 'Automated diagnostic validation'
         });
         // Read back

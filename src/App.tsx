@@ -1,4 +1,3 @@
-// Trigger Vercel rebuild to clear GitHub sync corruption
 import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { format } from 'date-fns';
@@ -10,7 +9,7 @@ import {
   Image as ImageIcon, Loader2, DollarSign, TrendingUp, TrendingDown,
   Activity, ArrowUpRight, ArrowDownRight, BarChart3, PieChart as PieChartIcon,
   Menu, Egg, LayoutGrid, Grid3x3, List as ListIcon, AlertTriangle, CreditCard, CheckCircle2, Bell, Cloud, Maximize2, Share2, Send, Printer, MoreHorizontal, Dna, Users, Palette, QrCode, Scan, FileText, ExternalLink, ArrowLeft, ArrowRightLeft, History as HistoryIcon, RefreshCw, UploadCloud, Eye,
-  Mail, MessageCircle, Video, Shield, ShieldCheck, Copy, Wifi, WifiOff, Flame, ShoppingBag, Store, BookOpen, Sparkles, FileSpreadsheet
+  Mail, MessageCircle, Video, Shield, Wifi, WifiOff, Flame, ShoppingBag, Store, BookOpen, Sparkles, FileSpreadsheet
 } from 'lucide-react';
 import GeneticsCalculatorOriginal from './components/GeneticsCalculator';
 const GeneticsCalculator = React.memo(GeneticsCalculatorOriginal);
@@ -44,30 +43,6 @@ import { BannedUserScreen } from './components/BannedUserScreen';
 import { useIncubationNotifications } from './hooks/useIncubationNotifications';
 import { IncubationAlertsModal } from './components/IncubationAlertsModal';
 import { CurrencyConverterRates } from './components/CurrencyConverterRates';
-import { PublicLandingPage } from './components/PublicLandingPage';
-
-function checkIsLandingInUrl() {
-  if (typeof window === 'undefined') return false;
-  const path = window.location.pathname.toLowerCase();
-  const params = new URLSearchParams(window.location.search);
-  const hash = window.location.hash.toLowerCase();
-  
-  const page = params.get('page');
-  const view = params.get('view');
-  const yoco = params.get('yoco');
-  
-  return (
-    path.includes('testsiteappyoco') ||
-    params.has('testsiteappyoco') ||
-    page === 'testsiteappyoco' ||
-    page === 'landing' ||
-    view === 'landing' ||
-    view === 'pricing' ||
-    yoco === 'verify' ||
-    hash === '#testsiteappyoco' ||
-    hash === '#landing'
-  );
-}
 
 function ImageGallery({ imageUrls, initialIndex, onClose }: { imageUrls: string[], initialIndex: number, onClose: () => void }) {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
@@ -780,9 +755,6 @@ export default function App() {
     pageName: string;
   } | null>(null);
 
-  // Public Landing / Yoco Verification Page state
-  const [showPublicLanding, setShowPublicLanding] = useState<boolean>(() => checkIsLandingInUrl());
-
   // Incubation Push Notifications
   const [isIncubationModalOpen, setIsIncubationModalOpen] = useState(false);
   const {
@@ -1009,13 +981,13 @@ export default function App() {
       }
 
       // Sync user profile immediately whenever user logs in or is present
-      const userDocRef = doc(db, 'users', user.uid);
-      const userSettingsDocRef = doc(db, 'userSettings', user.uid);
+      const userDocRef = doc(db, 'users', user?.uid);
+      const userSettingsDocRef = doc(db, 'userSettings', user?.uid);
       const userProfileData = {
-        uid: user.uid,
-        email: user.email || '',
-        displayName: user.displayName || user.email?.split('@')[0] || 'Breeder',
-        photoURL: user.photoURL || '',
+        uid: user?.uid,
+        email: user?.email || '',
+        displayName: user?.displayName || user?.email?.split('@')[0] || 'Breeder',
+        photoURL: user?.photoURL || '',
         lastLoginAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
@@ -1025,9 +997,9 @@ export default function App() {
       });
 
       setDoc(userSettingsDocRef, {
-        uid: user.uid,
-        email: user.email || '',
-        displayName: user.displayName || user.email?.split('@')[0] || 'Breeder'
+        uid: user?.uid,
+        email: user?.email || '',
+        displayName: user?.displayName || user?.email?.split('@')[0] || 'Breeder'
       }, { merge: true }).catch(err => {
         console.warn("Could not sync userSettings email:", err);
       });
@@ -1061,48 +1033,43 @@ export default function App() {
     fetchSharedItem();
   }, []);
 
-  // Yoco Payment Return Handler
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const params = new URLSearchParams(window.location.search);
-    const payment = params.get('payment');
-    const checkout = params.get('checkout');
-    if (payment === 'success' || checkout === 'success') {
-      sessionStorage.setItem('pending_yoco_payment_success', 'true');
-      const newUrl = window.location.pathname;
-      window.history.replaceState({}, document.title, newUrl);
-    }
-  }, []);
-
   useEffect(() => {
     if (!user || !userSettings) return;
-    const pendingPayment = sessionStorage.getItem('pending_yoco_payment_success');
-    if (pendingPayment === 'true') {
-      sessionStorage.removeItem('pending_yoco_payment_success');
-      handleRenew().catch(e => {
-        console.error("Yoco Renewal activation failed:", e);
-        toast.error("Failed to activate subscription. Please contact support.");
-      });
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('payment') === 'success') {
+      // 1. Remove the parameter from the URL immediately to prevent re-triggers
+      const newUrl = window.location.pathname;
+      window.history.replaceState({}, document.title, newUrl);
+
+      // 2. Use a session storage flag to ensure it only happens once per session/load
+      const hasRenewed = sessionStorage.getItem('has_renewed_payment');
+      if (!hasRenewed) {
+        sessionStorage.setItem('has_renewed_payment', 'true');
+        handleRenew().catch(e => {
+          console.error("Renewal failed:", e);
+          toast.error("Failed to activate subscription. Please contact support.");
+        });
+      }
     }
-  }, [user, Boolean(userSettings)]); // Only trigger when user/settings become available, not on every update
+  }, [user, !!userSettings]); // Only trigger when user/settings become available, not on every update
 
   useEffect(() => {
     if (!user) return;
 
     // Use limits to prevent "The Bleed" (excessive reads on large collections)
-    const qBirds = query(collection(db, 'birds'), where('uid', '==', user.uid), limit(birdsLimit));
+    const qBirds = query(collection(db, 'birds'), where('uid', '==', user?.uid), limit(birdsLimit));
     const unsubBirds = onSnapshot(qBirds, (snapshot) => {
       setBirds(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Bird)));
       setIsSyncing(snapshot.metadata.hasPendingWrites);
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'birds'));
 
-    const qCages = query(collection(db, 'cages'), where('uid', '==', user.uid), limit(cagesLimit));
+    const qCages = query(collection(db, 'cages'), where('uid', '==', user?.uid), limit(cagesLimit));
     const unsubCages = onSnapshot(qCages, (snapshot) => {
       setCages(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Cage)));
       setIsSyncing(snapshot.metadata.hasPendingWrites);
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'cages'));
 
-    const qPairs = query(collection(db, 'pairs'), where('uid', '==', user.uid), limit(pairsLimit));
+    const qPairs = query(collection(db, 'pairs'), where('uid', '==', user?.uid), limit(pairsLimit));
     const unsubPairs = onSnapshot(qPairs, (snapshot) => {
       setPairs(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Pair)));
       setIsSyncing(snapshot.metadata.hasPendingWrites);
@@ -1110,7 +1077,7 @@ export default function App() {
 
     const qBreeding = query(
       collection(db, 'breedingRecords'), 
-      where('uid', '==', user.uid), 
+      where('uid', '==', user?.uid), 
       limit(breedingLimit)
     );
     const unsubBreeding = onSnapshot(qBreeding, (snapshot) => {
@@ -1120,7 +1087,7 @@ export default function App() {
       setIsSyncing(snapshot.metadata.hasPendingWrites);
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'breedingRecords'));
 
-    const qTasks = query(collection(db, 'tasks'), where('uid', '==', user.uid), limit(tasksLimit));
+    const qTasks = query(collection(db, 'tasks'), where('uid', '==', user?.uid), limit(tasksLimit));
     const unsubTasks = onSnapshot(qTasks, (snapshot) => {
       setTasks(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Task)));
       setIsSyncing(snapshot.metadata.hasPendingWrites);
@@ -1128,7 +1095,7 @@ export default function App() {
 
     const qTransactions = query(
       collection(db, 'transactions'), 
-      where('uid', '==', user.uid), 
+      where('uid', '==', user?.uid), 
       limit(transactionLimit)
     );
     const unsubTransactions = onSnapshot(qTransactions, (snapshot) => {
@@ -1138,7 +1105,7 @@ export default function App() {
       setIsSyncing(snapshot.metadata.hasPendingWrites);
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'transactions'));
 
-    const qContacts = query(collection(db, 'contacts'), where('uid', '==', user.uid), orderBy('name', 'asc'), limit(contactsLimit));
+    const qContacts = query(collection(db, 'contacts'), where('uid', '==', user?.uid), orderBy('name', 'asc'), limit(contactsLimit));
     const unsubContacts = onSnapshot(qContacts, (snapshot) => {
       setContacts(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Contact)));
       setIsSyncing(snapshot.metadata.hasPendingWrites);
@@ -1188,7 +1155,7 @@ export default function App() {
     const fixingSettings = new Set<string>();
 
     let currentUserData: any = null;
-    const userDocRef = doc(db, 'users', user.uid);
+    const userDocRef = doc(db, 'users', user?.uid);
     const unsubUserDoc = onSnapshot(userDocRef, (uSnap) => {
       if (uSnap.exists()) {
         currentUserData = uSnap.data();
@@ -1215,7 +1182,7 @@ export default function App() {
       }
     }, (err) => handleFirestoreError(err, OperationType.GET, 'users'));
 
-    const docRef = doc(db, 'userSettings', user.uid);
+    const docRef = doc(db, 'userSettings', user?.uid);
     const unsubSettings = onSnapshot(docRef, (docSnap: any) => {
       setIsSyncing(docSnap.metadata.hasPendingWrites);
       
@@ -1223,7 +1190,7 @@ export default function App() {
         const trialExpiry = new Date();
         trialExpiry.setDate(trialExpiry.getDate() + 30);
         const fallbackSettings: UserSettings = {
-          id: user.uid,
+          id: user?.uid,
           species: [],
           subspecies: [],
           mutations: [],
@@ -1231,7 +1198,7 @@ export default function App() {
             { id: 'sold-default', name: 'Sold' },
             { id: 'deceased-default', name: 'Deceased' }
           ],
-          uid: user.uid,
+          uid: user?.uid,
           currency: 'ZAR',
           account_expiry_date: trialExpiry.toISOString()
         };
@@ -1246,7 +1213,7 @@ export default function App() {
           return;
         }
 
-        const userEmail = user.email?.toLowerCase().trim();
+        const userEmail = user?.email?.toLowerCase().trim();
         const isAdminUser = Boolean(
           (userEmail && ADMIN_EMAILS_LIST.includes(userEmail)) || 
           data.role === 'admin' ||
@@ -1268,8 +1235,8 @@ export default function App() {
 
         // Only initialize default expiry if missing everywhere
         if (!effectiveExpiry) { 
-          if (fixingSettings.has(user.uid)) return;
-          fixingSettings.add(user.uid); 
+          if (fixingSettings.has(user?.uid)) return;
+          fixingSettings.add(user?.uid); 
           const trialExpiry = new Date(); 
           trialExpiry.setDate(trialExpiry.getDate() + 30); 
           const defaultStatuses = ['Sold', 'Deceased'];
@@ -1285,7 +1252,7 @@ export default function App() {
             species: data.species || [], 
             subspecies: data.subspecies || [], 
             mutations: data.mutations || [], 
-            uid: user.uid, 
+            uid: user?.uid, 
             currency: data.currency || 'ZAR', 
             ...data, 
             statuses: updatedStatuses,
@@ -1332,7 +1299,7 @@ export default function App() {
         const trialExpiry = new Date();
         trialExpiry.setDate(trialExpiry.getDate() + 30);
         const initialSettings: UserSettings = {
-          id: user.uid,
+          id: user?.uid,
           species: [],
           subspecies: [],
           mutations: [],
@@ -1340,9 +1307,9 @@ export default function App() {
             { id: crypto.randomUUID(), name: 'Sold' },
             { id: crypto.randomUUID(), name: 'Deceased' }
           ],
-          uid: user.uid,
-          email: user.email || '',
-          displayName: user.displayName || user.email?.split('@')[0] || 'Breeder',
+          uid: user?.uid,
+          email: user?.email || '',
+          displayName: user?.displayName || user?.email?.split('@')[0] || 'Breeder',
           currency: 'ZAR',
           account_expiry_date: trialExpiry.toISOString()
         };
@@ -1351,7 +1318,7 @@ export default function App() {
       }
     }, (err) => handleFirestoreError(err, OperationType.GET, 'userSettings'));
 
-    const qShared = query(collection(db, 'shared_items'), where('createdBy', '==', user.uid), limit(50));
+    const qShared = query(collection(db, 'shared_items'), where('createdBy', '==', user?.uid), limit(50));
     const unsubShared = onSnapshot(qShared, (snapshot) => {
       setAllSharedItems(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as SharedItem)));
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'shared_items'));
@@ -1414,7 +1381,7 @@ export default function App() {
       try {
         const qRecurring = query(
           collection(db, 'transactions'),
-          where('uid', '==', user.uid),
+          where('uid', '==', user?.uid),
           where('recurring', 'in', ['Daily', 'Weekly', 'Monthly', 'Yearly'])
         );
         const snapshot = await getDocs(qRecurring);
@@ -1693,7 +1660,7 @@ export default function App() {
       // Use setDoc with merge: true to avoid overwriting fields we don't intend to change
       // and to ensure the document is created if it doesn't exist.
       const { id, ...data } = newSettings;
-      await setDoc(doc(db, 'userSettings', user.uid), data, { merge: true });
+      await setDoc(doc(db, 'userSettings', user?.uid), data, { merge: true });
     } catch (e) {
       handleFirestoreError(e, OperationType.WRITE, 'userSettings');
     }
@@ -1732,55 +1699,33 @@ export default function App() {
   };
 
   const handleRenew = async () => {
-    if (!user) return;
+    if (!user || !userSettings) return;
     
     try {
-      const docRef = doc(db, 'userSettings', user.uid);
-      const userDocRef = doc(db, 'users', user.uid);
-      const docSnap = await getDocFromServer(docRef);
-      const currentData = docSnap.exists() ? (docSnap.data() as UserSettings) : userSettings;
+      // Fetch latest from server to avoid race conditions
+      const docSnap = await getDocFromServer(doc(db, 'userSettings', user?.uid));
+      const currentData = docSnap.exists() ? docSnap.data() as UserSettings : userSettings;
       
-      const currentExpiry = (currentData && currentData.account_expiry_date) 
-        ? new Date(currentData.account_expiry_date) 
-        : new Date();
+      const currentExpiry = currentData.account_expiry_date ? new Date(currentData.account_expiry_date) : new Date();
       const now = new Date();
       
-      const baseDate = (currentExpiry > now && currentExpiry.getFullYear() < 2090) 
-        ? currentExpiry 
-        : now;
+      // Prevent topping up if they already have more than 45 days left
+      const diffTime = currentExpiry.getTime() - now.getTime();
+      const daysLeft = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
       
-      const newExpiry = new Date(baseDate.getTime());
-      newExpiry.setFullYear(newExpiry.getFullYear() + 1);
-      const isoExpiry = newExpiry.toISOString();
-      const nowIso = new Date().toISOString();
+      if (daysLeft > 45) {
+        console.log("Subscription already active for more than 45 days, skipping auto-renewal.");
+        return;
+      }
 
-      await Promise.all([
-        setDoc(docRef, {
-          account_expiry_date: isoExpiry,
-          subscriptionPlan: 'yearly',
-          subscribedAt: nowIso,
-          lastPaymentMethod: 'Yoco Gateway (ZAR R450/yr)',
-          updatedAt: nowIso
-        }, { merge: true }),
-        setDoc(userDocRef, {
-          account_expiry_date: isoExpiry,
-          subscriptionPlan: 'yearly',
-          subscribedAt: nowIso,
-          email: user.email || '',
-          displayName: user.displayName || '',
-          updatedAt: nowIso
-        }, { merge: true })
-      ]);
-
-      setUserSettings(prev => prev ? {
-        ...prev,
-        account_expiry_date: isoExpiry,
-        subscriptionPlan: 'yearly'
-      } : prev);
-
-      toast.success(`ðŸŽ‰ Subscription activated for 1 year! Valid until ${format(newExpiry, 'PPP')}`);
-    } catch (e: any) {
-      console.error("Error executing handleRenew:", e);
+      const baseDate = currentExpiry > now ? currentExpiry : now;
+      baseDate.setFullYear(baseDate.getFullYear() + 1);
+      
+      await updateDoc(doc(db, 'userSettings', user?.uid), {
+        account_expiry_date: baseDate.toISOString()
+      });
+      toast.success("Subscription activated for 1 year!");
+    } catch (e) {
       handleFirestoreError(e, OperationType.UPDATE, 'userSettings');
     }
   };
@@ -1857,19 +1802,10 @@ export default function App() {
     );
   }
 
-  // Public Landing / Yoco Verification Page Guard
-  if (showPublicLanding) {
-    return (
-      <PublicLandingPage 
-        onGoToLogin={() => setShowPublicLanding(false)} 
-      />
-    );
-  }
-
-  if (!user) {
+  if (!user && window.location.pathname !== '/nologinpage') {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-black p-4">
-        <div className="w-full max-w-md text-center space-y-6">
+        <div className="w-full max-w-md text-center space-y-8">
           <div className="space-y-2">
             <div className="inline-flex items-center justify-center w-20 h-20 rounded-3xl bg-secondary text-black-950 mb-4 shadow-2xl shadow-secondary/20">
               <BirdIcon size={40} />
@@ -1880,7 +1816,7 @@ export default function App() {
           <Button 
             onClick={handleLogin} 
             disabled={isLoggingIn}
-            className="w-full py-4 text-lg font-bold shadow-xl shadow-gold-500/10"
+            className="w-full py-4 text-lg font-bold"
           >
             {isLoggingIn ? (
               <>
@@ -1891,8 +1827,6 @@ export default function App() {
               'Sign in with Google'
             )}
           </Button>
-
-
         </div>
       </div>
     );
@@ -1931,7 +1865,7 @@ export default function App() {
           
           const defaultData = { 
             ...birdData, 
-            uid: user.uid,
+            uid: user?.uid,
             createdAt: new Date().toISOString()
           };
 
@@ -1967,7 +1901,7 @@ export default function App() {
                         motherId: rb.motherId ? idMap.get(rb.motherId) : undefined,
                         fatherId: rb.fatherId ? idMap.get(rb.fatherId) : undefined,
                         mateId: undefined,
-                        uid: user.uid,
+                        uid: user?.uid,
                         createdAt: new Date().toISOString()
                       });
                       batch.set(doc(db, 'birds', idMap.get(rb.originalId)!), newBird);
@@ -2146,7 +2080,7 @@ export default function App() {
     };
 
     const handleDeleteShared = () => {
-      if (!user || user.uid !== sharedItemView.createdBy) {
+      if (!user || user?.uid !== sharedItemView.createdBy) {
         toast.error('You do not have permission to delete this shared item.');
         return;
       }
@@ -2176,7 +2110,7 @@ export default function App() {
               {isTransfer ? `${sharedItemView.type} Transfer` : `Shared ${sharedItemView.type}`}
             </h1>
             <div className="flex items-center gap-2">
-              {user && user.uid === sharedItemView.createdBy && (
+              {user && user?.uid === sharedItemView.createdBy && (
                 <button 
                   onClick={handleDeleteShared}
                   className="p-2 text-rose-500 hover:text-rose-400 bg-rose-500/10 rounded-xl transition-colors"
@@ -2554,11 +2488,11 @@ export default function App() {
 
             <div className="flex items-center gap-2 px-2 py-1.5 bg-zinc-900/30 rounded-lg border border-white/5 group">
               <div className="w-6 h-6 rounded-full bg-zinc-700 border border-white/10 flex items-center justify-center text-white overflow-hidden shrink-0">
-                {user.photoURL ? <img src={user.photoURL} alt="" referrerPolicy="no-referrer" className="w-full h-full object-cover" /> : <User size={12} />}
+                {user?.photoURL ? <img src={user?.photoURL} alt="" referrerPolicy="no-referrer" className="w-full h-full object-cover" /> : <User size={12} />}
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-1.5">
-                  <p className="text-[9px] text-white/70 truncate uppercase font-bold tracking-tight">{user.email?.split('@')[0]}</p>
+                  <p className="text-[9px] text-white/70 truncate uppercase font-bold tracking-tight">{user?.email?.split('@')[0]}</p>
                   {isAdmin && (
                     <span className="text-[7px] font-black uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1 py-0.2 rounded">
                       ADMIN
@@ -3291,7 +3225,6 @@ export default function App() {
                     settings={userSettings} 
                     onRenew={handleRenew} 
                     onBack={handleGoBack}
-                    onOpenLanding={() => setShowPublicLanding(true)}
                   />
                 )}
 
@@ -4651,7 +4584,7 @@ function BirdCard({ bird, cage, birds, cages, viewMode = 'grid-large', currency,
             bird={bird}
             allBirds={birds}
             cages={cages}
-            currentUserId={user.uid}
+            currentUserId={user?.uid}
             onClose={() => setIsPassportOpen(false)}
           />
         </Modal>
@@ -6284,7 +6217,7 @@ function BreedingRecordForm({ user, initialData, pairs, birds, cages, onClose, u
         const eggsArr = formData.eggs || [];
         const data = sanitizeData({ 
           ...formData, 
-          ...(initialData?.id ? {} : { uid: user.uid }),
+          ...(initialData?.id ? {} : { uid: user?.uid }),
           eggsLaid: eggsArr.length,
           eggsHatched: eggsArr.filter(e => ['Hatched', 'Died', 'Weaned'].includes(e.status)).length,
           chicksWeaned: eggsArr.filter(e => e.status === 'Weaned').length
@@ -6501,7 +6434,7 @@ function BreedingRecordForm({ user, initialData, pairs, birds, cages, onClose, u
                               motherId: mother?.id || '',
                               fatherId: father?.id || '',
                               cageId: parentPair?.cageId || mother?.cageId || father?.cageId || '',
-                              uid: user.uid,
+                              uid: user?.uid,
                               notes: `Promoted from Egg ${index + 1} of Pair ${parentPair?.id || formData.pairId}`
                            };
                            
@@ -6611,7 +6544,7 @@ function TransactionForm({ user, initialData, birds, pairs, cages, contacts, cur
       try {
         const data = { 
           ...formData,
-          ...(initialData?.id ? {} : { uid: user.uid })
+          ...(initialData?.id ? {} : { uid: user?.uid })
         };
         // Setup initial nextDueDate if becoming recurring
         if (data.recurring && data.recurring !== 'None' && !data.nextDueDate) {
@@ -6780,7 +6713,7 @@ function ContactForm({ user, initialData, onClose, userSettings }: { user: Fireb
       try {
         const data = { 
           ...formData,
-          ...(initialData?.id ? {} : { uid: user.uid })
+          ...(initialData?.id ? {} : { uid: user?.uid })
         };
         if (initialData?.id) { 
           await updateDoc(doc(db, 'contacts', initialData.id), data); 
@@ -7117,7 +7050,7 @@ function TaskCard({ task, birds, cages, onBirdRef, onToggle, onEdit, onDelete, v
 
 // --- Subscription View ---
 
-function SubscriptionView({ settings, onRenew, onBack, onOpenLanding }: { settings: UserSettings, onRenew: () => void, onBack: () => void, onOpenLanding?: () => void }) {
+function SubscriptionView({ settings, onRenew, onBack }: { settings: UserSettings, onRenew: () => void, onBack: () => void }) {
   const expiryDate = settings.account_expiry_date ? new Date(settings.account_expiry_date) : null;
   const now = new Date();
   const isValidDate = expiryDate && !isNaN(expiryDate.getTime());
@@ -7190,6 +7123,7 @@ function SubscriptionView({ settings, onRenew, onBack, onOpenLanding }: { settin
         <div className="w-full md:w-auto flex flex-col gap-2">
           <Button 
             onClick={handlePay} 
+            disabled={!isExpired && daysLeft > 30}
             className="w-full md:w-56 py-4 text-sm font-black uppercase tracking-wider bg-gold-500 hover:bg-gold-400 text-black shadow-lg shadow-gold-500/10"
           >
             {isExpired ? 'Renew Now (R450 / yr)' : 'Extend 1 Year (R450 / yr)'}
@@ -7207,47 +7141,6 @@ function SubscriptionView({ settings, onRenew, onBack, onOpenLanding }: { settin
 
       {/* Currency Conversion Rate Estimator */}
       <CurrencyConverterRates basePriceZar={450} />
-
-      {/* Yoco Compliance & Verification Sharing Card */}
-      {settings.role === 'admin' && (
-        <div className="bg-gradient-to-r from-amber-500/10 via-zinc-900 to-zinc-950 border border-gold-500/30 rounded-2xl p-5 sm:p-6 flex flex-col md:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl bg-gold-500/20 text-gold-400 flex items-center justify-center shrink-0 border border-gold-500/40">
-              <ShieldCheck size={24} />
-            </div>
-            <div>
-              <h4 className="text-sm font-black text-white uppercase tracking-wider flex items-center gap-2">
-                Yoco Gateway Public Verification Page
-              </h4>
-              <p className="text-xs text-zinc-400 mt-0.5">
-                Share our public landing page with Yoco's compliance team for payment gateway verification. No login required.
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 shrink-0 w-full md:w-auto">
-            <Button
-              onClick={onOpenLanding}
-              variant="secondary"
-              className="flex-1 md:flex-initial bg-zinc-800 hover:bg-zinc-700 text-gold-300 font-bold text-xs py-2.5 px-4 rounded-xl border border-gold-500/30"
-            >
-              <Eye size={14} />
-              Preview Landing Page
-            </Button>
-            <Button
-              onClick={() => {
-                const shareUrl = `${window.location.origin}/testsiteappyoco`;
-                navigator.clipboard.writeText(shareUrl);
-                toast.success('Public Yoco verification link copied to clipboard!');
-              }}
-              className="flex-1 md:flex-initial bg-gold-500 hover:bg-gold-400 text-black font-bold text-xs py-2.5 px-4 rounded-xl shadow-lg shadow-gold-500/10"
-            >
-              <Copy size={14} />
-              Copy Link
-            </Button>
-          </div>
-        </div>
-      )}
 
       {/* Plan Inclusions */}
       <div className="bg-zinc-950/60 border border-zinc-800/80 rounded-2xl p-5 sm:p-6 space-y-4">
@@ -7595,7 +7488,7 @@ function SettingsView({ settings, onUpdate, allData, user, isSyncing, setDeleteC
           
           // Filter out of settings
           const nextMutations = settings.mutations.filter(m => m.id !== id);
-          batch.update(doc(db, 'userSettings', user.uid), {
+          batch.update(doc(db, 'userSettings', user?.uid), {
             mutations: nextMutations
           });
 
@@ -8708,7 +8601,7 @@ function BirdDocumentsModal({ bird, onClose, user }: { bird: Bird, onClose: () =
 
     setIsUploading(true);
     try {
-      const storageRef = ref(storage, `documents/${user.uid}/${Date.now()}_${file.name}`);
+      const storageRef = ref(storage, `documents/${user?.uid}/${Date.now()}_${file.name}`);
       const snapshot = await uploadBytes(storageRef, file);
       const url = await getDownloadURL(snapshot.ref);
 
@@ -9123,7 +9016,7 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
 
     setIsUploadingDoc(true);
     try {
-      const storageRef = ref(storage, `documents/${user.uid}/${Date.now()}_${file.name}`);
+      const storageRef = ref(storage, `documents/${user?.uid}/${Date.now()}_${file.name}`);
       const snapshot = await uploadBytes(storageRef, file);
       const url = await getDownloadURL(snapshot.ref);
       
@@ -9168,7 +9061,7 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
     try {
       const urls: string[] = [];
       for (const file of files) {
-        const url = await compressAndUploadImage(file, `birds/${user.uid}`);
+        const url = await compressAndUploadImage(file, `birds/${user?.uid}`);
         if (url) {
           urls.push(url);
         }
@@ -9208,7 +9101,7 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
         const data = sanitizeData(formData);
 
         if (!initialData?.id) {
-          data.uid = user.uid;
+          data.uid = user?.uid;
         }
         const batch = writeBatch(db);
         
@@ -9282,7 +9175,7 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
               femaleId: isMale ? mateId : birdId,
               status: 'Active',
               startDate: format(new Date(), 'yyyy-MM-dd'),
-              uid: user.uid
+              uid: user?.uid
             };
 
             const pairRef = existingPair ? doc(db, 'pairs', existingPair.id) : doc(collection(db, 'pairs'));
@@ -9300,7 +9193,7 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
             description: `Purchase of bird: ${formData.name}`,
             birdId: birdId,
             contactId: formData.boughtFromId || '',
-            uid: user.uid
+            uid: user?.uid
           });
         }
 
@@ -9314,7 +9207,7 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
             description: `Sale of bird: ${formData.name}`,
             birdId: birdId,
             contactId: buyerId || '',
-            uid: user.uid
+            uid: user?.uid
           });
         }
         
@@ -9812,7 +9705,7 @@ function CageForm({ user, initialData, cages, onClose, userSettings }: { user: F
     try {
       const urls: string[] = [];
       for (const file of files) {
-        const url = await compressAndUploadImage(file, `cages/${user.uid}`);
+        const url = await compressAndUploadImage(file, `cages/${user?.uid}`);
         if (url) {
           urls.push(url);
         }
@@ -9864,7 +9757,7 @@ function CageForm({ user, initialData, cages, onClose, userSettings }: { user: F
               continue;
             }
             const docRef = doc(collection(db, 'cages'));
-            batch.set(docRef, { ...formData, name: cageName, uid: user.uid });
+            batch.set(docRef, { ...formData, name: cageName, uid: user?.uid });
           }
           
           if (duplicates.length > 0 && duplicates.length === (end - start + 1)) {
@@ -9879,7 +9772,7 @@ function CageForm({ user, initialData, cages, onClose, userSettings }: { user: F
 
           const data = sanitizeData({ 
             ...formData,
-            ...(initialData?.id ? {} : { uid: user.uid })
+            ...(initialData?.id ? {} : { uid: user?.uid })
           });
           if (initialData?.id) { 
             await updateDoc(doc(db, 'cages', initialData.id), data); 
@@ -10067,7 +9960,7 @@ function PairForm({ user, initialData, birds, cages, onClose, userSettings }: { 
     try {
       const urls: string[] = [];
       for (const file of files) {
-        const url = await compressAndUploadImage(file, `pairs/${user.uid}`);
+        const url = await compressAndUploadImage(file, `pairs/${user?.uid}`);
         if (url) {
           urls.push(url);
         }
@@ -10106,7 +9999,7 @@ function PairForm({ user, initialData, birds, cages, onClose, userSettings }: { 
         const batch = writeBatch(db);
         const data = sanitizeData({ 
           ...formData,
-          ...(initialData?.id ? {} : { uid: user.uid })
+          ...(initialData?.id ? {} : { uid: user?.uid })
         });
         
         if (initialData?.id) { 
@@ -10320,7 +10213,7 @@ function TaskForm({ user, initialData, birds, cages, onClose, userSettings }: { 
       try {
         const data = sanitizeData({ 
           ...formData,
-          ...(initialData?.id ? {} : { uid: user.uid })
+          ...(initialData?.id ? {} : { uid: user?.uid })
         });
         if (initialData?.id) { 
           await updateDoc(doc(db, 'tasks', initialData.id), data);
@@ -10471,5 +10364,20 @@ function TaskForm({ user, initialData, birds, cages, onClose, userSettings }: { 
                 type="button" 
                 onClick={() => setFormData({ ...formData, subTasks: formData.subTasks?.filter((_, i) => i !== idx) })} 
                 className="text-white transition-colors"
-                onMouseEnter={(e) => e.currentTarget.style.color = 'varxœd‘ÏnÂ0‡ï<…Å$ÚJhí°µLCÛí2ö iã‚EšV‰ËŸAß}ašhœâ/Ögë—P^aB¡FF‘•º´÷p‡ùÄŸ(hzpuJóQÖç(7˜BŒ ™³ÚZ4¼v‰<t¼×žd@°]ãkzãŽVºÕýx÷Ãc£ë¦x”ÖÌ¥¹äñHÑ¦‹¢¨vñxUä„Z9ä3™ýÙ÷&}W§q2-û”…G[‘×ZCµ`Ü±pÔU…6“­ÌÖd–bK
-C^©ö°ŠœL5ªä@îKn|@î}W‘EÕ´ë·/ÏK©ÐŽ»;HC…ôŸå*2PX1î_$O`üŽm ‡1Iý&YÂ` rH*òc8¾+å¥°nDÞáÑ«RÿusNlÖ‰ßçWÚâtž{Mï  ÿÿ ÕÆ§<
+                onMouseEnter={(e) => e.currentTarget.style.color = 'var(--theme-delete-color, #ef4444)'}
+                onMouseLeave={(e) => e.currentTarget.style.color = 'white'}
+              >
+                <Trash2 size={16} />
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+      </fieldset>
+      <Button type="submit" className="w-full py-4 text-sm uppercase tracking-widest font-black" disabled={isSaving || isExpired}>
+        {isSaving ? <Loader2 className="animate-spin mr-2" size={16} /> : null}
+        {(initialData && initialData.id) ? t('Update Task') : t('Add Task')}
+      </Button>
+    </form>
+  );
+}
