@@ -106,13 +106,13 @@ export function DiditVerificationModal({
           });
         } else if (user) {
           await addDoc(collection(db, 'sellerProfiles'), {
-            uid: user?.uid,
-            sellerName: user?.displayName || user?.email?.split('@')[0] || 'Verified Breeder',
-            aviaryName: (user?.displayName || 'Averian') + ' Aviary',
+            uid: user.uid,
+            sellerName: user.displayName || user.email?.split('@')[0] || 'Verified Breeder',
+            aviaryName: (user.displayName || 'Averian') + ' Aviary',
             country: 'South Africa',
             whatsapp: '',
             phone: '',
-            email: user?.email || '',
+            email: user.email || '',
             status: 'approved',
             verifiedBy: 'Didit AI (Automated KYC)',
             verificationMethod: 'didit',
@@ -157,13 +157,13 @@ export function DiditVerificationModal({
         });
       } else if (user) {
         await addDoc(collection(db, 'sellerProfiles'), {
-          uid: user?.uid,
-          sellerName: user?.displayName || user?.email?.split('@')[0] || 'Verified Breeder',
-          aviaryName: (user?.displayName || 'Averian') + ' Aviary',
+          uid: user.uid,
+          sellerName: user.displayName || user.email?.split('@')[0] || 'Verified Breeder',
+          aviaryName: (user.displayName || 'Averian') + ' Aviary',
           country: 'South Africa',
           whatsapp: '',
           phone: '',
-          email: user?.email || '',
+          email: user.email || '',
           status: 'approved',
           verifiedBy: 'Didit AI (Automated KYC)',
           verificationMethod: 'didit',

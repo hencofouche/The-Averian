@@ -42,7 +42,7 @@ export function ContactsView({
               <span className="text-[8px] font-bold uppercase tracking-[0.2em] text-black bg-gold-500 px-2 py-0.5 rounded-full border border-gold-500">Official Support</span>
               {user?.uid && (
                 <span className="text-[8px] font-mono font-medium text-zinc-500 bg-black/40 border border-white/5 py-0.5 px-2 rounded-full uppercase select-all select-text cursor-pointer hover:border-gold-500/20 active:scale-95 transition-all" title="Your UID: hover to copy">
-                  UID: {user?.uid}
+                  UID: {user.uid}
                 </span>
               )}
             </div>
@@ -253,7 +253,7 @@ export function ContactsView({
                 className="bg-black border border-white/5 px-2 py-1 rounded-lg text-[8px] font-mono text-zinc-500 select-all select-text cursor-pointer hover:border-gold-500/20 transition-all uppercase w-full truncate"
                 title="Your User ID: copy and send to support"
               >
-                UID: {user?.uid}
+                UID: {user.uid}
               </div>
             )}
           </div>

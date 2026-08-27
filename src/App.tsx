@@ -40,6 +40,7 @@ import { getTranslatedLabel, LANGUAGE_NAMES, setActiveLanguage, t as tGlobal } f
 import { InstallAppButton } from './components/InstallAppButton';
 import { InstallPromptBanner } from './components/InstallPromptBanner';
 import { BannedUserScreen } from './components/BannedUserScreen';
+import { PublicLanding } from './components/PublicLanding';
 import { useIncubationNotifications } from './hooks/useIncubationNotifications';
 import { IncubationAlertsModal } from './components/IncubationAlertsModal';
 import { CurrencyConverterRates } from './components/CurrencyConverterRates';
@@ -652,6 +653,7 @@ export default function App() {
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [showPublicLanding, setShowPublicLanding] = useState(false);
   const [isScanModalOpen, setIsScanModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'birds' | 'cages' | 'pairs' | 'breeding' | 'financials' | 'tasks' | 'settings' | 'genetics' | 'contacts' | 'stats' | 'print' | 'pedigree' | 'subscription' | 'admin' | 'marketplace' | 'wiki'>('birds');
   const [statsFilter, setStatsFilter] = useState<{ birdId?: string, pairId?: string } | null>(null);
@@ -981,13 +983,13 @@ export default function App() {
       }
 
       // Sync user profile immediately whenever user logs in or is present
-      const userDocRef = doc(db, 'users', user?.uid);
-      const userSettingsDocRef = doc(db, 'userSettings', user?.uid);
+      const userDocRef = doc(db, 'users', user.uid);
+      const userSettingsDocRef = doc(db, 'userSettings', user.uid);
       const userProfileData = {
-        uid: user?.uid,
-        email: user?.email || '',
-        displayName: user?.displayName || user?.email?.split('@')[0] || 'Breeder',
-        photoURL: user?.photoURL || '',
+        uid: user.uid,
+        email: user.email || '',
+        displayName: user.displayName || user.email?.split('@')[0] || 'Breeder',
+        photoURL: user.photoURL || '',
         lastLoginAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
@@ -997,9 +999,9 @@ export default function App() {
       });
 
       setDoc(userSettingsDocRef, {
-        uid: user?.uid,
-        email: user?.email || '',
-        displayName: user?.displayName || user?.email?.split('@')[0] || 'Breeder'
+        uid: user.uid,
+        email: user.email || '',
+        displayName: user.displayName || user.email?.split('@')[0] || 'Breeder'
       }, { merge: true }).catch(err => {
         console.warn("Could not sync userSettings email:", err);
       });
@@ -1057,19 +1059,19 @@ export default function App() {
     if (!user) return;
 
     // Use limits to prevent "The Bleed" (excessive reads on large collections)
-    const qBirds = query(collection(db, 'birds'), where('uid', '==', user?.uid), limit(birdsLimit));
+    const qBirds = query(collection(db, 'birds'), where('uid', '==', user.uid), limit(birdsLimit));
     const unsubBirds = onSnapshot(qBirds, (snapshot) => {
       setBirds(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Bird)));
       setIsSyncing(snapshot.metadata.hasPendingWrites);
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'birds'));
 
-    const qCages = query(collection(db, 'cages'), where('uid', '==', user?.uid), limit(cagesLimit));
+    const qCages = query(collection(db, 'cages'), where('uid', '==', user.uid), limit(cagesLimit));
     const unsubCages = onSnapshot(qCages, (snapshot) => {
       setCages(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Cage)));
       setIsSyncing(snapshot.metadata.hasPendingWrites);
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'cages'));
 
-    const qPairs = query(collection(db, 'pairs'), where('uid', '==', user?.uid), limit(pairsLimit));
+    const qPairs = query(collection(db, 'pairs'), where('uid', '==', user.uid), limit(pairsLimit));
     const unsubPairs = onSnapshot(qPairs, (snapshot) => {
       setPairs(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Pair)));
       setIsSyncing(snapshot.metadata.hasPendingWrites);
@@ -1077,7 +1079,7 @@ export default function App() {
 
     const qBreeding = query(
       collection(db, 'breedingRecords'), 
-      where('uid', '==', user?.uid), 
+      where('uid', '==', user.uid), 
       limit(breedingLimit)
     );
     const unsubBreeding = onSnapshot(qBreeding, (snapshot) => {
@@ -1087,7 +1089,7 @@ export default function App() {
       setIsSyncing(snapshot.metadata.hasPendingWrites);
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'breedingRecords'));
 
-    const qTasks = query(collection(db, 'tasks'), where('uid', '==', user?.uid), limit(tasksLimit));
+    const qTasks = query(collection(db, 'tasks'), where('uid', '==', user.uid), limit(tasksLimit));
     const unsubTasks = onSnapshot(qTasks, (snapshot) => {
       setTasks(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Task)));
       setIsSyncing(snapshot.metadata.hasPendingWrites);
@@ -1095,7 +1097,7 @@ export default function App() {
 
     const qTransactions = query(
       collection(db, 'transactions'), 
-      where('uid', '==', user?.uid), 
+      where('uid', '==', user.uid), 
       limit(transactionLimit)
     );
     const unsubTransactions = onSnapshot(qTransactions, (snapshot) => {
@@ -1105,7 +1107,7 @@ export default function App() {
       setIsSyncing(snapshot.metadata.hasPendingWrites);
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'transactions'));
 
-    const qContacts = query(collection(db, 'contacts'), where('uid', '==', user?.uid), orderBy('name', 'asc'), limit(contactsLimit));
+    const qContacts = query(collection(db, 'contacts'), where('uid', '==', user.uid), orderBy('name', 'asc'), limit(contactsLimit));
     const unsubContacts = onSnapshot(qContacts, (snapshot) => {
       setContacts(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Contact)));
       setIsSyncing(snapshot.metadata.hasPendingWrites);
@@ -1155,7 +1157,7 @@ export default function App() {
     const fixingSettings = new Set<string>();
 
     let currentUserData: any = null;
-    const userDocRef = doc(db, 'users', user?.uid);
+    const userDocRef = doc(db, 'users', user.uid);
     const unsubUserDoc = onSnapshot(userDocRef, (uSnap) => {
       if (uSnap.exists()) {
         currentUserData = uSnap.data();
@@ -1182,7 +1184,7 @@ export default function App() {
       }
     }, (err) => handleFirestoreError(err, OperationType.GET, 'users'));
 
-    const docRef = doc(db, 'userSettings', user?.uid);
+    const docRef = doc(db, 'userSettings', user.uid);
     const unsubSettings = onSnapshot(docRef, (docSnap: any) => {
       setIsSyncing(docSnap.metadata.hasPendingWrites);
       
@@ -1190,7 +1192,7 @@ export default function App() {
         const trialExpiry = new Date();
         trialExpiry.setDate(trialExpiry.getDate() + 30);
         const fallbackSettings: UserSettings = {
-          id: user?.uid,
+          id: user.uid,
           species: [],
           subspecies: [],
           mutations: [],
@@ -1198,7 +1200,7 @@ export default function App() {
             { id: 'sold-default', name: 'Sold' },
             { id: 'deceased-default', name: 'Deceased' }
           ],
-          uid: user?.uid,
+          uid: user.uid,
           currency: 'ZAR',
           account_expiry_date: trialExpiry.toISOString()
         };
@@ -1213,7 +1215,7 @@ export default function App() {
           return;
         }
 
-        const userEmail = user?.email?.toLowerCase().trim();
+        const userEmail = user.email?.toLowerCase().trim();
         const isAdminUser = Boolean(
           (userEmail && ADMIN_EMAILS_LIST.includes(userEmail)) || 
           data.role === 'admin' ||
@@ -1235,8 +1237,8 @@ export default function App() {
 
         // Only initialize default expiry if missing everywhere
         if (!effectiveExpiry) { 
-          if (fixingSettings.has(user?.uid)) return;
-          fixingSettings.add(user?.uid); 
+          if (fixingSettings.has(user.uid)) return;
+          fixingSettings.add(user.uid); 
           const trialExpiry = new Date(); 
           trialExpiry.setDate(trialExpiry.getDate() + 30); 
           const defaultStatuses = ['Sold', 'Deceased'];
@@ -1252,7 +1254,7 @@ export default function App() {
             species: data.species || [], 
             subspecies: data.subspecies || [], 
             mutations: data.mutations || [], 
-            uid: user?.uid, 
+            uid: user.uid, 
             currency: data.currency || 'ZAR', 
             ...data, 
             statuses: updatedStatuses,
@@ -1299,7 +1301,7 @@ export default function App() {
         const trialExpiry = new Date();
         trialExpiry.setDate(trialExpiry.getDate() + 30);
         const initialSettings: UserSettings = {
-          id: user?.uid,
+          id: user.uid,
           species: [],
           subspecies: [],
           mutations: [],
@@ -1307,9 +1309,9 @@ export default function App() {
             { id: crypto.randomUUID(), name: 'Sold' },
             { id: crypto.randomUUID(), name: 'Deceased' }
           ],
-          uid: user?.uid,
-          email: user?.email || '',
-          displayName: user?.displayName || user?.email?.split('@')[0] || 'Breeder',
+          uid: user.uid,
+          email: user.email || '',
+          displayName: user.displayName || user.email?.split('@')[0] || 'Breeder',
           currency: 'ZAR',
           account_expiry_date: trialExpiry.toISOString()
         };
@@ -1318,7 +1320,7 @@ export default function App() {
       }
     }, (err) => handleFirestoreError(err, OperationType.GET, 'userSettings'));
 
-    const qShared = query(collection(db, 'shared_items'), where('createdBy', '==', user?.uid), limit(50));
+    const qShared = query(collection(db, 'shared_items'), where('createdBy', '==', user.uid), limit(50));
     const unsubShared = onSnapshot(qShared, (snapshot) => {
       setAllSharedItems(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as SharedItem)));
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'shared_items'));
@@ -1381,7 +1383,7 @@ export default function App() {
       try {
         const qRecurring = query(
           collection(db, 'transactions'),
-          where('uid', '==', user?.uid),
+          where('uid', '==', user.uid),
           where('recurring', 'in', ['Daily', 'Weekly', 'Monthly', 'Yearly'])
         );
         const snapshot = await getDocs(qRecurring);
@@ -1660,7 +1662,7 @@ export default function App() {
       // Use setDoc with merge: true to avoid overwriting fields we don't intend to change
       // and to ensure the document is created if it doesn't exist.
       const { id, ...data } = newSettings;
-      await setDoc(doc(db, 'userSettings', user?.uid), data, { merge: true });
+      await setDoc(doc(db, 'userSettings', user.uid), data, { merge: true });
     } catch (e) {
       handleFirestoreError(e, OperationType.WRITE, 'userSettings');
     }
@@ -1703,7 +1705,7 @@ export default function App() {
     
     try {
       // Fetch latest from server to avoid race conditions
-      const docSnap = await getDocFromServer(doc(db, 'userSettings', user?.uid));
+      const docSnap = await getDocFromServer(doc(db, 'userSettings', user.uid));
       const currentData = docSnap.exists() ? docSnap.data() as UserSettings : userSettings;
       
       const currentExpiry = currentData.account_expiry_date ? new Date(currentData.account_expiry_date) : new Date();
@@ -1721,7 +1723,7 @@ export default function App() {
       const baseDate = currentExpiry > now ? currentExpiry : now;
       baseDate.setFullYear(baseDate.getFullYear() + 1);
       
-      await updateDoc(doc(db, 'userSettings', user?.uid), {
+      await updateDoc(doc(db, 'userSettings', user.uid), {
         account_expiry_date: baseDate.toISOString()
       });
       toast.success("Subscription activated for 1 year!");
@@ -1802,7 +1804,11 @@ export default function App() {
     );
   }
 
-  if (!user && window.location.pathname !== '/nologinpage') {
+  if (!user) {
+    if (showPublicLanding) {
+      return <PublicLanding onBack={() => setShowPublicLanding(false)} />;
+    }
+
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-black p-4">
         <div className="w-full max-w-md text-center space-y-8">
@@ -1813,20 +1819,29 @@ export default function App() {
             <h1 className="text-5xl font-black tracking-tighter text-white">THE AV<span className="text-secondary">ERIAN</span></h1>
             <p className="text-black-50 font-medium">By The Averian</p>
           </div>
-          <Button 
-            onClick={handleLogin} 
-            disabled={isLoggingIn}
-            className="w-full py-4 text-lg font-bold"
-          >
-            {isLoggingIn ? (
-              <>
-                <Loader2 className="animate-spin" size={20} />
-                Signing in...
-              </>
-            ) : (
-              'Sign in with Google'
-            )}
-          </Button>
+          <div className="space-y-4">
+            <Button 
+              onClick={handleLogin} 
+              disabled={isLoggingIn}
+              className="w-full py-4 text-lg font-bold"
+            >
+              {isLoggingIn ? (
+                <>
+                  <Loader2 className="animate-spin" size={20} />
+                  Signing in...
+                </>
+              ) : (
+                'Sign in with Google'
+              )}
+            </Button>
+            
+            <button
+              onClick={() => setShowPublicLanding(true)}
+              className="text-sm font-medium text-black-100 hover:text-white transition-colors underline-offset-4 hover:underline"
+            >
+              Learn about our business & services
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -1865,7 +1880,7 @@ export default function App() {
           
           const defaultData = { 
             ...birdData, 
-            uid: user?.uid,
+            uid: user.uid,
             createdAt: new Date().toISOString()
           };
 
@@ -1901,7 +1916,7 @@ export default function App() {
                         motherId: rb.motherId ? idMap.get(rb.motherId) : undefined,
                         fatherId: rb.fatherId ? idMap.get(rb.fatherId) : undefined,
                         mateId: undefined,
-                        uid: user?.uid,
+                        uid: user.uid,
                         createdAt: new Date().toISOString()
                       });
                       batch.set(doc(db, 'birds', idMap.get(rb.originalId)!), newBird);
@@ -2080,7 +2095,7 @@ export default function App() {
     };
 
     const handleDeleteShared = () => {
-      if (!user || user?.uid !== sharedItemView.createdBy) {
+      if (!user || user.uid !== sharedItemView.createdBy) {
         toast.error('You do not have permission to delete this shared item.');
         return;
       }
@@ -2110,7 +2125,7 @@ export default function App() {
               {isTransfer ? `${sharedItemView.type} Transfer` : `Shared ${sharedItemView.type}`}
             </h1>
             <div className="flex items-center gap-2">
-              {user && user?.uid === sharedItemView.createdBy && (
+              {user && user.uid === sharedItemView.createdBy && (
                 <button 
                   onClick={handleDeleteShared}
                   className="p-2 text-rose-500 hover:text-rose-400 bg-rose-500/10 rounded-xl transition-colors"
@@ -2488,11 +2503,11 @@ export default function App() {
 
             <div className="flex items-center gap-2 px-2 py-1.5 bg-zinc-900/30 rounded-lg border border-white/5 group">
               <div className="w-6 h-6 rounded-full bg-zinc-700 border border-white/10 flex items-center justify-center text-white overflow-hidden shrink-0">
-                {user?.photoURL ? <img src={user?.photoURL} alt="" referrerPolicy="no-referrer" className="w-full h-full object-cover" /> : <User size={12} />}
+                {user.photoURL ? <img src={user.photoURL} alt="" referrerPolicy="no-referrer" className="w-full h-full object-cover" /> : <User size={12} />}
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-1.5">
-                  <p className="text-[9px] text-white/70 truncate uppercase font-bold tracking-tight">{user?.email?.split('@')[0]}</p>
+                  <p className="text-[9px] text-white/70 truncate uppercase font-bold tracking-tight">{user.email?.split('@')[0]}</p>
                   {isAdmin && (
                     <span className="text-[7px] font-black uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1 py-0.2 rounded">
                       ADMIN
@@ -4584,7 +4599,7 @@ function BirdCard({ bird, cage, birds, cages, viewMode = 'grid-large', currency,
             bird={bird}
             allBirds={birds}
             cages={cages}
-            currentUserId={user?.uid}
+            currentUserId={user.uid}
             onClose={() => setIsPassportOpen(false)}
           />
         </Modal>
@@ -6217,7 +6232,7 @@ function BreedingRecordForm({ user, initialData, pairs, birds, cages, onClose, u
         const eggsArr = formData.eggs || [];
         const data = sanitizeData({ 
           ...formData, 
-          ...(initialData?.id ? {} : { uid: user?.uid }),
+          ...(initialData?.id ? {} : { uid: user.uid }),
           eggsLaid: eggsArr.length,
           eggsHatched: eggsArr.filter(e => ['Hatched', 'Died', 'Weaned'].includes(e.status)).length,
           chicksWeaned: eggsArr.filter(e => e.status === 'Weaned').length
@@ -6434,7 +6449,7 @@ function BreedingRecordForm({ user, initialData, pairs, birds, cages, onClose, u
                               motherId: mother?.id || '',
                               fatherId: father?.id || '',
                               cageId: parentPair?.cageId || mother?.cageId || father?.cageId || '',
-                              uid: user?.uid,
+                              uid: user.uid,
                               notes: `Promoted from Egg ${index + 1} of Pair ${parentPair?.id || formData.pairId}`
                            };
                            
@@ -6544,7 +6559,7 @@ function TransactionForm({ user, initialData, birds, pairs, cages, contacts, cur
       try {
         const data = { 
           ...formData,
-          ...(initialData?.id ? {} : { uid: user?.uid })
+          ...(initialData?.id ? {} : { uid: user.uid })
         };
         // Setup initial nextDueDate if becoming recurring
         if (data.recurring && data.recurring !== 'None' && !data.nextDueDate) {
@@ -6713,7 +6728,7 @@ function ContactForm({ user, initialData, onClose, userSettings }: { user: Fireb
       try {
         const data = { 
           ...formData,
-          ...(initialData?.id ? {} : { uid: user?.uid })
+          ...(initialData?.id ? {} : { uid: user.uid })
         };
         if (initialData?.id) { 
           await updateDoc(doc(db, 'contacts', initialData.id), data); 
@@ -7488,7 +7503,7 @@ function SettingsView({ settings, onUpdate, allData, user, isSyncing, setDeleteC
           
           // Filter out of settings
           const nextMutations = settings.mutations.filter(m => m.id !== id);
-          batch.update(doc(db, 'userSettings', user?.uid), {
+          batch.update(doc(db, 'userSettings', user.uid), {
             mutations: nextMutations
           });
 
@@ -8601,7 +8616,7 @@ function BirdDocumentsModal({ bird, onClose, user }: { bird: Bird, onClose: () =
 
     setIsUploading(true);
     try {
-      const storageRef = ref(storage, `documents/${user?.uid}/${Date.now()}_${file.name}`);
+      const storageRef = ref(storage, `documents/${user.uid}/${Date.now()}_${file.name}`);
       const snapshot = await uploadBytes(storageRef, file);
       const url = await getDownloadURL(snapshot.ref);
 
@@ -9016,7 +9031,7 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
 
     setIsUploadingDoc(true);
     try {
-      const storageRef = ref(storage, `documents/${user?.uid}/${Date.now()}_${file.name}`);
+      const storageRef = ref(storage, `documents/${user.uid}/${Date.now()}_${file.name}`);
       const snapshot = await uploadBytes(storageRef, file);
       const url = await getDownloadURL(snapshot.ref);
       
@@ -9061,7 +9076,7 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
     try {
       const urls: string[] = [];
       for (const file of files) {
-        const url = await compressAndUploadImage(file, `birds/${user?.uid}`);
+        const url = await compressAndUploadImage(file, `birds/${user.uid}`);
         if (url) {
           urls.push(url);
         }
@@ -9101,7 +9116,7 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
         const data = sanitizeData(formData);
 
         if (!initialData?.id) {
-          data.uid = user?.uid;
+          data.uid = user.uid;
         }
         const batch = writeBatch(db);
         
@@ -9175,7 +9190,7 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
               femaleId: isMale ? mateId : birdId,
               status: 'Active',
               startDate: format(new Date(), 'yyyy-MM-dd'),
-              uid: user?.uid
+              uid: user.uid
             };
 
             const pairRef = existingPair ? doc(db, 'pairs', existingPair.id) : doc(collection(db, 'pairs'));
@@ -9193,7 +9208,7 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
             description: `Purchase of bird: ${formData.name}`,
             birdId: birdId,
             contactId: formData.boughtFromId || '',
-            uid: user?.uid
+            uid: user.uid
           });
         }
 
@@ -9207,7 +9222,7 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
             description: `Sale of bird: ${formData.name}`,
             birdId: birdId,
             contactId: buyerId || '',
-            uid: user?.uid
+            uid: user.uid
           });
         }
         
@@ -9705,7 +9720,7 @@ function CageForm({ user, initialData, cages, onClose, userSettings }: { user: F
     try {
       const urls: string[] = [];
       for (const file of files) {
-        const url = await compressAndUploadImage(file, `cages/${user?.uid}`);
+        const url = await compressAndUploadImage(file, `cages/${user.uid}`);
         if (url) {
           urls.push(url);
         }
@@ -9757,7 +9772,7 @@ function CageForm({ user, initialData, cages, onClose, userSettings }: { user: F
               continue;
             }
             const docRef = doc(collection(db, 'cages'));
-            batch.set(docRef, { ...formData, name: cageName, uid: user?.uid });
+            batch.set(docRef, { ...formData, name: cageName, uid: user.uid });
           }
           
           if (duplicates.length > 0 && duplicates.length === (end - start + 1)) {
@@ -9772,7 +9787,7 @@ function CageForm({ user, initialData, cages, onClose, userSettings }: { user: F
 
           const data = sanitizeData({ 
             ...formData,
-            ...(initialData?.id ? {} : { uid: user?.uid })
+            ...(initialData?.id ? {} : { uid: user.uid })
           });
           if (initialData?.id) { 
             await updateDoc(doc(db, 'cages', initialData.id), data); 
@@ -9960,7 +9975,7 @@ function PairForm({ user, initialData, birds, cages, onClose, userSettings }: { 
     try {
       const urls: string[] = [];
       for (const file of files) {
-        const url = await compressAndUploadImage(file, `pairs/${user?.uid}`);
+        const url = await compressAndUploadImage(file, `pairs/${user.uid}`);
         if (url) {
           urls.push(url);
         }
@@ -9999,7 +10014,7 @@ function PairForm({ user, initialData, birds, cages, onClose, userSettings }: { 
         const batch = writeBatch(db);
         const data = sanitizeData({ 
           ...formData,
-          ...(initialData?.id ? {} : { uid: user?.uid })
+          ...(initialData?.id ? {} : { uid: user.uid })
         });
         
         if (initialData?.id) { 
@@ -10213,7 +10228,7 @@ function TaskForm({ user, initialData, birds, cages, onClose, userSettings }: { 
       try {
         const data = sanitizeData({ 
           ...formData,
-          ...(initialData?.id ? {} : { uid: user?.uid })
+          ...(initialData?.id ? {} : { uid: user.uid })
         });
         if (initialData?.id) { 
           await updateDoc(doc(db, 'tasks', initialData.id), data);

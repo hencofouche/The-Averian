@@ -84,7 +84,7 @@ export function AdminDashboardView({
   // Active users count (derived from unique seller profiles & contacts)
   const estimatedActiveUsersCount = useMemo(() => {
     const uids = new Set<string>();
-    if (user?.uid) uids.add(user?.uid);
+    if (user?.uid) uids.add(user.uid);
     sellerProfiles.forEach(s => { if (s.uid) uids.add(s.uid); });
     marketplaceListings.forEach(l => { if (l.sellerId) uids.add(l.sellerId); });
     return Math.max(uids.size, 1);

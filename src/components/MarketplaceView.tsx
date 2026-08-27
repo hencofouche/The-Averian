@@ -88,7 +88,7 @@ export function MarketplaceView({
   // Current user's seller profile
   const myProfile = useMemo(() => {
     if (!user) return null;
-    return sellerProfiles.find(p => p.uid === user?.uid) || null;
+    return sellerProfiles.find(p => p.uid === user.uid) || null;
   }, [sellerProfiles, user]);
 
   const isVerifiedSeller = myProfile?.status === 'approved';
@@ -1332,7 +1332,7 @@ function SellerProfileModal({
     } else {
       await addDoc(collection(db, 'sellerProfiles'), {
         ...payload,
-        uid: user?.uid,
+        uid: user.uid,
         status: targetStatus || 'pending',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
@@ -1949,13 +1949,13 @@ function ListingFormModal({
     try {
       const listingData: Partial<MarketplaceListing> = {
         ...formData,
-        sellerId: user?.uid,
-        sellerName: sellerProfile?.sellerName || user?.displayName || 'Breeder',
+        sellerId: user.uid,
+        sellerName: sellerProfile?.sellerName || user.displayName || 'Breeder',
         sellerAviary: sellerProfile?.aviaryName || '',
         sellerTown: formData.locationTown || sellerProfile?.town || '',
         sellerPhone: sellerProfile?.phone || '',
         sellerWhatsApp: sellerProfile?.whatsapp || '',
-        sellerEmail: sellerProfile?.email || user?.email || '',
+        sellerEmail: sellerProfile?.email || user.email || '',
         country: sellerCountry.name,
         countryCode: sellerCountry.code,
         currency: sellerCountry.currencySymbol,
