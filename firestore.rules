@@ -3,85 +3,6 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     // ===============================================================
-    // Assumed Data Model
-    // ===============================================================
-    //
-    // Collection: birds
-    // Fields:
-    //   - name: string (required)
-    //   - species: string (required)
-    //   - sex: string (required, enum: Male, Female, Unknown)
-    //   - birthDate: string (optional, format: date)
-    //   - cageId: string (optional)
-    //   - motherId: string (optional)
-    //   - fatherId: string (optional)
-    //   - notes: string (optional)
-    //   - purchaseDate: string (optional, format: date)
-    //   - purchasePrice: number (optional)
-    //   - estimatedValue: number (optional)
-    //   - statuses: list (optional, list of strings)
-    //   - uid: string (required, immutable)
-    //
-    // Collection: transactions
-    // Fields:
-    //   - type: string (required, enum: Income, Expense)
-    //   - category: string (required)
-    //   - amount: number (required)
-    //   - date: string (required, format: date)
-    //   - birdId: string (optional)
-    //   - description: string (optional)
-    //   - uid: string (required, immutable)
-    //
-    // Collection: cages
-    // Fields:
-    //   - name: string (required)
-    //   - location: string (optional)
-    //   - imageUrl: string (optional)
-    //   - uid: string (required, immutable)
-    //
-    // Collection: pairs
-    // Fields:
-    //   - maleId: string (required)
-    //   - femaleId: string (required)
-    //   - startDate: string (optional, format: date)
-    //   - endDate: string (optional, format: date)
-    //   - status: string (required, enum: Active, Inactive)
-    //   - uid: string (required, immutable)
-    //
-    // Collection: breedingRecords
-    // Fields:
-    //   - pairId: string (required)
-    //   - startDate: string (required, format: date)
-    //   - endDate: string (optional, format: date)
-    //   - eggsLaid: number (required)
-    //   - eggsHatched: number (required)
-    //   - chicksWeaned: number (required)
-    //   - offspringIds: list (optional, list of strings)
-    //   - notes: string (optional)
-    //   - uid: string (required, immutable)
-    //
-    // Collection: tasks
-    // Fields:
-    //   - title: string (required)
-    //   - description: string (optional)
-    //   - status: string (required, enum: Pending, Completed)
-    //   - dueDate: string (optional, format: date)
-    //   - birdIds: list (required, list of strings)
-    //   - subTasks: list (required, list of maps)
-    //   - uid: string (required, immutable)
-    //
-    // Collection: userSettings
-    // Fields:
-    //   - species: list (required, list of maps)
-    //   - subspecies: list (required, list of maps)
-    //   - mutations: list (required, list of maps)
-    //   - uid: string (required, immutable)
-    //   - language: string (optional)
-    //   - currency: string (optional)
-    //
-    // ===============================================================
-
-    // ===============================================================
     // Helper Functions
     // ===============================================================
     
@@ -91,10 +12,6 @@ service cloud.firestore {
 
     function isOwner(uid) {
       return isAuthenticated() && request.auth.uid == uid;
-    }
-
-    function isDocOwner() {
-      return isAuthenticated() && (request.auth.uid == resource.data.uid || isAdmin());
     }
 
     function uidUnchanged() {
@@ -112,18 +29,6 @@ service cloud.firestore {
       return request.resource.data.keys().hasAll(fields);
     }
 
-    function hasOnlyAllowedFields(fields) {
-      return request.resource.data.keys().hasOnly(fields);
-    }
-
-    function isValidEmail(email) {
-      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
-    }
-
-    function isValidDateString(dateStr) {
-      return dateStr is string && (dateStr == "" || dateStr.matches("^\\d{4}-\\d{2}-\\d{2}$"));
-    }
-
     function isEmailAdmin() {
       return isAuthenticated() && 
              request.auth.token != null &&
@@ -139,19 +44,31 @@ service cloud.firestore {
     }
 
     function isDocAdmin() {
-      return isAuthenticated() && (
-        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-         'role' in get(/databases/$(database)/documents/users/$(request.auth.uid)).data &&
-         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin') ||
-        (exists(/databases/$(database)/documents/userSettings/$(request.auth.uid)) && 
-         'role' in get(/databases/$(database)/documents/userSettings/$(request.auth.uid)).data &&
-         get(/databases/$(database)/documents/userSettings/$(request.auth.uid)).data.role == 'admin') ||
-        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
-      );
+      return isAuthenticated() && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
     }
 
     function isAdmin() {
       return isEmailAdmin() || isDocAdmin();
+    }
+
+    function isOptionalString(data, field, maxLen) {
+      return !(field in data) || data[field] == null || (data[field] is string && data[field].size() <= maxLen);
+    }
+
+    function isOptionalNumber(data, field) {
+      return !(field in data) || data[field] == null || data[field] is number || data[field] is int || data[field] is float;
+    }
+
+    function isOptionalList(data, field) {
+      return !(field in data) || data[field] == null || data[field] is list;
+    }
+
+    function isOptionalBool(data, field) {
+      return !(field in data) || data[field] == null || data[field] is bool;
+    }
+
+    function isOptionalDate(data, field) {
+      return !(field in data) || data[field] == null || data[field] is string;
     }
 
     // ===============================================================
@@ -159,119 +76,145 @@ service cloud.firestore {
     // ===============================================================
 
     function isValidBird(data) {
-      return hasRequiredFields(['name', 'species', 'sex', 'uid']) &&
-             data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
-             data.species is string && data.species.size() > 0 && data.species.size() < 100 &&
-             data.sex in ['Male', 'Female', 'Unknown'] &&
-             (!('subSpecies' in data) || data.subSpecies is string) &&
-             (!('birthDate' in data) || isValidDateString(data.birthDate)) &&
-             (!('cageId' in data) || data.cageId is string) &&
-             (!('motherId' in data) || data.motherId is string) &&
-             (!('fatherId' in data) || data.fatherId is string) &&
-             (!('mateId' in data) || data.mateId is string) &&
-             (!('offspringIds' in data) || data.offspringIds is list) &&
-             (!('mutations' in data) || data.mutations is list) &&
-             (!('splitMutations' in data) || data.splitMutations is list) &&
-             (!('statuses' in data) || data.statuses is list) &&
-             (!('imageUrl' in data) || (data.imageUrl is string && data.imageUrl.size() < 1500000)) &&
-             (!('notes' in data) || data.notes is string && data.notes.size() < 2000) &&
-             (!('purchaseDate' in data) || isValidDateString(data.purchaseDate)) &&
-             (!('purchasePrice' in data) || data.purchasePrice is number) &&
-             (!('estimatedValue' in data) || data.estimatedValue is number);
+      return hasRequiredFields(['name', 'species', 'uid']) &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 200 &&
+             data.species is string && data.species.size() > 0 && data.species.size() < 200 &&
+             data.uid is string &&
+             isOptionalString(data, 'subSpecies', 200) &&
+             isOptionalString(data, 'sex', 50) &&
+             isOptionalDate(data, 'birthDate') &&
+             isOptionalDate(data, 'purchaseDate') &&
+             isOptionalString(data, 'ageYear', 100) &&
+             isOptionalString(data, 'cageId', 200) &&
+             isOptionalString(data, 'motherId', 200) &&
+             isOptionalString(data, 'fatherId', 200) &&
+             isOptionalString(data, 'mateId', 200) &&
+             isOptionalString(data, 'boughtFromId', 200) &&
+             isOptionalString(data, 'ringNumber', 100) &&
+             isOptionalString(data, 'bandingStatus', 100) &&
+             isOptionalString(data, 'sexingMethod', 100) &&
+             isOptionalString(data, 'deliveryOptions', 200) &&
+             isOptionalString(data, 'vetNotes', 2000) &&
+             isOptionalBool(data, 'vetChecked') &&
+             isOptionalBool(data, 'isGhost') &&
+             isOptionalString(data, 'ghostId', 200) &&
+             isOptionalList(data, 'offspringIds') &&
+             isOptionalList(data, 'mutations') &&
+             isOptionalList(data, 'splitMutations') &&
+             isOptionalList(data, 'statuses') &&
+             isOptionalList(data, 'imageUrls') &&
+             isOptionalList(data, 'documents') &&
+             isOptionalString(data, 'imageUrl', 2000000) &&
+             isOptionalString(data, 'notes', 5000) &&
+             isOptionalNumber(data, 'purchasePrice') &&
+             isOptionalNumber(data, 'estimatedValue') &&
+             isOptionalDate(data, 'createdAt') &&
+             isOptionalDate(data, 'updatedAt');
     }
 
     function isValidTransaction(data) {
       return hasRequiredFields(['type', 'category', 'amount', 'date', 'uid']) &&
              data.type in ['Income', 'Expense'] &&
-             data.category is string && data.category.size() > 0 && data.category.size() < 100 &&
-             data.amount is number &&
-             isValidDateString(data.date) &&
-             (!('birdId' in data) || data.birdId is string) &&
-             (!('description' in data) || data.description is string && data.description.size() < 2000);
+             data.category is string && data.category.size() > 0 && data.category.size() < 200 &&
+             isOptionalNumber(data, 'amount') &&
+             isOptionalDate(data, 'date') &&
+             data.uid is string &&
+             isOptionalString(data, 'birdId', 200) &&
+             isOptionalString(data, 'pairId', 200) &&
+             isOptionalString(data, 'contactId', 200) &&
+             isOptionalString(data, 'description', 5000) &&
+             isOptionalString(data, 'recurring', 50) &&
+             isOptionalDate(data, 'nextDueDate') &&
+             isOptionalString(data, 'recurringParentId', 200) &&
+             isOptionalDate(data, 'createdAt') &&
+             isOptionalDate(data, 'updatedAt');
     }
 
     function isValidCage(data) {
       return hasRequiredFields(['name', 'uid']) &&
-             data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
-             (!('location' in data) || data.location is string && data.location.size() < 200) &&
-             (!('imageUrl' in data) || (data.imageUrl is string && data.imageUrl.size() < 1500000));
+             data.name is string && data.name.size() > 0 && data.name.size() < 200 &&
+             data.uid is string &&
+             isOptionalString(data, 'location', 500) &&
+             isOptionalString(data, 'type', 100) &&
+             isOptionalString(data, 'notes', 5000) &&
+             isOptionalString(data, 'imageUrl', 2000000) &&
+             isOptionalList(data, 'imageUrls') &&
+             isOptionalNumber(data, 'width') &&
+             isOptionalNumber(data, 'height') &&
+             isOptionalNumber(data, 'depth') &&
+             isOptionalString(data, 'dimensionUnit', 50) &&
+             isOptionalDate(data, 'createdAt') &&
+             isOptionalDate(data, 'updatedAt');
     }
 
     function isValidPair(data) {
       return hasRequiredFields(['maleId', 'femaleId', 'status', 'uid']) &&
              data.maleId is string && data.femaleId is string &&
-             data.status in ['Active', 'Inactive'] &&
-             (!('startDate' in data) || isValidDateString(data.startDate)) &&
-             (!('endDate' in data) || isValidDateString(data.endDate));
+             data.status is string &&
+             data.uid is string &&
+             isOptionalString(data, 'cageId', 200) &&
+             isOptionalDate(data, 'startDate') &&
+             isOptionalDate(data, 'endDate') &&
+             isOptionalList(data, 'imageUrls') &&
+             isOptionalDate(data, 'createdAt') &&
+             isOptionalDate(data, 'updatedAt');
     }
 
     function isValidBreedingRecord(data) {
-      return hasRequiredFields(['pairId', 'startDate', 'eggsLaid', 'eggsHatched', 'chicksWeaned', 'uid']) &&
-             data.pairId is string && data.pairId.size() > 0 && data.pairId.size() < 100 &&
-             isValidDateString(data.startDate) &&
-             (!('endDate' in data) || isValidDateString(data.endDate)) &&
-             data.eggsLaid is number && data.eggsLaid >= 0 &&
-             data.eggsHatched is number && data.eggsHatched >= 0 &&
-             data.chicksWeaned is number && data.chicksWeaned >= 0 &&
-             (!('offspringIds' in data) || data.offspringIds is list) &&
-             (!('notes' in data) || data.notes is string && data.notes.size() < 2000);
+      return hasRequiredFields(['pairId', 'startDate', 'uid']) &&
+             data.pairId is string && data.pairId.size() > 0 && data.pairId.size() < 200 &&
+             data.uid is string &&
+             isOptionalDate(data, 'startDate') &&
+             isOptionalDate(data, 'endDate') &&
+             isOptionalNumber(data, 'eggsLaid') &&
+             isOptionalNumber(data, 'eggsHatched') &&
+             isOptionalNumber(data, 'chicksWeaned') &&
+             isOptionalNumber(data, 'incubationDays') &&
+             isOptionalNumber(data, 'ringingDays') &&
+             isOptionalList(data, 'eggs') &&
+             isOptionalList(data, 'offspringIds') &&
+             isOptionalString(data, 'notes', 5000) &&
+             isOptionalDate(data, 'createdAt') &&
+             isOptionalDate(data, 'updatedAt');
     }
 
     function isValidTask(data) {
       return hasRequiredFields(['title', 'status', 'uid']) &&
-             data.title is string && data.title.size() > 0 && data.title.size() < 200 &&
-             data.status in ['Pending', 'Completed'] &&
-             (!('description' in data) || data.description is string && data.description.size() < 2000) &&
-             (!('dueDate' in data) || isValidDateString(data.dueDate)) &&
-             (!('birdIds' in data) || data.birdIds is list) &&
-             (!('subTasks' in data) || data.subTasks is list);
+             data.title is string && data.title.size() > 0 && data.title.size() < 300 &&
+             data.status is string &&
+             data.uid is string &&
+             isOptionalString(data, 'description', 5000) &&
+             isOptionalString(data, 'priority', 50) &&
+             isOptionalString(data, 'category', 100) &&
+             isOptionalDate(data, 'dueDate') &&
+             isOptionalDate(data, 'reminderDate') &&
+             isOptionalNumber(data, 'reminderLeadTime') &&
+             isOptionalList(data, 'birdIds') &&
+             isOptionalList(data, 'subTasks') &&
+             isOptionalDate(data, 'createdAt') &&
+             isOptionalDate(data, 'updatedAt');
     }
 
-    function isValidUserSettings(data) {
-      return (!('species' in data) || (data.species is list && data.species.size() < 100)) &&
-             (!('subspecies' in data) || (data.subspecies is list && data.subspecies.size() < 200)) &&
-             (!('mutations' in data) || (data.mutations is list && data.mutations.size() < 500)) &&
-             (!('currency' in data) || (data.currency is string && data.currency.size() < 10)) &&
-             (!('account_expiry_date' in data) || data.account_expiry_date is string);
+    function isValidContact(data) {
+      return hasRequiredFields(['name', 'uid']) &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 200 &&
+             data.uid is string &&
+             isOptionalString(data, 'type', 50) &&
+             isOptionalString(data, 'phone', 100) &&
+             isOptionalString(data, 'email', 200) &&
+             isOptionalString(data, 'address', 500) &&
+             isOptionalString(data, 'notes', 5000) &&
+             isOptionalDate(data, 'createdAt') &&
+             isOptionalDate(data, 'updatedAt');
     }
 
     function isValidSharedItem(data) {
       return hasRequiredFields(['type', 'action', 'data', 'createdAt', 'createdBy']) &&
              data.type in ['bird', 'pair', 'cage'] &&
              data.action in ['share', 'transfer'] &&
-             data.data is string && data.data.size() < 1500000 &&
+             data.data is string && data.data.size() < 2000000 &&
              data.createdAt is string &&
              data.createdBy is string;
-    }
-
-    function isValidContact(data) {
-      return hasRequiredFields(['name', 'type', 'uid']) &&
-             data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
-             data.type in ['Buyer', 'Seller', 'Vet', 'Other', 'Both'] &&
-             (!('phone' in data) || (data.phone is string && data.phone.size() < 50)) &&
-             (!('email' in data) || (data.email is string && data.email.size() < 100)) &&
-             (!('address' in data) || (data.address is string && data.address.size() < 200)) &&
-             (!('notes' in data) || (data.notes is string && data.notes.size() < 2000));
-    }
-
-    function isValidWikiSpecies(data) {
-      return hasRequiredFields(['name', 'subspecies']) &&
-             data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
-             data.subspecies is list &&
-             (!('description' in data) || data.description is string && data.description.size() < 5000) &&
-             (!('incubationDays' in data) || data.incubationDays is number) &&
-             (!('clutchSize' in data) || data.clutchSize is string) &&
-             (!('diet' in data) || data.diet is string) &&
-             (!('nesting' in data) || data.nesting is string) &&
-             (!('imageUrl' in data) || data.imageUrl is string && data.imageUrl.size() < 1500000);
-    }
-
-    function isValidWikiMutation(data) {
-      return hasRequiredFields(['name', 'inheritance']) &&
-             data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
-             data.inheritance in ['autosomal_recessive', 'autosomal_dominant', 'incomplete_dominant', 'sex_linked_recessive'] &&
-             (!('description' in data) || data.description is string && data.description.size() < 5000) &&
-             (!('speciesId' in data) || data.speciesId is string);
     }
 
     // ===============================================================
@@ -279,68 +222,70 @@ service cloud.firestore {
     // ===============================================================
 
     match /contacts/{contactId} {
-      allow get: if isDocOwner() || isAdmin();
+      allow get: if isAuthenticated() && (resource.data.uid == request.auth.uid || isAdmin());
       allow list: if isAuthenticated() && (resource.data.uid == request.auth.uid || isAdmin());
-      allow create: if isAuthenticated() && ((isValidContact(request.resource.data) && uidUnchanged()) || isAdmin());
-      allow update: if (isDocOwner() && isValidContact(request.resource.data) && uidNotModified()) || isAdmin();
-      allow delete: if isDocOwner() || isAdmin();
+      allow create: if isAuthenticated() && (request.resource.data.uid == request.auth.uid || isAdmin()) && (isValidContact(request.resource.data) || isAdmin());
+      allow update: if isAuthenticated() && (resource.data.uid == request.auth.uid || isAdmin()) && (request.resource.data.uid == resource.data.uid || !('uid' in request.resource.data) || isAdmin()) && (isValidContact(request.resource.data) || isAdmin());
+      allow delete: if isAuthenticated() && (resource.data.uid == request.auth.uid || isAdmin());
     }
 
     match /birds/{birdId} {
-      allow get: if isDocOwner() || isAdmin();
+      allow get: if isAuthenticated() && (resource.data.uid == request.auth.uid || isAdmin());
       allow list: if isAuthenticated() && (resource.data.uid == request.auth.uid || isAdmin());
-      allow create: if isAuthenticated() && ((isValidBird(request.resource.data) && uidUnchanged()) || isAdmin());
-      allow update: if (isDocOwner() && isValidBird(request.resource.data) && uidNotModified()) || isAdmin();
-      allow delete: if isDocOwner() || isAdmin();
+      allow create: if isAuthenticated() && (request.resource.data.uid == request.auth.uid || isAdmin()) && (isValidBird(request.resource.data) || isAdmin());
+      allow update: if isAuthenticated() && (resource.data.uid == request.auth.uid || isAdmin()) && (request.resource.data.uid == resource.data.uid || !('uid' in request.resource.data) || isAdmin()) && (isValidBird(request.resource.data) || isAdmin());
+      allow delete: if isAuthenticated() && (resource.data.uid == request.auth.uid || isAdmin());
     }
 
     match /cages/{cageId} {
-      allow get: if isDocOwner() || isAdmin();
+      allow get: if isAuthenticated() && (resource.data.uid == request.auth.uid || isAdmin());
       allow list: if isAuthenticated() && (resource.data.uid == request.auth.uid || isAdmin());
-      allow create: if isAuthenticated() && ((isValidCage(request.resource.data) && uidUnchanged()) || isAdmin());
-      allow update: if (isDocOwner() && isValidCage(request.resource.data) && uidNotModified()) || isAdmin();
-      allow delete: if isDocOwner() || isAdmin();
+      allow create: if isAuthenticated() && (request.resource.data.uid == request.auth.uid || isAdmin()) && (isValidCage(request.resource.data) || isAdmin());
+      allow update: if isAuthenticated() && (resource.data.uid == request.auth.uid || isAdmin()) && (request.resource.data.uid == resource.data.uid || !('uid' in request.resource.data) || isAdmin()) && (isValidCage(request.resource.data) || isAdmin());
+      allow delete: if isAuthenticated() && (resource.data.uid == request.auth.uid || isAdmin());
     }
 
     match /pairs/{pairId} {
-      allow get: if isDocOwner() || isAdmin();
+      allow get: if isAuthenticated() && (resource.data.uid == request.auth.uid || isAdmin());
       allow list: if isAuthenticated() && (resource.data.uid == request.auth.uid || isAdmin());
-      allow create: if isAuthenticated() && ((isValidPair(request.resource.data) && uidUnchanged()) || isAdmin());
-      allow update: if (isDocOwner() && isValidPair(request.resource.data) && uidNotModified()) || isAdmin();
-      allow delete: if isDocOwner() || isAdmin();
+      allow create: if isAuthenticated() && (request.resource.data.uid == request.auth.uid || isAdmin()) && (isValidPair(request.resource.data) || isAdmin());
+      allow update: if isAuthenticated() && (resource.data.uid == request.auth.uid || isAdmin()) && (request.resource.data.uid == resource.data.uid || !('uid' in request.resource.data) || isAdmin()) && (isValidPair(request.resource.data) || isAdmin());
+      allow delete: if isAuthenticated() && (resource.data.uid == request.auth.uid || isAdmin());
     }
 
     match /breedingRecords/{recordId} {
-      allow get: if isDocOwner() || isAdmin();
+      allow get: if isAuthenticated() && (resource.data.uid == request.auth.uid || isAdmin());
       allow list: if isAuthenticated() && (resource.data.uid == request.auth.uid || isAdmin());
-      allow create: if isAuthenticated() && ((isValidBreedingRecord(request.resource.data) && uidUnchanged()) || isAdmin());
-      allow update: if (isDocOwner() && isValidBreedingRecord(request.resource.data) && uidNotModified()) || isAdmin();
-      allow delete: if isDocOwner() || isAdmin();
+      allow create: if isAuthenticated() && (request.resource.data.uid == request.auth.uid || isAdmin()) && (isValidBreedingRecord(request.resource.data) || isAdmin());
+      allow update: if isAuthenticated() && (resource.data.uid == request.auth.uid || isAdmin()) && (request.resource.data.uid == resource.data.uid || !('uid' in request.resource.data) || isAdmin()) && (isValidBreedingRecord(request.resource.data) || isAdmin());
+      allow delete: if isAuthenticated() && (resource.data.uid == request.auth.uid || isAdmin());
     }
 
     match /tasks/{taskId} {
-      allow get: if isDocOwner() || isAdmin();
+      allow get: if isAuthenticated() && (resource.data.uid == request.auth.uid || isAdmin());
       allow list: if isAuthenticated() && (resource.data.uid == request.auth.uid || isAdmin());
-      allow create: if isAuthenticated() && ((isValidTask(request.resource.data) && uidUnchanged()) || isAdmin());
-      allow update: if (isDocOwner() && isValidTask(request.resource.data) && uidNotModified()) || isAdmin();
-      allow delete: if isDocOwner() || isAdmin();
+      allow create: if isAuthenticated() && (request.resource.data.uid == request.auth.uid || isAdmin()) && (isValidTask(request.resource.data) || isAdmin());
+      allow update: if isAuthenticated() && (resource.data.uid == request.auth.uid || isAdmin()) && (request.resource.data.uid == resource.data.uid || !('uid' in request.resource.data) || isAdmin()) && (isValidTask(request.resource.data) || isAdmin());
+      allow delete: if isAuthenticated() && (resource.data.uid == request.auth.uid || isAdmin());
     }
 
     match /transactions/{transactionId} {
-      allow get: if isDocOwner() || isAdmin();
+      allow get: if isAuthenticated() && (resource.data.uid == request.auth.uid || isAdmin());
       allow list: if isAuthenticated() && (resource.data.uid == request.auth.uid || isAdmin());
-      allow create: if isAuthenticated() && ((isValidTransaction(request.resource.data) && uidUnchanged()) || isAdmin());
-      allow update: if (isDocOwner() && isValidTransaction(request.resource.data) && uidNotModified()) || isAdmin();
-      allow delete: if isDocOwner() || isAdmin();
+      allow create: if isAuthenticated() && (request.resource.data.uid == request.auth.uid || isAdmin()) && (isValidTransaction(request.resource.data) || isAdmin());
+      allow update: if isAuthenticated() && (resource.data.uid == request.auth.uid || isAdmin()) && (request.resource.data.uid == resource.data.uid || !('uid' in request.resource.data) || isAdmin()) && (isValidTransaction(request.resource.data) || isAdmin());
+      allow delete: if isAuthenticated() && (resource.data.uid == request.auth.uid || isAdmin());
     }
 
     match /userSettings/{userId} {
-      allow read, write: if isOwner(userId) || isAdmin();
+      allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+      allow create, update: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+      allow delete: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
     }
 
     match /push_subscriptions/{subId} {
-      allow read, write: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
-      allow create: if isAuthenticated() && (request.resource.data.userId == request.auth.uid || isAdmin());
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow write: if isAuthenticated() && (request.resource.data.userId == request.auth.uid || isAdmin());
     }
 
     match /shared_items/{itemId} {
@@ -351,7 +296,9 @@ service cloud.firestore {
     }
 
     match /users/{userId} {
-      allow read, write: if isOwner(userId) || isAdmin();
+      allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+      allow create, update: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+      allow delete: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
     }
 
     match /admins/{adminId} {
@@ -362,22 +309,22 @@ service cloud.firestore {
     match /sellerProfiles/{profileId} {
       allow read: if isAuthenticated();
       allow create: if isAuthenticated() && (request.resource.data.uid == request.auth.uid || isAdmin());
-      allow update: if (isAuthenticated() && resource.data.uid == request.auth.uid) || isAdmin();
-      allow delete: if (isAuthenticated() && resource.data.uid == request.auth.uid) || isAdmin();
+      allow update: if isAuthenticated() && (resource.data.uid == request.auth.uid || isAdmin());
+      allow delete: if isAuthenticated() && (resource.data.uid == request.auth.uid || isAdmin());
     }
 
     match /marketplaceListings/{listingId} {
       allow read: if isAuthenticated();
       allow create: if isAuthenticated() && (request.resource.data.sellerId == request.auth.uid || isAdmin());
-      allow update: if (isAuthenticated() && resource.data.sellerId == request.auth.uid) || isAdmin();
-      allow delete: if (isAuthenticated() && resource.data.sellerId == request.auth.uid) || isAdmin();
+      allow update: if isAuthenticated() && (resource.data.sellerId == request.auth.uid || isAdmin());
+      allow delete: if isAuthenticated() && (resource.data.sellerId == request.auth.uid || isAdmin());
     }
 
     match /marketplaceReviews/{reviewId} {
       allow read: if isAuthenticated();
       allow create: if isAuthenticated() && (request.resource.data.buyerId == request.auth.uid || isAdmin());
-      allow update: if isAdmin() || (isAuthenticated() && resource.data.buyerId == request.auth.uid);
-      allow delete: if isAdmin() || (isAuthenticated() && resource.data.buyerId == request.auth.uid);
+      allow update: if isAuthenticated() && (resource.data.buyerId == request.auth.uid || isAdmin());
+      allow delete: if isAuthenticated() && (resource.data.buyerId == request.auth.uid || isAdmin());
     }
 
     match /wikiSpecies/{speciesId} {

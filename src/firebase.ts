@@ -121,11 +121,16 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
 
   // Handle transient session token expiry during offline writes gracefully
   if (errMsg.includes('permission-denied') || errMsg.includes('unauthenticated')) {
-    console.warn(`Firestore authorization warning during '${operationType}' on '${path}': ${errMsg}. Will retry upon token refresh.`);
+    console.error(`Firestore authorization error during '${operationType}' on '${path}': ${errMsg}`);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('firestore-permission-denied', {
+        detail: { operationType, path, errMsg }
+      }));
+    }
     if (auth.currentUser) {
       auth.currentUser.getIdToken(true).catch(() => {});
     }
-    return;
+    throw new Error(errMsg);
   }
 
   // Handle transient listener Target ID re-sync / stream collisions gracefully

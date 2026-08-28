@@ -18,7 +18,13 @@ export function SubscriptionGate({ settings, onRenew, children }: { settings: Us
   const expiryDate = settings.account_expiry_date ? new Date(settings.account_expiry_date) : null;
   const now = new Date();
   const userEmail = (settings.email || '').toLowerCase().trim();
-  const isAdmin = userEmail === 'clashfouche@gmail.com';
+  const adminEmails = [
+    'clashfouche@gmail.com',
+    'teamotakuempire@gmail.com',
+    'theaveriansupport@gmail.com',
+    'hencofouche8@gmail.com'
+  ];
+  const isAdmin = adminEmails.includes(userEmail) || settings.role === 'admin';
   
   const isLifetime = settings.subscriptionPlan === 'lifetime' || 
                     settings.isBetaTester === true || 

@@ -181,7 +181,10 @@ import { startOfDay, startOfWeek, startOfMonth, startOfYear, endOfMonth, endOfWe
 
 // --- Helpers ---
 const ADMIN_EMAILS_LIST = [
-  'clashfouche@gmail.com'
+  'clashfouche@gmail.com',
+  'teamotakuempire@gmail.com',
+  'theaveriansupport@gmail.com',
+  'hencofouche8@gmail.com'
 ];
 
 const isSubscriptionExpired = (settings: UserSettings | null | undefined): boolean => {
