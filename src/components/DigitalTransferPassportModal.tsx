@@ -82,6 +82,7 @@ export function DigitalTransferPassportModal({
                 motherId: b.motherId,
                 fatherId: b.fatherId,
                 imageUrl: b.imageUrl,
+                imageUrls: b.imageUrls || (b.imageUrl ? [b.imageUrl] : []),
                 ringNumber: b.ringNumber,
                 birthDate: b.birthDate,
                 isGhost: true,

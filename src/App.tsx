@@ -713,6 +713,7 @@ export default function App() {
     name: string;
     speciesId?: string;
     inheritance?: 'autosomal_recessive' | 'autosomal_dominant' | 'incomplete_dominant' | 'sex_linked_recessive' | '';
+    onSuccess?: (name: string, id: string) => void;
   } | null>(null);
 
   // Pagination limits
@@ -1655,32 +1656,37 @@ export default function App() {
       // Use setDoc with merge: true to avoid overwriting fields we don't intend to change
       // and to ensure the document is created if it doesn't exist.
       const { id, ...data } = newSettings;
-      await setDoc(doc(db, 'userSettings', user.uid), data, { merge: true });
+      const sanitized = sanitizeData(data);
+      await setDoc(doc(db, 'userSettings', user.uid), sanitized, { merge: true });
+      setUserSettings(prev => prev ? ({ ...prev, ...sanitized }) : ({ id: user.uid, ...sanitized } as UserSettings));
     } catch (e) {
       handleFirestoreError(e, OperationType.WRITE, 'userSettings');
     }
   };
 
-  const handleAddSpecies = (name: string) => {
+  const handleAddSpecies = (name: string, onSuccess?: (name: string, id: string) => void) => {
     setQuickAddDialog({
       type: 'species',
       name,
+      onSuccess
     });
   };
 
-  const handleAddSubSpecies = (name: string, speciesId?: string) => {
+  const handleAddSubSpecies = (name: string, speciesId?: string, onSuccess?: (name: string, id: string) => void) => {
     setQuickAddDialog({
       type: 'subspecies',
       name,
       speciesId: speciesId || '',
+      onSuccess
     });
   };
 
-  const handleAddMutation = (name: string) => {
+  const handleAddMutation = (name: string, onSuccess?: (name: string, id: string) => void) => {
     setQuickAddDialog({
       type: 'mutation',
       name,
       inheritance: '',
+      onSuccess
     });
   };
 
@@ -3435,37 +3441,54 @@ export default function App() {
                         return;
                       }
 
-                      if (!userSettings) return;
+                      const fallbackId = user?.uid || 'anonymous';
+                      let current = userSettings || {
+                        id: fallbackId,
+                        species: [],
+                        subspecies: [],
+                        mutations: [],
+                        statuses: [{ id: 'sold-default', name: 'Sold' }, { id: 'deceased-default', name: 'Deceased' }],
+                        uid: fallbackId,
+                        currency: 'ZAR'
+                      };
 
-                      let updatedSettings = { ...userSettings };
+                      let updatedSettings = { ...current };
+                      let addedId = crypto.randomUUID();
+                      const trimmedName = quickAddDialog.name.trim();
                       
                       if (quickAddDialog.type === 'mutation') {
                         const newMut: Mutation = {
-                          id: crypto.randomUUID(),
-                          name: quickAddDialog.name.trim(),
+                          id: addedId,
+                          name: trimmedName,
                           inheritance: quickAddDialog.inheritance || undefined
                         };
-                        updatedSettings.mutations = [...(userSettings.mutations || []), newMut];
-                        toast.success(`Added mutation "${quickAddDialog.name}"`);
+                        updatedSettings.mutations = [...(current.mutations || []), newMut];
                       } else if (quickAddDialog.type === 'species') {
                         const newSpec: Species = {
-                          id: crypto.randomUUID(),
-                          name: quickAddDialog.name.trim()
+                          id: addedId,
+                          name: trimmedName
                         };
-                        updatedSettings.species = [...(userSettings.species || []), newSpec];
-                        toast.success(`Added species "${quickAddDialog.name}"`);
+                        updatedSettings.species = [...(current.species || []), newSpec];
                       } else if (quickAddDialog.type === 'subspecies') {
                         const newSub: SubSpecies = {
-                          id: crypto.randomUUID(),
-                          name: quickAddDialog.name.trim(),
+                          id: addedId,
+                          name: trimmedName,
                           speciesId: quickAddDialog.speciesId!
                         };
-                        updatedSettings.subspecies = [...(userSettings.subspecies || []), newSub];
-                        toast.success(`Added sub-species "${quickAddDialog.name}"`);
+                        updatedSettings.subspecies = [...(current.subspecies || []), newSub];
                       }
 
-                      await handleUpdateSettings(updatedSettings);
-                      setQuickAddDialog(null);
+                      try {
+                        await handleUpdateSettings(updatedSettings);
+                        toast.success(`Added ${quickAddDialog.type} "${trimmedName}"`);
+                        if (quickAddDialog.onSuccess) {
+                          quickAddDialog.onSuccess(trimmedName, addedId);
+                        }
+                      } catch (err: any) {
+                        toast.error(`Failed to save: ${err?.message || 'Unknown error'}`);
+                      } finally {
+                        setQuickAddDialog(null);
+                      }
                     }} 
                     className="flex-1 uppercase bg-gold-500 hover:bg-gold-600 text-black font-black text-[10px] tracking-widest"
                   >
@@ -4350,6 +4373,7 @@ function BirdCard({ bird, cage, birds, cages, viewMode = 'grid-large', currency,
             motherId: b.motherId,
             fatherId: b.fatherId,
             imageUrl: b.imageUrl,
+            imageUrls: b.imageUrls || (b.imageUrl ? [b.imageUrl] : []),
             isGhost: true, // Marker for imported relative
           });
           collect(b.motherId);
@@ -8982,7 +9006,7 @@ function ConfirmModal({ isOpen, onClose, onConfirm, title, message, isDeleting }
 
 // --- Forms ---
 
-function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettings, onAddSpecies, onAddSubSpecies, onAddMutation, onAddStatus, onClose }: { user: FirebaseUser, initialData?: Bird | null, cages: Cage[], birds: Bird[], pairs: Pair[], contacts: Contact[], userSettings: UserSettings | null, onAddSpecies: (n: string) => void, onAddSubSpecies: (n: string, sid: string) => void, onAddMutation: (n: string) => void, onAddStatus: (n: string) => void, onClose: () => void }) {
+function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettings, onAddSpecies, onAddSubSpecies, onAddMutation, onAddStatus, onClose }: { user: FirebaseUser, initialData?: Bird | null, cages: Cage[], birds: Bird[], pairs: Pair[], contacts: Contact[], userSettings: UserSettings | null, onAddSpecies: (n: string, cb?: (name: string, id: string) => void) => void, onAddSubSpecies: (n: string, sid: string, cb?: (name: string, id: string) => void) => void, onAddMutation: (n: string, cb?: (name: string, id: string) => void) => void, onAddStatus: (n: string) => void, onClose: () => void }) {
   const t = (text: string) => tGlobal(text, userSettings?.language || 'en');
   const symbol = getCurrencySymbol(userSettings?.currency);
   const detectedMateId = (initialData && initialData.id) ? (initialData.mateId || birds.find(b => b.mateId === initialData.id)?.id || '') : '';
@@ -9286,7 +9310,9 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
               const name = speciesOptions.find(o => o.id === id)?.name || '';
               setFormData({ ...formData, species: name, subSpecies: '' });
             }}
-            onAdd={onAddSpecies}
+            onAdd={(n) => onAddSpecies(n, (createdName) => {
+              setFormData(prev => ({ ...prev, species: createdName, subSpecies: '' }));
+            })}
             placeholder={t('Select Species')}
           />
         </div>
@@ -9299,7 +9325,9 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
               const name = subSpeciesOptions.find(o => o.id === id)?.name || '';
               setFormData({ ...formData, subSpecies: name });
             }}
-            onAdd={(n) => selectedSpecies && onAddSubSpecies(n, selectedSpecies.id)}
+            onAdd={(n) => selectedSpecies && onAddSubSpecies(n, selectedSpecies.id, (createdName) => {
+              setFormData(prev => ({ ...prev, subSpecies: createdName }));
+            })}
             placeholder={t('Select Sub-Species')}
             disabled={!formData.species}
           />
@@ -9321,7 +9349,9 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
                 mutations: current.includes(name) ? current.filter(m => m !== name) : [...current, name] 
               });
             }}
-            onAdd={onAddMutation}
+            onAdd={(n) => onAddMutation(n, (createdName) => {
+              setFormData(prev => ({ ...prev, mutations: [...(prev.mutations || []), createdName] }));
+            })}
             placeholder={t('Select Mutations')}
           />
         </div>
@@ -9339,7 +9369,9 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
                 splitMutations: current.includes(name) ? current.filter(m => m !== name) : [...current, name] 
               });
             }}
-            onAdd={onAddMutation}
+            onAdd={(n) => onAddMutation(n, (createdName) => {
+              setFormData(prev => ({ ...prev, splitMutations: [...(prev.splitMutations || []), createdName] }));
+            })}
             placeholder={t('Select Split Mutations')}
           />
         </div>

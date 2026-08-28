@@ -155,6 +155,7 @@ service cloud.firestore {
              isOptionalString(data, 'cageId', 200) &&
              isOptionalDate(data, 'startDate') &&
              isOptionalDate(data, 'endDate') &&
+             isOptionalString(data, 'imageUrl', 2000000) &&
              isOptionalList(data, 'imageUrls') &&
              isOptionalDate(data, 'createdAt') &&
              isOptionalDate(data, 'updatedAt');
