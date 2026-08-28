@@ -27,7 +27,7 @@ export function SubscriptionGate({ settings, onRenew, children }: { settings: Us
                     (expiryDate && expiryDate.getFullYear() > 2090);
 
   const isValidDate = expiryDate && !isNaN(expiryDate.getTime());
-  const isExpired = isLifetime ? false : (!isValidDate || now > expiryDate);
+  const isExpired = isLifetime ? false : (isValidDate ? (now > expiryDate) : false);
   
   const diffTime = isValidDate ? expiryDate.getTime() - now.getTime() : 0;
   const daysLeft = isLifetime ? 99999 : Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));

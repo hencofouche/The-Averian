@@ -197,9 +197,9 @@ const isSubscriptionExpired = (settings: UserSettings | null | undefined): boole
   ) {
     return false;
   }
-  if (!settings.account_expiry_date) return true;
+  if (!settings.account_expiry_date) return false;
   const expiryDate = new Date(settings.account_expiry_date);
-  if (isNaN(expiryDate.getTime())) return true;
+  if (isNaN(expiryDate.getTime())) return false;
   return new Date() > expiryDate;
 };
 
