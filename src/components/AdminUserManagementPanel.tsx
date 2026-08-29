@@ -16,7 +16,7 @@ import { cn } from '../lib/utils';
 import { toast } from 'sonner';
 import { 
   collection, getDocs, doc, setDoc, updateDoc, writeBatch, 
-  query, where, addDoc, deleteDoc
+  query, where, addDoc, deleteDoc, limit
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import { format, addDays, addMonths, addYears, isAfter, isBefore } from 'date-fns';
@@ -146,8 +146,8 @@ export function AdminUserManagementPanel({
     }
     setIsLoading(true);
     try {
-      // 1. Fetch from 'users' collection
-      const usersSnap = await getDocs(collection(db, 'users'));
+      // 1. Fetch from 'users' collection with safety bound
+      const usersSnap = await getDocs(query(collection(db, 'users'), limit(300)));
       const usersMap = new Map<string, UserWithDetails>();
 
       usersSnap.forEach((d) => {
@@ -179,7 +179,7 @@ export function AdminUserManagementPanel({
       });
 
       // 2. Fetch from 'userSettings' to capture all existing accounts
-      const settingsSnap = await getDocs(collection(db, 'userSettings'));
+      const settingsSnap = await getDocs(query(collection(db, 'userSettings'), limit(300)));
       settingsSnap.forEach((d) => {
         const data = d.data() as UserSettings;
         const uid = data.uid || d.id;
@@ -260,7 +260,7 @@ export function AdminUserManagementPanel({
       });
 
       // 3. Fetch from 'sellerProfiles'
-      const sellersSnap = await getDocs(collection(db, 'sellerProfiles'));
+      const sellersSnap = await getDocs(query(collection(db, 'sellerProfiles'), limit(200)));
       sellersSnap.forEach((d) => {
         const data = d.data() as SellerProfile;
         if (data.uid && usersMap.has(data.uid)) {

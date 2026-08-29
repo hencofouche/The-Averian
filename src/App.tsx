@@ -1028,10 +1028,41 @@ export default function App() {
       }
     };
     fetchSharedItem();
+    // Fetch dynamic Wiki data on demand / startup using caching
+    const cachedSpecies = localStorage.getItem('averian_wiki_species_cache');
+    const cachedMutations = localStorage.getItem('averian_wiki_mutations_cache');
+    if (cachedSpecies) {
+      try { setWikiSpecies(JSON.parse(cachedSpecies)); } catch (_) {}
+    }
+    if (cachedMutations) {
+      try { setWikiMutations(JSON.parse(cachedMutations)); } catch (_) {}
+    }
+
+    const fetchWikiDataOnce = async () => {
+      try {
+        const [speciesSnap, mutationsSnap] = await Promise.all([
+          getDocs(query(collection(db, 'wikiSpecies'), limit(100))),
+          getDocs(query(collection(db, 'wikiMutations'), limit(200)))
+        ]);
+        const sList = speciesSnap.docs.map(d => ({ ...d.data(), id: d.id }));
+        const mList = mutationsSnap.docs.map(d => ({ ...d.data(), id: d.id }));
+        setWikiSpecies(sList);
+        setWikiMutations(mList);
+        try {
+          localStorage.setItem('averian_wiki_species_cache', JSON.stringify(sList));
+          localStorage.setItem('averian_wiki_mutations_cache', JSON.stringify(mList));
+        } catch (_) {}
+      } catch (err) {
+        console.warn("Wiki data fetch fallback:", err);
+      }
+    };
+    fetchWikiDataOnce();
   }, []);
 
+  const userUid = user?.uid;
+
   useEffect(() => {
-    if (!user || !userSettings) return;
+    if (!userUid) return;
     const params = new URLSearchParams(window.location.search);
     if (params.get('payment') === 'success') {
       // 1. Remove the parameter from the URL immediately to prevent re-triggers
@@ -1048,25 +1079,25 @@ export default function App() {
         });
       }
     }
-  }, [user, !!userSettings]); // Only trigger when user/settings become available, not on every update
+  }, [userUid, !!userSettings]); // Stabilized on userUid
 
   useEffect(() => {
-    if (!user) return;
+    if (!userUid) return;
 
     // Use limits to prevent "The Bleed" (excessive reads on large collections)
-    const qBirds = query(collection(db, 'birds'), where('uid', '==', user.uid), limit(birdsLimit));
+    const qBirds = query(collection(db, 'birds'), where('uid', '==', userUid), limit(birdsLimit));
     const unsubBirds = onSnapshot(qBirds, (snapshot) => {
       setBirds(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Bird)));
       setIsSyncing(snapshot.metadata.hasPendingWrites);
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'birds'));
 
-    const qCages = query(collection(db, 'cages'), where('uid', '==', user.uid), limit(cagesLimit));
+    const qCages = query(collection(db, 'cages'), where('uid', '==', userUid), limit(cagesLimit));
     const unsubCages = onSnapshot(qCages, (snapshot) => {
       setCages(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Cage)));
       setIsSyncing(snapshot.metadata.hasPendingWrites);
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'cages'));
 
-    const qPairs = query(collection(db, 'pairs'), where('uid', '==', user.uid), limit(pairsLimit));
+    const qPairs = query(collection(db, 'pairs'), where('uid', '==', userUid), limit(pairsLimit));
     const unsubPairs = onSnapshot(qPairs, (snapshot) => {
       setPairs(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Pair)));
       setIsSyncing(snapshot.metadata.hasPendingWrites);
@@ -1074,7 +1105,7 @@ export default function App() {
 
     const qBreeding = query(
       collection(db, 'breedingRecords'), 
-      where('uid', '==', user.uid), 
+      where('uid', '==', userUid), 
       limit(breedingLimit)
     );
     const unsubBreeding = onSnapshot(qBreeding, (snapshot) => {
@@ -1084,7 +1115,7 @@ export default function App() {
       setIsSyncing(snapshot.metadata.hasPendingWrites);
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'breedingRecords'));
 
-    const qTasks = query(collection(db, 'tasks'), where('uid', '==', user.uid), limit(tasksLimit));
+    const qTasks = query(collection(db, 'tasks'), where('uid', '==', userUid), limit(tasksLimit));
     const unsubTasks = onSnapshot(qTasks, (snapshot) => {
       setTasks(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Task)));
       setIsSyncing(snapshot.metadata.hasPendingWrites);
@@ -1092,7 +1123,7 @@ export default function App() {
 
     const qTransactions = query(
       collection(db, 'transactions'), 
-      where('uid', '==', user.uid), 
+      where('uid', '==', userUid), 
       limit(transactionLimit)
     );
     const unsubTransactions = onSnapshot(qTransactions, (snapshot) => {
@@ -1102,39 +1133,13 @@ export default function App() {
       setIsSyncing(snapshot.metadata.hasPendingWrites);
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'transactions'));
 
-    const qContacts = query(collection(db, 'contacts'), where('uid', '==', user.uid), limit(contactsLimit));
+    const qContacts = query(collection(db, 'contacts'), where('uid', '==', userUid), limit(contactsLimit));
     const unsubContacts = onSnapshot(qContacts, (snapshot) => {
       const contactsList = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Contact));
       contactsList.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
       setContacts(contactsList);
       setIsSyncing(snapshot.metadata.hasPendingWrites);
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'contacts'));
-
-    // Marketplace collections (cross-user)
-    const qSellers = query(collection(db, 'sellerProfiles'), limit(100));
-    const unsubSellers = onSnapshot(qSellers, (snapshot) => {
-      setSellerProfiles(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as SellerProfile)));
-    }, (err) => handleFirestoreError(err, OperationType.LIST, 'sellerProfiles'));
-
-    const qListings = query(collection(db, 'marketplaceListings'), limit(150));
-    const unsubListings = onSnapshot(qListings, (snapshot) => {
-      setMarketplaceListings(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as MarketplaceListing)));
-    }, (err) => handleFirestoreError(err, OperationType.LIST, 'marketplaceListings'));
-
-    const qReviews = query(collection(db, 'marketplaceReviews'), limit(100));
-    const unsubReviews = onSnapshot(qReviews, (snapshot) => {
-      setMarketplaceReviews(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as MarketplaceReview)));
-    }, (err) => handleFirestoreError(err, OperationType.LIST, 'marketplaceReviews'));
-
-    const qWikiSpecies = query(collection(db, 'wikiSpecies'), limit(100));
-    const unsubWikiSpecies = onSnapshot(qWikiSpecies, (snapshot) => {
-      setWikiSpecies(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })));
-    }, (err) => handleFirestoreError(err, OperationType.LIST, 'wikiSpecies'));
-
-    const qWikiMutations = query(collection(db, 'wikiMutations'), limit(200));
-    const unsubWikiMutations = onSnapshot(qWikiMutations, (snapshot) => {
-      setWikiMutations(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })));
-    }, (err) => handleFirestoreError(err, OperationType.LIST, 'wikiMutations'));
 
     // Coming Soon / Feature Flags config subscription
     const unsubComingSoon = onSnapshot(doc(db, 'appConfig', 'comingSoon'), (docSnap) => {
@@ -1151,10 +1156,8 @@ export default function App() {
       console.warn("Coming soon config sync (offline fallback):", err);
     });
 
-    const fixingSettings = new Set<string>();
-
     let currentUserData: any = null;
-    const userDocRef = doc(db, 'users', user.uid);
+    const userDocRef = doc(db, 'users', userUid);
     const unsubUserDoc = onSnapshot(userDocRef, (uSnap) => {
       if (uSnap.exists()) {
         currentUserData = uSnap.data();
@@ -1181,7 +1184,7 @@ export default function App() {
       }
     }, (err) => handleFirestoreError(err, OperationType.GET, 'users'));
 
-    const docRef = doc(db, 'userSettings', user.uid);
+    const docRef = doc(db, 'userSettings', userUid);
     const unsubSettings = onSnapshot(docRef, (docSnap: any) => {
       setIsSyncing(docSnap.metadata.hasPendingWrites);
       
@@ -1189,7 +1192,7 @@ export default function App() {
         const trialExpiry = new Date();
         trialExpiry.setDate(trialExpiry.getDate() + 30);
         const fallbackSettings: UserSettings = {
-          id: user.uid,
+          id: userUid,
           species: [],
           subspecies: [],
           mutations: [],
@@ -1197,7 +1200,7 @@ export default function App() {
             { id: 'sold-default', name: 'Sold' },
             { id: 'deceased-default', name: 'Deceased' }
           ],
-          uid: user.uid,
+          uid: userUid,
           currency: 'ZAR',
           account_expiry_date: trialExpiry.toISOString()
         };
@@ -1207,11 +1210,8 @@ export default function App() {
 
       if (docSnap.exists()) {
         const data = docSnap.data() as UserSettings;
-        if (docSnap.metadata.hasPendingWrites) {
-          // Process pending writes through the same merge logic to prevent temporary loss of merged fields
-        }
 
-        const userEmail = user.email?.toLowerCase().trim();
+        const userEmail = user?.email?.toLowerCase().trim();
         const isAdminUser = Boolean(
           (userEmail && ADMIN_EMAILS_LIST.includes(userEmail)) || 
           data.role === 'admin' ||
@@ -1231,73 +1231,30 @@ export default function App() {
           effectiveExpiry = '2099-12-31T23:59:59.000Z';
         }
 
-        // Only initialize default expiry if missing everywhere
-        if (!effectiveExpiry) { 
-          if (fixingSettings.has(user.uid)) return;
-          fixingSettings.add(user.uid); 
-          const trialExpiry = new Date(); 
-          trialExpiry.setDate(trialExpiry.getDate() + 30); 
-          const defaultStatuses = ['Sold', 'Deceased'];
-          const existingStatusNames = (data.statuses || []).map(s => s.name);
-          const missingDefaults = defaultStatuses.filter(name => !existingStatusNames.includes(name));
-          
-          const updatedStatuses = [
-            ...(data.statuses || []),
-            ...missingDefaults.map(name => ({ id: crypto.randomUUID(), name }))
-          ];
+        const defaultStatuses = ['Sold', 'Deceased'];
+        const existingStatusNames = (data.statuses || []).map(s => s.name);
+        const missingDefaults = defaultStatuses.filter(name => !existingStatusNames.includes(name));
 
-          const updated = { 
-            species: data.species || [], 
-            subspecies: data.subspecies || [], 
-            mutations: data.mutations || [], 
-            uid: user.uid, 
-            currency: data.currency || 'ZAR', 
-            ...data, 
-            statuses: updatedStatuses,
-            isBetaTester: Boolean(isBeta),
-            canTestComingSoon: Boolean(isBeta),
-            account_expiry_date: isLifePlan ? '2099-12-31T23:59:59.000Z' : trialExpiry.toISOString() 
-          }; 
-          setDoc(docRef, updated, { merge: true }).catch(e => console.error('Failed to fix settings', e)); 
-          setUserSettings({ id: docSnap.id, ...updated }); 
-        } else { 
-          if (isAdminUser && (data.role !== 'admin' || data.subscriptionPlan !== 'lifetime')) {
-            // Auto-grant lifetime & admin role in database for admin accounts
-            const adminUpdated: UserSettings = {
-              ...data,
-              role: 'admin',
-              subscriptionPlan: 'lifetime',
-              account_expiry_date: '2099-12-31T23:59:59.000Z'
-            };
-            setDoc(docRef, adminUpdated, { merge: true }).catch(e => console.error('Failed to update admin role in settings', e));
-            setUserSettings({ id: docSnap.id, ...adminUpdated });
-          } else {
-            const defaultStatuses = ['Sold', 'Deceased'];
-            const existingStatusNames = (data.statuses || []).map(s => s.name);
-            const missingDefaults = defaultStatuses.filter(name => !existingStatusNames.includes(name));
+        const finalMergedSettings: UserSettings = {
+          id: docSnap.id,
+          ...data,
+          role: isAdminUser ? 'admin' : (data.role || currentUserData?.role),
+          isBetaTester: Boolean(isBeta),
+          canTestComingSoon: Boolean(isBeta),
+          account_expiry_date: effectiveExpiry,
+          subscriptionPlan: isLifePlan ? 'lifetime' : (data.subscriptionPlan || currentUserData?.subscriptionPlan),
+          statuses: missingDefaults.length > 0 
+            ? [...(data.statuses || []), ...missingDefaults.map(name => ({ id: crypto.randomUUID(), name }))]
+            : (data.statuses || [])
+        };
 
-            const finalMergedSettings: UserSettings = {
-              id: docSnap.id,
-              ...data,
-              role: isAdminUser ? 'admin' : (data.role || currentUserData?.role),
-              isBetaTester: Boolean(isBeta),
-              canTestComingSoon: Boolean(isBeta),
-              account_expiry_date: effectiveExpiry,
-              subscriptionPlan: isLifePlan ? 'lifetime' : (data.subscriptionPlan || currentUserData?.subscriptionPlan),
-              statuses: missingDefaults.length > 0 
-                ? [...(data.statuses || []), ...missingDefaults.map(name => ({ id: crypto.randomUUID(), name }))]
-                : (data.statuses || [])
-            };
-
-            setUserSettings(finalMergedSettings);
-          }
-        }
+        setUserSettings(finalMergedSettings);
       } else {
         if (docSnap.metadata.fromCache) return;
         const trialExpiry = new Date();
         trialExpiry.setDate(trialExpiry.getDate() + 30);
         const initialSettings: UserSettings = {
-          id: user.uid,
+          id: userUid,
           species: [],
           subspecies: [],
           mutations: [],
@@ -1305,9 +1262,9 @@ export default function App() {
             { id: crypto.randomUUID(), name: 'Sold' },
             { id: crypto.randomUUID(), name: 'Deceased' }
           ],
-          uid: user.uid,
-          email: user.email || '',
-          displayName: user.displayName || user.email?.split('@')[0] || 'Breeder',
+          uid: userUid,
+          email: user?.email || '',
+          displayName: user?.displayName || user?.email?.split('@')[0] || 'Breeder',
           currency: 'ZAR',
           account_expiry_date: trialExpiry.toISOString()
         };
@@ -1316,7 +1273,7 @@ export default function App() {
       }
     }, (err) => handleFirestoreError(err, OperationType.GET, 'userSettings'));
 
-    const qShared = query(collection(db, 'shared_items'), where('createdBy', '==', user.uid), limit(50));
+    const qShared = query(collection(db, 'shared_items'), where('createdBy', '==', userUid), limit(50));
     const unsubShared = onSnapshot(qShared, (snapshot) => {
       setAllSharedItems(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as SharedItem)));
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'shared_items'));
@@ -1332,14 +1289,36 @@ export default function App() {
       try { unsubSettings(); } catch (_) {}
       try { unsubUserDoc(); } catch (_) {}
       try { unsubShared(); } catch (_) {}
+      try { unsubComingSoon(); } catch (_) {}
+    };
+  }, [userUid, birdsLimit, cagesLimit, pairsLimit, breedingLimit, tasksLimit, transactionLimit, contactsLimit]);
+
+  // Lazy-load Marketplace collections only when user views marketplace or admin tabs
+  const shouldLoadMarketplace = activeTab === 'marketplace' || activeTab === 'admin';
+  useEffect(() => {
+    if (!shouldLoadMarketplace) return;
+
+    const qSellers = query(collection(db, 'sellerProfiles'), limit(100));
+    const unsubSellers = onSnapshot(qSellers, (snapshot) => {
+      setSellerProfiles(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as SellerProfile)));
+    }, (err) => handleFirestoreError(err, OperationType.LIST, 'sellerProfiles'));
+
+    const qListings = query(collection(db, 'marketplaceListings'), limit(150));
+    const unsubListings = onSnapshot(qListings, (snapshot) => {
+      setMarketplaceListings(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as MarketplaceListing)));
+    }, (err) => handleFirestoreError(err, OperationType.LIST, 'marketplaceListings'));
+
+    const qReviews = query(collection(db, 'marketplaceReviews'), limit(100));
+    const unsubReviews = onSnapshot(qReviews, (snapshot) => {
+      setMarketplaceReviews(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as MarketplaceReview)));
+    }, (err) => handleFirestoreError(err, OperationType.LIST, 'marketplaceReviews'));
+
+    return () => {
       try { unsubSellers(); } catch (_) {}
       try { unsubListings(); } catch (_) {}
       try { unsubReviews(); } catch (_) {}
-      try { unsubWikiSpecies(); } catch (_) {}
-      try { unsubWikiMutations(); } catch (_) {}
-      try { unsubComingSoon(); } catch (_) {}
     };
-  }, [user, birdsLimit, cagesLimit, pairsLimit, breedingLimit, tasksLimit, transactionLimit, contactsLimit]);
+  }, [shouldLoadMarketplace]);
 
   const handleUpdateComingSoonPageConfig = async (pageId: AppPageId, config: ComingSoonPageConfig) => {
     const updatedPages = {
@@ -1438,7 +1417,7 @@ export default function App() {
       processRecurring();
     }, 2000);
     return () => clearTimeout(timeoutId);
-  }, [user]);
+  }, [userUid]);
 
   const filteredItems = useMemo(() => {
     const query = searchQuery.toLowerCase();
@@ -6586,22 +6565,24 @@ function TransactionForm({ user, initialData, birds, pairs, cages, contacts, cur
     
     const processSave = async () => {
       try {
-        const data = { 
+        const rawData = { 
           ...formData,
           ...(initialData?.id ? {} : { uid: user.uid })
         };
         // Setup initial nextDueDate if becoming recurring
-        if (data.recurring && data.recurring !== 'None' && !data.nextDueDate) {
-          const basedate = parseISO(data.date || format(new Date(), 'yyyy-MM-dd'));
+        if (rawData.recurring && rawData.recurring !== 'None' && !rawData.nextDueDate) {
+          const basedate = parseISO(rawData.date || format(new Date(), 'yyyy-MM-dd'));
           let nextD = basedate;
-          if (data.recurring === 'Daily') nextD = addDays(basedate, 1);
-          if (data.recurring === 'Weekly') nextD = addDays(basedate, 7);
-          if (data.recurring === 'Monthly') nextD = addMonths(basedate, 1);
-          if (data.recurring === 'Yearly') nextD = addMonths(basedate, 12);
-          data.nextDueDate = format(nextD, 'yyyy-MM-dd');
-        } else if (data.recurring === 'None') {
-          delete data.nextDueDate;
+          if (rawData.recurring === 'Daily') nextD = addDays(basedate, 1);
+          if (rawData.recurring === 'Weekly') nextD = addDays(basedate, 7);
+          if (rawData.recurring === 'Monthly') nextD = addMonths(basedate, 1);
+          if (rawData.recurring === 'Yearly') nextD = addMonths(basedate, 12);
+          rawData.nextDueDate = format(nextD, 'yyyy-MM-dd');
+        } else if (rawData.recurring === 'None') {
+          delete rawData.nextDueDate;
         }
+
+        const data = sanitizeData(rawData);
 
         if (initialData?.id) { 
           await updateDoc(doc(db, 'transactions', initialData.id), data); 
@@ -6755,10 +6736,11 @@ function ContactForm({ user, initialData, onClose, userSettings }: { user: Fireb
     
     const processSave = async () => {
       try {
-        const data = { 
+        const rawData = { 
           ...formData,
           ...(initialData?.id ? {} : { uid: user.uid })
         };
+        const data = sanitizeData(rawData);
         if (initialData?.id) { 
           await updateDoc(doc(db, 'contacts', initialData.id), data); 
         } else { 

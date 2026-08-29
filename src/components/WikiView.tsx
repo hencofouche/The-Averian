@@ -186,7 +186,7 @@ export function WikiView({ user, isAdmin, userSettings, wikiSpecies, wikiMutatio
 
   // Fallback real-time listeners only if props not supplied
   useEffect(() => {
-    if (wikiSpecies) return; // Skip if parent already manages it
+    if (wikiSpecies !== undefined) return; // Skip if parent already manages it
     const unsub = onSnapshot(collection(db, 'wikiSpecies'), (snapshot) => {
       const items: WikiSpecies[] = [];
       snapshot.forEach((doc) => {
@@ -209,7 +209,7 @@ export function WikiView({ user, isAdmin, userSettings, wikiSpecies, wikiMutatio
   }, [wikiSpecies]);
 
   useEffect(() => {
-    if (wikiMutations) return; // Skip if parent already manages it
+    if (wikiMutations !== undefined) return; // Skip if parent already manages it
     const unsub = onSnapshot(collection(db, 'wikiMutations'), (snapshot) => {
       const items: WikiMutation[] = [];
       snapshot.forEach((doc) => {
