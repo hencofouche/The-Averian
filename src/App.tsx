@@ -253,7 +253,7 @@ const generateGoogleCalendarUrl = (text: string, date: string, details: string =
 };
 
 
-import { compressAndUploadImage, deleteStorageFileIfApplicable } from "./lib/image-utils";
+import { compressAndUploadImage, deleteStorageFileIfApplicable, ensurePassportPayloadFitsFirestore } from "./lib/image-utils";
 
 // --- UI Components ---
 
@@ -1102,9 +1102,11 @@ export default function App() {
       setIsSyncing(snapshot.metadata.hasPendingWrites);
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'transactions'));
 
-    const qContacts = query(collection(db, 'contacts'), where('uid', '==', user.uid), orderBy('name', 'asc'), limit(contactsLimit));
+    const qContacts = query(collection(db, 'contacts'), where('uid', '==', user.uid), limit(contactsLimit));
     const unsubContacts = onSnapshot(qContacts, (snapshot) => {
-      setContacts(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Contact)));
+      const contactsList = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Contact));
+      contactsList.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+      setContacts(contactsList);
       setIsSyncing(snapshot.metadata.hasPendingWrites);
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'contacts'));
 
@@ -1703,9 +1705,16 @@ export default function App() {
     if (!user || !userSettings) return;
     
     try {
-      // Fetch latest from server to avoid race conditions
-      const docSnap = await getDocFromServer(doc(db, 'userSettings', user.uid));
-      const currentData = docSnap.exists() ? docSnap.data() as UserSettings : userSettings;
+      // Fetch latest from server with graceful local state fallback
+      let currentData = userSettings;
+      try {
+        const docSnap = await getDocFromServer(doc(db, 'userSettings', user.uid));
+        if (docSnap.exists()) {
+          currentData = docSnap.data() as UserSettings;
+        }
+      } catch (networkErr) {
+        console.warn("Server fetch failed, using local settings state:", networkErr);
+      }
       
       const currentExpiry = currentData.account_expiry_date ? new Date(currentData.account_expiry_date) : new Date();
       const now = new Date();
@@ -1722,9 +1731,12 @@ export default function App() {
       const baseDate = currentExpiry > now ? currentExpiry : now;
       baseDate.setFullYear(baseDate.getFullYear() + 1);
       
-      await updateDoc(doc(db, 'userSettings', user.uid), {
-        account_expiry_date: baseDate.toISOString()
-      });
+      const updatedExpiry = baseDate.toISOString();
+      await setDoc(doc(db, 'userSettings', user.uid), {
+        account_expiry_date: updatedExpiry
+      }, { merge: true });
+      
+      setUserSettings(prev => prev ? ({ ...prev, account_expiry_date: updatedExpiry }) : null);
       toast.success("Subscription activated for 1 year!");
     } catch (e) {
       handleFirestoreError(e, OperationType.UPDATE, 'userSettings');
@@ -3934,7 +3946,7 @@ function ShareBirdModal({ bird, mother, father, mate, offspring, cages, cageName
         const docRef = await addDoc(collection(db, 'shared_items'), {
           type: 'bird',
           action: 'transfer',
-          data: JSON.stringify(transferData),
+          data: ensurePassportPayloadFitsFirestore(transferData),
           createdAt: new Date().toISOString(),
           createdBy: auth.currentUser?.uid || ''
         });
@@ -4090,7 +4102,7 @@ function SharePairModal({ pair, male, female, birds, records, onClose }: { pair:
         const docRef = await addDoc(collection(db, 'shared_items'), {
           type: 'pair',
           action: 'transfer',
-          data: JSON.stringify(transferData),
+          data: ensurePassportPayloadFitsFirestore(transferData),
           createdAt: new Date().toISOString(),
           createdBy: auth.currentUser?.uid || ''
         });
@@ -4403,7 +4415,7 @@ function BirdCard({ bird, cage, birds, cages, viewMode = 'grid-large', currency,
       const docRef = await addDoc(collection(db, 'shared_items'), {
         type: 'bird',
         action: 'transfer',
-        data: JSON.stringify(transferData),
+        data: ensurePassportPayloadFitsFirestore(transferData),
         createdAt: new Date().toISOString(),
         createdBy: auth.currentUser?.uid || ''
       });

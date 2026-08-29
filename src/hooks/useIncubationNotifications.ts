@@ -62,6 +62,8 @@ export function useIncubationNotifications(breedingRecords: BreedingRecord[] = [
           body: 'The Averian will alert you when eggs are ready for candling, lockdown, and hatching!'
         });
         await syncAndDispatchIncubationAlerts(breedingRecords, birds);
+      } else if (result === 'unsupported') {
+        toast.info('Browser push notifications are restricted in embedded preview frames. Open in a new tab for native push alerts, or view the in-app Incubation Alerts panel anytime!');
       } else if (result === 'denied') {
         toast.error('Notification permission was blocked in your browser settings.');
       }

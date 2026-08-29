@@ -140,3 +140,49 @@ export const compressAndUploadImage = async (
   });
 };
 
+/**
+ * Ensures any shared item or digital passport JSON payload stays safely within Firestore's 1MB document limit.
+ */
+export function ensurePassportPayloadFitsFirestore(payload: any, maxBytes = 850000): string {
+  let jsonString = JSON.stringify(payload);
+  if (jsonString.length <= maxBytes) {
+    return jsonString;
+  }
+
+  // Clone payload to optimize
+  const optimized = { ...payload };
+
+  // 1. If related birds have multiple photos or long image arrays, trim them to primary image only
+  if (Array.isArray(optimized.relatedBirds)) {
+    optimized.relatedBirds = optimized.relatedBirds.map((rb: any) => {
+      const primaryUrl = rb.imageUrl || (rb.imageUrls && rb.imageUrls[0]) || '';
+      return {
+        ...rb,
+        imageUrl: primaryUrl,
+        imageUrls: primaryUrl ? [primaryUrl] : []
+      };
+    });
+  }
+
+  jsonString = JSON.stringify(optimized);
+  if (jsonString.length <= maxBytes) {
+    return jsonString;
+  }
+
+  // 2. If still large, remove heavy embedded base64 images from distant relatives (keeping name/pedigree structure)
+  if (Array.isArray(optimized.relatedBirds)) {
+    optimized.relatedBirds = optimized.relatedBirds.map((rb: any) => {
+      if (rb.imageUrl && rb.imageUrl.startsWith('data:') && rb.imageUrl.length > 50000) {
+        return {
+          ...rb,
+          imageUrl: undefined,
+          imageUrls: []
+        };
+      }
+      return rb;
+    });
+  }
+
+  return JSON.stringify(optimized);
+}
+

@@ -17,13 +17,29 @@ export interface IncubationReminderItem {
   speciesName?: string;
 }
 
+export function isIframeEnvironment(): boolean {
+  try {
+    return typeof window !== 'undefined' && window.self !== window.top;
+  } catch (_) {
+    return true;
+  }
+}
+
 export function isNotificationSupported(): boolean {
-  return typeof window !== 'undefined' && 'Notification' in window;
+  try {
+    return typeof window !== 'undefined' && 'Notification' in window && typeof Notification.requestPermission === 'function';
+  } catch (_) {
+    return false;
+  }
 }
 
 export function getNotificationPermission(): NotificationPermission | 'unsupported' {
   if (!isNotificationSupported()) return 'unsupported';
-  return Notification.permission;
+  try {
+    return Notification.permission;
+  } catch (_) {
+    return 'unsupported';
+  }
 }
 
 export async function requestNotificationPermission(): Promise<NotificationPermission | 'unsupported'> {
@@ -31,8 +47,11 @@ export async function requestNotificationPermission(): Promise<NotificationPermi
   try {
     const permission = await Notification.requestPermission();
     return permission;
-  } catch (err) {
-    console.error('Failed to request notification permission:', err);
+  } catch (err: any) {
+    console.warn('Failed to request notification permission (or restricted by iframe context):', err);
+    if (isIframeEnvironment()) {
+      return 'unsupported';
+    }
     return 'denied';
   }
 }

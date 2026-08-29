@@ -4,6 +4,7 @@ import { Bird, Pair, Cage, BreedingRecord } from '../types';
 import { Badge } from './ui';
 import { cn } from '../lib/utils';
 import { toast } from 'sonner';
+import { ensurePassportPayloadFitsFirestore } from '../lib/image-utils';
 
 interface DigitalTransferPassportModalProps {
   bird?: Bird;
@@ -122,7 +123,7 @@ export function DigitalTransferPassportModal({
         const docRef = await addDoc(collection(db, 'shared_items'), {
           type: 'bird',
           action: 'transfer',
-          data: JSON.stringify(passportPayload),
+          data: ensurePassportPayloadFitsFirestore(passportPayload),
           createdAt: new Date().toISOString(),
           createdBy: currentUserId
         });
@@ -160,7 +161,7 @@ export function DigitalTransferPassportModal({
         const docRef = await addDoc(collection(db, 'shared_items'), {
           type: 'pair',
           action: 'transfer',
-          data: JSON.stringify(passportPayload),
+          data: ensurePassportPayloadFitsFirestore(passportPayload),
           createdAt: new Date().toISOString(),
           createdBy: currentUserId
         });
