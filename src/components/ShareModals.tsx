@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { 
-  Share2, Send, Copy, Check, QrCode, Eye, Type, Hash, Sliders, ListPlus, CheckSquare, Heart 
+  Share2, Send, Copy, Check, QrCode, Eye, Type, Hash, Sliders, ListPlus, CheckSquare, Heart, Image as ImageIcon, Loader2 
 } from 'lucide-react';
 import { Bird, Cage, Pair, BreedingRecord, UserSettings, CustomBirdFieldDefinition } from '../types';
 import { Button, Badge } from './ui';
@@ -10,6 +10,36 @@ import { ensurePassportPayloadFitsFirestore } from '../lib/image-utils';
 import { toast } from 'sonner';
 import { cn } from '../lib/utils';
 import { QRCodeSVG } from 'qrcode.react';
+
+async function imageUriToFile(uri: string, filename: string): Promise<File | null> {
+  if (!uri) return null;
+  try {
+    if (uri.startsWith('data:')) {
+      const parts = uri.split(',');
+      const mimeMatch = parts[0].match(/:(.*?);/);
+      const mime = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+      const bstr = atob(parts[1]);
+      let n = bstr.length;
+      const u8arr = new Uint8Array(n);
+      while (n--) {
+        u8arr[n] = bstr.charCodeAt(n);
+      }
+      const ext = mime.split('/')[1] || 'jpg';
+      const cleanName = filename.endsWith(`.${ext}`) ? filename : `${filename}.${ext}`;
+      return new File([u8arr], cleanName, { type: mime });
+    } else {
+      const response = await fetch(uri, { mode: 'cors' });
+      const blob = await response.blob();
+      const mime = blob.type || 'image/jpeg';
+      const ext = mime.split('/')[1] || 'jpg';
+      const cleanName = filename.endsWith(`.${ext}`) ? filename : `${filename}.${ext}`;
+      return new File([blob], cleanName, { type: mime });
+    }
+  } catch (err) {
+    console.warn('Could not convert image URI to File:', err);
+    return null;
+  }
+}
 
 export function ShareBirdModal({ 
   bird, 
@@ -36,7 +66,11 @@ export function ShareBirdModal({
   const [showQR, setShowQR] = useState(false);
   const [isTransferMode, setIsTransferMode] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isSharing, setIsSharing] = useState(false);
   
+  const birdPhotoUrl = bird.imageUrl || (bird.imageUrls && bird.imageUrls[0]) || '';
+  const [includePhoto, setIncludePhoto] = useState<boolean>(!!birdPhotoUrl);
+
   // Dynamic field selection for standard share
   const [selectedFields, setSelectedFields] = useState<Record<string, boolean>>({
     name: true,
@@ -111,19 +145,46 @@ export function ShareBirdModal({
   };
 
   const handleNativeShare = async () => {
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: `Bird: ${bird.name}`,
+    setIsSharing(true);
+    try {
+      const filesToShare: File[] = [];
+      if (includePhoto && birdPhotoUrl) {
+        const file = await imageUriToFile(birdPhotoUrl, `bird-${bird.name.replace(/[^a-zA-Z0-9]/g, '_')}`);
+        if (file) filesToShare.push(file);
+      }
+
+      if (navigator.share) {
+        const shareData: ShareData = {
+          title: `Bird Passport: ${bird.name}`,
           text: shareText,
-        });
-      } catch (err) {
-        if ((err as any).name !== 'AbortError') {
-          toast.error('Share cancelled or failed');
+        };
+
+        if (filesToShare.length > 0 && navigator.canShare && navigator.canShare({ files: filesToShare })) {
+          shareData.files = filesToShare;
+        }
+
+        await navigator.share(shareData);
+      } else {
+        handleCopyText();
+      }
+    } catch (err) {
+      if ((err as any).name !== 'AbortError') {
+        console.error('Share error:', err);
+        try {
+          if (navigator.share) {
+            await navigator.share({
+              title: `Bird Passport: ${bird.name}`,
+              text: shareText
+            });
+          } else {
+            handleCopyText();
+          }
+        } catch (_) {
+          toast.error('Share failed or was cancelled');
         }
       }
-    } else {
-      handleCopyText();
+    } finally {
+      setIsSharing(false);
     }
   };
 
@@ -236,13 +297,43 @@ export function ShareBirdModal({
                 type="button" 
                 variant="primary" 
                 onClick={handleNativeShare} 
+                disabled={isSharing}
                 className="py-1.5 px-3 flex items-center gap-1.5 text-[10px] font-black uppercase"
               >
-                <Share2 size={14} />
-                Share
+                {isSharing ? <Loader2 size={14} className="animate-spin" /> : <Share2 size={14} />}
+                {isSharing ? 'Preparing...' : 'Share'}
               </Button>
             </div>
           </div>
+
+          {/* Bird Photo Attachment Option */}
+          {birdPhotoUrl && (
+            <div className="p-3 bg-black-900 border border-gold-500/30 rounded-2xl flex items-center gap-3 shadow-md">
+              <div className="w-12 h-12 rounded-xl overflow-hidden border border-gold-500/40 bg-black shrink-0 relative">
+                <img 
+                  src={birdPhotoUrl} 
+                  alt={bird.name} 
+                  className="w-full h-full object-cover"
+                  referrerPolicy="no-referrer"
+                />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between gap-1">
+                  <span className="text-xs font-bold text-white truncate">{bird.name} Photo</span>
+                  <Badge variant="warning" className="text-[9px] px-1.5 py-0.5 bg-gold-500/20 text-gold-400 border-gold-500/30">Photo Attached</Badge>
+                </div>
+                <label className="flex items-center gap-2 mt-1 cursor-pointer select-none">
+                  <input 
+                    type="checkbox" 
+                    checked={includePhoto} 
+                    onChange={(e) => setIncludePhoto(e.target.checked)}
+                    className="w-3.5 h-3.5 rounded border-black-700 bg-black text-gold-500 focus:ring-0"
+                  />
+                  <span className="text-[11px] text-gold-400 font-medium">Attach photo when sharing</span>
+                </label>
+              </div>
+            </div>
+          )}
 
           {/* Field Selection Checklist */}
           <div className="space-y-2">
@@ -413,6 +504,12 @@ export function SharePairModal({
   const [showQR, setShowQR] = useState(false);
   const [isTransferMode, setIsTransferMode] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isSharing, setIsSharing] = useState(false);
+
+  const malePhotoUrl = male?.imageUrl || (male?.imageUrls && male.imageUrls[0]) || '';
+  const femalePhotoUrl = female?.imageUrl || (female?.imageUrls && female.imageUrls[0]) || '';
+  const [includeMalePhoto, setIncludeMalePhoto] = useState<boolean>(!!malePhotoUrl);
+  const [includeFemalePhoto, setIncludeFemalePhoto] = useState<boolean>(!!femalePhotoUrl);
   
   // Field selection for standard share
   const [selectedFields, setSelectedFields] = useState<Record<string, boolean>>({
@@ -515,19 +612,50 @@ export function SharePairModal({
   };
 
   const handleNativeShare = async () => {
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: `Breeding Pair: ${male?.name} x ${female?.name}`,
+    setIsSharing(true);
+    try {
+      const filesToShare: File[] = [];
+      if (includeMalePhoto && malePhotoUrl) {
+        const file = await imageUriToFile(malePhotoUrl, `cock-${male?.name ? male.name.replace(/[^a-zA-Z0-9]/g, '_') : 'male'}`);
+        if (file) filesToShare.push(file);
+      }
+      if (includeFemalePhoto && femalePhotoUrl) {
+        const file = await imageUriToFile(femalePhotoUrl, `hen-${female?.name ? female.name.replace(/[^a-zA-Z0-9]/g, '_') : 'female'}`);
+        if (file) filesToShare.push(file);
+      }
+
+      if (navigator.share) {
+        const shareData: ShareData = {
+          title: `Breeding Pair: ${male?.name || 'Sire'} x ${female?.name || 'Dam'}`,
           text: shareText,
-        });
-      } catch (err) {
-        if ((err as any).name !== 'AbortError') {
-          toast.error('Share cancelled or failed');
+        };
+
+        if (filesToShare.length > 0 && navigator.canShare && navigator.canShare({ files: filesToShare })) {
+          shareData.files = filesToShare;
+        }
+
+        await navigator.share(shareData);
+      } else {
+        handleCopyText();
+      }
+    } catch (err) {
+      if ((err as any).name !== 'AbortError') {
+        console.error('Share error:', err);
+        try {
+          if (navigator.share) {
+            await navigator.share({
+              title: `Breeding Pair: ${male?.name || 'Sire'} x ${female?.name || 'Dam'}`,
+              text: shareText,
+            });
+          } else {
+            handleCopyText();
+          }
+        } catch (_) {
+          toast.error('Share failed or was cancelled');
         }
       }
-    } else {
-      handleCopyText();
+    } finally {
+      setIsSharing(false);
     }
   };
 
@@ -660,13 +788,67 @@ export function SharePairModal({
                 type="button" 
                 variant="primary" 
                 onClick={handleNativeShare} 
+                disabled={isSharing}
                 className="py-1.5 px-3 flex items-center gap-1.5 text-[10px] font-black uppercase"
               >
-                <Share2 size={14} />
-                Share
+                {isSharing ? <Loader2 size={14} className="animate-spin" /> : <Share2 size={14} />}
+                {isSharing ? 'Preparing...' : 'Share'}
               </Button>
             </div>
           </div>
+
+          {/* Pair Photos Attachment Option */}
+          {(malePhotoUrl || femalePhotoUrl) && (
+            <div className="p-3 bg-black-900 border border-gold-500/30 rounded-2xl space-y-3 shadow-md">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-black uppercase tracking-wider text-gold-400 flex items-center gap-1.5">
+                  <ImageIcon size={13} />
+                  Attach Photos to Share:
+                </span>
+                <Badge variant="warning" className="text-[9px] px-1.5 py-0.5 bg-gold-500/20 text-gold-400 border-gold-500/30">Images Included</Badge>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {malePhotoUrl && (
+                  <div className="flex items-center gap-2.5 p-2 bg-black-950 border border-black-800 rounded-xl">
+                    <div className="w-10 h-10 rounded-lg overflow-hidden border border-gold-500/30 bg-black shrink-0">
+                      <img src={malePhotoUrl} alt={male?.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <span className="text-xs font-bold text-white truncate block">Cock: {male?.name}</span>
+                      <label className="flex items-center gap-1.5 mt-0.5 cursor-pointer select-none">
+                        <input 
+                          type="checkbox" 
+                          checked={includeMalePhoto} 
+                          onChange={(e) => setIncludeMalePhoto(e.target.checked)}
+                          className="w-3.5 h-3.5 rounded border-black-700 bg-black text-gold-500 focus:ring-0"
+                        />
+                        <span className="text-[10px] text-gold-400 font-medium">Attach Photo</span>
+                      </label>
+                    </div>
+                  </div>
+                )}
+                {femalePhotoUrl && (
+                  <div className="flex items-center gap-2.5 p-2 bg-black-950 border border-black-800 rounded-xl">
+                    <div className="w-10 h-10 rounded-lg overflow-hidden border border-gold-500/30 bg-black shrink-0">
+                      <img src={femalePhotoUrl} alt={female?.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <span className="text-xs font-bold text-white truncate block">Hen: {female?.name}</span>
+                      <label className="flex items-center gap-1.5 mt-0.5 cursor-pointer select-none">
+                        <input 
+                          type="checkbox" 
+                          checked={includeFemalePhoto} 
+                          onChange={(e) => setIncludeFemalePhoto(e.target.checked)}
+                          className="w-3.5 h-3.5 rounded border-black-700 bg-black text-gold-500 focus:ring-0"
+                        />
+                        <span className="text-[10px] text-gold-400 font-medium">Attach Photo</span>
+                      </label>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Field Selection Checklist */}
           <div className="space-y-2">
@@ -757,10 +939,11 @@ export function SharePairModal({
               type="button" 
               variant="primary" 
               onClick={handleNativeShare} 
+              disabled={isSharing}
               className="flex-1 py-3 flex items-center justify-center gap-2 text-xs font-black uppercase"
             >
-              <Share2 size={16} />
-              Share Details
+              {isSharing ? <Loader2 size={16} className="animate-spin" /> : <Share2 size={16} />}
+              {isSharing ? 'Preparing Images...' : 'Share Details'}
             </Button>
           </div>
         </>
