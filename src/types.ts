@@ -15,6 +15,14 @@ export interface Mutation {
   inheritance?: 'autosomal_recessive' | 'autosomal_dominant' | 'incomplete_dominant' | 'sex_linked_recessive';
 }
 
+export interface CustomBirdFieldDefinition {
+  id: string;
+  name: string;
+  type: 'text' | 'number';
+  description?: string;
+  createdAt?: string;
+}
+
 export interface CustomStatus {
   id: string;
   name: string;
@@ -67,6 +75,7 @@ export interface UserSettings {
   subspecies: SubSpecies[];
   mutations: Mutation[];
   statuses?: CustomStatus[];
+  customBirdFields?: CustomBirdFieldDefinition[];
   uid: string;
   aviaryName?: string;
   currency?: string;
@@ -184,6 +193,7 @@ export interface Bird {
   boughtFromId?: string;
   uid: string;
   documents?: BirdDocument[];
+  customFields?: Record<string, string | number>;
   isGhost?: boolean;
   ghostId?: string;
 }
@@ -335,10 +345,15 @@ export interface Pair {
 export interface Egg {
   id: string;
   laidDate?: string;
-  status: 'Laid' | 'Fertile' | 'Infertile / Clear' | 'Dead In Shell' | 'Hatched' | 'Died' | 'Weaned';
+  status: 'Laid' | 'Fertile' | 'Infertile / Clear' | 'Dead In Shell' | 'Hatched' | 'Died' | 'Weaned' | 'Sold';
   actualHatchDate?: string;
   notes?: string;
   birdId?: string; // If it becomes a bird
+  salePrice?: number;
+  saleDate?: string;
+  buyerId?: string;
+  buyerName?: string;
+  transactionId?: string;
 }
 
 export interface BreedingRecord {
@@ -346,6 +361,13 @@ export interface BreedingRecord {
   pairId: string;
   startDate: string;
   endDate?: string;
+  clutchDate?: string;
+  hatchDate?: string;
+  clutchSize?: number;
+  fertileEggs?: number;
+  hatchedCount?: number;
+  bandedCount?: number;
+  status?: string;
   eggsLaid: number; // Keep for backward compatibility
   eggsHatched: number; // Keep for backward compatibility 
   chicksWeaned: number; // Keep for backward compatibility

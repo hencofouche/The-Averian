@@ -1,10 +1,13 @@
 import React, { useState, useMemo } from 'react';
-import { Egg as EggIcon, Calendar, Bell, CheckCircle2, AlertTriangle, Clock, Activity, Flame, ShieldAlert, Sparkles, ChevronRight, HelpCircle, ArrowRight } from 'lucide-react';
+import { Egg as EggIcon, Calendar, Bell, CheckCircle2, AlertTriangle, Clock, Activity, Flame, ShieldAlert, Sparkles, ChevronRight, HelpCircle, ArrowRight, DollarSign, User, TrendingUp } from 'lucide-react';
 import { format, addDays, parseISO, differenceInDays, isAfter, isBefore, startOfDay } from 'date-fns';
 import { Egg, BreedingRecord, Pair, Bird } from '../types';
 import { Badge } from './ui';
 import { cn } from '../lib/utils';
 import { toast } from 'sonner';
+import { db, auth } from '../firebase';
+import { doc, setDoc, collection, updateDoc } from 'firebase/firestore';
+
 const generateGoogleCalendarUrl = (text: string, date: string, details: string = '') => {
   if (!date) return '';
   const startDate = new Date(date);
@@ -172,19 +175,75 @@ export function SmartCandlingModal({
   const [selectedStatus, setSelectedStatus] = useState(egg.status);
   const [candlingNotes, setCandlingNotes] = useState(egg.notes || '');
   const [actualHatch, setActualHatch] = useState(egg.actualHatchDate || '');
+  const [salePrice, setSalePrice] = useState<number | string>(egg.salePrice ?? '');
+  const [saleDate, setSaleDate] = useState<string>(egg.saleDate || format(new Date(), 'yyyy-MM-dd'));
+  const [buyerName, setBuyerName] = useState<string>(egg.buyerName || '');
+  const [isProcessingSale, setIsProcessingSale] = useState(false);
 
-  const handleSave = () => {
-    onUpdateEgg({
-      status: selectedStatus,
-      notes: candlingNotes,
-      actualHatchDate: actualHatch || undefined
-    });
-    toast.success(`Egg #${eggIndex + 1} status updated to ${selectedStatus}!`);
-    onClose();
+  const handleSave = async () => {
+    setIsProcessingSale(true);
+    try {
+      let transactionId = egg.transactionId;
+      const numSalePrice = typeof salePrice === 'number' ? salePrice : parseFloat(salePrice) || 0;
+
+      // If status is 'Sold' and salePrice > 0, create or update the financial transaction
+      if (selectedStatus === 'Sold' && numSalePrice > 0) {
+        const currentUser = auth.currentUser;
+        if (currentUser) {
+          const pairName = `${male?.name || 'Sire'} × ${female?.name || 'Dam'}`;
+          const transData = {
+            type: 'Income' as const,
+            category: 'Egg Sale',
+            amount: numSalePrice,
+            date: saleDate || format(new Date(), 'yyyy-MM-dd'),
+            description: `Egg #${eggIndex + 1} sold from Pair: ${pairName}${buyerName ? ` (Buyer: ${buyerName})` : ''}`,
+            pairId: pair?.id || record.pairId,
+            uid: currentUser.uid
+          };
+
+          if (transactionId) {
+            try {
+              await updateDoc(doc(db, 'transactions', transactionId), transData);
+            } catch {
+              const newDocRef = doc(collection(db, 'transactions'));
+              await setDoc(newDocRef, transData);
+              transactionId = newDocRef.id;
+            }
+          } else {
+            const newDocRef = doc(collection(db, 'transactions'));
+            await setDoc(newDocRef, transData);
+            transactionId = newDocRef.id;
+          }
+        }
+      }
+
+      onUpdateEgg({
+        status: selectedStatus,
+        notes: candlingNotes,
+        actualHatchDate: actualHatch || undefined,
+        salePrice: selectedStatus === 'Sold' ? numSalePrice : undefined,
+        saleDate: selectedStatus === 'Sold' ? saleDate : undefined,
+        buyerName: selectedStatus === 'Sold' ? buyerName : undefined,
+        transactionId: selectedStatus === 'Sold' ? transactionId : undefined
+      });
+
+      if (selectedStatus === 'Sold') {
+        toast.success(`Egg #${eggIndex + 1} marked as Sold! Added to Pair ROI & Accounting.`);
+      } else {
+        toast.success(`Egg #${eggIndex + 1} status updated to ${selectedStatus}!`);
+      }
+      onClose();
+    } catch (err) {
+      console.error('Error saving egg status/sale:', err);
+      toast.error('Failed to update egg record');
+    } finally {
+      setIsProcessingSale(false);
+    }
   };
 
   const getStatusColor = (status: Egg['status']) => {
     switch (status) {
+      case 'Sold': return 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30';
       case 'Fertile': return 'text-amber-400 bg-amber-500/10 border-amber-500/30';
       case 'Hatched': return 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30';
       case 'Weaned': return 'text-sky-400 bg-sky-500/10 border-sky-500/30';
@@ -332,6 +391,13 @@ export function SmartCandlingModal({
               desc: 'Vibrant spiderweb blood network, dark embryo eye spot, visible pulsing heartbeat.'
             },
             {
+              id: 'Sold',
+              label: 'Sold to Breeder / Buyer',
+              badge: 'Sold (+ROI)',
+              badgeStyle: 'bg-emerald-500/20 text-emerald-400 font-black',
+              desc: 'Egg has been sold directly. Sale price is credited to this Pair\'s ROI and financial ledger.'
+            },
+            {
               id: 'Infertile / Clear',
               label: 'Infertile / Clear',
               badge: 'No Embryo',
@@ -414,6 +480,70 @@ export function SmartCandlingModal({
               🔔 Ringing / Banding Target Date: {format(addDays(parseISO(actualHatch), record.ringingDays), 'MMMM dd, yyyy')} ({record.ringingDays} days post-hatch)
             </p>
           )}
+        </div>
+      )}
+
+      {/* Egg Sale Details Input if Sold */}
+      {selectedStatus === 'Sold' && (
+        <div className="p-4 bg-gradient-to-br from-emerald-500/15 via-emerald-950/40 to-black border border-emerald-500/30 rounded-2xl space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <TrendingUp size={16} className="text-emerald-400" />
+              <label className="text-xs font-black uppercase tracking-widest text-emerald-400">
+                Egg Sale & Pair ROI Attribution
+              </label>
+            </div>
+            <span className="text-[9px] bg-emerald-500/20 text-emerald-300 font-bold uppercase px-2 py-0.5 rounded-md border border-emerald-500/30">
+              Auto-adds to Pair ROI
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold text-zinc-300 uppercase tracking-wider">Sale Price</label>
+              <div className="relative">
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  required
+                  placeholder="0.00"
+                  value={salePrice}
+                  onChange={e => setSalePrice(e.target.value)}
+                  className="w-full pl-7 pr-3 py-2 bg-black border border-emerald-500/40 rounded-xl text-white text-xs font-mono font-bold focus:outline-none focus:border-emerald-400"
+                />
+                <DollarSign size={13} className="absolute left-2 top-2.5 text-emerald-400" />
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold text-zinc-300 uppercase tracking-wider">Sale Date</label>
+              <input
+                type="date"
+                value={saleDate}
+                onChange={e => setSaleDate(e.target.value)}
+                className="w-full px-3 py-2 bg-black border border-emerald-500/40 rounded-xl text-white text-xs font-mono focus:outline-none focus:border-emerald-400"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold text-zinc-300 uppercase tracking-wider">Buyer Name / Contact (Optional)</label>
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="e.g. John Doe, Local Aviary Buyer..."
+                value={buyerName}
+                onChange={e => setBuyerName(e.target.value)}
+                className="w-full pl-7 pr-3 py-2 bg-black border border-zinc-800 rounded-xl text-white text-xs placeholder:text-zinc-600 focus:outline-none focus:border-emerald-400"
+              />
+              <User size={13} className="absolute left-2 top-2.5 text-zinc-500" />
+            </div>
+          </div>
+
+          <p className="text-[10px] text-emerald-300/80 font-medium leading-normal">
+            💡 Saving will record an Income transaction of category <strong className="text-white">Egg Sale</strong> linked directly to Pair <strong className="text-white">{male?.name || 'Sire'} × {female?.name || 'Dam'}</strong>.
+          </p>
         </div>
       )}
 

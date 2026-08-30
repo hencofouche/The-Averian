@@ -1,3 +1,5 @@
+import { ShareBirdModal, SharePairModal } from './components/ShareModals';
+import { SettingsView } from `./components/SettingsView`;
 import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { format } from 'date-fns';
@@ -9,41 +11,44 @@ import {
   Image as ImageIcon, Loader2, DollarSign, TrendingUp, TrendingDown,
   Activity, ArrowUpRight, ArrowDownRight, BarChart3, PieChart as PieChartIcon,
   Menu, Egg, LayoutGrid, Grid3x3, List as ListIcon, AlertTriangle, CreditCard, CheckCircle2, Bell, Cloud, Maximize2, Share2, Send, Printer, MoreHorizontal, Dna, Users, Palette, QrCode, Scan, FileText, ExternalLink, ArrowLeft, ArrowRightLeft, History as HistoryIcon, RefreshCw, UploadCloud, Eye,
-  Mail, MessageCircle, Video, Shield, Wifi, WifiOff, Flame, ShoppingBag, Store, BookOpen, Sparkles, FileSpreadsheet
+  Mail, MessageCircle, Video, Shield, Wifi, WifiOff, Flame, ShoppingBag, Store, BookOpen, Sparkles, FileSpreadsheet,
+  ListPlus, Type, Hash, Sliders
 } from 'lucide-react';
-import GeneticsCalculatorOriginal from './components/GeneticsCalculator';
+import GeneticsCalculatorOriginal from `./components/GeneticsCalculator`;
 const GeneticsCalculator = React.memo(GeneticsCalculatorOriginal);
-import { ContactsView as ContactsViewOriginal } from './components/ContactsView';
+import { ContactsView as ContactsViewOriginal } from `./components/ContactsView`;
 const ContactsView = React.memo(ContactsViewOriginal);
-import { AdminDiagnosticsView } from './components/AdminDiagnosticsView';
-import { AdminDashboardView } from './components/AdminDashboardView';
-import { MarketplaceView } from './components/MarketplaceView';
-import { WikiView } from './components/WikiView';
-import { SmartCandlingModal, computeEggTimeline, getSpeciesIncubation, SPECIES_INCUBATION_DATA } from './components/SmartCandlingModal';
-import { DigitalTransferPassportModal } from './components/DigitalTransferPassportModal';
-import { ComingSoonView } from './components/ComingSoonView';
-import { AdminPageTestingBanner } from './components/AdminPageTestingBanner';
-import { AdminComingSoonModal } from './components/AdminComingSoonModal';
+import { AdminDiagnosticsView } from `./components/AdminDiagnosticsView`;
+import { AdminDashboardView } from `./components/AdminDashboardView`;
+import { MarketplaceView } from `./components/MarketplaceView`;
+import { WikiView } from `./components/WikiView`;
+import { SmartCandlingModal, computeEggTimeline, getSpeciesIncubation, SPECIES_INCUBATION_DATA } from `./components/SmartCandlingModal`;
+import { calculatePairRoi, getPairOffspring } from './lib/pair-roi';
+import { DigitalTransferPassportModal } from `./components/DigitalTransferPassportModal`;
+import { ComingSoonView } from `./components/ComingSoonView`;
+import { AdminPageTestingBanner } from `./components/AdminPageTestingBanner`;
+import { AdminComingSoonModal } from `./components/AdminComingSoonModal`;
 // Google Workspace native integrations removed to prevent trust-violating security warnings
 import { 
   SellerProfile, MarketplaceListing, MarketplaceReview, 
-  AppPageId, AppComingSoonSettings, ComingSoonPageConfig 
-} from './types';
-import { QRCodeSVG } from 'qrcode.react';
+  AppPageId, AppComingSoonSettings, ComingSoonPageConfig,
+  CustomBirdFieldDefinition
+} from `./types`;
+import { QRCodeSVG } from `qrcode.react`;
 import { SubscriptionGate } from "./components/SubscriptionGate";
 import { Button, Input, Select, Card, Textarea, BirdCompactInfo, Badge } from "./components/ui";
-import { Scanner } from '@yudiel/react-qr-scanner';
+import { Scanner } from `@yudiel/react-qr-scanner`;
 import { motion, AnimatePresence } from 'motion/react';
-import { generateBirdListPDF, generateCageListPDF, generatePairListPDF, generateCertificatePDF, generateQRListPDF } from './lib/pdf-engine';
-import { defaultSpecies, defaultMutations } from './lib/default-data';
-import { getTranslatedLabel, LANGUAGE_NAMES, setActiveLanguage, t as tGlobal } from './lib/translations';
-import { InstallAppButton } from './components/InstallAppButton';
-import { InstallPromptBanner } from './components/InstallPromptBanner';
-import { BannedUserScreen } from './components/BannedUserScreen';
-import { PublicLanding } from './components/PublicLanding';
-import { useIncubationNotifications } from './hooks/useIncubationNotifications';
-import { IncubationAlertsModal } from './components/IncubationAlertsModal';
-import { CurrencyConverterRates } from './components/CurrencyConverterRates';
+import { generateBirdListPDF, generateCageListPDF, generatePairListPDF, generateCertificatePDF, generateQRListPDF } from `./lib/pdf-engine`;
+import { defaultSpecies, defaultMutations } from `./lib/default-data`;
+import { getTranslatedLabel, LANGUAGE_NAMES, setActiveLanguage, t as tGlobal } from `./lib/translations`;
+import { InstallAppButton } from `./components/InstallAppButton`;
+import { InstallPromptBanner } from `./components/InstallPromptBanner`;
+import { BannedUserScreen } from `./components/BannedUserScreen`;
+import { PublicLanding } from `./components/PublicLanding`;
+import { useIncubationNotifications } from `./hooks/useIncubationNotifications`;
+import { IncubationAlertsModal } from `./components/IncubationAlertsModal`;
+import { CurrencyConverterRates } from `./components/CurrencyConverterRates`;
 
 function ImageGallery({ imageUrls, initialIndex, onClose }: { imageUrls: string[], initialIndex: number, onClose: () => void }) {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
@@ -162,7 +167,7 @@ import {
 } from 'recharts';
 import { 
   auth, db, storage, loginWithGoogle, logout, handleFirestoreError, testConnection, setFirestoreNetworkState
-} from './firebase';
+} from `./firebase`;
 import { 
   onAuthStateChanged, User as FirebaseUser 
 } from 'firebase/auth';
@@ -173,23 +178,23 @@ import {
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { 
   Bird, Cage, Pair, Task, Transaction, OperationType, BreedingRecord, UserSettings, Species, SubSpecies, Mutation, SharedItem, Contact, BirdDocument, Egg as EggType
-} from './types';
-import { cn, generateColorPalette } from './lib/utils';
-import ColorWheel from '@uiw/react-color-wheel';
-import { hexToHsva, hsvaToHex } from '@uiw/color-convert';
+} from `./types`;
+import { cn, generateColorPalette } from `./lib/utils`;
+import ColorWheel from `@uiw/react-color-wheel`;
+import { hexToHsva, hsvaToHex } from `@uiw/color-convert`;
 import { startOfDay, startOfWeek, startOfMonth, startOfYear, endOfMonth, endOfWeek, addDays, addMonths, isSameMonth, subDays, subWeeks, subMonths, subYears, isWithinInterval, parseISO } from 'date-fns';
 
 // --- Helpers ---
 const ADMIN_EMAILS_LIST = [
-  'clashfouche@gmail.com',
-  'teamotakuempire@gmail.com',
-  'theaveriansupport@gmail.com',
-  'hencofouche8@gmail.com'
+  `clashfouche@gmail.com`,
+  `teamotakuempire@gmail.com`,
+  `theaveriansupport@gmail.com`,
+  `hencofouche8@gmail.com`
 ];
 
 const isSubscriptionExpired = (settings: UserSettings | null | undefined): boolean => {
   if (!settings) return false;
-  const userEmail = (settings.email || auth.currentUser?.email || '').toLowerCase().trim();
+  const userEmail = (settings.email || auth.currentUser?.email || ``).toLowerCase().trim();
   if (
     settings.role === 'admin' ||
     settings.subscriptionPlan === 'lifetime' ||
@@ -210,7 +215,17 @@ const sanitizeData = (data: any) => {
   const sanitized: any = {};
   Object.keys(data).forEach(key => {
     if (key !== 'id' && data[key] !== undefined) {
-      sanitized[key] = data[key];
+      if (key === 'customFields' && typeof data[key] === 'object' && data[key] !== null) {
+        const cleanCustom: Record<string, any> = {};
+        Object.entries(data[key]).forEach(([ck, cv]) => {
+          if (cv !== undefined && cv !== null && cv !== ``) {
+            cleanCustom[ck] = cv;
+          }
+        });
+        sanitized[key] = cleanCustom;
+      } else {
+        sanitized[key] = data[key];
+      }
     }
   });
   return sanitized;
@@ -219,31 +234,31 @@ const sanitizeData = (data: any) => {
 const getCurrencySymbol = (currency?: string) => {
   switch (currency) {
     case 'ZAR': return 'R';
-    case 'EUR': return '€';
-    case 'GBP': return '£';
+    case 'EUR': return 'EUR';
+    case 'GBP': return 'GBP';
     case 'AUD': return 'A$';
     case 'CAD': return 'C$';
     case 'CHF': return 'CHF';
-    case 'JPY': return '¥';
-    case 'CNY': return '¥';
-    case 'INR': return '₹';
-    case 'PHP': return '₱';
-    case 'RUB': return '₽';
+    case 'JPY': return 'JPY';
+    case 'CNY': return 'JPY';
+    case 'INR': return 'INR';
+    case 'PHP': return 'PHP';
+    case 'RUB': return 'RUB';
     case 'BRL': return 'R$';
     case 'MXN': return 'Mex$';
     case 'SAR': return 'SR';
     case 'AED': return 'AED';
-    case 'ILS': return '₪';
+    case 'ILS': return 'ILS';
     case 'NZD': return 'NZ$';
     case 'SGD': return 'S$';
-    case 'TRY': return '₺';
-    case 'PLN': return 'zł';
+    case 'TRY': return 'TRY';
+    case 'PLN': return 'zl';
     case 'USD': default: return '$';
   }
 };
 
-const generateGoogleCalendarUrl = (text: string, date: string, details: string = '') => {
-  if (!date) return '';
+const generateGoogleCalendarUrl = (text: string, date: string, details: string = ``) => {
+  if (!date) return ``;
   const startDate = new Date(date);
   const endDate = new Date(startDate.getTime() + 30 * 60 * 1000); // 30 mins later
   
@@ -281,7 +296,7 @@ const PairCompactInfo = ({ pair, birds, cages, className, onClick }: { pair: Pai
           <span className="text-[10px] font-black text-white uppercase truncate shrink-0">{bird?.name || 'Unassigned'}</span>
           {bird && (
             <span className="text-[8px] font-bold text-white/80 uppercase truncate">
-              {bird.species}{bird.subSpecies ? ` (${bird.subSpecies})` : ''}
+              {bird.species}{bird.subSpecies ? ` (${bird.subSpecies})` : ``}
             </span>
           )}
         </div>
@@ -378,14 +393,14 @@ const PedigreeNode = ({ bird, roleLabel, generation, onBirdRef, cages, userSetti
                   variant={bird.sex === 'Male' ? 'male' : bird.sex === 'Female' ? 'female' : 'neutral'} 
                   className="text-[5px] sm:text-[7px] py-0 px-1 shrink-0 uppercase font-black"
                 >
-                  {bird.sex?.[0] || '?'}
+                  {bird.sex?.[0] || `?`}
                 </Badge>
               </div>
 
               <div className="text-left leading-tight">
                 <div className="flex flex-wrap items-center gap-x-1 gap-y-0.5 text-[6px] sm:text-[10px]">
                   <span className="text-secondary font-bold uppercase truncate">
-                    {bird.species}{bird.subSpecies ? ` (${bird.subSpecies})` : ''}
+                    {bird.species}{bird.subSpecies ? ` (${bird.subSpecies})` : ``}
                   </span>
                 </div>
                 
@@ -515,7 +530,7 @@ export const SearchableSelect = ({
   birds?: Bird[]
 }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(``);
   
   const filteredOptions = options.filter(opt => 
     opt.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -573,7 +588,7 @@ export const SearchableSelect = ({
       >
         <span className={cn("truncate", !value && !selectedValues.length && "text-black-100")}>
           {multi 
-            ? (selectedValues.length ? selectedValues.map(v => options.find(o => o.id === v)?.name || v).join(', ') : placeholder)
+            ? (selectedValues.length ? selectedValues.map(v => options.find(o => o.id === v)?.name || v).join(`, `) : placeholder)
             : (options.find(o => o.id === value)?.name || placeholder)
           }
         </span>
@@ -628,7 +643,7 @@ export const SearchableSelect = ({
                     onClick={(e) => {
                       e.stopPropagation();
                       onAdd(search);
-                      setSearch('');
+                      setSearch(``);
                     }}
                   >
                     <Button variant="secondary" className="w-full py-1.5 text-[10px] h-auto">
@@ -692,9 +707,10 @@ export default function App() {
     };
   }, []);
   
-  const [transferCageId, setTransferCageId] = useState('');
+  const [transferCageId, setTransferCageId] = useState(``);
   const [transferImportBreeding, setTransferImportBreeding] = useState(true);
   const [transferImportPedigree, setTransferImportPedigree] = useState(true);
+  const [transferImportCustomFields, setTransferImportCustomFields] = useState(true);
 
   const [birds, setBirds] = useState<Bird[]>([]);
   const [cages, setCages] = useState<Cage[]>([]);
@@ -712,7 +728,7 @@ export default function App() {
     type: 'mutation' | 'species' | 'subspecies';
     name: string;
     speciesId?: string;
-    inheritance?: 'autosomal_recessive' | 'autosomal_dominant' | 'incomplete_dominant' | 'sex_linked_recessive' | '';
+    inheritance?: 'autosomal_recessive' | 'autosomal_dominant' | 'incomplete_dominant' | 'sex_linked_recessive' | 'other';
     onSuccess?: (name: string, id: string) => void;
   } | null>(null);
 
@@ -725,7 +741,7 @@ export default function App() {
   const [contactsLimit, setContactsLimit] = useState(100);
   const [tasksLimit, setTasksLimit] = useState(50);
   
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState(``);
   const [navigationHistory, setNavigationHistory] = useState<{ tab: string, query: string, filter: any } | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<any>(null);
@@ -774,12 +790,12 @@ export default function App() {
       setIsOnline(true);
       if (!isForcedOffline) {
         setFirestoreNetworkState(true);
-        toast.success('Internet reconnected! Cloud sync active.');
+        toast.success(`Internet reconnected! Cloud sync active.`);
       }
     };
     const handleOffline = () => {
       setIsOnline(false);
-      toast('Operating in 100% Offline Mode. All edits are saved locally.', { icon: '📡' });
+      toast('Operating in 100% Offline Mode. All edits are saved locally.', { icon: '[Antenna]' });
     };
 
     window.addEventListener('online', handleOnline);
@@ -794,9 +810,9 @@ export default function App() {
     setIsForcedOffline(forced);
     await setFirestoreNetworkState(!forced);
     if (forced) {
-      toast('Forced Offline Mode enabled (0 Network usage).', { icon: '🚫' });
+      toast('Forced Offline Mode enabled (0 Network usage).', { icon: '[Ban]' });
     } else {
-      toast.success('Cloud synchronization re-enabled.');
+      toast.success(`Cloud synchronization re-enabled.`);
     }
   };
 
@@ -805,7 +821,7 @@ export default function App() {
   // Check if current user is Admin (clashfouche@gmail.com only)
   const isAdmin = useMemo(() => {
     const email = user?.email?.toLowerCase().trim();
-    return email === 'clashfouche@gmail.com';
+    return email === `clashfouche@gmail.com`;
   }, [user?.email]);
 
   const [hasRedirectedAdmin, setHasRedirectedAdmin] = useState(false);
@@ -900,7 +916,7 @@ export default function App() {
     if (isAdmin) {
       effective.role = 'admin';
       effective.subscriptionPlan = 'lifetime';
-      effective.account_expiry_date = '2099-12-31T23:59:59.000Z';
+      effective.account_expiry_date = `2099-12-31T23:59:59.000Z`;
     }
 
     return effective;
@@ -982,9 +998,9 @@ export default function App() {
       const userSettingsDocRef = doc(db, 'userSettings', user.uid);
       const userProfileData = {
         uid: user.uid,
-        email: user.email || '',
+        email: user.email || ``,
         displayName: user.displayName || user.email?.split('@')[0] || 'Breeder',
-        photoURL: user.photoURL || '',
+        photoURL: user.photoURL || ``,
         lastLoginAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
@@ -995,7 +1011,7 @@ export default function App() {
 
       setDoc(userSettingsDocRef, {
         uid: user.uid,
-        email: user.email || '',
+        email: user.email || ``,
         displayName: user.displayName || user.email?.split('@')[0] || 'Breeder'
       }, { merge: true }).catch(err => {
         console.warn("Could not sync userSettings email:", err);
@@ -1017,11 +1033,11 @@ export default function App() {
           if (docSnap.exists()) {
             setSharedItemView({ id: docSnap.id, ...docSnap.data() } as SharedItem);
           } else {
-            toast.error('Shared item not found or has expired.');
+            toast.error(`Shared item not found or has expired.`);
           }
         } catch (e) {
           console.error("Error fetching shared item:", e);
-          toast.error('Failed to load shared item.');
+          toast.error(`Failed to load shared item.`);
         } finally {
           setIsSharedItemLoading(false);
         }
@@ -1169,7 +1185,7 @@ export default function App() {
           
           let mergedExpiry = currentUserData.account_expiry_date || prev.account_expiry_date;
           if (isLife && (!mergedExpiry || new Date(mergedExpiry).getFullYear() < 2090)) {
-            mergedExpiry = '2099-12-31T23:59:59.000Z';
+            mergedExpiry = `2099-12-31T23:59:59.000Z`;
           }
 
           return {
@@ -1228,7 +1244,7 @@ export default function App() {
         }
 
         if (isLifePlan && (!effectiveExpiry || new Date(effectiveExpiry).getFullYear() < 2090)) {
-          effectiveExpiry = '2099-12-31T23:59:59.000Z';
+          effectiveExpiry = `2099-12-31T23:59:59.000Z`;
         }
 
         const defaultStatuses = ['Sold', 'Deceased'];
@@ -1263,7 +1279,7 @@ export default function App() {
             { id: crypto.randomUUID(), name: 'Deceased' }
           ],
           uid: userUid,
-          email: user?.email || '',
+          email: user?.email || ``,
           displayName: user?.displayName || user?.email?.split('@')[0] || 'Breeder',
           currency: 'ZAR',
           account_expiry_date: trialExpiry.toISOString()
@@ -1346,8 +1362,8 @@ export default function App() {
     try {
       await setDoc(doc(db, 'appConfig', 'comingSoon'), updatedSettings, { merge: true });
     } catch (err: any) {
-      console.error('Failed to update coming soon config in Firestore:', err);
-      toast.error('Failed to save configuration: ' + err.message);
+      console.error(`Failed to update coming soon config in Firestore:`, err);
+      toast.error(`Failed to save configuration: ` + err.message);
       throw err;
     }
   };
@@ -1459,7 +1475,7 @@ export default function App() {
         return cages
           .filter(c => {
             const lowName = c.name.toLowerCase();
-            const lowLoc = (c.location || '').toLowerCase();
+            const lowLoc = (c.location || ``).toLowerCase();
 
             // Always allow exact ID match
             if (c.id.toLowerCase() === query) return true;
@@ -1567,7 +1583,7 @@ export default function App() {
       await loginWithGoogle();
     } catch (error: any) {
       if (error.code !== 'auth/cancelled-popup-request' && error.code !== 'auth/popup-closed-by-user') {
-        console.error('Login error:', error);
+        console.error(`Login error:`, error);
       }
     } finally {
       setIsLoggingIn(false);
@@ -1634,8 +1650,8 @@ export default function App() {
   const handleUpdateSettings = async (newSettings: UserSettings) => {
     if (!user) return;
     try {
-      // Use setDoc with merge: true to avoid overwriting fields we don't intend to change
-      // and to ensure the document is created if it doesn't exist.
+      // Use setDoc with merge: true to avoid overwriting fields we don`t intend to change
+      // and to ensure the document is created if it doesn`t exist.
       const { id, ...data } = newSettings;
       const sanitized = sanitizeData(data);
       await setDoc(doc(db, 'userSettings', user.uid), sanitized, { merge: true });
@@ -1657,7 +1673,7 @@ export default function App() {
     setQuickAddDialog({
       type: 'subspecies',
       name,
-      speciesId: speciesId || '',
+      speciesId: speciesId || ``,
       onSuccess
     });
   };
@@ -1666,7 +1682,7 @@ export default function App() {
     setQuickAddDialog({
       type: 'mutation',
       name,
-      inheritance: '',
+      inheritance: ``,
       onSuccess
     });
   };
@@ -1730,7 +1746,7 @@ export default function App() {
   const handleDeleteTransaction = React.useCallback((id: string) => {
     setDeleteConfirmation({
       title: 'Delete Transaction',
-      message: 'Are you sure you want to delete this transaction? This action cannot be undone.',
+      message: `Are you sure you want to delete this transaction? This action cannot be undone.`,
       onConfirm: async () => {
         try { await deleteDoc(doc(db, 'transactions', id)); }
         catch (e) { handleFirestoreError(e, OperationType.DELETE, 'transactions'); }
@@ -1746,7 +1762,7 @@ export default function App() {
   const handleDeleteBreeding = React.useCallback((id: string) => {
     setDeleteConfirmation({
       title: 'Delete Breeding Record',
-      message: 'Are you sure you want to delete this breeding record? This action cannot be undone.',
+      message: `Are you sure you want to delete this breeding record? This action cannot be undone.`,
       onConfirm: async () => {
         try { await deleteDoc(doc(db, 'breedingRecords', id)); }
         catch (e) { handleFirestoreError(e, OperationType.DELETE, 'breedingRecords'); }
@@ -1754,11 +1770,11 @@ export default function App() {
     });
   }, [handleFirestoreError]);
 
-  const handleNavigate = React.useCallback((tab: any, query: string = '', filter: { birdId?: string, pairId?: string } | null = null, isDirectNav: boolean = false) => {
+  const handleNavigate = React.useCallback((tab: any, query: string = ``, filter: { birdId?: string, pairId?: string } | null = null, isDirectNav: boolean = false) => {
     if (isDirectNav) {
       setNavigationHistory(null);
     } else {
-      // Save current state to history if it's different
+      // Save current state to history if it`s different
       const isPedigreeChange = tab === 'pedigree' && activeTab === 'pedigree' && searchQuery !== query;
       if (activeTab !== tab || isPedigreeChange || searchQuery !== query) {
         setNavigationHistory({ tab: activeTab, query: searchQuery, filter: statsFilter });
@@ -1854,7 +1870,7 @@ export default function App() {
 
     const handleImport = async () => {
       if (!user) {
-        toast.error('Please log in to import birds to your aviary.');
+        toast.error(`Please log in to import birds to your aviary.`);
         return;
       }
       if (sharedItemView.type === 'bird') {
@@ -1951,10 +1967,33 @@ export default function App() {
             }
           }
 
+          // Check & apply customFields
+          if (data.customFields && (!isTransfer || transferImportCustomFields)) {
+            defaultData.customFields = data.customFields;
+          }
+
+          // Sync customFieldDefinitions if any new definitions are transferred
+          if (data.customFieldDefinitions && Array.isArray(data.customFieldDefinitions) && userSettings) {
+            const existingFieldNames = new Set((userSettings.customBirdFields || []).map((f: any) => f.name.toLowerCase()));
+            const newFieldsToAdd = data.customFieldDefinitions.filter((cf: any) => cf.name && !existingFieldNames.has(cf.name.toLowerCase()));
+            if (newFieldsToAdd.length > 0) {
+              const updatedSettings = {
+                ...userSettings,
+                customBirdFields: [...(userSettings.customBirdFields || []), ...newFieldsToAdd]
+              };
+              try {
+                await setDoc(doc(db, 'users', user.uid, 'settings', 'general'), sanitizeData(updatedSettings), { merge: true });
+                setUserSettings(updatedSettings);
+              } catch (err) {
+                console.error(`Failed to sync imported custom field definitions:`, err);
+              }
+            }
+          }
+
           // Actually save the bird
           await setDoc(doc(db, 'birds', mainBirdId), sanitizeData(defaultData));
           
-          toast.success('Bird imported successfully!');
+          toast.success(`Bird imported successfully!`);
           setActiveTab('birds');
           setSharedItemView(null);
         } catch (e) {
@@ -1963,10 +2002,10 @@ export default function App() {
         }
       } else if (sharedItemView.type === 'pair') {
         try {
-          let newMaleId = '';
+          let newMaleId = ``;
           const maleData = data.maleBird || {
             name: data.maleName,
-            species: data.maleSpecies || '',
+            species: data.maleSpecies || ``,
             sex: 'Male'
           };
           if (maleData.name) {
@@ -1976,7 +2015,8 @@ export default function App() {
             } else {
               const maleToSave = sanitizeData({
                 ...maleData,
-                cageId: transferCageId || '',
+                cageId: transferCageId || ``,
+                customFields: (!isTransfer || transferImportCustomFields) ? (maleData.customFields || data.maleBird?.customFields) : undefined,
                 uid: user?.uid,
                 createdAt: new Date().toISOString()
               });
@@ -1985,10 +2025,10 @@ export default function App() {
             }
           }
           
-          let newFemaleId = '';
+          let newFemaleId = ``;
           const femaleData = data.femaleBird || {
             name: data.femaleName,
-            species: data.femaleSpecies || '',
+            species: data.femaleSpecies || ``,
             sex: 'Female'
           };
           if (femaleData.name) {
@@ -1998,7 +2038,8 @@ export default function App() {
             } else {
               const femaleToSave = sanitizeData({
                 ...femaleData,
-                cageId: transferCageId || '',
+                cageId: transferCageId || ``,
+                customFields: (!isTransfer || transferImportCustomFields) ? (femaleData.customFields || data.femaleBird?.customFields) : undefined,
                 uid: user?.uid,
                 createdAt: new Date().toISOString()
               });
@@ -2030,7 +2071,7 @@ export default function App() {
             for (const record of data.breedingRecords) {
               await addDoc(collection(db, 'breedingRecords'), sanitizeData({
                 ...record,
-                id: undefined, // ensure we don't copy old IDs
+                id: undefined, // ensure we don`t copy old IDs
                 pairId: pairRef.id,
                 uid: user?.uid
               }));
@@ -2048,7 +2089,7 @@ export default function App() {
         try {
           const cageRef = await addDoc(collection(db, 'cages'), sanitizeData({
             name: data.name,
-            location: data.location || '',
+            location: data.location || ``,
             type: data.type || 'Standard',
             uid: user?.uid,
             createdAt: new Date().toISOString()
@@ -2065,7 +2106,7 @@ export default function App() {
               }));
             }
           }
-          toast.success('Cage and birds imported successfully!');
+          toast.success(`Cage and birds imported successfully!`);
           setActiveTab('cages');
         } catch (e) {
           console.error("Error importing cage:", e);
@@ -2086,12 +2127,12 @@ export default function App() {
 
     const handleDeleteShared = () => {
       if (!user || user.uid !== sharedItemView.createdBy) {
-        toast.error('You do not have permission to delete this shared item.');
+        toast.error(`You do not have permission to delete this shared item.`);
         return;
       }
       setDeleteConfirmation({
         title: 'Delete Shared Link',
-        message: 'Are you sure you want to delete this shared link? Others will no longer be able to import it.',
+        message: `Are you sure you want to delete this shared link? Others will no longer be able to import it.`,
         onConfirm: async () => {
           try {
             await deleteDoc(doc(db, 'shared_items', sharedItemView.id));
@@ -2152,7 +2193,7 @@ export default function App() {
                       <Badge variant={data.sex === 'Male' ? 'male' : data.sex === 'Female' ? 'female' : 'neutral'}>{data.sex}</Badge>
                     </h2>
                     <p className="text-gold-500 font-bold uppercase tracking-widest text-xs mt-1">
-                      {data.species} {data.subSpecies ? `• ${data.subSpecies}` : ''}
+                      {data.species} {data.subSpecies ? `* ${data.subSpecies}` : ``}
                     </p>
                   </div>
 
@@ -2188,6 +2229,37 @@ export default function App() {
                       </div>
                     )}
                   </div>
+
+                  {data.customFields && Object.keys(data.customFields).length > 0 && (
+                    <div className="space-y-2 border-t border-black-800 pt-4">
+                      <p className="text-black-200 uppercase tracking-widest text-[10px] font-black flex items-center gap-1.5">
+                        <Sliders size={12} className="text-gold-500" />
+                        <span>Additional Information</span>
+                      </p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {Object.entries(data.customFields).map(([k, v]: [string, any]) => {
+                          const def = data.customFieldDefinitions?.find((d: any) => d.id === k || d.name.toLowerCase() === k.toLowerCase());
+                          const fieldName = def?.name || k;
+                          const fieldType = def?.type || (typeof v === 'number' ? 'number' : 'text');
+                          return (
+                            <div key={k} className="p-2 bg-black-900 border border-black-700 rounded-xl flex items-center justify-between gap-2">
+                              <div className="min-w-0 flex-1">
+                                <p className="text-[8px] font-black uppercase text-zinc-400 truncate">{fieldName}</p>
+                                <p className="text-xs font-bold text-white truncate mt-0.5">{String(v)}</p>
+                              </div>
+                              <span className={cn(
+                                "text-[8px] font-black uppercase px-1.5 py-0.5 rounded border flex items-center gap-0.5 shrink-0",
+                                fieldType === 'number' ? "bg-amber-500/10 text-amber-400 border-amber-500/30" : "bg-blue-500/10 text-blue-400 border-blue-500/30"
+                              )}>
+                                {fieldType === 'number' ? <Hash size={9} /> : <Type size={9} />}
+                                {fieldType === 'number' ? 'Num' : 'Txt'}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
 
                   {data.notes && (
                     <div className="space-y-1 border-t border-black-800 pt-4">
@@ -2289,6 +2361,16 @@ export default function App() {
                     {[...cages].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                   </select>
                 </div>
+
+                {((data.customFields && Object.keys(data.customFields).length > 0) || (data.customFieldDefinitions && data.customFieldDefinitions.length > 0)) && (
+                  <label className="flex items-center gap-3 cursor-pointer group select-none">
+                    <input type="checkbox" className="hidden" checked={transferImportCustomFields} onChange={e => setTransferImportCustomFields(e.target.checked)} />
+                    <div className={cn("w-5 h-5 rounded flex items-center justify-center border transition-colors", transferImportCustomFields ? "bg-gold-500 border-gold-500 text-black" : "border-black-600 bg-zinc-900")}>
+                      {transferImportCustomFields && <CheckSquare size={14} />}
+                    </div>
+                    <span className="text-xs font-bold text-white group-hover:text-gold-500 transition-colors">Import Extra Custom Fields</span>
+                  </label>
+                )}
 
                 {sharedItemView.type === 'bird' && (data.fatherName || data.motherName) && (
                   <label className="flex items-center gap-3 cursor-pointer group select-none">
@@ -2457,7 +2539,7 @@ export default function App() {
               onClick={() => setWalkthroughStep(1)}
               className="w-full flex items-center justify-center gap-2 py-1.5 rounded-lg border border-gold-500/10 bg-gold-500/5 hover:bg-gold-500/10 hover:border-gold-500/20 text-[8px] text-zinc-400 hover:text-gold-500 transition-all uppercase tracking-wider font-extrabold cursor-pointer"
             >
-              👑 <span className="tracking-widest">Help & Guide Tour</span>
+              [Crown] <span className="tracking-widest">Help & Guide Tour</span>
             </button>
           </div>
 
@@ -2497,7 +2579,7 @@ export default function App() {
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-1.5">
-                  <p className="text-[9px] text-white/70 truncate uppercase font-bold tracking-tight">{user.email?.split('@')[0]}</p>
+                  <p className="text-[9px] text-white/70 truncate uppercase font-bold tracking-tight">{user.email?.split(`@`)[0]}</p>
                   {isAdmin && (
                     <span className="text-[7px] font-black uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1 py-0.2 rounded">
                       ADMIN
@@ -2509,8 +2591,8 @@ export default function App() {
                 onClick={logout} 
                 className="p-1 text-white/30 transition-colors"
                 style={{ '--hover-color': 'var(--theme-delete-color, #ef4444)' } as any}
-                onMouseEnter={(e) => e.currentTarget.style.color = 'var(--theme-delete-color, #ef4444)'}
-                onMouseLeave={(e) => e.currentTarget.style.color = 'rgba(255,255,255,0.3)'}
+                onMouseEnter={(e) => e.currentTarget.style.color = `var(--theme-delete-color, #ef4444)`}
+                onMouseLeave={(e) => e.currentTarget.style.color = `rgba(255,255,255,0.3)`}
               >
                 <LogOut size={12} />
               </button>
@@ -2596,7 +2678,7 @@ export default function App() {
                 />
                 {searchQuery && (
                   <button 
-                    onClick={() => setSearchQuery('')}
+                    onClick={() => setSearchQuery(``)}
                     className="absolute right-4 top-1/2 -translate-y-1/2 text-black-100 hover:text-white transition-colors"
                   >
                     <X size={14} />
@@ -2801,7 +2883,7 @@ export default function App() {
                                     batch.delete(doc(db, 'pairs', p.id));
                                   });
 
-                                  // Clear mate's record
+                                  // Clear mate`s record
                                   const mateId = bird.mateId || birds.find(b => b.mateId === bird.id)?.id;
                                   if (mateId && mateId !== bird.id) {
                                     batch.update(doc(db, 'birds', mateId), { mateId: '' });
@@ -2919,7 +3001,7 @@ export default function App() {
                             onEdit={() => { setEditingItem(pair); setIsModalOpen(true); }}
                             onDelete={() => setDeleteConfirmation({ 
                               title: 'Delete Pair', 
-                              message: 'Are you sure you want to delete this breeding pair? This action cannot be undone.',
+                              message: `Are you sure you want to delete this breeding pair? This action cannot be undone.`,
                               onConfirm: async () => {
                                 try { 
                                   const batch = writeBatch(db);
@@ -2974,10 +3056,11 @@ export default function App() {
                             male={birds.find(b => b.id === pairs.find(p => p.id === record.pairId)?.maleId)}
                             female={birds.find(b => b.id === pairs.find(p => p.id === record.pairId)?.femaleId)}
                             birds={birds}
+                            currency={userSettings?.currency}
                             onEdit={() => { setEditingItem(record); setIsModalOpen(true); }}
                             onDelete={() => setDeleteConfirmation({ 
                               title: 'Delete Breeding Record', 
-                              message: 'Are you sure you want to delete this breeding record? This action cannot be undone.',
+                              message: `Are you sure you want to delete this breeding record? This action cannot be undone.`,
                               onConfirm: async () => {
                                 try { await deleteDoc(doc(db, 'breedingRecords', record.id)); }
                                 catch (e) { handleFirestoreError(e, OperationType.DELETE, 'breedingRecords'); }
@@ -3190,7 +3273,7 @@ export default function App() {
                       onEdit={(c) => { setEditingItem(c); setIsModalOpen(true); }}
                       onDelete={(id) => setDeleteConfirmation({
                         title: 'Delete Contact',
-                        message: 'Are you sure you want to delete this contact? This action cannot be undone.',
+                        message: `Are you sure you want to delete this contact? This action cannot be undone.`,
                         onConfirm: async () => {
                           try { await deleteDoc(doc(db, 'contacts', id)); }
                           catch (e) { handleFirestoreError(e, OperationType.DELETE, 'contacts'); }
@@ -3277,7 +3360,7 @@ export default function App() {
                     onToggleForceOffline={handleToggleForceOffline}
                     comingSoonSettings={comingSoonSettings}
                     onUpdateComingSoonPageConfig={handleUpdateComingSoonPageConfig}
-                    onNavigateToTab={(tab) => handleNavigate(tab, '', null, true)}
+                    onNavigateToTab={(tab) => handleNavigate(tab, ``, null, true)}
                   />
                 )}
               </div>
@@ -3332,7 +3415,7 @@ export default function App() {
         onClose={() => setDeleteConfirmation(null)}
         onConfirm={handleConfirmDelete}
         title={deleteConfirmation?.title || 'Confirm Delete'}
-        message={deleteConfirmation?.message || 'Are you sure you want to delete this item? This action cannot be undone.'}
+        message={deleteConfirmation?.message || `Are you sure you want to delete this item? This action cannot be undone.`}
         isDeleting={isDeleting}
       />
 
@@ -3344,12 +3427,12 @@ export default function App() {
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
               className="bg-black border border-gold-500/30 p-6 rounded-3xl w-full max-w-sm shadow-2xl relative overflow-hidden"
-              style={{ backgroundColor: 'var(--theme-card-color, #121212)' }}
+              style={{ backgroundColor: `var(--theme-card-color, #121212)` }}
             >
               <div className="absolute -top-12 -left-12 w-32 h-32 bg-gold-500/5 rounded-full blur-2xl pointer-events-none" />
               
               <h4 className="text-sm font-black uppercase tracking-widest text-gold-500 mb-4 flex items-center gap-2">
-                <span>✨ Quick Add {quickAddDialog.type === 'subspecies' ? 'Sub-Species' : quickAddDialog.type === 'species' ? 'Species' : 'Mutation'}</span>
+                <span>[Sparkle] Quick Add {quickAddDialog.type === 'subspecies' ? 'Sub-Species' : quickAddDialog.type === 'species' ? 'Species' : 'Mutation'}</span>
               </h4>
 
               <div className="space-y-4">
@@ -3374,7 +3457,7 @@ export default function App() {
                   <div className="space-y-1">
                     <label className="text-[9px] font-black text-black-200 uppercase tracking-widest ml-1">Inheritance</label>
                     <Select 
-                      value={quickAddDialog.inheritance || ''} 
+                      value={quickAddDialog.inheritance || ``} 
                       onChange={e => setQuickAddDialog({ ...quickAddDialog, inheritance: e.target.value as any })}
                     >
                       <option value="" className="bg-black text-white">None (Select in Calculator)</option>
@@ -3391,7 +3474,7 @@ export default function App() {
                   <div className="space-y-1">
                     <label className="text-[9px] font-black text-black-200 uppercase tracking-widest ml-1">Parent Species</label>
                     <Select 
-                      value={quickAddDialog.speciesId || ''} 
+                      value={quickAddDialog.speciesId || ``} 
                       onChange={e => setQuickAddDialog({ ...quickAddDialog, speciesId: e.target.value })}
                     >
                       <option value="" className="bg-black text-white">Select Parent Species</option>
@@ -3521,7 +3604,7 @@ export default function App() {
                 <div className="absolute -bottom-12 -right-12 w-48 h-48 bg-gold-500/5 rounded-full blur-3xl pointer-events-none" />
 
                 <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-gold-500/20 to-gold-500/5 border border-gold-500/30 flex items-center justify-center text-gold-500 shadow-lg shadow-gold-500/10">
-                  <span className="text-3xl animate-bounce">👑</span>
+                  <span className="text-3xl animate-bounce">[Crown]</span>
                 </div>
 
                 <div className="space-y-2">
@@ -3624,7 +3707,7 @@ export default function App() {
                   >
                     <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300" />
                     <span className="relative z-10 flex items-center justify-center gap-2">
-                      👑 HIGHLIGHTED MEMBERSHIP PLAN 👑
+                      [Crown] HIGHLIGHTED MEMBERSHIP PLAN [Crown]
                     </span>
                   </button>
                   <p className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest mt-1.5 animate-pulse">Click directly to explore secure payment & subscription setups</p>
@@ -3816,340 +3899,17 @@ function NavItem({
       <span className="flex-1 text-left uppercase tracking-widest text-[10px] truncate">{label}</span>
       {isComingSoon ? (
         <span className={cn(
-          'text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded border shrink-0',
+          `text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded border shrink-0`,
           isAdmin 
             ? 'bg-amber-500/20 text-amber-300 border-amber-500/40' 
             : 'bg-amber-500/10 text-amber-400 border-amber-500/30'
         )}>
-          {isAdmin ? '🚧 SOON' : 'SOON'}
+          {isAdmin ? '[Under Construction] SOON' : 'SOON'}
         </span>
       ) : (
         <span className={cn('text-[10px] px-2 py-0.5 rounded-lg font-black', active ? 'bg-black/20 text-black' : 'bg-zinc-800 text-white/50 group-hover:text-secondary')}>{count}</span>
       )}
     </button>
-  );
-}
-
-function ShareBirdModal({ bird, mother, father, mate, offspring, cages, cageName, onClose }: { bird: Bird, mother?: Bird, father?: Bird, mate?: Bird, offspring: Bird[], cages: Cage[], cageName?: string, onClose: () => void }) {
-  const [selectedFields, setSelectedFields] = useState<string[]>(['name', 'sex', 'species', 'mutations', 'splitMutations', 'cage', 'mate', 'offspring', 'parents', 'birthDate', 'image']);
-  const [isTransferMode, setIsTransferMode] = useState(false);
-
-  const fields = [
-    { id: 'name', label: 'ID / Number' },
-    { id: 'sex', label: 'Sex' },
-    { id: 'species', label: 'Species & Sub-species' },
-    { id: 'mutations', label: 'Mutations' },
-    { id: 'splitMutations', label: 'Split Mutations' },
-    { id: 'cage', label: 'Cage Number' },
-    { id: 'mate', label: 'Current Mate' },
-    { id: 'offspring', label: 'Offspring List' },
-    { id: 'birthDate', label: 'Birth Date' },
-    { id: 'parents', label: 'Parents (Names)' },
-    { id: 'image', label: 'Bird Image' },
-    { id: 'notes', label: 'Notes' },
-  ];
-
-  const formatBirdInfo = (targetBird: Bird, title: string, includeImage: boolean = false) => {
-    let text = `📍 ${title}: ${targetBird.name}\n`;
-    const indent = "   ";
-    
-    if (selectedFields.includes('sex')) text += `${indent}• Sex: ${targetBird.sex}\n`;
-    if (selectedFields.includes('species')) {
-      text += `${indent}• Species: ${targetBird.species}${targetBird.subSpecies ? ` (${targetBird.subSpecies})` : ''}\n`;
-    }
-    if (selectedFields.includes('mutations') && targetBird.mutations?.length) {
-      text += `${indent}• Mutations: ${targetBird.mutations.join(', ')}\n`;
-    }
-    if (selectedFields.includes('splitMutations') && targetBird.splitMutations?.length) {
-      text += `${indent}• Split: ${targetBird.splitMutations.join(', ')}\n`;
-    }
-    if (selectedFields.includes('birthDate') && targetBird.birthDate) {
-      text += `${indent}• Born: ${targetBird.birthDate}\n`;
-    }
-    if (selectedFields.includes('cage')) {
-      const birdCage = cages.find(c => c.id === targetBird.cageId);
-      if (birdCage) text += `${indent}• Cage: ${birdCage.name}\n`;
-      else if (targetBird.id === bird.id && cageName) text += `${indent}• Cage: ${cageName}\n`;
-    }
-    if (includeImage && selectedFields.includes('image') && targetBird.imageUrl && !targetBird.imageUrl.startsWith('data:')) {
-      text += `${indent}• Image: ${targetBird.imageUrl}\n`;
-    }
-    return text + "\n";
-  };
-
-  const handleShare = async () => {
-    let shareText = `🕊️ BIRD PROFILE: ${bird.name}\n`;
-    shareText += `====================\n\n`;
-    
-    shareText += formatBirdInfo(bird, "MAIN DETAILS", true);
-    
-    if (selectedFields.includes('parents')) {
-      if (father || mother) {
-        shareText += `🧬 PARENTS\n`;
-        if (father) shareText += formatBirdInfo(father, "Father");
-        if (mother) shareText += formatBirdInfo(mother, "Mother");
-      }
-    }
-
-    if (selectedFields.includes('mate') && mate) {
-      shareText += `💝 CURRENT MATE\n`;
-      shareText += formatBirdInfo(mate, "Mate");
-    }
-
-    if (selectedFields.includes('offspring') && offspring.length > 0) {
-      shareText += `🐣 OFFSPRING (${offspring.length})\n`;
-      offspring.forEach((o, i) => {
-        shareText += formatBirdInfo(o, `Child #${i + 1}`);
-      });
-    }
-
-    if (selectedFields.includes('notes') && bird.notes) {
-      shareText += `📝 NOTES\n${bird.notes}\n\n`;
-    }
-
-    if (isTransferMode) {
-      shareText += `\n--- Transfer Data ---\n`;
-      const transferData = {
-        ...bird,
-        uid: undefined,
-        cageId: undefined,
-        motherId: undefined,
-        fatherId: undefined,
-        mateId: undefined,
-        motherName: mother?.name,
-        fatherName: father?.name,
-        mateName: mate?.name,
-      };
-      
-      try {
-        const docRef = await addDoc(collection(db, 'shared_items'), {
-          type: 'bird',
-          action: 'transfer',
-          data: ensurePassportPayloadFitsFirestore(transferData),
-          createdAt: new Date().toISOString(),
-          createdBy: auth.currentUser?.uid || ''
-        });
-        const transferUrl = `${window.location.origin}?transferId=${docRef.id}`;
-        shareText += `\nImport Link: ${transferUrl}\n`;
-      } catch (err) {
-        console.error('Failed to create transfer link:', err);
-      }
-    }
-
-    const shareData: any = {
-      title: `Bird: ${bird.name}`,
-      text: shareText
-    };
-
-    if (selectedFields.includes('image') && bird.imageUrl?.startsWith('data:')) {
-      try {
-        const res = await fetch(bird.imageUrl);
-        const blob = await res.blob();
-        const file = new File([blob], `${bird.name.replace(/[^a-zA-Z0-9]/g, '_')}.webp`, { type: 'image/webp' });
-        if (navigator.canShare && navigator.canShare({ files: [file] })) {
-          shareData.files = [file];
-        }
-      } catch (err) {
-        console.error('Failed to prepare image for sharing:', err);
-      }
-    }
-
-    if (navigator.share) {
-      try {
-        await navigator.share(shareData);
-        onClose();
-      } catch (err) {
-        if ((err as Error).name !== 'AbortError') {
-          console.error('Share failed:', err);
-          navigator.clipboard.writeText(shareText);
-          toast.success('Bird info copied to clipboard');
-        }
-        onClose();
-      }
-    } else {
-      navigator.clipboard.writeText(shareText);
-      toast.success('Bird info copied to clipboard');
-      onClose();
-    }
-  };
-
-  return (
-    <div className="space-y-6">
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h3 className="text-sm font-black text-white uppercase tracking-widest">Select Data to Share</h3>
-          <button 
-            onClick={() => setIsTransferMode(!isTransferMode)}
-            className={cn(
-              "text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full border transition-all",
-              isTransferMode ? "bg-gold-500 border-gold-500 text-black" : "border-black-700 text-white/50"
-            )}
-          >
-            {isTransferMode ? 'Transfer Mode ON' : 'Transfer Mode OFF'}
-          </button>
-        </div>
-        
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-          {fields.map(field => (
-            <div 
-              key={field.id}
-              onClick={() => setSelectedFields(prev => prev.includes(field.id) ? prev.filter(f => f !== field.id) : [...prev, field.id])}
-              className={cn(
-                "flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all",
-                selectedFields.includes(field.id) ? "bg-gold-500/10 border-gold-500/50" : "bg-zinc-900/50 border-black-800 hover:border-black-600"
-              )}
-            >
-              <div className={cn("w-4 h-4 rounded border flex items-center justify-center transition-colors", selectedFields.includes(field.id) ? "bg-gold-500 border-gold-500 text-black" : "border-black-600")}>
-                {selectedFields.includes(field.id) && <CheckSquare size={12} />}
-              </div>
-              <span className="text-xs font-bold text-white">{field.label}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <Button onClick={handleShare} className="w-full py-4">
-        <Send size={18} className="mr-2" />
-        {isTransferMode ? 'Share & Transfer' : 'Share Bird Info'}
-      </Button>
-    </div>
-  );
-}
-
-function SharePairModal({ pair, male, female, birds, records, onClose }: { pair: Pair, male?: Bird, female?: Bird, birds: Bird[], records: BreedingRecord[], onClose: () => void }) {
-  const [selectedFields, setSelectedFields] = useState<string[]>(['male', 'female', 'breeding']);
-  const [isTransferMode, setIsTransferMode] = useState(false);
-
-  const fields = [
-    { id: 'male', label: 'Male Bird Info' },
-    { id: 'female', label: 'Female Bird Info' },
-    { id: 'breeding', label: 'Breeding Records' }
-  ];
-
-  const handleShare = async () => {
-    let shareText = `💞 PAIR PROFILE\n`;
-    shareText += `====================\n\n`;
-    
-    if (selectedFields.includes('male') && male) {
-      shareText += `♂️ MALE: ${male.name}\n   • Species: ${male.species}\n   • Mutations: ${male.mutations?.join(', ') || 'N/A'}\n\n`;
-    }
-    if (selectedFields.includes('female') && female) {
-      shareText += `♀️ FEMALE: ${female.name}\n   • Species: ${female.species}\n   • Mutations: ${female.mutations?.join(', ') || 'N/A'}\n\n`;
-    }
-
-    const pairRecords = records.filter(r => r.pairId === pair.id);
-    if (selectedFields.includes('breeding') && pairRecords.length > 0) {
-      shareText += `🐣 BREEDING RECORDS (${pairRecords.length})\n`;
-      pairRecords.forEach(r => {
-        shareText += `   • ${r.startDate}: Laid: ${r.eggsLaid}, Hatched: ${r.eggsHatched}, Weaned: ${r.chicksWeaned}\n`;
-      });
-      shareText += `\n`;
-    }
-
-    if (isTransferMode) {
-      shareText += `\n--- Transfer Data ---\n`;
-
-      const maleFather = male ? birds.find(b => b.id === male.fatherId) : undefined;
-      const maleMother = male ? birds.find(b => b.id === male.motherId) : undefined;
-      const femaleFather = female ? birds.find(b => b.id === female.fatherId) : undefined;
-      const femaleMother = female ? birds.find(b => b.id === female.motherId) : undefined;
-
-      const cleanBirdForTransfer = (b?: Bird, f?: Bird, m?: Bird) => b ? {
-        ...b, 
-        uid: undefined, 
-        cageId: undefined, 
-        fatherId: undefined, 
-        motherId: undefined, 
-        mateId: undefined,
-        fatherName: f?.name, 
-        motherName: m?.name,
-        notes: b.notes || '',
-        statuses: b.statuses || [],
-        purchasePrice: b.purchasePrice || 0,
-        estimatedValue: b.estimatedValue || 0,
-      } : undefined;
-
-      const transferData = {
-        ...pair,
-        uid: undefined,
-        maleBird: selectedFields.includes('male') ? cleanBirdForTransfer(male, maleFather, maleMother) : undefined,
-        femaleBird: selectedFields.includes('female') ? cleanBirdForTransfer(female, femaleFather, femaleMother) : undefined,
-        breedingRecords: selectedFields.includes('breeding') ? pairRecords.map(r => ({ ...r, pairId: undefined, uid: undefined })) : [],
-      };
-      
-      try {
-        const docRef = await addDoc(collection(db, 'shared_items'), {
-          type: 'pair',
-          action: 'transfer',
-          data: ensurePassportPayloadFitsFirestore(transferData),
-          createdAt: new Date().toISOString(),
-          createdBy: auth.currentUser?.uid || ''
-        });
-        const transferUrl = `${window.location.origin}?transferId=${docRef.id}`;
-        shareText += `\nImport Link: ${transferUrl}\n`;
-      } catch (err) {
-        console.error('Failed to create transfer link:', err);
-      }
-    }
-
-    if (navigator.share) {
-      try {
-        await navigator.share({ title: `Pair Transfer`, text: shareText });
-        onClose();
-      } catch (err) {
-        if ((err as Error).name !== 'AbortError') {
-          navigator.clipboard.writeText(shareText);
-          toast.success('Pair info copied to clipboard');
-        }
-        onClose();
-      }
-    } else {
-      navigator.clipboard.writeText(shareText);
-      toast.success('Pair info copied to clipboard');
-      onClose();
-    }
-  };
-
-  return (
-    <div className="space-y-6">
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h3 className="text-sm font-black text-white uppercase tracking-widest">Select Data to Share</h3>
-          <button 
-            onClick={() => setIsTransferMode(!isTransferMode)}
-            className={cn(
-              "text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full border transition-all",
-              isTransferMode ? "bg-gold-500 border-gold-500 text-black" : "border-black-700 text-white/50"
-            )}
-          >
-            {isTransferMode ? 'Transfer Mode ON' : 'Transfer Mode OFF'}
-          </button>
-        </div>
-        
-        <div className="grid grid-cols-1 gap-2">
-          {fields.map(field => (
-            <div 
-              key={field.id}
-              onClick={() => setSelectedFields(prev => prev.includes(field.id) ? prev.filter(f => f !== field.id) : [...prev, field.id])}
-              className={cn(
-                "flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all",
-                selectedFields.includes(field.id) ? "bg-gold-500/10 border-gold-500/50" : "bg-zinc-900/50 border-black-800 hover:border-black-600"
-              )}
-            >
-              <div className={cn("w-4 h-4 rounded border flex items-center justify-center transition-colors", selectedFields.includes(field.id) ? "bg-gold-500 border-gold-500 text-black" : "border-black-600")}>
-                {selectedFields.includes(field.id) && <CheckSquare size={12} />}
-              </div>
-              <span className="text-xs font-bold text-white">{field.label}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <Button onClick={handleShare} className="w-full py-4">
-        <Send size={18} className="mr-2" />
-        {isTransferMode ? 'Share & Transfer' : 'Share Pair Info'}
-      </Button>
-    </div>
   );
 }
 
@@ -4214,7 +3974,7 @@ function PedigreeFullView({ birdId, birds, cages, onBirdRef, onBack, userSetting
             -webkit-print-color-adjust: exact;
           }
           #pedigree-print-area .bg-black,
-          #pedigree-print-area .bg-\\[\\#050505\\] { 
+          #pedigree-print-area .bg-\[\#050505\] { 
             background: white !important; 
           }
           #pedigree-print-area .bg-zinc-900 { 
@@ -4228,11 +3988,11 @@ function PedigreeFullView({ birdId, birds, cages, onBirdRef, onBack, userSetting
           #pedigree-print-area .text-white { 
             color: black !important; 
           }
-          #pedigree-print-area .border-white\\/5, 
-          #pedigree-print-area .border-white\\/10 { 
+          #pedigree-print-area .border-white\/5, 
+          #pedigree-print-area .border-white\/10 { 
             border-color: #eee !important; 
           }
-          #pedigree-print-area .bg-emerald-500\\/10 { 
+          #pedigree-print-area .bg-emerald-500\/10 { 
             background: #f0fdf4 !important; 
             border: 1pt solid #bbf7d0 !important;
           }
@@ -4311,8 +4071,8 @@ function PedigreeFullView({ birdId, birds, cages, onBirdRef, onBack, userSetting
               padding: 0 !important;
               overflow: visible !important;
            }
-           .print\\:bg-white { background: white !important; }
-           .print\\:text-black { color: black !important; }
+           .print\:bg-white { background: white !important; }
+           .print\:text-black { color: black !important; }
            ::-webkit-scrollbar { display: none; }
         }
       `}</style>
@@ -4326,6 +4086,22 @@ function BirdCard({ bird, cage, birds, cages, viewMode = 'grid-large', currency,
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [isPassportOpen, setIsPassportOpen] = useState(false);
   const [showDocs, setShowDocs] = useState(false);
+  const [showCustomFields, setShowCustomFields] = useState(false);
+
+  const customFieldEntries = useMemo(() => {
+    if (!bird.customFields) return [];
+    return Object.entries(bird.customFields)
+      .filter(([_, v]) => v !== undefined && v !== `` && v !== null)
+      .map(([key, val]) => {
+        const def = userSettings?.customBirdFields?.find(f => f.id === key || f.name.toLowerCase() === key.toLowerCase());
+        return {
+          key,
+          name: def?.name || key,
+          value: val,
+          type: def?.type || (typeof val === 'number' ? 'number' : 'text')
+        };
+      });
+  }, [bird.customFields, userSettings?.customBirdFields]);
   const [showActions, setShowActions] = useState(false);
   const symbol = getCurrencySymbol(currency);
   const offspring = birds.filter(b => b.motherId === bird.id || b.fatherId === bird.id || bird.offspringIds?.includes(b.id));
@@ -4384,7 +4160,7 @@ function BirdCard({ bird, cage, birds, cages, viewMode = 'grid-large', currency,
         uid: undefined,
         cageId: undefined,
         mateId: undefined,
-        notes: bird.notes || '',
+        notes: bird.notes || ``,
         statuses: bird.statuses || [],
         purchasePrice: bird.purchasePrice || 0,
         estimatedValue: bird.estimatedValue || 0,
@@ -4396,7 +4172,7 @@ function BirdCard({ bird, cage, birds, cages, viewMode = 'grid-large', currency,
         action: 'transfer',
         data: ensurePassportPayloadFitsFirestore(transferData),
         createdAt: new Date().toISOString(),
-        createdBy: auth.currentUser?.uid || ''
+        createdBy: auth.currentUser?.uid || ``
       });
       
       const url = `${window.location.origin}?transferId=${docRef.id}`;
@@ -4412,7 +4188,7 @@ function BirdCard({ bird, cage, birds, cages, viewMode = 'grid-large', currency,
         toast.success('Transfer link copied to clipboard');
       }
     } catch (err) {
-      console.error('Transfer failed:', err);
+      console.error(`Transfer failed:`, err);
       toast.error('Failed to generate transfer link');
     }
   };
@@ -4465,7 +4241,7 @@ function BirdCard({ bird, cage, birds, cages, viewMode = 'grid-large', currency,
             {/* 2. Species & Sub-species */}
             <p className="text-[9px] sm:text-[10px] text-gold-500 font-black uppercase tracking-widest truncate">
               {bird.species}
-              {bird.subSpecies && <span className="text-white mx-1">•</span>}
+              {bird.subSpecies && <span className="text-white mx-1">*</span>}
               {bird.subSpecies && <span className="text-white">{bird.subSpecies}</span>}
             </p>
           </div>
@@ -4586,7 +4362,7 @@ function BirdCard({ bird, cage, birds, cages, viewMode = 'grid-large', currency,
                     className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl transition-all group/btn min-w-[80px]"
                     style={{
                       backgroundColor: `color-mix(in srgb, var(--theme-delete-color, #ef4444), transparent 90%)`,
-                      color: 'var(--theme-delete-color, #ef4444)',
+                      color: `var(--theme-delete-color, #ef4444)`,
                       borderColor: `color-mix(in srgb, var(--theme-delete-color, #ef4444), transparent 80%)`,
                       borderWidth: '1px'
                     }}
@@ -4600,9 +4376,9 @@ function BirdCard({ bird, cage, birds, cages, viewMode = 'grid-large', currency,
           </AnimatePresence>
         </div>
         <Modal isOpen={isShareModalOpen} onClose={() => setIsShareModalOpen(false)} title="Share Bird"> 
-          <ShareBirdModal bird={bird} mother={mother} father={father} mate={mate} offspring={offspring} cages={cages} cageName={cage?.name} onClose={() => setIsShareModalOpen(false)} /> 
+          <ShareBirdModal bird={bird} mother={mother} father={father} mate={mate} offspring={offspring} cages={cages} cageName={cage?.name} userSettings={userSettings} onClose={() => setIsShareModalOpen(false)} /> 
         </Modal> 
-        <Modal isOpen={isPassportOpen} onClose={() => setIsPassportOpen(false)} title={`Digital Transfer Passport`}>
+        <Modal isOpen={isPassportOpen} onClose={() => setIsPassportOpen(false)} title={'Digital Transfer Passport'}>
           <DigitalTransferPassportModal
             bird={bird}
             allBirds={birds}
@@ -4624,6 +4400,64 @@ function BirdCard({ bird, cage, birds, cages, viewMode = 'grid-large', currency,
             </button>
           )}
         </div>
+
+        {customFieldEntries.length > 0 && (
+          <div className="pt-2 border-t border-black-800/50 space-y-2">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowCustomFields(!showCustomFields);
+              }}
+              className="w-full flex items-center justify-between p-2 rounded-xl bg-black-900/80 hover:bg-black-900 border border-black-800 text-left transition-colors cursor-pointer group/cf"
+            >
+              <div className="flex items-center gap-1.5 min-w-0">
+                <Sliders size={13} className="text-gold-500 shrink-0" />
+                <span className="text-[10px] font-black uppercase tracking-wider text-white truncate">
+                  Custom Fields ({customFieldEntries.length})
+                </span>
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="text-[9px] font-bold text-zinc-500 group-hover/cf:text-gold-500 uppercase transition-colors">
+                  {showCustomFields ? 'Hide' : 'View'}
+                </span>
+                {showCustomFields ? <ChevronUp size={13} className="text-gold-500" /> : <ChevronDown size={13} className="text-zinc-500" />}
+              </div>
+            </button>
+
+            <AnimatePresence>
+              {showCustomFields && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="overflow-hidden space-y-1.5 pt-1"
+                >
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                    {customFieldEntries.map(item => (
+                      <div 
+                        key={item.key} 
+                        className="p-2 bg-black border border-black-700/80 rounded-xl flex items-center justify-between gap-2 text-xs"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[8px] font-black uppercase tracking-widest text-zinc-400 truncate">{item.name}</p>
+                          <p className="text-xs font-bold text-white truncate mt-0.5">{String(item.value)}</p>
+                        </div>
+                        <span className={cn(
+                          "text-[8px] font-black uppercase px-1.5 py-0.5 rounded border flex items-center gap-0.5 shrink-0",
+                          item.type === 'number' ? "bg-amber-500/10 text-amber-400 border-amber-500/30" : "bg-blue-500/10 text-blue-400 border-blue-500/30"
+                        )}>
+                          {item.type === 'number' ? <Hash size={9} /> : <Type size={9} />}
+                          {item.type === 'number' ? 'Num' : 'Txt'}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        )}
 
         {effectiveViewMode !== 'list' && bird.notes && (
           <div className="pt-3 border-t border-black-800/50 space-y-2">
@@ -4682,8 +4516,8 @@ function CageCard({ cage, birds, cages, viewMode = 'grid-large', onBirdRef, onNa
                 onClick={(e) => { e.stopPropagation(); onDelete(); }} 
                 className="p-1.5 rounded-lg transition-colors"
                 style={{
-                  backgroundColor: 'color-mix(in srgb, var(--theme-delete-color, #ef4444), transparent 90%)',
-                  color: 'var(--theme-delete-color, #ef4444)'
+                  backgroundColor: `color-mix(in srgb, var(--theme-delete-color, #ef4444), transparent 90%)`,
+                  color: `var(--theme-delete-color, #ef4444)`
                 }}
               >
                 <Trash2 size={16} />
@@ -4708,7 +4542,7 @@ function CageCard({ cage, birds, cages, viewMode = 'grid-large', onBirdRef, onNa
             <div className={cn(effectiveViewMode === 'list' ? "flex items-center gap-2" : "col-span-2 space-y-1 border-t border-black-800/40 pt-2")}>
               <p className="text-white uppercase tracking-widest font-black text-[9px]">Dimensions{effectiveViewMode === 'list' ? ':' : ''}</p>
               <p className="text-white font-bold">
-                {cage.width}W × {cage.height}H × {cage.depth}D ({cage.dimensionUnit || 'cm'})
+                {cage.width}W x {cage.height}H x {cage.depth}D ({cage.dimensionUnit || 'cm'})
               </p>
             </div>
           )}
@@ -4745,7 +4579,7 @@ function CageCard({ cage, birds, cages, viewMode = 'grid-large', onBirdRef, onNa
             className="flex-1 flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-2 rounded-lg transition-all min-w-[70px]"
             style={{
               backgroundColor: `color-mix(in srgb, var(--theme-delete-color, #ef4444), transparent 90%)`,
-              color: 'var(--theme-delete-color, #ef4444)',
+              color: `var(--theme-delete-color, #ef4444)`,
               borderColor: `color-mix(in srgb, var(--theme-delete-color, #ef4444), transparent 80%)`,
               borderWidth: '1px'
             }}
@@ -4834,16 +4668,16 @@ function PairCard({ pair, male, female, cages, birds, records, currency, onBirdR
               <Badge variant="male" className="text-[8px] px-1 py-0 shrink-0">M</Badge>
               <span className="text-xs font-bold text-white truncate max-w-[120px]">{male?.name || 'Unknown'}</span>
               <span className="text-[9px] text-black-400 truncate uppercase tracking-widest">
-                {male?.species}{male?.subSpecies ? ` • ${male.subSpecies}` : ''}
+                {male?.species}{male?.subSpecies ? ` * ${male.subSpecies}` : ``}
               </span>
               {male?.mutations && male.mutations.length > 0 && (
                 <span className="text-[8px] px-1.5 py-0.5 bg-white/5 border border-white/5 rounded text-white/60 font-bold uppercase truncate">
-                  {male.mutations.join(', ')}
+                  {male.mutations.join(`, `)}
                 </span>
               )}
               {male?.splitMutations && male.splitMutations.length > 0 && (
                 <span className="text-[8px] px-1.5 py-0.5 bg-white/5 border border-white/5 rounded text-white/60 font-bold uppercase truncate">
-                  /{male.splitMutations.join(', ')}
+                  /{male.splitMutations.join(`, `)}
                 </span>
               )}
             </div>
@@ -4851,16 +4685,16 @@ function PairCard({ pair, male, female, cages, birds, records, currency, onBirdR
               <Badge variant="female" className="text-[8px] px-1 py-0 shrink-0">F</Badge>
               <span className="text-xs font-bold text-white truncate max-w-[120px]">{female?.name || 'Unknown'}</span>
               <span className="text-[9px] text-black-400 truncate uppercase tracking-widest">
-                {female?.species}{female?.subSpecies ? ` • ${female.subSpecies}` : ''}
+                {female?.species}{female?.subSpecies ? ` * ${female.subSpecies}` : ``}
               </span>
               {female?.mutations && female.mutations.length > 0 && (
                 <span className="text-[8px] px-1.5 py-0.5 bg-white/5 border border-white/5 rounded text-white/60 font-bold uppercase truncate">
-                  {female.mutations.join(', ')}
+                  {female.mutations.join(`, `)}
                 </span>
               )}
               {female?.splitMutations && female.splitMutations.length > 0 && (
                 <span className="text-[8px] px-1.5 py-0.5 bg-white/5 border border-white/5 rounded text-white/60 font-bold uppercase truncate">
-                  /{female.splitMutations.join(', ')}
+                  /{female.splitMutations.join(`, `)}
                 </span>
               )}
             </div>
@@ -4938,7 +4772,7 @@ function PairCard({ pair, male, female, cages, birds, records, currency, onBirdR
             {pair.endDate && (
               <span 
                 className="font-bold opacity-60"
-                style={{ color: 'var(--theme-delete-color, #ef4444)' }}
+                style={{ color: `var(--theme-delete-color, #ef4444)` }}
               >
                 Ended: {pair.endDate}
               </span>
@@ -4982,9 +4816,9 @@ function PairCard({ pair, male, female, cages, birds, records, currency, onBirdR
               onClick={(e) => { e.stopPropagation(); onDelete(); }} 
               className="flex flex-col items-center justify-center py-2 rounded-xl transition-all active:scale-95 border"
               style={{
-                backgroundColor: 'color-mix(in srgb, var(--theme-delete-color, #ef4444), transparent 95%)',
-                color: 'var(--theme-delete-color, #ef4444)',
-                borderColor: 'color-mix(in srgb, var(--theme-delete-color, #ef4444), transparent 80%)'
+                backgroundColor: `color-mix(in srgb, var(--theme-delete-color, #ef4444), transparent 95%)`,
+                color: `var(--theme-delete-color, #ef4444)`,
+                borderColor: `color-mix(in srgb, var(--theme-delete-color, #ef4444), transparent 80%)`
               }}
               title="Delete"
             >
@@ -4995,9 +4829,9 @@ function PairCard({ pair, male, female, cages, birds, records, currency, onBirdR
         </div>
       </div>
       <Modal isOpen={isShareModalOpen} onClose={() => setIsShareModalOpen(false)} title="Share Pair"> 
-        <SharePairModal pair={pair} male={male} female={female} birds={birds} records={records || []} onClose={() => setIsShareModalOpen(false)} /> 
+        <SharePairModal pair={pair} male={male} female={female} birds={birds} cages={cages} records={records || []} userSettings={userSettings} onClose={() => setIsShareModalOpen(false)} /> 
       </Modal> 
-      <Modal isOpen={isPassportOpen} onClose={() => setIsPassportOpen(false)} title={`Digital Transfer Passport - Pair`}>
+      <Modal isOpen={isPassportOpen} onClose={() => setIsPassportOpen(false)} title={'Digital Transfer Passport - Pair'}>
         <DigitalTransferPassportModal
           pair={pair}
           male={male}
@@ -5005,7 +4839,7 @@ function PairCard({ pair, male, female, cages, birds, records, currency, onBirdR
           allBirds={birds}
           cages={cages}
           records={records || []}
-          currentUserId={pair.uid || ''}
+          currentUserId={pair.uid || ``}
           onClose={() => setIsPassportOpen(false)}
         />
       </Modal> 
@@ -5069,27 +4903,27 @@ function FinancialsView({
   const getModalContent = () => {
     if (!clickedTotal) return null;
 
-    let modalTitle = '';
+    let modalTitle = ``;
     let overallVal = 0;
-    let description = '';
+    let description = ``;
     let showStockDetails = false;
 
     if (clickedTotal === 'profit') {
       modalTitle = t('Net Profit Breakdown');
       overallVal = stats.netProfit;
-      description = t('Net Profit reflects total cash income minus total expenses recorded in your transactions.');
+      description = t(`Net Profit reflects total cash income minus total expenses recorded in your transactions.`);
     } else if (clickedTotal === 'income') {
       modalTitle = t('Total Income Breakdown');
       overallVal = stats.totalIncome;
-      description = t('Total Income is the sum of all sales, client rewards, and related revenues.');
+      description = t(`Total Income is the sum of all sales, client rewards, and related revenues.`);
     } else if (clickedTotal === 'expense') {
       modalTitle = t('Total Expenses Breakdown');
       overallVal = stats.totalExpenses;
-      description = t('Total Expenses represents feed cost, equipment purchases, and bird acquisitions.');
+      description = t(`Total Expenses represents feed cost, equipment purchases, and bird acquisitions.`);
     } else if (clickedTotal === 'stock') {
       modalTitle = t('Total Stock Value Breakdown');
       overallVal = stats.totalStockValue;
-      description = t('Stock Value represents the asset valuation of your active, living breeding stock.');
+      description = t(`Stock Value represents the asset valuation of your active, living breeding stock.`);
       showStockDetails = true;
     }
 
@@ -5118,7 +4952,7 @@ function FinancialsView({
         {/* Breakdown Grid / Spans */}
         {clickedTotal !== 'stock' && (
           <div className="space-y-3">
-            <h4 className="text-[10px] font-black text-white uppercase tracking-widest ml-1">{t('Periodic Projections & Averages')}</h4>
+            <h4 className="text-[10px] font-black text-white uppercase tracking-widest ml-1">{t(`Periodic Projections & Averages`)}</h4>
             <div className="grid grid-cols-2 gap-3">
               <div className="p-4 bg-zinc-900 border border-black-800 rounded-xl space-y-1">
                 <p className="text-[9px] text-white/50 font-black uppercase tracking-widest">{t('Daily Average')}</p>
@@ -5161,9 +4995,9 @@ function FinancialsView({
                 <span className="font-extrabold text-emerald-400">+{symbol}{Math.max(0, stats.totalStockValue - stats.totalStockCost).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
               </div>
               <div className="flex items-center justify-between col-span-full">
-                <span className="text-white/40 font-bold uppercase text-[9px] tracking-widest">{t('Value Growth %')}:</span>
+                <span className="text-white/40 font-bold uppercase text-[9px] tracking-widest">{t(`Value Growth %`)}:</span>
                 <span className="font-extrabold text-emerald-400">
-                  {stats.totalStockCost > 0 ? ((stats.totalStockValue - stats.totalStockCost) / stats.totalStockCost * 100).toFixed(1) : '0.0'}%
+                  {stats.totalStockCost > 0 ? ((stats.totalStockValue - stats.totalStockCost) / stats.totalStockCost * 100).toFixed(1) : `0.0`}%
                 </span>
               </div>
             </div>
@@ -5192,7 +5026,7 @@ function FinancialsView({
           </div>
           <div>
             <p className="text-lg sm:text-xl md:text-2xl font-black text-white tracking-tighter break-all">{symbol}{stats.netProfit.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
-            <p className="text-[8px] sm:text-[9px] text-white/50 mt-1 font-bold uppercase tracking-tighter">{t('Averages & ROI Breakdown')}</p>
+            <p className="text-[8px] sm:text-[9px] text-white/50 mt-1 font-bold uppercase tracking-tighter">{t(`Averages & ROI Breakdown`)}</p>
           </div>
         </Card>
 
@@ -5218,10 +5052,10 @@ function FinancialsView({
         >
           <div className="flex items-center justify-between mb-3 sm:mb-4">
             <p className="text-[8px] sm:text-[10px] font-black text-white uppercase tracking-widest mr-2">{t('Total Expenses')}</p>
-            <ArrowDownRight size={16} className="shrink-0 transition-transform group-hover:translate-x-1 group-hover:translate-y-1" style={{ color: 'var(--theme-delete-color, #ef4444)' }} />
+            <ArrowDownRight size={16} className="shrink-0 transition-transform group-hover:translate-x-1 group-hover:translate-y-1" style={{ color: `var(--theme-delete-color, #ef4444)` }} />
           </div>
           <div>
-            <p className="text-lg sm:text-xl md:text-2xl font-black tracking-tighter break-all" style={{ color: 'var(--theme-delete-color, #ef4444)' }}>{symbol}{stats.totalExpenses.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+            <p className="text-lg sm:text-xl md:text-2xl font-black tracking-tighter break-all" style={{ color: `var(--theme-delete-color, #ef4444)` }}>{symbol}{stats.totalExpenses.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
             <p className="text-[8px] sm:text-[9px] text-white/50 mt-1 font-bold uppercase tracking-tighter">{t('View Period Averages')}</p>
           </div>
         </Card>
@@ -5315,7 +5149,7 @@ function EntityStatsView({
   onDeleteTransaction: (id: string) => void
 }) {
   const [activeTab, setActiveTab] = useState<'roi' | 'breeding'>('roi');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState(``);
   const symbol = getCurrencySymbol(currency);
 
   const entityName = useMemo(() => {
@@ -5365,10 +5199,24 @@ function EntityStatsView({
     return filtered;
   }, [breedingRecords, filter, pairs, searchQuery]);
 
+  const targetPair = useMemo(() => {
+    return filter.pairId ? pairs.find(p => p.id === filter.pairId) : undefined;
+  }, [filter.pairId, pairs]);
+
+  const pairRoi = useMemo(() => {
+    if (!targetPair) return null;
+    return calculatePairRoi(targetPair, transactions, birds, breedingRecords);
+  }, [targetPair, transactions, birds, breedingRecords]);
+
   const stats = useMemo(() => {
-    const income = filteredTransactions.filter(t => t.type === 'Income').reduce((acc, t) => acc + t.amount, 0);
-    const expenses = filteredTransactions.filter(t => t.type === 'Expense').reduce((acc, t) => acc + t.amount, 0);
+    let income = filteredTransactions.filter(t => t.type === 'Income').reduce((acc, t) => acc + t.amount, 0);
+    let expenses = filteredTransactions.filter(t => t.type === 'Expense').reduce((acc, t) => acc + t.amount, 0);
     
+    if (pairRoi) {
+      income = pairRoi.totalIncome;
+      expenses = pairRoi.totalExpenses;
+    }
+
     const relevantBirds = filter.birdId 
       ? birds.filter(b => b.id === filter.birdId) 
       : filter.pairId 
@@ -5397,7 +5245,7 @@ function EntityStatsView({
       hatchRate: totalEggs > 0 ? (totalHatched / totalEggs) * 100 : 0,
       weanRate: totalHatched > 0 ? (totalWeaned / totalHatched) * 100 : 0
     };
-  }, [filteredTransactions, filteredBreedingRecords, birds, filter]);
+  }, [filteredTransactions, filteredBreedingRecords, birds, filter, pairRoi]);
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto px-1 sm:px-0">
@@ -5413,7 +5261,7 @@ function EntityStatsView({
             <p className="text-[10px] text-gold-500 font-bold uppercase tracking-widest">Showing breeding and financial ROI</p>
           </div>
         </div>
-        <Button variant="secondary" className="px-4 py-2 text-[10px]" onClick={() => onBirdRef('')}>Close Stats</Button>
+        <Button variant="secondary" className="px-4 py-2 text-[10px]" onClick={() => onBirdRef(``)}>Close Stats</Button>
       </div>
 
       <div className="flex bg-zinc-900 p-1 rounded-2xl border border-black-700 w-fit mx-auto">
@@ -5475,6 +5323,63 @@ function EntityStatsView({
               </div>
             </Card>
           </div>
+
+          {/* Dedicated Pair ROI Breakdown if viewing Pair */}
+          {pairRoi && (
+            <div className="p-5 bg-gradient-to-br from-zinc-900 via-zinc-950 to-black border border-gold-500/30 rounded-2xl space-y-4 shadow-xl">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 pb-3 border-b border-zinc-800">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 rounded-xl bg-gold-500/10 border border-gold-500/20 text-gold-400">
+                    <TrendingUp size={18} />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-black uppercase tracking-widest text-white">Breeding Pair ROI Attribution</h4>
+                    <p className="text-[10px] text-zinc-400 font-medium">Auto-aggregates all egg sales, chick/offspring sales, parent stock costs, and direct pair expenses</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-bold text-zinc-400 uppercase">Pair ROI:</span>
+                  <span className={cn("text-xs font-black px-2.5 py-1 rounded-lg border", pairRoi.roiPercentage >= 0 ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30" : "bg-rose-500/10 text-rose-400 border-rose-500/30")}>
+                    {pairRoi.roiPercentage >= 0 ? `+${pairRoi.roiPercentage.toFixed(1)}%` : `${pairRoi.roiPercentage.toFixed(1)}%`}
+                  </span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="p-3 bg-black/60 rounded-xl border border-zinc-800 space-y-1">
+                  <span className="text-[9px] font-black uppercase tracking-wider text-emerald-400/90 flex items-center gap-1">
+                    <Egg size={11} /> Egg Sales
+                  </span>
+                  <p className="text-base font-black text-emerald-400">{symbol}{pairRoi.eggSalesIncome.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                  <p className="text-[9px] text-zinc-500 font-medium">{pairRoi.soldEggsCount} egg(s) sold</p>
+                </div>
+
+                <div className="p-3 bg-black/60 rounded-xl border border-zinc-800 space-y-1">
+                  <span className="text-[9px] font-black uppercase tracking-wider text-sky-400/90 flex items-center gap-1">
+                    <BirdIcon size={11} /> Chick Sales
+                  </span>
+                  <p className="text-base font-black text-sky-400">{symbol}{pairRoi.chickSalesIncome.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                  <p className="text-[9px] text-zinc-500 font-medium">{pairRoi.soldChicksCount} chick(s) sold ({pairRoi.totalOffspringCount} offspring)</p>
+                </div>
+
+                <div className="p-3 bg-black/60 rounded-xl border border-zinc-800 space-y-1">
+                  <span className="text-[9px] font-black uppercase tracking-wider text-rose-400/90">
+                    Parent Stock Cost
+                  </span>
+                  <p className="text-base font-black text-rose-400">{symbol}{pairRoi.parentAcquisitionCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                  <p className="text-[9px] text-zinc-500 font-medium">Sire & Dam initial cost</p>
+                </div>
+
+                <div className="p-3 bg-black/60 rounded-xl border border-zinc-800 space-y-1">
+                  <span className="text-[9px] font-black uppercase tracking-wider text-amber-400/90">
+                    Direct Expenses
+                  </span>
+                  <p className="text-base font-black text-amber-400">{symbol}{(pairRoi.pairDirectExpenses + pairRoi.offspringExpenses).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                  <p className="text-[9px] text-zinc-500 font-medium">Feed, bands, clutch meds</p>
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className="flex flex-col space-y-4">
             <div className="flex items-center justify-between">
@@ -5573,6 +5478,7 @@ function EntityStatsView({
                   male={birds.find(b => b.id === pairs.find(p => p.id === r.pairId)?.maleId)}
                   female={birds.find(b => b.id === pairs.find(p => p.id === r.pairId)?.femaleId)}
                   birds={birds}
+                  currency={currency}
                   onEdit={() => onEditBreeding(r)}
                   onDelete={() => onDeleteBreeding(r.id)}
                   onBirdRef={onBirdRef}
@@ -5600,21 +5506,21 @@ function TransactionCard({ transaction, bird, pair, contact, cages, birds, curre
   const catInfo = useMemo(() => {
     const cat = transaction.category.toLowerCase();
     if (cat.includes('sale') || cat.includes('sold') || cat.includes('revenue')) {
-      return { icon: '💰', label: 'Bird Sale', style: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/25' };
+      return { icon: '[Money]', label: 'Bird Sale', style: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/25' };
     } else if (cat.includes('feed') || cat.includes('seed') || cat.includes('food') || cat.includes('nutrition')) {
-      return { icon: '🌾', label: 'Feed & Nutrition', style: 'bg-amber-500/10 text-amber-400 border-amber-505/25' };
+      return { icon: '[Grain]', label: 'Feed & Nutrition', style: 'bg-amber-500/10 text-amber-400 border-amber-505/25' };
     } else if (cat.includes('vet') || cat.includes('med') || cat.includes('health') || cat.includes('treatment')) {
-      return { icon: '🏥', label: 'Veterinary / Medical', style: 'bg-rose-500/10 text-rose-400 border-rose-500/25' };
+      return { icon: '[Health]', label: 'Veterinary / Medical', style: 'bg-rose-500/10 text-rose-400 border-rose-500/25' };
     } else if (cat.includes('test') || cat.includes('dna') || cat.includes('sexing')) {
-      return { icon: '🧬', label: 'DNA & Sexing', style: 'bg-teal-500/10 text-teal-400 border-teal-505/25' };
+      return { icon: '[DNA]', label: 'DNA & Sexing', style: 'bg-teal-500/10 text-teal-400 border-teal-505/25' };
     } else if (cat.includes('cage') || cat.includes('equipment') || cat.includes('nest') || cat.includes('ring') || cat.includes('toy')) {
-      return { icon: '⚙️', label: 'Equipment & Cages', style: 'bg-sky-500/10 text-sky-400 border-sky-505/25' };
+      return { icon: '[Gear]', label: 'Equipment & Cages', style: 'bg-sky-500/10 text-sky-400 border-sky-505/25' };
     } else if (cat.includes('buy') || cat.includes('purchase') || cat.includes('acquisition') || cat.includes('import')) {
-      return { icon: '🕊️', label: 'Acquisition', style: 'bg-indigo-500/10 text-indigo-400 border-indigo-505/25' };
+      return { icon: '[Bird]', label: 'Acquisition', style: 'bg-indigo-500/10 text-indigo-400 border-indigo-505/25' };
     } else {
       return transaction.type === 'Income'
-        ? { icon: '📈', label: 'Other Income', style: 'bg-emerald-500/10 text-emerald-400 border-emerald-505/25' }
-        : { icon: '📉', label: 'Other Expense', style: 'bg-zinc-800 text-zinc-400 border-zinc-700' };
+        ? { icon: '[Up]', label: 'Other Income', style: 'bg-emerald-500/10 text-emerald-400 border-emerald-505/25' }
+        : { icon: '[Down]', label: 'Other Expense', style: 'bg-zinc-800 text-zinc-400 border-zinc-700' };
     }
   }, [transaction.category, transaction.type]);
 
@@ -5658,7 +5564,7 @@ function TransactionCard({ transaction, bird, pair, contact, cages, birds, curre
             >
               {transaction.type === 'Income' ? '+' : '-'}{symbol}{transaction.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
             </p>
-            <p className="text-[8px] sm:text-[9px] text-white/40 font-bold uppercase tracking-widest mt-1">{format(new Date(transaction.date), 'MMM dd, yyyy')}</p>
+            <p className="text-[8px] sm:text-[9px] text-white/40 font-bold uppercase tracking-widest mt-1">{format(new Date(transaction.date), `MMM dd, yyyy`)}</p>
           </div>
         </div>
 
@@ -5677,7 +5583,7 @@ function TransactionCard({ transaction, bird, pair, contact, cages, birds, curre
                 <Heart size={10} className="text-rose-500 shrink-0 animate-pulse" />
                 <span className="text-[9px] uppercase font-bold text-zinc-500 whitespace-nowrap">Breeding Pair:</span>
                 <span className="text-white/80 font-bold truncate">
-                  {birds.find(b => b.id === pair.maleId)?.name || 'Male'} × {birds.find(b => b.id === pair.femaleId)?.name || 'Female'}
+                  {birds.find(b => b.id === pair.maleId)?.name || 'Male'} x {birds.find(b => b.id === pair.femaleId)?.name || 'Female'}
                 </span>
               </div>
             )}
@@ -5714,9 +5620,9 @@ function TransactionCard({ transaction, bird, pair, contact, cages, birds, curre
             onClick={onDelete} 
             className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg transition-all border text-[9px] font-black uppercase tracking-widest"
             style={{
-              backgroundColor: 'color-mix(in srgb, var(--theme-delete-color, #ef4444), transparent 90%)',
-              color: 'var(--theme-delete-color, #ef4444)',
-              borderColor: 'color-mix(in srgb, var(--theme-delete-color, #ef4444), transparent 80%)'
+              backgroundColor: `color-mix(in srgb, var(--theme-delete-color, #ef4444), transparent 90%)`,
+              color: `var(--theme-delete-color, #ef4444)`,
+              borderColor: `color-mix(in srgb, var(--theme-delete-color, #ef4444), transparent 80%)`
             }}
           >
             <Trash2 size={12} />
@@ -5776,7 +5682,7 @@ function TransactionCard({ transaction, bird, pair, contact, cages, birds, curre
                 </div>
                 <div className="flex justify-between items-center py-2 border-b border-zinc-900">
                   <span className="text-white/40 text-[10px]">Posting Date</span>
-                  <span className="text-white">{format(new Date(transaction.date), 'MMMM dd, yyyy')}</span>
+                  <span className="text-white">{format(new Date(transaction.date), `MMMM dd, yyyy`)}</span>
                 </div>
                 <div className="flex justify-between items-center py-2 border-b border-zinc-900">
                   <span className="text-white/40 text-[10px]">Recurring Cycle</span>
@@ -5821,7 +5727,7 @@ function TransactionCard({ transaction, bird, pair, contact, cages, birds, curre
                             Pair Breeding Registry
                           </p>
                           <p className="text-[10px] text-white/50 mt-0.5 font-bold truncate">
-                            {birds.find(b => b.id === pair.maleId)?.name || 'Male'} × {birds.find(b => b.id === pair.femaleId)?.name || 'Female'}
+                            {birds.find(b => b.id === pair.maleId)?.name || 'Male'} x {birds.find(b => b.id === pair.femaleId)?.name || 'Female'}
                           </p>
                         </div>
                       </div>
@@ -5875,12 +5781,13 @@ function TransactionCard({ transaction, bird, pair, contact, cages, birds, curre
   );
 }
 
-function BreedingRecordCard({ record, pair, male, female, birds, onEdit, onDelete, onBirdRef, viewMode = 'grid-large' }: { record: BreedingRecord, pair?: Pair, male?: Bird, female?: Bird, birds: Bird[], onEdit: () => void, onDelete: () => void, onBirdRef: (name: string) => void, viewMode?: 'grid-large' | 'list' }) {
+function BreedingRecordCard({ record, pair, male, female, birds, onEdit, onDelete, onBirdRef, viewMode = 'grid-large', currency = 'USD' }: { record: BreedingRecord, pair?: Pair, male?: Bird, female?: Bird, birds: Bird[], onEdit: () => void, onDelete: () => void, onBirdRef: (name: string) => void, viewMode?: 'grid-large' | 'list', currency?: string }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [activeCandlingEgg, setActiveCandlingEgg] = useState<{ egg: EggType; index: number } | null>(null);
   const effectiveViewMode = (viewMode === 'list' && isExpanded) ? 'grid-large' : viewMode;
+  const symbol = getCurrencySymbol(currency);
 
-  const species = female?.species || male?.species || '';
+  const species = female?.species || male?.species || ``;
   const speciesPresets = getSpeciesIncubation(species);
 
   // Auto update egg in firestore
@@ -5902,14 +5809,14 @@ function BreedingRecordCard({ record, pair, male, female, birds, onEdit, onDelet
         chicksWeaned: weaned
       });
     } catch (err) {
-      console.error('Failed to update candled egg:', err);
+      console.error(`Failed to update candled egg:`, err);
     }
   };
 
-  const addLocalTaskAutomatically = async (title: string, date: string, description: string = '') => {
+  const addLocalTaskAutomatically = async (title: string, date: string, description: string = ``) => {
     const currentUser = auth.currentUser;
     if (!currentUser) {
-      toast.error('Log in to save tasks to your Aviary Chores automatically!');
+      toast.error(`Log in to save tasks to your Aviary Chores automatically!`);
       return;
     }
     try {
@@ -5926,9 +5833,9 @@ function BreedingRecordCard({ record, pair, male, female, birds, onEdit, onDelet
         uid: currentUser.uid,
         createdAt: new Date().toISOString()
       });
-      toast.success('Task successfully created in your Aviary Chores!');
+      toast.success(`Task successfully created in your Aviary Chores!`);
     } catch (err) {
-      console.error('Failed to auto-add local task:', err);
+      console.error(`Failed to auto-add local task:`, err);
       toast.error('Failed to save task locally');
     }
   };
@@ -5957,8 +5864,8 @@ function BreedingRecordCard({ record, pair, male, female, birds, onEdit, onDelet
                 onClick={(e) => { e.stopPropagation(); onDelete(); }} 
                 className="p-2 rounded-lg transition-colors"
                 style={{
-                  backgroundColor: 'color-mix(in srgb, var(--theme-delete-color, #ef4444), transparent 90%)',
-                  color: 'var(--theme-delete-color, #ef4444)'
+                  backgroundColor: `color-mix(in srgb, var(--theme-delete-color, #ef4444), transparent 90%)`,
+                  color: `var(--theme-delete-color, #ef4444)`
                 }}
               >
                 <Trash2 size={16} />
@@ -6037,10 +5944,15 @@ function BreedingRecordCard({ record, pair, male, female, birds, onEdit, onDelet
                                Candle / Status
                              </button>
                              <Badge 
-                               variant={egg.status === 'Hatched' || egg.status === 'Weaned' ? 'success' : (egg.status === 'Laid' || egg.status === 'Fertile' ? 'info' : 'neutral')}
-                               className="text-[8px] font-black py-0.5 px-2"
+                               variant={egg.status === 'Sold' ? 'success' : (egg.status === 'Hatched' || egg.status === 'Weaned' ? 'success' : (egg.status === 'Laid' || egg.status === 'Fertile' ? 'info' : 'neutral'))}
+                               className="text-[8px] font-black py-0.5 px-2 flex items-center gap-1"
                              >
-                               {egg.status}
+                               {egg.status === 'Sold' ? (
+                                 <>
+                                   <DollarSign size={9} />
+                                   Sold {egg.salePrice ? `(${symbol}${egg.salePrice})` : ''}
+                                 </>
+                               ) : egg.status}
                              </Badge>
                            </div>
                         </div>
@@ -6077,13 +5989,13 @@ function BreedingRecordCard({ record, pair, male, female, birds, onEdit, onDelet
                              <button 
                                type="button"
                                onClick={() => {
-                                 const eventTitle = `Expected Hatch: Egg #${index + 1} (${male?.name || 'Sire'} × ${female?.name || 'Dam'})`;
+                                 const eventTitle = `Expected Hatch: Egg #${index + 1} (${male?.name || 'Sire'} x ${female?.name || 'Dam'})`;
                                  const eventDate = expectedHatchDate;
                                  const eventDesc = `Expected hatching of Egg #${index + 1} under Pair: ${male?.name || 'Sire'} x ${female?.name || 'Dam'}`;
                                  const url = generateGoogleCalendarUrl(eventTitle, eventDate, eventDesc);
                                  if (url) {
                                    window.open(url, '_blank', 'noopener,noreferrer');
-                                   toast.success('Opening Google Calendar & automatically adding task locally!');
+                                   toast.success(`Opening Google Calendar & automatically adding task locally!`);
                                  }
                                  addLocalTaskAutomatically(eventTitle, eventDate, eventDesc);
                                }}
@@ -6107,13 +6019,13 @@ function BreedingRecordCard({ record, pair, male, female, birds, onEdit, onDelet
                              <button 
                                type="button"
                                onClick={() => {
-                                 const eventTitle = `Ringing Reminder: Egg #${index + 1} (${male?.name || 'Sire'} × ${female?.name || 'Dam'})`;
+                                 const eventTitle = `Ringing Reminder: Egg #${index + 1} (${male?.name || 'Sire'} x ${female?.name || 'Dam'})`;
                                  const eventDate = ringingDate;
                                  const eventDesc = `Ringing reminder for chick #${index + 1} of Pair: ${male?.name || 'Sire'} x ${female?.name || 'Dam'}`;
                                  const url = generateGoogleCalendarUrl(eventTitle, eventDate, eventDesc);
                                  if (url) {
                                    window.open(url, '_blank', 'noopener,noreferrer');
-                                   toast.success('Opening Google Calendar & automatically adding task locally!');
+                                   toast.success(`Opening Google Calendar & automatically adding task locally!`);
                                  }
                                  addLocalTaskAutomatically(eventTitle, eventDate, eventDesc);
                                }}
@@ -6158,14 +6070,14 @@ function BreedingRecordCard({ record, pair, male, female, birds, onEdit, onDelet
 function BreedingRecordForm({ user, initialData, pairs, birds, cages, onClose, userSettings }: { user: FirebaseUser, initialData?: BreedingRecord, pairs: Pair[], birds: Bird[], cages: Cage[], onClose: () => void, userSettings?: UserSettings }) {
   const t = (text: string) => getTranslatedLabel(text, userSettings?.language || 'en');
   const [formData, setFormData] = useState<Partial<BreedingRecord>>(initialData || { 
-    pairId: '', 
+    pairId: ``, 
     startDate: format(new Date(), 'yyyy-MM-dd'), 
-    endDate: '', 
+    endDate: ``, 
     eggsLaid: 0, 
     eggsHatched: 0, 
     chicksWeaned: 0, 
     offspringIds: [], 
-    notes: '', 
+    notes: ``, 
     eggs: [],
     incubationDays: 21,
     ringingDays: 7
@@ -6229,7 +6141,7 @@ function BreedingRecordForm({ user, initialData, pairs, birds, cages, onClose, u
       return;
     }
     if (!formData.pairId) {
-      toast.error('Please select a pair.');
+      toast.error(`Please select a pair.`);
       return;
     }
     if (isSaving) return;
@@ -6271,19 +6183,19 @@ function BreedingRecordForm({ user, initialData, pairs, birds, cages, onClose, u
     <form onSubmit={handleSubmit} className="space-y-4">
       {isExpired && (
         <div className="bg-rose-500/20 text-rose-300 border border-rose-500/30 p-3 rounded-2xl text-[10px] font-black uppercase tracking-widest text-center shadow-inner">
-          ⚠️ Subscription Expired — Entry is in Read-Only Mode
+          ! Subscription Expired - Entry is in Read-Only Mode
         </div>
       )}
       <fieldset disabled={isExpired} className="space-y-4">
         <div className="space-y-1">
           <SearchableSelect 
             label={t('Pair')}
-          value={formData.pairId || ''}
+          value={formData.pairId || ``}
           onChange={(val) => {
             const selectedPair = pairs.find(p => p.id === val);
             const female = birds.find(b => b.id === selectedPair?.femaleId);
             const male = birds.find(b => b.id === selectedPair?.maleId);
-            const speciesName = female?.species || male?.species || '';
+            const speciesName = female?.species || male?.species || ``;
             const presets = getSpeciesIncubation(speciesName);
             setFormData({ 
               ...formData, 
@@ -6299,9 +6211,9 @@ function BreedingRecordForm({ user, initialData, pairs, birds, cages, onClose, u
               const female = birds.find(b => b.id === p.femaleId);
               return { 
                 id: p.id, 
-                name: `${male?.name || 'Empty'} × ${female?.name || 'Empty'}`,
+                name: `${male?.name || 'Empty'} x ${female?.name || 'Empty'}`,
                 details: p.status,
-                subText: `${male?.species || ''}${male?.subSpecies ? ` (${male.subSpecies})` : ''}`,
+                subText: `${male?.species || ''}${male?.subSpecies ? ' (${male.subSpecies})' : ''}`,
                 pair: p
               };
             })
@@ -6324,7 +6236,7 @@ function BreedingRecordForm({ user, initialData, pairs, birds, cages, onClose, u
       
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1">
-          <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">{t('Incubation (Days)')}</label>
+          <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">{t(`Incubation (Days)`)}</label>
           <Input 
             type="number" 
             min="1" 
@@ -6333,7 +6245,7 @@ function BreedingRecordForm({ user, initialData, pairs, birds, cages, onClose, u
           />
         </div>
         <div className="space-y-1">
-          <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">{t('Ringing Age (Days)')}</label>
+          <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">{t(`Ringing Age (Days)`)}</label>
           <Input 
             type="number" 
             min="1" 
@@ -6360,7 +6272,7 @@ function BreedingRecordForm({ user, initialData, pairs, birds, cages, onClose, u
       
       <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">{t('Eggs & Offspring')}</label>
+          <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">{t(`Eggs & Offspring`)}</label>
           <Button type="button" onClick={handleAddEgg} variant="secondary" className="h-6 text-xs px-3 bg-zinc-700 hover:bg-zinc-600 rounded">
             + {t('Add Egg')}
           </Button>
@@ -6396,8 +6308,8 @@ function BreedingRecordForm({ user, initialData, pairs, birds, cages, onClose, u
                         setFormData({ ...formData, eggs: newEggs, eggsLaid: newEggs.length });
                       }} 
                       className="text-white/30 transition-colors"
-                      onMouseEnter={(e) => e.currentTarget.style.color = 'var(--theme-delete-color, #ef4444)'}
-                      onMouseLeave={(e) => e.currentTarget.style.color = 'rgba(255,255,255,0.3)'}
+                      onMouseEnter={(e) => e.currentTarget.style.color = `var(--theme-delete-color, #ef4444)`}
+                      onMouseLeave={(e) => e.currentTarget.style.color = `rgba(255,255,255,0.3)`}
                     >
                       <Trash2 size={14} />
                     </button>
@@ -6409,7 +6321,7 @@ function BreedingRecordForm({ user, initialData, pairs, birds, cages, onClose, u
                     <label className="text-[9px] font-bold text-white/50 uppercase tracking-widest">{t('Laid Date')}</label>
                     <Input 
                       type="date" 
-                      value={egg.laidDate || ''} 
+                      value={egg.laidDate || ``} 
                       onChange={e => updateEgg(index, { laidDate: e.target.value })} 
                       className="h-8 text-xs font-mono" 
                     />
@@ -6418,7 +6330,7 @@ function BreedingRecordForm({ user, initialData, pairs, birds, cages, onClose, u
                     <label className="text-[9px] font-bold text-white/50 uppercase tracking-widest">{t('Hatch Date')}</label>
                     <Input 
                       type="date" 
-                      value={egg.actualHatchDate || ''} 
+                      value={egg.actualHatchDate || ``} 
                       onChange={e => updateEgg(index, { actualHatchDate: e.target.value, status: e.target.value && egg.status === 'Laid' ? 'Hatched' : egg.status })} 
                       className="h-8 text-xs font-mono border-l-2 border-emerald-500/50" 
                     />
@@ -6431,7 +6343,7 @@ function BreedingRecordForm({ user, initialData, pairs, birds, cages, onClose, u
                       <label className="text-[9px] font-bold text-white/50 uppercase tracking-widest">{t('Notes')}</label>
                       <Input 
                          placeholder="Info..." 
-                        value={egg.notes || ''} 
+                        value={egg.notes || ``} 
                         onChange={e => updateEgg(index, { notes: e.target.value })} 
                         className="h-8 text-xs" 
                       />
@@ -6442,7 +6354,7 @@ function BreedingRecordForm({ user, initialData, pairs, birds, cages, onClose, u
                 {egg.status === 'Weaned' && !egg.birdId && (
                   <div className="pt-2 mt-1 border-t border-black-800">
                      <Button type="button" variant="secondary" className="w-full h-8 text-[10px]" onClick={async () => {
-                        const loadingToast = toast.loading('Promoting to Bird...');
+                        const loadingToast = toast.loading(`Promoting to Bird...`);
                         try {
                            const parentPair = pairs.find(p => p.id === formData.pairId);
                            const mother = birds.find(b => b.id === parentPair?.femaleId);
@@ -6451,12 +6363,12 @@ function BreedingRecordForm({ user, initialData, pairs, birds, cages, onClose, u
                            const data: any = {
                               name: `Offspring (Egg ${index + 1})`,
                               species: mother?.species || father?.species || 'Unknown',
-                              subSpecies: mother?.subSpecies || father?.subSpecies || '',
+                              subSpecies: mother?.subSpecies || father?.subSpecies || ``,
                               sex: 'Unknown',
                               birthDate: egg.actualHatchDate || new Date().toISOString().split('T')[0],
-                              motherId: mother?.id || '',
-                              fatherId: father?.id || '',
-                              cageId: parentPair?.cageId || mother?.cageId || father?.cageId || '',
+                              motherId: mother?.id || ``,
+                              fatherId: father?.id || ``,
+                              cageId: parentPair?.cageId || mother?.cageId || father?.cageId || ``,
                               uid: user.uid,
                               notes: `Promoted from Egg ${index + 1} of Pair ${parentPair?.id || formData.pairId}`
                            };
@@ -6469,10 +6381,10 @@ function BreedingRecordForm({ user, initialData, pairs, birds, cages, onClose, u
                            updateEgg(index, { birdId: docRef.id });
                            setFormData({ ...formData, offspringIds: [...currentOffs, docRef.id] });
                            
-                           toast.success('Successfully promoted to a new Bird profile!');
+                           toast.success(`Successfully promoted to a new Bird profile!`);
                         } catch (err) {
                            console.error(err);
-                           toast.error('Failed to promote to bird.');
+                           toast.error(`Failed to promote to bird.`);
                         } finally {
                            toast.dismiss(loadingToast);
                         }
@@ -6523,7 +6435,7 @@ function BreedingRecordForm({ user, initialData, pairs, birds, cages, onClose, u
       
       <div className="space-y-1">
         <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">{t('Clutch Notes')}</label>
-        <textarea name="breedingNotes" id="breedingNotes" className="w-full px-4 py-3 bg-black border border-black-700 rounded-2xl focus:outline-none focus:ring-2 focus:ring-gold-500/20 focus:border-gold-500 text-white transition-all min-h-[80px] text-sm font-medium placeholder:text-white/30" placeholder={t('General breeding notes...')}
+        <textarea name="breedingNotes" id="breedingNotes" className="w-full px-4 py-3 bg-black border border-black-700 rounded-2xl focus:outline-none focus:ring-2 focus:ring-gold-500/20 focus:border-gold-500 text-white transition-all min-h-[80px] text-sm font-medium placeholder:text-white/30" placeholder={t(`General breeding notes...`)}
           value={formData.notes} 
           onChange={e => setFormData({ ...formData, notes: e.target.value })} 
         />
@@ -6543,13 +6455,13 @@ function TransactionForm({ user, initialData, birds, pairs, cages, contacts, cur
   const symbol = getCurrencySymbol(currency);
   const [formData, setFormData] = useState<Partial<Transaction>>(initialData || {
     type: 'Expense',
-    category: '',
+    category: ``,
     amount: 0,
     date: format(new Date(), 'yyyy-MM-dd'),
-    birdId: '',
-    pairId: '',
-    contactId: '',
-    description: '',
+    birdId: ``,
+    pairId: ``,
+    contactId: ``,
+    description: ``,
     recurring: 'None'
   });
   const [isSaving, setIsSaving] = useState(false);
@@ -6608,7 +6520,7 @@ function TransactionForm({ user, initialData, birds, pairs, cages, contacts, cur
     <form onSubmit={handleSubmit} className="space-y-6">
       {isExpired && (
         <div className="bg-rose-500/20 text-rose-300 border border-rose-500/30 p-3 rounded-2xl text-[10px] font-black uppercase tracking-widest text-center shadow-inner">
-          ⚠️ Subscription Expired — Entry is in Read-Only Mode
+          ! Subscription Expired - Entry is in Read-Only Mode
         </div>
       )}
       <fieldset disabled={isExpired} className="space-y-6">
@@ -6628,7 +6540,7 @@ function TransactionForm({ user, initialData, birds, pairs, cages, contacts, cur
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="space-y-2">
           <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">{t('Category')}</label>
-          <Input required placeholder={t('e.g. Seed, Sale, Vet')} value={formData.category} onChange={e => setFormData({ ...formData, category: e.target.value })} />
+          <Input required placeholder={t(`e.g. Seed, Sale, Vet`)} value={formData.category} onChange={e => setFormData({ ...formData, category: e.target.value })} />
         </div>
         <div className="space-y-2">
           <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">{t('Date')}</label>
@@ -6637,7 +6549,7 @@ function TransactionForm({ user, initialData, birds, pairs, cages, contacts, cur
         <div className="space-y-2">
           <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">{t('Recurring Schedule')}</label>
           <Select value={formData.recurring || 'None'} onChange={e => setFormData({ ...formData, recurring: e.target.value as any })}>
-            <option value="None" className="bg-black text-white">{t('None (One-time)')}</option>
+            <option value="None" className="bg-black text-white">{t(`None (One-time)`)}</option>
             <option value="Daily" className="bg-black text-white">{t('Daily')}</option>
             <option value="Weekly" className="bg-black text-white">{t('Weekly')}</option>
             <option value="Monthly" className="bg-black text-white">{t('Monthly')}</option>
@@ -6649,13 +6561,13 @@ function TransactionForm({ user, initialData, birds, pairs, cages, contacts, cur
         <div className="space-y-2">
           <SearchableSelect 
             label={t('Related Bird')}
-            value={formData.birdId || ''}
+            value={formData.birdId || ``}
             onChange={(val) => setFormData({ ...formData, birdId: val })}
             options={[
               { id: '', name: t('None') },
               ...birds.filter(b => !b.isGhost).map(b => {
                 const cage = cages.find(c => c.id === b.cageId);
-                const mutationsStr = b.mutations?.length ? `[${b.mutations.join(', ')}]` : '';
+            const mutationsStr = b.mutations?.length ? `[${b.mutations.join(', ')}]` : '';
                 return {
                   id: b.id,
                   name: b.name,
@@ -6670,14 +6582,14 @@ function TransactionForm({ user, initialData, birds, pairs, cages, contacts, cur
         <div className="space-y-2">
           <SearchableSelect 
             label={t('Related Pair')}
-            value={formData.pairId || ''}
+            value={formData.pairId || ``}
             onChange={(val) => setFormData({ ...formData, pairId: val })}
             options={[
               { id: '', name: t('None') },
               ...pairs.filter(p => p.maleId || p.femaleId).map(p => {
                 const m = birds.find(b => b.id === p.maleId)?.name || 'Empty';
                 const f = birds.find(b => b.id === p.femaleId)?.name || 'Empty';
-                const species = birds.find(b => b.id === p.maleId)?.species || '';
+                const species = birds.find(b => b.id === p.maleId)?.species || ``;
                 return { 
                   id: p.id, 
                   name: `${m} x ${f}`,
@@ -6691,7 +6603,7 @@ function TransactionForm({ user, initialData, birds, pairs, cages, contacts, cur
         <div className="space-y-2">
           <SearchableSelect 
             label={t('Contact')}
-            value={formData.contactId || ''}
+            value={formData.contactId || ``}
             onChange={(val) => setFormData({ ...formData, contactId: val })}
             options={[
               { id: '', name: t('None') },
@@ -6702,7 +6614,7 @@ function TransactionForm({ user, initialData, birds, pairs, cages, contacts, cur
       </div>
       <div className="space-y-2">
         <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">{t('Description')}</label>
-        <Textarea rows={3} placeholder={t('Additional details...')} value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} />
+        <Textarea rows={3} placeholder={t(`Additional details...`)} value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} />
       </div>
       </fieldset>
       <Button type="submit" className="w-full py-4 text-sm font-bold shadow-xl shadow-gold-500/20" disabled={isSaving || isExpired}>
@@ -6716,12 +6628,12 @@ function TransactionForm({ user, initialData, birds, pairs, cages, contacts, cur
 function ContactForm({ user, initialData, onClose, userSettings }: { user: FirebaseUser, initialData?: Contact, onClose: () => void, userSettings?: UserSettings }) {
   const t = (text: string) => getTranslatedLabel(text, userSettings?.language || 'en');
   const [formData, setFormData] = useState<Partial<Contact>>(initialData || {
-    name: '',
+    name: ``,
     type: 'Both',
-    email: '',
-    phone: '',
-    address: '',
-    notes: ''
+    email: ``,
+    phone: ``,
+    address: ``,
+    notes: ``
   });
   const [isSaving, setIsSaving] = useState(false);
 
@@ -6765,7 +6677,7 @@ function ContactForm({ user, initialData, onClose, userSettings }: { user: Fireb
     <form onSubmit={handleSubmit} className="space-y-6">
       {isExpired && (
         <div className="bg-rose-500/20 text-rose-300 border border-rose-500/30 p-3 rounded-2xl text-[10px] font-black uppercase tracking-widest text-center shadow-inner">
-          ⚠️ Subscription Expired — Entry is in Read-Only Mode
+          ! Subscription Expired - Entry is in Read-Only Mode
         </div>
       )}
       <fieldset disabled={isExpired} className="space-y-6">
@@ -6797,7 +6709,7 @@ function ContactForm({ user, initialData, onClose, userSettings }: { user: Fireb
       </div>
       <div className="space-y-2">
         <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">{t('Notes')}</label>
-        <Textarea rows={3} placeholder={t('Additional details...')} value={formData.notes} onChange={e => setFormData({ ...formData, notes: e.target.value })} />
+        <Textarea rows={3} placeholder={t(`Additional details...`)} value={formData.notes} onChange={e => setFormData({ ...formData, notes: e.target.value })} />
       </div>
       </fieldset>
       <Button type="submit" className="w-full py-4 text-sm font-bold shadow-xl shadow-gold-500/20" disabled={isSaving || isExpired}>
@@ -6809,24 +6721,37 @@ function ContactForm({ user, initialData, onClose, userSettings }: { user: Fireb
 }
 
 const getGoogleCalendarUrl = (task: Task, birds: Bird[], cages: Cage[]) => {
-  const isAllDay = !task.reminderDate && !!task.dueDate;
-  const baseDate = task.reminderDate ? new Date(task.reminderDate) : (task.dueDate ? new Date(task.dueDate) : new Date());
+  const isAllDay = !task.dueTime;
+  const baseDate = new Date(task.dueDate || new Date());
   
-  const formatDate = (date: Date, allday: boolean) => {
-    const iso = date.toISOString();
-    if (allday) return iso.split('T')[0].replace(/-/g, '');
-    return iso.replace(/-|:|\.\d+/g, '');
+  if (task.dueTime) {
+    const [hours, minutes] = task.dueTime.split(':').map(Number);
+    baseDate.setHours(hours || 0, minutes || 0, 0, 0);
+  }
+
+  const formatDate = (date: Date, allDay: boolean) => {
+    const pad = (n: number) => n.toString().padStart(2, '0');
+    const y = date.getUTCFullYear();
+    const m = pad(date.getUTCMonth() + 1);
+    const d = pad(date.getUTCDate());
+    if (allDay) {
+      return `${y}${m}${d}`;
+    }
+    const h = pad(date.getUTCHours());
+    const min = pad(date.getUTCMinutes());
+    const s = pad(date.getUTCSeconds());
+    return `${y}${m}${d}T${h}${min}${s}Z`;
   };
 
   const start = formatDate(baseDate, isAllDay);
-  const duration = isAllDay ? 24 * 60 * 60 * 1000 : 15 * 60 * 1000; // Default to 15 min duration
+  const duration = isAllDay ? 24 * 60 * 60 * 1000 : 60 * 60 * 1000;
   const end = formatDate(new Date(baseDate.getTime() + duration), isAllDay);
-  
+
   const title = encodeURIComponent(task.title);
   let descriptionText = task.description || '';
   
   if (task.reminderLeadTime) {
-    descriptionText += `\n\n🔔 REMINDER REQUESTED: ${task.reminderLeadTime} minutes before.`;
+    descriptionText += `\n\n[Bell] REMINDER REQUESTED: ${task.reminderLeadTime} minutes before.`;
   }
 
   const taggedBirds = birds.filter(b => task.birdIds?.includes(b.id));
@@ -6834,7 +6759,7 @@ const getGoogleCalendarUrl = (task: Task, birds: Bird[], cages: Cage[]) => {
     descriptionText += '\n\nTagged Birds:\n' + taggedBirds.map(b => {
       const cage = cages.find(c => c.id === b.cageId);
       let info = `- ${b.name} (${b.species})`;
-      if (b.subSpecies) info += ` • ${b.subSpecies}`;
+      if (b.subSpecies) info += ` * ${b.subSpecies}`;
       if (cage) info += ` [Cage: ${cage.name}]`;
       if (b.mutations && b.mutations.length > 0) info += ` Mutations: ${b.mutations.join(', ')}`;
       return info;
@@ -6843,7 +6768,7 @@ const getGoogleCalendarUrl = (task: Task, birds: Bird[], cages: Cage[]) => {
 
   if (task.subTasks && task.subTasks.length > 0) {
     descriptionText += '\n\nSubtasks:\n' + task.subTasks.map(st => {
-      let stLine = `${st.completed ? '✅' : '⭕'} ${st.title}`;
+      let stLine = `${st.completed ? '[OK]' : '[Circle]'} ${st.title}`;
       const stBirds = birds.filter(b => st.birdIds?.includes(b.id));
       if (stBirds.length > 0) {
         stLine += ` (@${stBirds.map(b => b.name).join(', ')})`;
@@ -6851,9 +6776,10 @@ const getGoogleCalendarUrl = (task: Task, birds: Bird[], cages: Cage[]) => {
       return stLine;
     }).join('\n');
   }
-  descriptionText += '\n\n— Generated by Aviary Manager Pro —';
+
+  descriptionText += '\n\n- Generated by Aviary Manager Pro -';
   const encodedDescription = encodeURIComponent(descriptionText);
-  
+
   return `https://www.google.com/calendar/render?action=TEMPLATE&text=${title}&details=${encodedDescription}&dates=${start}/${end}`;
 };
 
@@ -6866,7 +6792,7 @@ function TaskCard({ task, birds, cages, onBirdRef, onToggle, onEdit, onDelete, v
     <Card 
       onClick={() => viewMode === 'list' && setExpanded(!expanded)}
       className={cn(
-        'transition-all group border-black-800 hover:border-gold-500/30 relative overflow-hidden', 
+        `transition-all group border-black-800 hover:border-gold-500/30 relative overflow-hidden`, 
         task.status === 'Completed' && 'opacity-60',
         effectiveViewMode === 'list' ? "flex flex-row items-center p-4 gap-4 cursor-pointer hover:bg-black-900/50" : "cursor-default"
       )}
@@ -6876,10 +6802,10 @@ function TaskCard({ task, birds, cages, onBirdRef, onToggle, onEdit, onDelete, v
           <button 
             onClick={(e) => { e.stopPropagation(); onToggle(); }} 
             className={cn(
-              'w-5 h-5 sm:w-6 sm:h-6 rounded-lg border-2 flex items-center justify-center transition-all duration-300 shrink-0', 
+              `w-5 h-5 sm:w-6 sm:h-6 rounded-lg border-2 flex items-center justify-center transition-all duration-300 shrink-0`, 
               task.status === 'Completed' 
                 ? 'bg-gold-500 border-gold-500 text-black-950 shadow-lg shadow-gold-500/20' 
-                : 'border-black-700 hover:border-gold-500/50'
+                : `border-black-700 hover:border-gold-500/50`
             )}
           >
             {task.status === 'Completed' && <CheckSquare size={14} className="fill-current" />}
@@ -6940,9 +6866,9 @@ function TaskCard({ task, birds, cages, onBirdRef, onToggle, onEdit, onDelete, v
               onClick={(e) => { e.stopPropagation(); onDelete(); }} 
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all border"
               style={{
-                backgroundColor: 'color-mix(in srgb, var(--theme-delete-color, #ef4444), transparent 90%)',
-                color: 'var(--theme-delete-color, #ef4444)',
-                borderColor: 'color-mix(in srgb, var(--theme-delete-color, #ef4444), transparent 80%)'
+                backgroundColor: `color-mix(in srgb, var(--theme-delete-color, #ef4444), transparent 90%)`,
+                color: `var(--theme-delete-color, #ef4444)`,
+                borderColor: `color-mix(in srgb, var(--theme-delete-color, #ef4444), transparent 80%)`
               }}
             >
               <Trash2 size={14} />
@@ -7059,9 +6985,9 @@ function TaskCard({ task, birds, cages, onBirdRef, onToggle, onEdit, onDelete, v
               onClick={(e) => { e.stopPropagation(); onDelete(); }} 
               className="flex-1 flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-2 rounded-lg transition-all border min-w-0"
               style={{
-                backgroundColor: 'color-mix(in srgb, var(--theme-delete-color, #ef4444), transparent 90%)',
-                color: 'var(--theme-delete-color, #ef4444)',
-                borderColor: 'color-mix(in srgb, var(--theme-delete-color, #ef4444), transparent 80%)'
+                backgroundColor: `color-mix(in srgb, var(--theme-delete-color, #ef4444), transparent 90%)`,
+                color: `var(--theme-delete-color, #ef4444)`,
+                borderColor: `color-mix(in srgb, var(--theme-delete-color, #ef4444), transparent 80%)`
               }}
             >
               <Trash2 size={14} />
@@ -7085,9 +7011,9 @@ function SubscriptionView({ settings, onRenew, onBack }: { settings: UserSetting
   const daysLeft = Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
 
   const statusText = isExpired 
-    ? 'Your access has expired. Renew to regain full access.' 
+    ? `Your access has expired. Renew to regain full access.` 
     : daysLeft === 0 
-      ? 'Today is your last day of access. Renew now to avoid interruption.'
+      ? `Today is your last day of access. Renew now to avoid interruption.`
       : `You have ${daysLeft} days remaining.`;
 
   const handlePay = async () => {
@@ -7160,7 +7086,7 @@ function SubscriptionView({ settings, onRenew, onBack }: { settings: UserSetting
             </p>
           )}
           <p className="text-[9px] text-center text-zinc-400 font-bold uppercase tracking-widest">
-            Billed in ZAR (R450) • Powered by Yoco
+            Billed in ZAR (R450) * Powered by Yoco
           </p>
         </div>
       </Card>
@@ -7236,7 +7162,7 @@ function ThemeColorPicker({ label, color, defaultColor, onChange }: { label: str
   useEffect(() => {
     if (!isOpen) return;
     
-    let targetVar = '';
+    let targetVar = ``;
     if (label === 'Accent Color') targetVar = '--theme-color-500';
     else if (label === 'Text Color') targetVar = '--theme-text-color';
     else if (label === 'Background Color') targetVar = '--theme-bg-color';
@@ -7259,7 +7185,7 @@ function ThemeColorPicker({ label, color, defaultColor, onChange }: { label: str
   }, [localColor, isOpen, label]);
 
   const handleClose = () => {
-    let targetVar = '';
+    let targetVar = ``;
     if (label === 'Accent Color') targetVar = '--theme-color-500';
     else if (label === 'Text Color') targetVar = '--theme-text-color';
     else if (label === 'Background Color') targetVar = '--theme-bg-color';
@@ -7308,7 +7234,7 @@ function ThemeColorPicker({ label, color, defaultColor, onChange }: { label: str
         </div>
         {(color && color !== defaultColor) && (
           <button 
-            onClick={(e) => { e.stopPropagation(); onChange(''); }}
+            onClick={(e) => { e.stopPropagation(); onChange(``); }}
             className="ml-auto text-[10px] bg-black-800 hover:bg-black-700 text-white px-2 py-1 rounded-lg transition-colors uppercase font-bold"
           >
             Reset
@@ -7393,769 +7319,6 @@ function ThemeColorPicker({ label, color, defaultColor, onChange }: { label: str
 
 // --- Settings View ---
 
-function SettingsView({ settings, onUpdate, allData, user, isSyncing, setDeleteConfirmation, allSharedItems, setAllSharedItems }: { settings: UserSettings, onUpdate: (s: UserSettings) => void, allData: any, user: FirebaseUser | null, isSyncing: boolean, setDeleteConfirmation: (data: any) => void, allSharedItems: SharedItem[], setAllSharedItems: React.Dispatch<React.SetStateAction<SharedItem[]>> }) {
-  const [activeSection, setActiveSection] = useState<'general' | 'species' | 'subspecies' | 'mutations' | 'statuses' | 'data' | null>('general');
-  const [newSpecies, setNewSpecies] = useState('');
-  const [newMutation, setNewMutation] = useState('');
-  const [newMutationInheritance, setNewMutationInheritance] = useState<'autosomal_recessive' | 'autosomal_dominant' | 'incomplete_dominant' | 'sex_linked_recessive' | ''>('');
-  const [newStatus, setNewStatus] = useState('');
-  const [newSubSpecies, setNewSubSpecies] = useState('');
-  const [selectedSpeciesId, setSelectedSpeciesId] = useState('');
-  const [editingItem, setEditingItem] = useState<{ type: 'species' | 'subspecies' | 'mutation' | 'status', id: string, name: string, inheritance?: 'autosomal_recessive' | 'autosomal_dominant' | 'incomplete_dominant' | 'sex_linked_recessive' } | null>(null);
-
-  const availableSpecies = useMemo(() => {
-    const list = [...(settings.species || [])];
-    if (settings.useDefaultData !== false) {
-      defaultSpecies.forEach(ds => {
-        if (!list.some(s => s.name.toLowerCase() === ds.name.toLowerCase() || s.id === ds.id)) {
-          list.push({ id: ds.id, name: ds.name });
-        }
-      });
-    }
-    return list;
-  }, [settings.species, settings.useDefaultData]);
-
-  const downloadBackup = () => {
-    const data = JSON.stringify(allData, null, 2);
-    const blob = new Blob([data], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `aviary_backup_${new Date().toISOString().split('T')[0]}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const addSpecies = () => {
-    if (!newSpecies.trim()) return;
-    onUpdate({ ...settings, species: [...(settings.species || []), { id: crypto.randomUUID(), name: newSpecies.trim() }] });
-    setNewSpecies('');
-  };
-
-  const addMutation = () => {
-    if (!newMutation.trim()) return;
-    onUpdate({ 
-      ...settings, 
-      mutations: [
-        ...(settings.mutations || []), 
-        { 
-          id: crypto.randomUUID(), 
-          name: newMutation.trim(), 
-          inheritance: newMutationInheritance || undefined 
-        }
-      ] 
-    });
-    setNewMutation('');
-    setNewMutationInheritance('');
-  };
-
-  const addStatus = () => {
-    if (!newStatus.trim()) return;
-    onUpdate({ ...settings, statuses: [...(settings.statuses || []), { id: crypto.randomUUID(), name: newStatus.trim() }] });
-    setNewStatus('');
-  };
-
-  const addSubSpecies = () => {
-    if (!newSubSpecies.trim() || !selectedSpeciesId) return;
-    onUpdate({ ...settings, subspecies: [...(settings.subspecies || []), { id: crypto.randomUUID(), name: newSubSpecies.trim(), speciesId: selectedSpeciesId }] });
-    setNewSubSpecies('');
-  };
-
-  const handleEdit = () => {
-    if (!editingItem || !editingItem.name.trim()) return;
-    const newSettings = { ...settings };
-    if (editingItem.type === 'species') {
-      newSettings.species = newSettings.species.map(s => s.id === editingItem.id ? { ...s, name: editingItem.name.trim() } : s);
-    } else if (editingItem.type === 'subspecies') {
-      newSettings.subspecies = newSettings.subspecies.map(ss => ss.id === editingItem.id ? { ...ss, name: editingItem.name.trim() } : ss);
-    } else if (editingItem.type === 'mutation') {
-      newSettings.mutations = newSettings.mutations.map(m => m.id === editingItem.id ? { ...m, name: editingItem.name.trim(), inheritance: editingItem.inheritance } : m);
-    } else if (editingItem.type === 'status') {
-      newSettings.statuses = newSettings.statuses?.map(s => s.id === editingItem.id ? { ...s, name: editingItem.name.trim() } : s) || [];
-    }
-    onUpdate(newSettings);
-    setEditingItem(null);
-  };
-
-  const removeSpecies = (id: string, name: string) => {
-    setDeleteConfirmation({
-      title: 'Delete Species',
-      message: `Are you sure you want to delete "${name}"? All associated sub-species will also be removed.`,
-      onConfirm: () => {
-        onUpdate({ 
-          ...settings, 
-          species: settings.species.filter(s => s.id !== id),
-          subspecies: settings.subspecies.filter(ss => ss.speciesId !== id)
-        });
-        toast.success('Species removed');
-      }
-    });
-  };
-
-  const removeSubSpecies = (id: string, name: string) => {
-    setDeleteConfirmation({
-      title: 'Delete Sub-species',
-      message: `Are you sure you want to delete "${name}"?`,
-      onConfirm: () => {
-        onUpdate({ ...settings, subspecies: settings.subspecies.filter(ss => ss.id !== id) });
-        toast.success('Sub-species removed');
-      }
-    });
-  };
-
-  const removeMutation = (id: string, name: string) => {
-    setDeleteConfirmation({
-      title: 'Delete Mutation',
-      message: `Are you sure you want to delete "${name}"? It will be removed from all associated birds.`,
-      onConfirm: async () => {
-        if (!user) return;
-        try {
-          const batch = writeBatch(db);
-          
-          // Filter out of settings
-          const nextMutations = settings.mutations.filter(m => m.id !== id);
-          batch.update(doc(db, 'userSettings', user.uid), {
-            mutations: nextMutations
-          });
-
-          // Remove from birds
-          const affectedBirds = (allData.birds || []).filter((b: any) => 
-            b.mutations?.includes(name) || b.splitMutations?.includes(name)
-          );
-
-          affectedBirds.forEach((b: any) => {
-            batch.update(doc(db, 'birds', b.id), {
-              mutations: b.mutations?.filter((m: string) => m !== name) || [],
-              splitMutations: b.splitMutations?.filter((m: string) => m !== name) || []
-            });
-          });
-
-          await batch.commit();
-          onUpdate({ ...settings, mutations: nextMutations });
-          toast.success('Mutation removed from settings and all associated birds');
-        } catch (e) {
-          console.error("Failed to delete mutation: ", e);
-          toast.error("Failed to remove mutation from birds or settings");
-        }
-      }
-    });
-  };
-
-  const removeStatus = (id: string, name: string) => {
-    setDeleteConfirmation({
-      title: 'Delete Status',
-      message: `Are you sure you want to delete status "${name}"?`,
-      onConfirm: () => {
-        onUpdate({ ...settings, statuses: settings.statuses?.filter(s => s.id !== id) || [] });
-        toast.success('Status removed');
-      }
-    });
-  };
-
-  const SettingRow = ({ icon: Icon, title, description, active, onClick }: { icon: any, title: string, description: string, active: boolean, onClick: () => void }) => (
-    <button 
-      onClick={onClick}
-      className={cn(
-        "w-full p-4 rounded-2xl border transition-all flex items-center gap-4 text-left",
-        active 
-          ? "bg-gold-500/10 border-gold-500/50 shadow-lg shadow-gold-500/5" 
-          : "bg-black-900 border-black-800 hover:border-black-700"
-      )}
-    >
-      <div className={cn("p-3 rounded-xl", active ? "bg-gold-500 text-black" : "bg-zinc-800 text-gold-500")}>
-        <Icon size={20} />
-      </div>
-      <div className="flex-1">
-        <h4 className={cn("font-black uppercase tracking-widest text-sm", active ? "text-gold-500" : "text-white")}>{title}</h4>
-        <p className="text-[10px] font-bold text-white/50 uppercase tracking-tighter mt-0.5">{description}</p>
-      </div>
-      <ChevronRight size={20} className={cn("transition-transform", active ? "rotate-90 text-gold-500" : "text-black-200")} />
-    </button>
-  );
-
-  return (
-    <div className="max-w-7xl mx-auto p-4 sm:p-6 min-h-[600px] flex flex-col lg:flex-row gap-8">
-      {/* Sidebar / Categories */}
-      <div className="w-full lg:w-80 space-y-3 flex-shrink-0">
-        <SettingRow 
-          icon={User} 
-          title="General" 
-          description="Language & Currency" 
-          active={activeSection === 'general'} 
-          onClick={() => setActiveSection('general')} 
-        />
-        <SettingRow 
-          icon={BirdIcon} 
-          title="Species" 
-          description="Manage Bird Species" 
-          active={activeSection === 'species'} 
-          onClick={() => setActiveSection('species')} 
-        />
-        <SettingRow 
-          icon={GitBranch} 
-          title="Sub-Species" 
-          description="Manage Sub-Species" 
-          active={activeSection === 'subspecies'} 
-          onClick={() => setActiveSection('subspecies')} 
-        />
-        <SettingRow 
-          icon={Tag} 
-          title="Mutations" 
-          description="Manage Mutations" 
-          active={activeSection === 'mutations'} 
-          onClick={() => setActiveSection('mutations')} 
-        />
-        <SettingRow 
-          icon={Tag} 
-          title="Statuses" 
-          description="Manage Statuses" 
-          active={activeSection === 'statuses'} 
-          onClick={() => setActiveSection('statuses')} 
-        />
-        <SettingRow 
-          icon={Activity} 
-          title="Data Management" 
-          description="Backup & Export" 
-          active={activeSection === 'data'} 
-          onClick={() => setActiveSection('data')} 
-        />
-      </div>
-
-      {/* Content Area */}
-      <div className="flex-1 bg-black-900/50 border border-black-800 rounded-3xl p-6 lg:p-8 overflow-y-auto custom-scrollbar">
-        <AnimatePresence mode="wait">
-          {activeSection === 'general' && (
-            <motion.div 
-              key="general"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              className="space-y-6"
-            >
-              <div className="space-y-4">
-                <h3 className="text-lg font-black uppercase tracking-widest text-gold-500">General Settings</h3>
-                
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-black-100 uppercase tracking-widest ml-1">Currency</label>
-                    <Select 
-                      value={settings.currency || 'ZAR'} 
-                      onChange={e => onUpdate({ ...settings, currency: e.target.value })}
-                    >
-                      <option value="ZAR">South African Rand (R)</option>
-                      <option value="USD">US Dollar ($)</option>
-                      <option value="EUR">Euro (€)</option>
-                      <option value="GBP">British Pound (£)</option>
-                      <option value="AUD">Australian Dollar (A$)</option>
-                      <option value="CAD">Canadian Dollar (C$)</option>
-                      <option value="CHF">Swiss Franc (CHF)</option>
-                      <option value="JPY">Japanese Yen (¥)</option>
-                      <option value="CNY">Chinese Yuan (¥)</option>
-                      <option value="INR">Indian Rupee (₹)</option>
-                      <option value="PHP">Philippine Peso (₱)</option>
-                      <option value="RUB">Russian Ruble (₽)</option>
-                      <option value="BRL">Brazilian Real (R$)</option>
-                      <option value="MXN">Mexican Peso (Mex$)</option>
-                      <option value="SAR">Saudi Riyal (SR)</option>
-                      <option value="AED">UAE Dirham (AED)</option>
-                      <option value="ILS">Israeli Shekel (₪)</option>
-                      <option value="NZD">New Zealand Dollar (NZ$)</option>
-                      <option value="SGD">Singapore Dollar (S$)</option>
-                      <option value="TRY">Turkish Lira (₺)</option>
-                      <option value="PLN">Polish Złoty (zł)</option>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-black-100 uppercase tracking-widest ml-1">Language</label>
-                    <Select 
-                      value={settings.language || 'en'} 
-                      onChange={e => onUpdate({ ...settings, language: e.target.value })}
-                    >
-                      {Object.entries(LANGUAGE_NAMES).map(([code, name]) => (
-                        <option key={code} value={code}>{name}</option>
-                      ))}
-                    </Select>
-                  </div>
-
-                  <ThemeColorPicker 
-                    label="Accent Color"
-                    color={settings.themeColor} 
-                    defaultColor="#d4af37"
-                    onChange={(hex) => onUpdate({ ...settings, themeColor: hex })}
-                  />
-                  <ThemeColorPicker 
-                    label="Text Color"
-                    color={settings.textColor} 
-                    defaultColor="#ffffff"
-                    onChange={(hex) => onUpdate({ ...settings, textColor: hex })}
-                  />
-                  <ThemeColorPicker 
-                    label="Background Color"
-                    color={settings.backgroundColor} 
-                    defaultColor="#000000"
-                    onChange={(hex) => onUpdate({ ...settings, backgroundColor: hex })}
-                  />
-                  <ThemeColorPicker 
-                    label="Card Color"
-                    color={settings.cardColor} 
-                    defaultColor="#0a0a0a"
-                    onChange={(hex) => onUpdate({ ...settings, cardColor: hex })}
-                  />
-                  <ThemeColorPicker 
-                    label="Male Color"
-                    color={settings.maleColor} 
-                    defaultColor="#3b82f6"
-                    onChange={(hex) => onUpdate({ ...settings, maleColor: hex })}
-                  />
-                  <ThemeColorPicker 
-                    label="Female Color"
-                    color={settings.femaleColor} 
-                    defaultColor="#e11d48"
-                    onChange={(hex) => onUpdate({ ...settings, femaleColor: hex })}
-                  />
-                  <ThemeColorPicker 
-                    label="Delete Color"
-                    color={settings.deleteColor} 
-                    defaultColor="#ef4444"
-                    onChange={(hex) => onUpdate({ ...settings, deleteColor: hex })}
-                  />
-                  <ThemeColorPicker 
-                    label="Alt Accent Color"
-                    color={settings.secondaryColor} 
-                    defaultColor="#d4af37"
-                    onChange={(hex) => onUpdate({ ...settings, secondaryColor: hex })}
-                  />
-                </div>
-
-                <div className="pt-4 border-t border-black-800 space-y-4">
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-black-100 uppercase tracking-widest ml-1">Device & App Installation</label>
-                    <InstallAppButton variant="settings" showAlwaysInSettings />
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-black-100 uppercase tracking-widest ml-1">Data Settings</label>
-                    <label className="flex items-center gap-2 px-3 py-3 bg-black border border-black-700 rounded-lg cursor-pointer hover:bg-zinc-800 transition-colors">
-                      <input 
-                        type="checkbox" 
-                        checked={settings.useDefaultData !== false} 
-                        onChange={e => onUpdate({ ...settings, useDefaultData: e.target.checked })} 
-                        className="rounded bg-black border-black-700 w-4 h-4 text-gold-500 focus:ring-gold-500/20"
-                      />
-                      <span className="text-sm font-bold text-white">Enable Default Master Data (Species, Mutations)</span>
-                    </label>
-                    <p className="text-xs text-black-200 ml-1">Provides a base set of standard species & mutations automatically. Includes genetic rules for the calculator if applicable.</p>
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-          )}
-
-          {activeSection === 'species' && (
-            <motion.div 
-              key="species"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              className="space-y-6"
-            >
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-black uppercase tracking-widest text-secondary">Manage Species</h3>
-                  <Badge variant="info">{settings.species?.length || 0} Total</Badge>
-                </div>
-                <div className="flex gap-2">
-                  <Input placeholder="New species name..." value={newSpecies} onChange={e => setNewSpecies(e.target.value)} onKeyDown={e => e.key === 'Enter' && addSpecies()} />
-                  <Button onClick={addSpecies} variant="secondary" className="px-4"><Plus size={18} /></Button>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-                  {settings.species?.map(s => (
-                    <div key={s.id} className="p-3 bg-black border border-black-700 rounded-xl flex items-center justify-between group">
-                      <span className="text-sm font-bold text-white">{s.name}</span>
-                      <div className="flex items-center gap-2">
-                        <button 
-                          onClick={() => setEditingItem({ type: 'species', id: s.id, name: s.name })} 
-                          className="text-secondary hover:text-white p-2 bg-zinc-800 hover:bg-secondary rounded-xl transition-all border border-secondary/20"
-                          title="Edit"
-                        >
-                          <Edit2 size={16} />
-                        </button>
-                        <button 
-                          onClick={() => removeSpecies(s.id, s.name)} 
-                          className="p-2 rounded-xl transition-all"
-                          style={{
-                            backgroundColor: `color-mix(in srgb, var(--theme-delete-color, #ef4444), transparent 90%)`,
-                            color: 'var(--theme-delete-color, #ef4444)',
-                            borderColor: `color-mix(in srgb, var(--theme-delete-color, #ef4444), transparent 80%)`,
-                            borderWidth: '1px'
-                          }}
-                          title="Delete"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </motion.div>
-          )}
-
-          {activeSection === 'subspecies' && (
-            <motion.div 
-              key="subspecies"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              className="space-y-6"
-            >
-              <div className="space-y-4">
-                <h3 className="text-lg font-black uppercase tracking-widest text-gold-500">Manage Sub-Species</h3>
-                <div className="grid grid-cols-1 gap-3">
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black text-black-100 uppercase tracking-widest ml-1">Parent Species</label>
-                    <Select value={selectedSpeciesId} onChange={e => setSelectedSpeciesId(e.target.value)}>
-                      <option value="">Select Parent Species</option>
-                      {availableSpecies.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                    </Select>
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black text-black-100 uppercase tracking-widest ml-1">Sub-Species Name</label>
-                    <div className="flex gap-2">
-                       <Input placeholder="New sub-species name..." value={newSubSpecies} onChange={e => setNewSubSpecies(e.target.value)} onKeyDown={e => e.key === 'Enter' && addSubSpecies()} />
-                      <Button onClick={addSubSpecies} variant="secondary" className="px-4" disabled={!selectedSpeciesId}><Plus size={18} /></Button>
-                    </div>
-                  </div>
-                </div>
-                <div className="space-y-4 mt-6">
-                  {availableSpecies.map(s => {
-                    const subs = settings.subspecies?.filter(ss => ss.speciesId === s.id) || [];
-                    if (subs.length === 0) return null;
-                    return (
-                      <div key={s.id} className="space-y-2">
-                        <p className="text-[10px] font-black text-black-100 uppercase tracking-widest ml-1">{s.name} Sub-species</p>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-                          {subs.map(ss => (
-                            <div key={ss.id} className="p-3 bg-black border border-black-700 rounded-xl flex items-center justify-between group">
-                              <span className="text-sm font-bold text-white">{ss.name}</span>
-                              <div className="flex items-center gap-1">
-                                <button onClick={() => setEditingItem({ type: 'subspecies', id: ss.id, name: ss.name })} className="text-black-200 hover:text-secondary p-1.5 bg-zinc-800 rounded-lg transition-all"><Edit2 size={14} /></button>
-                                <button 
-                                  onClick={() => removeSubSpecies(ss.id, ss.name)} 
-                                  className="p-1.5 rounded-lg transition-all"
-                                  style={{
-                                    backgroundColor: `color-mix(in srgb, var(--theme-delete-color, #ef4444), transparent 90%)`,
-                                    color: 'var(--theme-delete-color, #ef4444)',
-                                    borderColor: `color-mix(in srgb, var(--theme-delete-color, #ef4444), transparent 80%)`,
-                                    borderWidth: '1px'
-                                  }}
-                                >
-                                  <Trash2 size={14} />
-                                </button>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </motion.div>
-          )}
-
-          {activeSection === 'mutations' && (
-            <motion.div 
-              key="mutations"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              className="space-y-6"
-            >
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-black uppercase tracking-widest text-gold-500">Manage Mutations</h3>
-                  <Badge variant="info">{settings.mutations?.length || 0} Total</Badge>
-                </div>
-                <div className="flex flex-col sm:flex-row gap-2">
-                  <div className="flex-1">
-                    <Input placeholder="New mutation name..." value={newMutation} onChange={e => setNewMutation(e.target.value)} onKeyDown={e => e.key === 'Enter' && addMutation()} />
-                  </div>
-                  <div className="w-full sm:w-64">
-                    <Select value={newMutationInheritance} onChange={e => setNewMutationInheritance(e.target.value as any)}>
-                      <option value="" className="bg-black text-white">None (Select in Calculator)</option>
-                      <option value="autosomal_recessive" className="bg-black text-white">Recessive</option>
-                      <option value="autosomal_dominant" className="bg-black text-white">Dominant</option>
-                      <option value="incomplete_dominant" className="bg-black text-white">Incomplete Dominant</option>
-                      <option value="sex_linked_recessive" className="bg-black text-white">Sex-linked Recessive</option>
-                    </Select>
-                  </div>
-                  <Button onClick={addMutation} variant="secondary" className="px-4 shrink-0"><Plus size={18} /></Button>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-                  {settings.mutations?.map(m => (
-                    <div key={m.id} className="p-3 bg-black border border-black-700 rounded-xl flex items-center justify-between group">
-                      <span className="text-sm font-bold text-white">{m.name}</span>
-                      <div className="flex items-center gap-1">
-                        <button onClick={() => setEditingItem({ type: 'mutation', id: m.id, name: m.name, inheritance: m.inheritance })} className="text-black-200 hover:text-secondary p-1.5 bg-zinc-800 rounded-lg transition-all"><Edit2 size={14} /></button>
-                        <button 
-                          onClick={() => removeMutation(m.id, m.name)} 
-                          className="p-1.5 rounded-lg transition-all"
-                          style={{
-                            backgroundColor: `color-mix(in srgb, var(--theme-delete-color, #ef4444), transparent 90%)`,
-                            color: 'var(--theme-delete-color, #ef4444)',
-                            borderColor: `color-mix(in srgb, var(--theme-delete-color, #ef4444), transparent 80%)`,
-                            borderWidth: '1px'
-                          }}
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </motion.div>
-          )}
-
-          {activeSection === 'statuses' && (
-            <motion.div 
-              key="statuses"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              className="space-y-6"
-            >
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-black uppercase tracking-widest text-gold-500">Manage Statuses</h3>
-                  <Badge variant="info">{settings.statuses?.length || 0} Total</Badge>
-                </div>
-                <div className="flex gap-2">
-                  <Input placeholder="New status name..." value={newStatus} onChange={e => setNewStatus(e.target.value)} onKeyDown={e => e.key === 'Enter' && addStatus()} />
-                  <Button onClick={addStatus} variant="secondary" className="px-4"><Plus size={18} /></Button>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-                  {settings.statuses?.map(s => (
-                    <div key={s.id} className="p-3 bg-black border border-black-700 rounded-xl flex items-center justify-between group">
-                      <span className="text-sm font-bold text-white">{s.name}</span>
-                      <div className="flex items-center gap-1">
-                        <button onClick={() => setEditingItem({ type: 'status', id: s.id, name: s.name })} className="text-black-200 hover:text-secondary p-1.5 bg-zinc-800 rounded-lg transition-all"><Edit2 size={14} /></button>
-                        <button 
-                          onClick={() => removeStatus(s.id, s.name)} 
-                          className="p-1.5 rounded-lg transition-all"
-                          style={{
-                            backgroundColor: `color-mix(in srgb, var(--theme-delete-color, #ef4444), transparent 90%)`,
-                            color: 'var(--theme-delete-color, #ef4444)',
-                            borderColor: `color-mix(in srgb, var(--theme-delete-color, #ef4444), transparent 80%)`,
-                            borderWidth: '1px'
-                          }}
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </motion.div>
-          )}
-
-          {activeSection === 'data' && (
-            <motion.div 
-              key="data"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              className="space-y-6"
-            >
-              <div className="space-y-4">
-                <h3 className="text-lg font-black uppercase tracking-widest text-gold-500">Data Management</h3>
-                <div className="p-6 bg-black border border-black-700 rounded-3xl space-y-4">
-                  <div className="flex items-center gap-4">
-                    <div className="p-3 bg-gold-500/10 rounded-2xl text-gold-500">
-                      <ImageIcon size={24} />
-                    </div>
-                    <div>
-                      <h4 className="text-sm font-black uppercase tracking-widest text-white">Manual Backup</h4>
-                      <p className="text-[10px] font-bold text-white/50 uppercase tracking-tighter mt-0.5">Download all your records as a JSON file</p>
-                    </div>
-                  </div>
-                  <Button onClick={downloadBackup} className="w-full py-4">Download Backup Now</Button>
-                </div>
-
-                <div className="bg-black-900 border border-black-800 rounded-3xl p-6 space-y-6">
-                  <div className="flex items-center gap-4">
-                    <div className="p-3 bg-gold-500/10 rounded-2xl text-gold-500">
-                      <Cloud size={24} />
-                    </div>
-                    <div className="flex-1">
-                      <h4 className="text-sm font-black uppercase tracking-widest text-white">Cloud Sync</h4>
-                      <p className="text-[10px] font-bold text-white/50 uppercase tracking-tighter mt-0.5">
-                        {isSyncing ? 'Syncing changes...' : 'All data backed up online'}
-                      </p>
-                    </div>
-                    <Button 
-                      variant="ghost" 
-                      onClick={() => window.location.reload()}
-                      className="text-[10px] font-black uppercase tracking-widest text-gold-500"
-                    >
-                      Refresh
-                    </Button>
-                  </div>
-                  
-                  <div className="pt-4 border-t border-black-800 space-y-2">
-                    <div className="flex justify-between items-center text-[10px] font-bold uppercase tracking-widest">
-                      <span className="text-white/50">User ID</span>
-                      <span className="text-white font-mono">{user?.uid.slice(0, 8)}...</span>
-                    </div>
-                    <div className="flex justify-between items-center text-[10px] font-bold uppercase tracking-widest">
-                      <span className="text-white/50">Birds</span>
-                      <span className="text-white">{allData.birds.length}</span>
-                    </div>
-                    <div className="flex justify-between items-center text-[10px] font-bold uppercase tracking-widest">
-                      <span className="text-white/50">Cages</span>
-                      <span className="text-white">{allData.cages.length}</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-4 pt-8 border-t border-black-800">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-lg font-black uppercase tracking-widest text-gold-500">Shared Items History</h3>
-                    <Badge variant="info" className="bg-black border-black-700">{allSharedItems.length} Records</Badge>
-                  </div>
-                  <p className="text-[10px] text-white/50 uppercase font-bold tracking-widest leading-relaxed">
-                    Access history of items you've shared or transferred. You can re-open their link to import them again.
-                  </p>
-                  
-                  <div className="grid grid-cols-1 gap-3">
-                    {allSharedItems.length > 0 ? (
-                      allSharedItems.map(item => {
-                        let itemName = 'Unknown Item';
-                        try {
-                          const itemData = JSON.parse(item.data);
-                          itemName = itemData.name || itemData.id || 'Unnamed';
-                        } catch (e) {}
-
-                        return (
-                          <div key={item.id} className="p-4 bg-black border border-black-800 rounded-2xl flex items-center justify-between group hover:border-gold-500/30 transition-all">
-                            <div className="flex items-center gap-4">
-                              <div className={cn(
-                                "p-3 rounded-xl border shrink-0",
-                                item.action === 'transfer' 
-                                  ? "bg-gold-500/10 border-gold-500/20 text-gold-500" 
-                                  : "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
-                              )}>
-                                {item.action === 'transfer' ? <ArrowRightLeft size={20} /> : <Share2 size={20} />}
-                              </div>
-                              <div className="min-w-0">
-                                <h4 className="text-sm font-black text-white uppercase tracking-widest truncate">{itemName}</h4>
-                                <div className="flex items-center gap-2 mt-1">
-                                  <span className="text-[9px] font-black uppercase tracking-wider text-white/40">{item.type}</span>
-                                  <span className="w-1 h-1 rounded-full bg-black-700" />
-                                  <span className="text-[9px] font-black uppercase tracking-wider text-white/40">{new Date(item.createdAt).toLocaleDateString()}</span>
-                                </div>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <button 
-                                onClick={() => {
-                                  const url = `${window.location.origin}?${item.action === 'transfer' ? 'transferId' : 'shareId'}=${item.id}`;
-                                  window.open(url, '_blank');
-                                }}
-                                className="p-2.5 bg-zinc-800 text-white/50 hover:text-white rounded-xl transition-all border border-black-700 hover:border-black-600"
-                                title="Open Link"
-                              >
-                                <ExternalLink size={16} />
-                              </button>
-                              <button 
-                                onClick={() => {
-                                  setDeleteConfirmation({
-                                    title: 'Remove Shared Item',
-                                    message: 'Are you sure you want to remove this shared record? The link will no longer work.',
-                                    onConfirm: async () => {
-                                      try {
-                                        await deleteDoc(doc(db, 'shared_items', item.id));
-                                        toast.success('Shared item removed.');
-                                      } catch (err) {
-                                        handleFirestoreError(err, OperationType.DELETE, 'shared_items');
-                                      }
-                                    }
-                                  });
-                                }}
-                                className="p-2.5 bg-rose-500/5 text-rose-500/50 hover:text-rose-500 rounded-xl transition-all border border-rose-500/10 hover:border-rose-500/30"
-                                title="Delete Record"
-                              >
-                                <Trash2 size={16} />
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      })
-                    ) : (
-                      <div className="py-12 border-2 border-dashed border-black-800 rounded-3xl flex flex-col items-center justify-center text-center px-6">
-                        <div className="p-4 bg-black-900 rounded-full text-white/10 mb-4">
-                          <HistoryIcon size={32} />
-                        </div>
-                        <p className="text-xs font-black text-white/30 uppercase tracking-widest">No shared items found</p>
-                        <p className="text-[10px] font-bold text-white/20 uppercase tracking-tighter mt-1 max-w-[200px]">Items you share or transfer will appear here for history.</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-          )}
-
-
-        </AnimatePresence>
-      </div>
-
-      {/* Edit Modal */}
-      <AnimatePresence>
-        {editingItem && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-black-900 border border-black-800 p-6 rounded-3xl w-full max-w-md shadow-2xl"
-            >
-              <h4 className="text-lg font-black uppercase tracking-widest text-gold-500 mb-4">Edit {editingItem.type}</h4>
-              <div className="space-y-4">
-                <Input 
-                  value={editingItem.name} 
-                  onChange={e => setEditingItem({ ...editingItem, name: e.target.value })}
-                  onKeyDown={e => e.key === 'Enter' && handleEdit()}
-                  autoFocus
-                />
-                {editingItem.type === 'mutation' && (
-                  <div>
-                    <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1 mb-1 block">Inheritance</label>
-                    <Select value={editingItem.inheritance || ''} onChange={e => setEditingItem({ ...editingItem, inheritance: e.target.value as any })}>
-                      <option value="" className="bg-black text-white">None (Select in Calculator)</option>
-                      <option value="autosomal_recessive" className="bg-black text-white">Recessive</option>
-                      <option value="autosomal_dominant" className="bg-black text-white">Dominant</option>
-                      <option value="incomplete_dominant" className="bg-black text-white">Incomplete Dominant</option>
-                      <option value="sex_linked_recessive" className="bg-black text-white">Sex-linked Recessive</option>
-                    </Select>
-                  </div>
-                )}
-                <div className="flex gap-2">
-                  <Button onClick={() => setEditingItem(null)} variant="ghost" className="flex-1">Cancel</Button>
-                  <Button onClick={handleEdit} className="flex-1">Save Changes</Button>
-                </div>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-    </div>
-  );
-}
-
 function PrintView({ 
   birds, 
   pairs, 
@@ -8213,9 +7376,9 @@ function PrintView({
       return { 
         id: b.id, 
         name: b.name, 
-        details: `${b.species}${b.subSpecies ? ` • ${b.subSpecies}` : ''}${cage ? ` - Cage: ${cage.name}` : ''}`, 
+        details: `${b.species}${b.subSpecies ? ` * ${b.subSpecies}` : ''}${cage ? ' - Cage: ${cage.name}' : ''}`, 
         bird: b,
-        cageName: cage?.name || ''
+        cageName: cage?.name || ``
       };
     }).sort((a, b) => {
       if (a.cageName !== b.cageName) {
@@ -8242,9 +7405,9 @@ function PrintView({
       return { 
         id: p.id, 
         name: `Pair: ${mName} x ${fName}`, 
-        details: `M: ${maleInfo} | F: ${femaleInfo}${cage ? ` - Cage: ${cage.name}` : ''}`,
+        details: `M: ${maleInfo} | F: ${femaleInfo}${cage ? ` - Cage: ${cage.name}` : ``}`,
         pair: p,
-        cageName: cage?.name || ''
+        cageName: cage?.name || ``
       };
     }).sort((a, b) => {
       if (a.cageName !== b.cageName) {
@@ -8306,7 +7469,7 @@ function PrintView({
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 pb-6 border-b border-black-800">
         <div>
           <h1 className="text-3xl font-black text-white uppercase tracking-tighter">{t('Print Center')}</h1>
-          <p className="text-black-100 text-xs font-bold uppercase tracking-widest mt-1">{t('Configure your physical records & labels')}</p>
+          <p className="text-black-100 text-xs font-bold uppercase tracking-widest mt-1">{t(`Configure your physical records & labels`)}</p>
         </div>
         <div className="flex bg-black-900 border border-black-800 p-1 rounded-2xl w-full lg:w-[450px]">
           <button 
@@ -8367,7 +7530,7 @@ function PrintView({
             {printMode === 'qr' && (
               <div className="space-y-4 p-4 bg-zinc-900/30 border border-black-800 rounded-2xl">
                 <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-black text-gold-500 uppercase tracking-widest">{t('QR Dimensions (mm)')}</span>
+                  <span className="text-[10px] font-black text-gold-500 uppercase tracking-widest">{t(`QR Dimensions (mm)`)}</span>
                   <div className="flex items-center gap-2">
                     <span className="text-[9px] text-white/50 uppercase font-black">{t('Thermal Mode')}</span>
                     <button 
@@ -8445,9 +7608,9 @@ function PrintView({
                 onClick={() => setQrSelections([])} 
                 className="text-[10px] font-black uppercase tracking-widest hover:bg-opacity-10 px-3 py-1.5 rounded-lg transition-colors border"
                 style={{
-                  color: 'var(--theme-delete-color, #ef4444)',
-                  backgroundColor: 'color-mix(in srgb, var(--theme-delete-color, #ef4444), transparent 95%)',
-                  borderColor: 'color-mix(in srgb, var(--theme-delete-color, #ef4444), transparent 80%)'
+                  color: `var(--theme-delete-color, #ef4444)`,
+                  backgroundColor: `color-mix(in srgb, var(--theme-delete-color, #ef4444), transparent 95%)`,
+                  borderColor: `color-mix(in srgb, var(--theme-delete-color, #ef4444), transparent 80%)`
                 }}
               >
                 {t('Clear All')}
@@ -8468,7 +7631,7 @@ function PrintView({
                 </div>
                 <div className="space-y-2">
                    <p className="text-lg font-black text-white uppercase tracking-widest underline decoration-gold-500 underline-offset-8">{t('Observation Sheet')}</p>
-                   <p className="text-[10px] text-black-100 font-bold uppercase max-w-sm mx-auto leading-relaxed">{t('System will generate a high-fidelity blank table formatted for manual entry and pen-and-paper tracking.')}</p>
+                   <p className="text-[10px] text-black-100 font-bold uppercase max-w-sm mx-auto leading-relaxed">{t(`System will generate a high-fidelity blank table formatted for manual entry and pen-and-paper tracking.`)}</p>
                 </div>
               </div>
             ) : (
@@ -8482,9 +7645,9 @@ function PrintView({
                           onClick={() => toggleSelection(id)} 
                           className="w-8 h-8 rounded-xl flex items-center justify-center transition-all shadow-lg backdrop-blur-sm border"
                           style={{
-                            backgroundColor: 'color-mix(in srgb, var(--theme-delete-color, #ef4444), transparent 80%)',
-                            color: 'var(--theme-delete-color, #ef4444)',
-                            borderColor: 'color-mix(in srgb, var(--theme-delete-color, #ef4444), transparent 70%)'
+                            backgroundColor: `color-mix(in srgb, var(--theme-delete-color, #ef4444), transparent 80%)`,
+                            color: `var(--theme-delete-color, #ef4444)`,
+                            borderColor: `color-mix(in srgb, var(--theme-delete-color, #ef4444), transparent 70%)`
                           }}
                         >
                           <X size={14} />
@@ -8514,8 +7677,8 @@ function PrintView({
                             onClick={() => toggleSelection(id)} 
                             className="ml-4 w-8 h-8 rounded-xl flex items-center justify-center transition-all shadow-lg"
                             style={{
-                              backgroundColor: 'color-mix(in srgb, var(--theme-delete-color, #ef4444), transparent 90%)',
-                              color: 'var(--theme-delete-color, #ef4444)'
+                              backgroundColor: `color-mix(in srgb, var(--theme-delete-color, #ef4444), transparent 90%)`,
+                              color: `var(--theme-delete-color, #ef4444)`
                             }}
                           >
                             <X size={14} />
@@ -8591,7 +7754,7 @@ function Modal({ isOpen, onClose, title, children }: { isOpen: boolean, onClose:
 }
 
 function BirdDocumentsModal({ bird, onClose, user }: { bird: Bird, onClose: () => void, user: FirebaseUser | null }) {
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState(``);
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [uploadType, setUploadType] = useState('DNA Sexing');
   const [isUploading, setIsUploading] = useState(false);
@@ -8693,23 +7856,23 @@ function BirdDocumentsModal({ bird, onClose, user }: { bird: Bird, onClose: () =
           <p className="text-sm sm:text-base font-black text-white mt-1">{stats.total}</p>
         </div>
         <div className="p-2 sm:p-3 bg-zinc-900 border border-zinc-805/50 rounded-2xl text-center">
-          <p className="text-[9px] font-black uppercase text-zinc-400 tracking-wider">DNA 🧬</p>
+          <p className="text-[9px] font-black uppercase text-zinc-400 tracking-wider">DNA [DNA]</p>
           <p className="text-sm sm:text-base font-black text-white mt-1">{stats.dna}</p>
         </div>
         <div className="p-2 sm:p-3 bg-zinc-900 border border-zinc-805/50 rounded-2xl text-center">
-          <p className="text-[9px] font-black uppercase text-zinc-400 tracking-wider">Vet 🏥</p>
+          <p className="text-[9px] font-black uppercase text-zinc-400 tracking-wider">Vet [Health]</p>
           <p className="text-sm sm:text-base font-black text-white mt-1">{stats.vet}</p>
         </div>
         <div className="p-2 sm:p-3 bg-zinc-900 border border-zinc-805/50 rounded-2xl text-center">
-          <p className="text-[9px] font-black uppercase text-zinc-400 tracking-wider">Permit 📄</p>
+          <p className="text-[9px] font-black uppercase text-zinc-400 tracking-wider">Permit [Doc]</p>
           <p className="text-sm sm:text-base font-black text-white mt-1">{stats.permit}</p>
         </div>
         <div className="p-2 sm:p-3 bg-zinc-900 border border-zinc-805/50 rounded-2xl text-center">
-          <p className="text-[9px] font-black uppercase text-zinc-400 tracking-wider">Pedigree 🌳</p>
+          <p className="text-[9px] font-black uppercase text-zinc-400 tracking-wider">Pedigree [Tree]</p>
           <p className="text-sm sm:text-base font-black text-white mt-1">{stats.pedigree}</p>
         </div>
         <div className="p-2 sm:p-3 bg-zinc-900 border border-zinc-805/50 rounded-2xl text-center">
-          <p className="text-[9px] font-black uppercase text-zinc-400 tracking-wider">Other 📁</p>
+          <p className="text-[9px] font-black uppercase text-zinc-400 tracking-wider">Other [Folder]</p>
           <p className="text-sm sm:text-base font-black text-white mt-1">{stats.general}</p>
         </div>
       </div>
@@ -8733,10 +7896,10 @@ function BirdDocumentsModal({ bird, onClose, user }: { bird: Bird, onClose: () =
                     uploadType === type ? "bg-gold-500 border-gold-400 text-black font-black" : "bg-black border-zinc-800 text-white/70 hover:bg-zinc-850"
                   )}
                 >
-                  {type === 'DNA Sexing' ? '🧬 DNA' :
-                   type === 'Vet Record' ? '🏥 Vet' :
-                   type === 'Permit' ? '📄 Permit' :
-                   type === 'Pedigree' ? '🌳 Link' : '📁 Other'}
+                  {type === 'DNA Sexing' ? '[DNA] DNA' :
+                   type === 'Vet Record' ? '[Health] Vet' :
+                   type === 'Permit' ? '[Doc] Permit' :
+                   type === 'Pedigree' ? '[Tree] Link' : '[Folder] Other'}
                 </button>
               ))}
             </div>
@@ -8798,7 +7961,7 @@ function BirdDocumentsModal({ bird, onClose, user }: { bird: Bird, onClose: () =
                   selectedCategory === cat ? "bg-zinc-800 text-gold-500 border border-zinc-700 shadow-sm" : "text-white/60 hover:text-white"
                 )}
               >
-                {cat === 'All' ? '📂 All' : cat}
+                {cat === 'All' ? '[Folder] All' : cat}
               </button>
             ))}
           </div>
@@ -8825,7 +7988,7 @@ function BirdDocumentsModal({ bird, onClose, user }: { bird: Bird, onClose: () =
                 <span className="text-xs font-black text-white leading-tight block truncate group-hover:text-gold-500 transition-colors uppercase tracking-wide">{doc.name}</span>
                 <div className="flex items-center gap-2 mt-1 flex-wrap">
                   <Badge variant="neutral" className="bg-zinc-850 text-gold-500 text-[8px] px-1.5 py-0 border border-zinc-800 uppercase tracking-widest">{doc.type}</Badge>
-                  <span className="text-[9px] text-white/30 font-bold uppercase">{format(new Date(doc.createdAt), 'MMM dd, yyyy')}</span>
+                  <span className="text-[9px] text-white/30 font-bold uppercase">{format(new Date(doc.createdAt), `MMM dd, yyyy`)}</span>
                 </div>
               </div>
             </div>
@@ -8939,7 +8102,7 @@ function BirdDocumentsModal({ bird, onClose, user }: { bird: Bird, onClose: () =
                 <p className="text-[8px] font-black uppercase text-white/30 tracking-wider">Vault Registry Details</p>
                 <div className="flex items-center gap-2 mt-1">
                   <Badge variant="neutral" className="bg-zinc-900 text-gold-500 text-[8px] px-1.5 py-0.5 border border-zinc-800">{previewDoc.type}</Badge>
-                  <span className="text-[9px] font-bold text-white/50 uppercase">Uploaded on {format(new Date(previewDoc.createdAt), 'MMMM dd, yyyy')}</span>
+                  <span className="text-[9px] font-bold text-white/50 uppercase">Uploaded on {format(new Date(previewDoc.createdAt), `MMMM dd, yyyy`)}</span>
                 </div>
               </div>
               <div className="flex gap-2 shrink-0">
@@ -9005,33 +8168,34 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
   const symbol = getCurrencySymbol(userSettings?.currency);
   const detectedMateId = (initialData && initialData.id) ? (initialData.mateId || birds.find(b => b.mateId === initialData.id)?.id || '') : '';
   const [formData, setFormData] = useState<Partial<Bird>>(initialData ? { ...initialData, mateId: detectedMateId } : { 
-    name: '', 
-    species: '', 
-    subSpecies: '',
+    name: ``, 
+    species: ``, 
+    subSpecies: ``,
     sex: 'Unknown', 
-    cageId: '', 
-    birthDate: '', 
-    purchaseDate: '',
+    cageId: ``, 
+    birthDate: ``, 
+    purchaseDate: ``,
     purchasePrice: 0,
     estimatedValue: 0,
-    boughtFromId: '',
-    notes: '', 
-    motherId: '', 
-    fatherId: '', 
-    mateId: '',
+    boughtFromId: ``,
+    notes: ``, 
+    motherId: ``, 
+    fatherId: ``, 
+    mateId: ``,
     offspringIds: [],
     mutations: [],
     splitMutations: [],
     statuses: [],
-    imageUrl: '',
-    imageUrls: []
+    imageUrl: ``,
+    imageUrls: [],
+    customFields: initialData?.customFields || {}
   });
   const [addToExpenses, setAddToExpenses] = useState(!initialData?.id);
   const [isUploading, setIsUploading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [recordSale, setRecordSale] = useState(true);
   const [salePrice, setSalePrice] = useState(formData.estimatedValue || 0);
-  const [buyerId, setBuyerId] = useState('');
+  const [buyerId, setBuyerId] = useState(``);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [isUploadingDoc, setIsUploadingDoc] = useState(false);
   const [docType, setDocType] = useState('General');
@@ -9100,11 +8264,11 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
         });
       }
     } catch (err) {
-      console.error('Bird image processing error:', err);
+      console.error(`Bird image processing error:`, err);
       setUploadError(err instanceof Error ? err.message : 'Upload failed');
     } finally {
       setIsUploading(false);
-      if (e.target) e.target.value = '';
+      if (e.target) e.target.value = ``;
     }
   };
 
@@ -9115,7 +8279,7 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
       return;
     }
     if (!formData.name?.trim()) {
-      toast.error('Please enter a name or ID for the bird.');
+      toast.error(`Please enter a name or ID for the bird.`);
       return;
     }
     if (isUploading || isSaving) return;
@@ -9134,8 +8298,8 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
         // Sold / Deceased logic: remove from cage and mate
         const isDeceasedOrSold = formData.statuses?.some(s => s === 'Deceased' || s === 'Sold');
         if (isDeceasedOrSold) {
-          data.cageId = '';
-          data.mateId = '';
+          data.cageId = ``;
+          data.mateId = ``;
         }
 
         let birdRef;
@@ -9186,7 +8350,7 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
           const mateBird = birds.find(b => b.id === mateId);
           
           if (mateBird) {
-            // Update mate's record to point back to this bird
+            // Update mate`s record to point back to this bird
             const mateRef = doc(db, 'birds', mateId);
             batch.update(mateRef, { mateId: birdId });
 
@@ -9218,7 +8382,7 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
             date: formData.purchaseDate || format(new Date(), 'yyyy-MM-dd'),
             description: `Purchase of bird: ${formData.name}`,
             birdId: birdId,
-            contactId: formData.boughtFromId || '',
+            contactId: formData.boughtFromId || ``,
             uid: user.uid
           });
         }
@@ -9232,7 +8396,7 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
             date: format(new Date(), 'yyyy-MM-dd'),
             description: `Sale of bird: ${formData.name}`,
             birdId: birdId,
-            contactId: buyerId || '',
+            contactId: buyerId || ``,
             uid: user.uid
           });
         }
@@ -9259,7 +8423,7 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
     <form onSubmit={handleSubmit} className="space-y-4">
       {isExpired && (
         <div className="bg-rose-500/20 text-rose-300 border border-rose-500/30 p-3 rounded-2xl text-[10px] font-black uppercase tracking-widest text-center shadow-inner">
-          ⚠️ Subscription Expired — Entry is in Read-Only Mode
+          ! Subscription Expired - Entry is in Read-Only Mode
         </div>
       )}
       <fieldset disabled={isExpired} className="space-y-4">
@@ -9284,7 +8448,7 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
         <div className="col-span-3">
           <SearchableSelect 
             label={t('Cage')}
-            value={formData.cageId || ''}
+            value={formData.cageId || ``}
             onChange={(val) => setFormData({ ...formData, cageId: val })}
             options={[
               { id: '', name: t('Unassigned') },
@@ -9301,11 +8465,11 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
             options={speciesOptions}
             value={selectedSpecies?.id}
             onChange={(id) => {
-              const name = speciesOptions.find(o => o.id === id)?.name || '';
-              setFormData({ ...formData, species: name, subSpecies: '' });
+              const name = speciesOptions.find(o => o.id === id)?.name || ``;
+              setFormData({ ...formData, species: name, subSpecies: `` });
             }}
             onAdd={(n) => onAddSpecies(n, (createdName) => {
-              setFormData(prev => ({ ...prev, species: createdName, subSpecies: '' }));
+              setFormData(prev => ({ ...prev, species: createdName, subSpecies: `` }));
             })}
             placeholder={t('Select Species')}
           />
@@ -9316,7 +8480,7 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
             options={subSpeciesOptions}
             value={subSpeciesOptions.find(o => o.name === formData.subSpecies)?.id}
             onChange={(id) => {
-              const name = subSpeciesOptions.find(o => o.id === id)?.name || '';
+              const name = subSpeciesOptions.find(o => o.id === id)?.name || ``;
               setFormData({ ...formData, subSpecies: name });
             }}
             onAdd={(n) => selectedSpecies && onAddSubSpecies(n, selectedSpecies.id, (createdName) => {
@@ -9336,7 +8500,7 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
             multi
             selectedValues={formData.mutations?.map(m => mutationOptions.find(o => o.name === m)?.id || m) || []}
             onChange={(id) => {
-              const name = mutationOptions.find(o => o.id === id)?.name || '';
+              const name = mutationOptions.find(o => o.id === id)?.name || ``;
               const current = formData.mutations || [];
               setFormData({ 
                 ...formData, 
@@ -9356,7 +8520,7 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
             multi
             selectedValues={formData.splitMutations?.map(m => mutationOptions.find(o => o.name === m)?.id || m) || []}
             onChange={(id) => {
-              const name = mutationOptions.find(o => o.id === id)?.name || '';
+              const name = mutationOptions.find(o => o.id === id)?.name || ``;
               const current = formData.splitMutations || [];
               setFormData({ 
                 ...formData, 
@@ -9378,7 +8542,7 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
           multi
           selectedValues={formData.statuses?.map(s => statusOptions.find(o => o.name === s)?.id || s) || []}
           onChange={(id) => {
-            const name = statusOptions.find(o => o.id === id)?.name || '';
+            const name = statusOptions.find(o => o.id === id)?.name || ``;
             const current = formData.statuses || [];
             setFormData({
               ...formData,
@@ -9394,9 +8558,9 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
         <div className="p-4 bg-gold-500/10 border border-gold-500/20 rounded-2xl space-y-3">
           <div className="flex items-center gap-2 text-gold-500">
             <DollarSign size={18} />
-            <h4 className="text-xs font-black uppercase tracking-widest">{t('Record Sale as Income?')}</h4>
+            <h4 className="text-xs font-black uppercase tracking-widest">{t(`Record Sale as Income?`)}</h4>
           </div>
-          <p className="text-[10px] text-white/60">{t('This bird is marked as Sold. Would you like to record the transaction for profit tracking?')}</p>
+          <p className="text-[10px] text-white/60">{t(`This bird is marked as Sold. Would you like to record the transaction for profit tracking?`)}</p>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
               <label className="text-[9px] font-bold text-white/40 uppercase tracking-tighter">{t('Sale Price')} ({symbol})</label>
@@ -9437,7 +8601,7 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
               )}
             >
               {isUploading ? <Loader2 size={16} className="animate-spin" /> : <ImageIcon size={16} />}
-              {t('Upload Image(s)')}
+              {t(`Upload Image(s)`)}
             </label>
           </div>
         </div>
@@ -9461,7 +8625,7 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
                     const filtered = existing.filter((_, i) => i !== idx);
                     setFormData(prev => {
                        const merged = filtered;
-                       return { ...prev, imageUrls: merged, imageUrl: merged[0] || '' };
+                       return { ...prev, imageUrls: merged, imageUrl: merged[0] || `` };
                     });
                   }}
                   className="absolute inset-0 bg-black/80 items-center justify-center hidden group-hover:flex transition-all text-red-500 cursor-pointer"
@@ -9488,14 +8652,14 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
             { id: '', name: t('Unknown') }, 
             ...birds.filter(b => b.sex === 'Male' && b.id !== initialData?.id).map(b => {
               const cage = cages.find(c => c.id === b.cageId);
-              const mutationsStr = b.mutations?.length ? `[${b.mutations.join(', ')}]` : '';
+            const mutationsStr = b.mutations?.length ? `[${b.mutations.join(', ')}]` : '';
               return { 
                 id: b.id, 
                 name: b.isGhost ? `${b.name} (Pedigree Only)` : b.name,
                 details: cage?.name || t('Unassigned'),
                 subText: mutationsStr,
                 bird: b,
-                cageName: cage?.name || ''
+                cageName: cage?.name || ``
               };
             }).sort((a, b) => {
               if (a.cageName !== b.cageName) {
@@ -9517,14 +8681,14 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
             { id: '', name: t('Unknown') }, 
             ...birds.filter(b => b.sex === 'Female' && b.id !== initialData?.id).map(b => {
               const cage = cages.find(c => c.id === b.cageId);
-              const mutationsStr = b.mutations?.length ? `[${b.mutations.join(', ')}]` : '';
+            const mutationsStr = b.mutations?.length ? `[${b.mutations.join(', ')}]` : '';
               return { 
                 id: b.id, 
                 name: b.isGhost ? `${b.name} (Pedigree Only)` : b.name,
                 details: cage?.name || t('Unassigned'),
                 subText: mutationsStr,
                 bird: b,
-                cageName: cage?.name || ''
+                cageName: cage?.name || ``
               };
             }).sort((a, b) => {
               if (a.cageName !== b.cageName) {
@@ -9549,14 +8713,14 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
             { id: '', name: t('None') }, 
             ...birds.filter(b => b.id !== initialData?.id).map(b => {
               const cage = cages.find(c => c.id === b.cageId);
-              const mutationsStr = b.mutations?.length ? `[${b.mutations.join(', ')}]` : '';
+            const mutationsStr = b.mutations?.length ? `[${b.mutations.join(', ')}]` : '';
               return { 
                 id: b.id, 
                 name: b.isGhost ? `${b.name} (Pedigree Only)` : b.name,
                 details: cage?.name || t('Unassigned'),
                 subText: mutationsStr,
                 bird: b,
-                cageName: cage?.name || ''
+                cageName: cage?.name || ``
               };
             }).sort((a, b) => {
               if (a.cageName !== b.cageName) {
@@ -9583,7 +8747,7 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
               details: cage?.name || t('Unassigned'),
               subText: mutationsStr,
               bird: b,
-              cageName: cage?.name || ''
+              cageName: cage?.name || ``
             };
           }).sort((a, b) => {
             if (a.cageName !== b.cageName) {
@@ -9620,13 +8784,13 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
 
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1">
-          <label className="text-[10px] font-black text-black-100 uppercase tracking-widest ml-1">{t('Est. Value')} ({symbol})</label>
+          <label className="text-[10px] font-black text-black-100 uppercase tracking-widest ml-1">{t(`Est. Value`)} ({symbol})</label>
           <Input type="number" min="0" step="0.01" value={formData.estimatedValue} onChange={e => setFormData({ ...formData, estimatedValue: parseFloat(e.target.value) || 0 })} />
         </div>
         <SearchableSelect 
           label={t('Bought From')}
           options={[{ id: '', name: t('None') }, ...contacts.map(c => ({ id: c.id, name: c.name }))]}
-          value={formData.boughtFromId || ''}
+          value={formData.boughtFromId || ``}
           onChange={(id) => setFormData({ ...formData, boughtFromId: id })}
           placeholder={t('Bought From')}
         />
@@ -9647,14 +8811,88 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
 
       <div className="space-y-1">
         <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">{t('Notes')}</label>
-        <textarea name="birdNotes" id="birdNotes" className="w-full px-4 py-3 bg-black border border-black-700 rounded-2xl focus:outline-none focus:ring-2 focus:ring-gold-500/20 focus:border-gold-500 text-white transition-all min-h-[100px] text-sm font-medium placeholder:text-white/30" placeholder={t('Additional notes...')}
+        <textarea name="birdNotes" id="birdNotes" className="w-full px-4 py-3 bg-black border border-black-700 rounded-2xl focus:outline-none focus:ring-2 focus:ring-gold-500/20 focus:border-gold-500 text-white transition-all min-h-[100px] text-sm font-medium placeholder:text-white/30" placeholder={t(`Additional notes...`)}
           value={formData.notes} 
           onChange={e => setFormData({ ...formData, notes: e.target.value })} 
         />
       </div>
 
+      {/* Custom Bird Fields (Dynamic from UserSettings) */}
+      {userSettings?.customBirdFields && userSettings.customBirdFields.length > 0 && (
+        <div className="space-y-3 pt-3 border-t border-black-800">
+          <div className="flex items-center justify-between">
+            <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1 flex items-center gap-1.5">
+              <Sliders size={14} className="text-gold-500" />
+              <span>Additional Information & Custom Fields</span>
+            </label>
+            <span className="text-[9px] font-bold text-zinc-500 uppercase">
+              {userSettings.customBirdFields.length} Defined
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {userSettings.customBirdFields.map(field => {
+              const value = (formData.customFields as any)?.[field.id] ?? (formData.customFields as any)?.[field.name] ?? ``;
+              return (
+                <div key={field.id} className="space-y-1 bg-black-950/60 p-3 rounded-2xl border border-black-800">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] font-black text-white uppercase tracking-widest flex items-center gap-1">
+                      {field.type === 'number' ? <Hash size={11} className="text-amber-400" /> : <Type size={11} className="text-blue-400" />}
+                      <span>{field.name}</span>
+                    </label>
+                    <span className={cn(
+                      "text-[8px] font-bold uppercase px-1.5 py-0.5 rounded border",
+                      field.type === 'number' ? "bg-amber-500/10 text-amber-400 border-amber-500/30" : "bg-blue-500/10 text-blue-400 border-blue-500/30"
+                    )}>
+                      {field.type === 'number' ? 'Numerical' : 'Text'}
+                    </span>
+                  </div>
+
+                  {field.type === 'number' ? (
+                    <Input
+                      type="number"
+                      step="any"
+                      placeholder={field.description || `Enter ${field.name.toLowerCase()}...`}
+                      value={value}
+                      onChange={e => {
+                        const numVal = e.target.value === '' ? '' : Number(e.target.value);
+                        setFormData({
+                          ...formData,
+                          customFields: {
+                            ...(formData.customFields || {}),
+                            [field.id]: numVal
+                          }
+                        });
+                      }}
+                    />
+                  ) : (
+                    <Input
+                      type="text"
+                      placeholder={field.description || `Enter ${field.name.toLowerCase()}...`}
+                      value={value}
+                      onChange={e => {
+                        setFormData({
+                          ...formData,
+                          customFields: {
+                            ...(formData.customFields || {}),
+                            [field.id]: e.target.value
+                          }
+                        });
+                      }}
+                    />
+                  )}
+                  {field.description && (
+                    <p className="text-[9px] text-zinc-400 italic mt-0.5">{field.description}</p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       <div className="space-y-3 pt-2 border-t border-black-800">
-        <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">{t('Documents (DNA, Vet, Permits)')}</label>
+        <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">{t(`Documents (DNA, Vet, Permits)`)}</label>
         
         <div className="flex gap-2">
           <Select 
@@ -9727,7 +8965,7 @@ function CageForm({ user, initialData, cages, onClose, userSettings }: { user: F
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isMultiMode, setIsMultiMode] = useState(false);
-  const [multiPrefix, setMultiPrefix] = useState('');
+  const [multiPrefix, setMultiPrefix] = useState(``);
   const [multiStart, setMultiStart] = useState('1');
   const [multiEnd, setMultiEnd] = useState('10');
 
@@ -9752,11 +8990,11 @@ function CageForm({ user, initialData, cages, onClose, userSettings }: { user: F
         });
       }
     } catch (err) {
-      console.error('Cage image processing error:', err);
+      console.error(`Cage image processing error:`, err);
       setUploadError(err instanceof Error ? err.message : 'Upload failed');
     } finally {
       setIsUploading(false);
-      if (e.target) e.target.value = '';
+      if (e.target) e.target.value = ``;
     }
   };
 
@@ -9836,7 +9074,7 @@ function CageForm({ user, initialData, cages, onClose, userSettings }: { user: F
     <form onSubmit={handleSubmit} className="space-y-4">
       {isExpired && (
         <div className="bg-rose-500/20 text-rose-300 border border-rose-500/30 p-3 rounded-2xl text-[10px] font-black uppercase tracking-widest text-center shadow-inner">
-          ⚠️ Subscription Expired — Entry is in Read-Only Mode
+          ! Subscription Expired - Entry is in Read-Only Mode
         </div>
       )}
       <fieldset disabled={isExpired} className="space-y-4">
@@ -9862,7 +9100,7 @@ function CageForm({ user, initialData, cages, onClose, userSettings }: { user: F
               )}
             >
               {isUploading ? <Loader2 size={16} className="animate-spin" /> : <ImageIcon size={16} />}
-              {t('Upload Image(s)')}
+              {t(`Upload Image(s)`)}
             </label>
           </div>
         </div>
@@ -9886,7 +9124,7 @@ function CageForm({ user, initialData, cages, onClose, userSettings }: { user: F
                     const filtered = existing.filter((_, i) => i !== idx);
                     setFormData(prev => {
                        const merged = filtered;
-                       return { ...prev, imageUrls: merged, imageUrl: merged[0] || '' };
+                       return { ...prev, imageUrls: merged, imageUrl: merged[0] || `` };
                     });
                   }}
                   className="absolute inset-0 bg-black/80 items-center justify-center hidden group-hover:flex transition-all text-red-500 cursor-pointer"
@@ -9903,7 +9141,7 @@ function CageForm({ user, initialData, cages, onClose, userSettings }: { user: F
       {isMultiMode && !initialData ? (
         <div className="space-y-4 bg-black/20 p-4 rounded-2xl border border-black-800 animate-in fade-in slide-in-from-top-2">
           <div className="space-y-1">
-            <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">{t('Name Prefix (e.g. A)')}</label>
+            <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">{t(`Name Prefix (e.g. A)`)}</label>
             <Input required value={multiPrefix} onChange={e => setMultiPrefix(e.target.value)} placeholder={t('Prefix')} />
           </div>
           <div className="grid grid-cols-2 gap-4 text-center">
@@ -9929,14 +9167,14 @@ function CageForm({ user, initialData, cages, onClose, userSettings }: { user: F
 
       <div className="grid grid-cols-4 gap-2 border-t border-black-800/40 pt-4 mt-2">
         <div className="col-span-4">
-          <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">{t('Dimensions (Optional)')}</label>
+          <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">{t(`Dimensions (Optional)`)}</label>
         </div>
         <div className="space-y-1">
           <label className="text-[9px] font-black text-zinc-400 uppercase tracking-widest ml-1">{t('Width')}</label>
           <Input 
             type="number" 
             placeholder="W" 
-            value={formData.width || ''} 
+            value={formData.width || ``} 
             onChange={e => setFormData({ ...formData, width: parseFloat(e.target.value) || undefined })} 
           />
         </div>
@@ -9945,7 +9183,7 @@ function CageForm({ user, initialData, cages, onClose, userSettings }: { user: F
           <Input 
             type="number" 
             placeholder="H" 
-            value={formData.height || ''} 
+            value={formData.height || ``} 
             onChange={e => setFormData({ ...formData, height: parseFloat(e.target.value) || undefined })} 
           />
         </div>
@@ -9954,7 +9192,7 @@ function CageForm({ user, initialData, cages, onClose, userSettings }: { user: F
           <Input 
             type="number" 
             placeholder="D" 
-            value={formData.depth || ''} 
+            value={formData.depth || ``} 
             onChange={e => setFormData({ ...formData, depth: parseFloat(e.target.value) || undefined })} 
           />
         </div>
@@ -10007,11 +9245,11 @@ function PairForm({ user, initialData, birds, cages, onClose, userSettings }: { 
         });
       }
     } catch (err) {
-      console.error('Pair image processing error:', err);
+      console.error(`Pair image processing error:`, err);
       setUploadError(err instanceof Error ? err.message : 'Upload failed');
     } finally {
       setIsUploading(false);
-      if (e.target) e.target.value = '';
+      if (e.target) e.target.value = ``;
     }
   };
 
@@ -10022,7 +9260,7 @@ function PairForm({ user, initialData, birds, cages, onClose, userSettings }: { 
       return;
     }
     if (!formData.maleId || !formData.femaleId) {
-      toast.error('Please select both a male and a female bird.');
+      toast.error(`Please select both a male and a female bird.`);
       return;
     }
     if (isSaving || isUploading) return;
@@ -10078,27 +9316,27 @@ function PairForm({ user, initialData, birds, cages, onClose, userSettings }: { 
     <form onSubmit={handleSubmit} className="space-y-4">
       {isExpired && (
         <div className="bg-rose-500/20 text-rose-300 border border-rose-500/30 p-3 rounded-2xl text-[10px] font-black uppercase tracking-widest text-center shadow-inner">
-          ⚠️ Subscription Expired — Entry is in Read-Only Mode
+          ! Subscription Expired - Entry is in Read-Only Mode
         </div>
       )}
       <fieldset disabled={isExpired} className="space-y-4">
         <div className="grid grid-cols-2 gap-4">
         <SearchableSelect 
           label={t('Male / Bird 1')}
-          value={formData.maleId || ''}
+          value={formData.maleId || ``}
           onChange={(val) => setFormData({ ...formData, maleId: val })}
           options={[
             { id: '', name: t('Select Bird 1') },
             ...birds.filter(b => b.sex === 'Male' || b.sex === 'Unknown').map(b => {
               const cage = cages.find(c => c.id === b.cageId);
-              const mutationsStr = b.mutations?.length ? `[${b.mutations.join(', ')}]` : '';
+            const mutationsStr = b.mutations?.length ? `[${b.mutations.join(', ')}]` : '';
               return { 
                 id: b.id, 
                 name: b.name,
                 details: cage?.name || 'Unassigned',
                 subText: mutationsStr,
                 bird: b,
-                cageName: cage?.name || ''
+                cageName: cage?.name || ``
               };
             }).sort((a, b) => {
               if (a.cageName !== b.cageName) {
@@ -10113,20 +9351,20 @@ function PairForm({ user, initialData, birds, cages, onClose, userSettings }: { 
         />
         <SearchableSelect 
           label={t('Female / Bird 2')}
-          value={formData.femaleId || ''}
+          value={formData.femaleId || ``}
           onChange={(val) => setFormData({ ...formData, femaleId: val })}
           options={[
             { id: '', name: t('Select Bird 2') },
             ...birds.filter(b => b.sex === 'Female' || b.sex === 'Unknown').map(b => {
               const cage = cages.find(c => c.id === b.cageId);
-              const mutationsStr = b.mutations?.length ? `[${b.mutations.join(', ')}]` : '';
+            const mutationsStr = b.mutations?.length ? `[${b.mutations.join(', ')}]` : '';
               return { 
                 id: b.id, 
                 name: b.name,
                 details: cage?.name || 'Unassigned',
                 subText: mutationsStr,
                 bird: b,
-                cageName: cage?.name || ''
+                cageName: cage?.name || ``
               };
             }).sort((a, b) => {
               if (a.cageName !== b.cageName) {
@@ -10161,7 +9399,7 @@ function PairForm({ user, initialData, birds, cages, onClose, userSettings }: { 
               )}
             >
               {isUploading ? <Loader2 size={16} className="animate-spin" /> : <ImageIcon size={16} />}
-              {t('Upload Image(s)')}
+              {t(`Upload Image(s)`)}
             </label>
           </div>
         </div>
@@ -10208,9 +9446,9 @@ function PairForm({ user, initialData, birds, cages, onClose, userSettings }: { 
 function TaskForm({ user, initialData, birds, cages, onClose, userSettings }: { user: FirebaseUser, initialData?: Task, birds: Bird[], cages: Cage[], onClose: () => void, userSettings?: UserSettings }) {
   const t = (text: string) => getTranslatedLabel(text, userSettings?.language || 'en');
   const [formData, setFormData] = useState<Partial<Task>>(initialData || { title: '', description: '', status: 'Pending', priority: 'Medium', category: 'General', dueDate: '', reminderDate: '', birdIds: [], subTasks: [] });
-  const [newSubTask, setNewSubTask] = useState('');
+  const [newSubTask, setNewSubTask] = useState(``);
   const [isSaving, setIsSaving] = useState(false);
-  const [birdSearch, setBirdSearch] = useState('');
+  const [birdSearch, setBirdSearch] = useState(``);
   const [isBirdDropdownOpen, setIsBirdDropdownOpen] = useState(false);
   const [syncToGoogleCalendar, setSyncToGoogleCalendar] = useState(true);
 
@@ -10237,7 +9475,7 @@ function TaskForm({ user, initialData, birds, cages, onClose, userSettings }: { 
           window.open(url, '_blank', 'noopener,noreferrer');
         }
       } catch (err) {
-        console.error('Failed to open Google Calendar:', err);
+        console.error(`Failed to open Google Calendar:`, err);
       }
     }
 
@@ -10271,7 +9509,7 @@ function TaskForm({ user, initialData, birds, cages, onClose, userSettings }: { 
   const addSubTask = () => {
     if (!newSubTask.trim()) return;
     setFormData({ ...formData, subTasks: [...(formData.subTasks || []), { title: newSubTask, completed: false, birdIds: [] }] });
-    setNewSubTask('');
+    setNewSubTask(``);
   };
   const toggleBirdTag = (birdId: string) => {
     if (isSubscriptionExpired(userSettings)) return;
@@ -10284,7 +9522,7 @@ function TaskForm({ user, initialData, birds, cages, onClose, userSettings }: { 
     <form onSubmit={handleSubmit} className="space-y-4">
       {isExpired && (
         <div className="bg-rose-500/20 text-rose-300 border border-rose-500/30 p-3 rounded-2xl text-[10px] font-black uppercase tracking-widest text-center shadow-inner">
-          ⚠️ Subscription Expired — Entry is in Read-Only Mode
+          ! Subscription Expired - Entry is in Read-Only Mode
         </div>
       )}
       <fieldset disabled={isExpired} className="space-y-4">
@@ -10295,123 +9533,49 @@ function TaskForm({ user, initialData, birds, cages, onClose, userSettings }: { 
       </div>
       <div className="space-y-1">
         <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">{t('Description')}</label>
-        <textarea name="taskDescription" id="taskDescription" className="w-full px-4 py-3 bg-black border border-black-700 rounded-2xl focus:outline-none focus:ring-2 focus:ring-gold-500/20 focus:border-gold-500 text-white transition-all min-h-[80px] text-sm font-medium placeholder:text-white/30" placeholder={t('Task description...')}
+        <textarea name="taskDescription" id="taskDescription" className="w-full px-4 py-3 bg-black border border-black-700 rounded-2xl focus:outline-none focus:ring-2 focus:ring-gold-500/20 focus:border-gold-500 text-white transition-all min-h-[80px] text-sm font-medium placeholder:text-white/30" placeholder={t(`Task description...`)}
           value={formData.description} 
-          onChange={e => setFormData({ ...formData, description: e.target.value })} 
+          onChange={e => setFormData({ ...formData, description: e.target.value })}
         />
       </div>
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-1"><label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">{t('Status')}</label><Select value={formData.status} onChange={e => setFormData({ ...formData, status: e.target.value as any })}><option value="Pending" className="bg-black text-white">{t('Pending')}</option><option value="Completed" className="bg-black text-white">{t('Completed')}</option></Select></div>
-        <div className="space-y-1"><label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">{t('Due Date')}</label><Input type="date" value={formData.dueDate} onChange={e => setFormData({ ...formData, dueDate: e.target.value })} /></div>
-      </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div className="space-y-1">
-          <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">{t('Calendar & Reminder')}</label>
-          <Input type="datetime-local" value={formData.reminderDate || ''} onChange={e => setFormData({ ...formData, reminderDate: e.target.value })} />
-        </div>
-        <div className="space-y-1">
-          <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">{t('Reminder notification')}</label>
-          <Select 
-            value={formData.reminderLeadTime || 0} 
-            onChange={e => setFormData({ ...formData, reminderLeadTime: parseInt(e.target.value) })}
-          >
-            <option value={0} className="bg-black text-white text-xs">{t('At time of event')}</option>
-            <option value={2} className="bg-black text-white text-xs">{t('2 minutes before')}</option>
-            <option value={5} className="bg-black text-white text-xs">{t('5 minutes before')}</option>
-            <option value={10} className="bg-black text-white text-xs">{t('10 minutes before')}</option>
-            <option value={15} className="bg-black text-white text-xs">{t('15 minutes before')}</option>
-            <option value={30} className="bg-black text-white text-xs">{t('30 minutes before')}</option>
-            <option value={60} className="bg-black text-white text-xs">{t('1 hour before')}</option>
-            <option value={1440} className="bg-black text-white text-xs">{t('1 day before')}</option>
-          </Select>
-        </div>
-      </div>
-      <div className="flex items-center gap-2.5 px-1.5 py-1">
-        <input 
-          type="checkbox" 
-          id="syncToGoogleCalendar"
-          checked={syncToGoogleCalendar}
-          onChange={(e) => setSyncToGoogleCalendar(e.target.checked)}
-          className="w-4 h-4 rounded border-zinc-800 bg-black text-gold-500 focus:ring-gold-500/20 cursor-pointer"
-        />
-        <div className="flex flex-col">
-          <label htmlFor="syncToGoogleCalendar" className="text-[11px] font-bold text-white/95 select-none cursor-pointer">
-            {t('Add to Google Calendar on save')}
-          </label>
-          <span className="text-[9px] text-white/40">{t('Opens calendar automatically to schedule mobile notifications.')}</span>
-        </div>
-      </div>
-      <div className="space-y-2 relative">
-        <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">{t('Tag Birds')}</label>
-        
-        {/* Selected Birds Chips */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2">
-          {selectedBirdsData.map(b => (
-            <div key={b.id} className="relative group">
-              <BirdCompactInfo bird={b} cages={cages} className="bg-zinc-900 border-black-700" />
-              <button 
-                type="button" 
-                onClick={() => toggleBirdTag(b.id)}
-                className="absolute top-2 right-2 text-white/30 transition-colors z-10"
-                onMouseEnter={(e) => e.currentTarget.style.color = 'var(--theme-delete-color, #ef4444)'}
-                onMouseLeave={(e) => e.currentTarget.style.color = 'rgba(255,255,255,0.3)'}
-              >
-                <X size={14} />
-              </button>
-            </div>
-          ))}
-          {selectedBirdsData.length === 0 && (
-            <span className="text-[10px] text-white/30 italic ml-1 leading-8 col-span-2">{t('No birds tagged yet...')}</span>
-          )}
-        </div>
 
-        <SearchableSelect 
-          label=""
-          placeholder={t('Tag more birds...')}
-          options={birds.filter(b => !b.isGhost).map(b => {
-             const cage = cages.find(c => c.id === b.cageId);
-             const mutationsStr = b.mutations?.length ? `[${b.mutations.join(', ')}]` : '';
-             return {
-               id: b.id,
-               name: b.name,
-               details: cage?.name || 'Unassigned',
-               subText: `${b.species} ${mutationsStr}`,
-               bird: b
-             };
-          })}
-          multi
-          selectedValues={formData.birdIds || []}
-          onChange={(id) => toggleBirdTag(id)}
-        />
-      </div>
-      <div className="space-y-2">
-        <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">{t('Subtasks')}</label>
-        <div className="flex gap-2">
-          <Input placeholder={t('Add subtask...')} value={newSubTask} onChange={e => setNewSubTask(e.target.value)} onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addSubTask())} />
-          <Button type="button" onClick={addSubTask} variant="secondary" className="px-3"><Plus size={16} /></Button>
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-1">
+          <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">{t('Due Date')}</label>
+          <Input type="date" value={formData.dueDate || ``} onChange={e => setFormData({ ...formData, dueDate: e.target.value })} />
         </div>
-        <div className="space-y-2">
-          {formData.subTasks?.map((sub, idx) => (
-            <div key={idx} className="flex items-center justify-between p-3 bg-black rounded-2xl border border-black-700">
-              <span className="text-xs font-bold text-white">{sub.title}</span>
-              <button 
-                type="button" 
-                onClick={() => setFormData({ ...formData, subTasks: formData.subTasks?.filter((_, i) => i !== idx) })} 
-                className="text-white transition-colors"
-                onMouseEnter={(e) => e.currentTarget.style.color = 'var(--theme-delete-color, #ef4444)'}
-                onMouseLeave={(e) => e.currentTarget.style.color = 'white'}
+        <div className="space-y-1">
+          <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">{t('Due Time')}</label>
+          <Input type="time" value={formData.dueTime || ``} onChange={e => setFormData({ ...formData, dueTime: e.target.value })} />
+        </div>
+      </div>
+
+      <div className="space-y-1">
+        <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">{t('Tag Birds')}</label>
+        <div className="flex flex-wrap gap-1.5 p-3 bg-black border border-black-700 rounded-2xl max-h-32 overflow-y-auto">
+          {birds.map(b => {
+            const isTagged = formData.birdIds?.includes(b.id);
+            return (
+              <button
+                key={b.id}
+                type="button"
+                onClick={() => toggleBirdTag(b.id)}
+                className={cn(
+                  "px-2.5 py-1 rounded-xl text-xs font-bold transition-all border",
+                  isTagged ? "bg-gold-500 text-black border-gold-500" : "bg-zinc-800 text-zinc-300 border-zinc-700 hover:border-zinc-500"
+                )}
               >
-                <Trash2 size={16} />
+                {b.name} ({b.species})
               </button>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
-      </fieldset>
-      <Button type="submit" className="w-full py-4 text-sm uppercase tracking-widest font-black" disabled={isSaving || isExpired}>
-        {isSaving ? <Loader2 className="animate-spin mr-2" size={16} /> : null}
-        {(initialData && initialData.id) ? t('Update Task') : t('Add Task')}
+
+      <Button type="submit" disabled={isSaving || isExpired} className="w-full py-4 text-sm font-black uppercase">
+        {isSaving ? t('Saving...') : initialData ? t('Update Task') : t('Create Task')}
       </Button>
-    </form>
+    </fieldset>
+  </form>
   );
 }
