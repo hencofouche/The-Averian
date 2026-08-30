@@ -7837,8 +7837,8 @@ function ScannerModal({ isOpen, onClose, onScan }: { isOpen: boolean, onClose: (
 
 function Modal({ isOpen, onClose, title, children }: { isOpen: boolean, onClose: () => void, title: string, children: React.ReactNode }) {
   if (!isOpen) return null;
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-xl">
+  return createPortal(
+    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/90 backdrop-blur-xl">
       <motion.div initial={{ scale: 0.95, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} className="bg-black-950 border border-black-700 rounded-[2rem] shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
         <div className="p-6 border-b border-black-700 flex items-center justify-between bg-black-950">
           <h3 className="text-xl font-black text-white uppercase tracking-widest">{title}</h3>
@@ -7846,7 +7846,8 @@ function Modal({ isOpen, onClose, title, children }: { isOpen: boolean, onClose:
         </div>
         <div className="p-6 overflow-y-auto custom-scrollbar bg-black-950 text-white">{children}</div>
       </motion.div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
@@ -8231,8 +8232,8 @@ function BirdDocumentsModal({ bird, onClose, user }: { bird: Bird, onClose: () =
 
 function ConfirmModal({ isOpen, onClose, onConfirm, title, message, isDeleting }: { isOpen: boolean, onClose: () => void, onConfirm: () => void, title: string, message: string, isDeleting?: boolean }) {
   if (!isOpen) return null;
-  return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/90 backdrop-blur-xl">
+  return createPortal(
+    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/90 backdrop-blur-xl">
       <motion.div 
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
@@ -8254,7 +8255,8 @@ function ConfirmModal({ isOpen, onClose, onConfirm, title, message, isDeleting }
           </div>
         </div>
       </motion.div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
