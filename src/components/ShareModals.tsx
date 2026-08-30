@@ -216,6 +216,34 @@ export function ShareBirdModal({
 
       {!isTransferMode ? (
         <>
+          {/* Quick Actions Bar - Top */}
+          <div className="p-3 bg-gradient-to-r from-gold-500/10 via-amber-500/10 to-transparent border border-gold-500/30 rounded-2xl flex items-center justify-between gap-2 shadow-sm">
+            <div className="min-w-0 flex-1">
+              <span className="text-[9px] font-black uppercase tracking-wider text-gold-400 block">Quick Action</span>
+              <span className="text-xs font-bold text-white truncate block">{bird.name} ({bird.species || 'Bird'})</span>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <Button 
+                type="button" 
+                variant="secondary" 
+                onClick={handleCopyText} 
+                className="py-1.5 px-3 flex items-center gap-1.5 text-[10px] font-black uppercase"
+              >
+                {copied ? <Check size={14} className="text-green-400" /> : <Copy size={14} />}
+                {copied ? 'Copied' : 'Copy'}
+              </Button>
+              <Button 
+                type="button" 
+                variant="primary" 
+                onClick={handleNativeShare} 
+                className="py-1.5 px-3 flex items-center gap-1.5 text-[10px] font-black uppercase"
+              >
+                <Share2 size={14} />
+                Share
+              </Button>
+            </div>
+          </div>
+
           {/* Field Selection Checklist */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
@@ -275,16 +303,26 @@ export function ShareBirdModal({
 
           {/* Text Preview Box */}
           <div className="space-y-1">
-            <label className="text-[10px] font-black uppercase tracking-widest text-zinc-400">
-              Formatted Preview:
-            </label>
-            <div className="p-3 bg-black-950 border border-black-800 rounded-xl font-mono text-xs text-white/80 whitespace-pre-wrap max-h-48 overflow-y-auto custom-scrollbar">
+            <div className="flex items-center justify-between">
+              <label className="text-[10px] font-black uppercase tracking-widest text-zinc-400">
+                Formatted Preview:
+              </label>
+              <button
+                type="button"
+                onClick={handleCopyText}
+                className="text-[10px] font-bold text-gold-400 hover:text-gold-300 flex items-center gap-1 uppercase tracking-wider transition-colors"
+              >
+                {copied ? <Check size={12} className="text-green-400" /> : <Copy size={12} />}
+                {copied ? 'Copied' : 'Copy Text'}
+              </button>
+            </div>
+            <div className="p-3 bg-black-950 border border-black-800 rounded-xl font-mono text-xs text-white/80 whitespace-pre-wrap max-h-40 overflow-y-auto custom-scrollbar select-all">
               {shareText}
             </div>
           </div>
 
-          {/* Action Buttons */}
-          <div className="flex gap-2">
+          {/* Sticky Bottom Action Buttons */}
+          <div className="sticky -bottom-6 -mx-6 -mb-6 p-4 bg-black-950/95 backdrop-blur-md border-t border-black-800 flex gap-2 z-20 mt-4 shadow-2xl">
             <Button 
               type="button" 
               variant="secondary" 
@@ -333,17 +371,19 @@ export function ShareBirdModal({
             </div>
           </div>
 
-          {/* Transfer Action Button */}
-          <Button 
-            type="button" 
-            variant="primary" 
-            onClick={handleCreateTransferLink} 
-            disabled={isGenerating}
-            className="w-full py-4 flex items-center justify-center gap-2 text-xs font-black uppercase"
-          >
-            <Send size={16} />
-            {isGenerating ? 'Generating Passport...' : 'Create & Share Transfer Link'}
-          </Button>
+          {/* Sticky Transfer Action Button */}
+          <div className="sticky -bottom-6 -mx-6 -mb-6 p-4 bg-black-950/95 backdrop-blur-md border-t border-black-800 z-20 mt-4 shadow-2xl">
+            <Button 
+              type="button" 
+              variant="primary" 
+              onClick={handleCreateTransferLink} 
+              disabled={isGenerating}
+              className="w-full py-3.5 flex items-center justify-center gap-2 text-xs font-black uppercase"
+            >
+              <Send size={16} />
+              {isGenerating ? 'Generating Passport...' : 'Create & Share Transfer Link'}
+            </Button>
+          </div>
         </>
       )}
     </div>
@@ -600,6 +640,34 @@ export function SharePairModal({
 
       {!isTransferMode ? (
         <>
+          {/* Quick Actions Bar - Top */}
+          <div className="p-3 bg-gradient-to-r from-gold-500/10 via-amber-500/10 to-transparent border border-gold-500/30 rounded-2xl flex items-center justify-between gap-2 shadow-sm">
+            <div className="min-w-0 flex-1">
+              <span className="text-[9px] font-black uppercase tracking-wider text-gold-400 block">Quick Action</span>
+              <span className="text-xs font-bold text-white truncate block">{male?.name || 'Sire'} x {female?.name || 'Dam'}</span>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <Button 
+                type="button" 
+                variant="secondary" 
+                onClick={handleCopyText} 
+                className="py-1.5 px-3 flex items-center gap-1.5 text-[10px] font-black uppercase"
+              >
+                {copied ? <Check size={14} className="text-green-400" /> : <Copy size={14} />}
+                {copied ? 'Copied' : 'Copy'}
+              </Button>
+              <Button 
+                type="button" 
+                variant="primary" 
+                onClick={handleNativeShare} 
+                className="py-1.5 px-3 flex items-center gap-1.5 text-[10px] font-black uppercase"
+              >
+                <Share2 size={14} />
+                Share
+              </Button>
+            </div>
+          </div>
+
           {/* Field Selection Checklist */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
@@ -656,16 +724,26 @@ export function SharePairModal({
 
           {/* Formatted Text Preview Box */}
           <div className="space-y-1">
-            <label className="text-[10px] font-black uppercase tracking-widest text-zinc-400">
-              Formatted Preview:
-            </label>
-            <div className="p-3 bg-black-950 border border-black-800 rounded-xl font-mono text-xs text-white/80 whitespace-pre-wrap max-h-48 overflow-y-auto custom-scrollbar">
+            <div className="flex items-center justify-between">
+              <label className="text-[10px] font-black uppercase tracking-widest text-zinc-400">
+                Formatted Preview:
+              </label>
+              <button
+                type="button"
+                onClick={handleCopyText}
+                className="text-[10px] font-bold text-gold-400 hover:text-gold-300 flex items-center gap-1 uppercase tracking-wider transition-colors"
+              >
+                {copied ? <Check size={12} className="text-green-400" /> : <Copy size={12} />}
+                {copied ? 'Copied' : 'Copy Text'}
+              </button>
+            </div>
+            <div className="p-3 bg-black-950 border border-black-800 rounded-xl font-mono text-xs text-white/80 whitespace-pre-wrap max-h-40 overflow-y-auto custom-scrollbar select-all">
               {shareText}
             </div>
           </div>
 
-          {/* Action Buttons */}
-          <div className="flex gap-2">
+          {/* Sticky Bottom Action Buttons */}
+          <div className="sticky -bottom-6 -mx-6 -mb-6 p-4 bg-black-950/95 backdrop-blur-md border-t border-black-800 flex gap-2 z-20 mt-4 shadow-2xl">
             <Button 
               type="button" 
               variant="secondary" 
@@ -715,17 +793,19 @@ export function SharePairModal({
             </div>
           </div>
 
-          {/* Transfer Action Button */}
-          <Button 
-            type="button" 
-            variant="primary" 
-            onClick={handleCreateTransferLink} 
-            disabled={isGenerating}
-            className="w-full py-4 flex items-center justify-center gap-2 text-xs font-black uppercase"
-          >
-            <Send size={16} />
-            {isGenerating ? 'Generating Pair Passport...' : 'Create & Share Pair Transfer Link'}
-          </Button>
+          {/* Sticky Transfer Action Button */}
+          <div className="sticky -bottom-6 -mx-6 -mb-6 p-4 bg-black-950/95 backdrop-blur-md border-t border-black-800 z-20 mt-4 shadow-2xl">
+            <Button 
+              type="button" 
+              variant="primary" 
+              onClick={handleCreateTransferLink} 
+              disabled={isGenerating}
+              className="w-full py-3.5 flex items-center justify-center gap-2 text-xs font-black uppercase"
+            >
+              <Send size={16} />
+              {isGenerating ? 'Generating Pair Passport...' : 'Create & Share Pair Transfer Link'}
+            </Button>
+          </div>
         </>
       )}
     </div>

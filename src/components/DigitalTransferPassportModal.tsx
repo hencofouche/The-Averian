@@ -208,7 +208,7 @@ export function DigitalTransferPassportModal({
   };
 
   return (
-    <div className="space-y-6 text-white max-h-[85vh] overflow-y-auto custom-scrollbar p-1">
+    <div className="space-y-6 text-white pb-2">
       {/* Passport Header Card */}
       <div className="p-5 bg-gradient-to-br from-zinc-900 via-zinc-950 to-black border border-gold-500/30 rounded-3xl relative overflow-hidden shadow-2xl space-y-3">
         <div className="absolute top-0 right-0 p-6 opacity-10 pointer-events-none">
@@ -346,7 +346,7 @@ export function DigitalTransferPassportModal({
       )}
 
       {/* Modal Actions */}
-      <div className="flex items-center justify-between gap-3 pt-4 border-t border-zinc-800">
+      <div className="sticky -bottom-6 -mx-6 -mb-6 p-4 bg-zinc-950/95 backdrop-blur-md border-t border-zinc-800 flex items-center justify-between gap-3 z-20 mt-4 shadow-2xl">
         <button
           type="button"
           onClick={onClose}
