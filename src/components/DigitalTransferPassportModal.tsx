@@ -183,7 +183,10 @@ export function DigitalTransferPassportModal({
     navigator.clipboard.writeText(passportLink);
     setCopied(true);
     toast.success("Passport transfer link copied to clipboard!");
-    setTimeout(() => setCopied(false), 2500);
+    setTimeout(() => {
+      setCopied(false);
+      onClose();
+    }, 600);
   };
 
   const handleShareNative = async () => {
@@ -197,6 +200,7 @@ export function DigitalTransferPassportModal({
     if (navigator.share) {
       try {
         await navigator.share(shareData);
+        onClose();
       } catch (err) {
         if ((err as Error).name !== 'AbortError') {
           handleCopyLink();

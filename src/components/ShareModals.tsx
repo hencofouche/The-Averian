@@ -138,7 +138,10 @@ export function ShareBirdModal({
       await navigator.clipboard.writeText(shareText);
       setCopied(true);
       toast.success('Bird information copied to clipboard');
-      setTimeout(() => setCopied(false), 2000);
+      setTimeout(() => {
+        setCopied(false);
+        onClose();
+      }, 600);
     } catch (err) {
       toast.error('Failed to copy text');
     }
@@ -164,8 +167,9 @@ export function ShareBirdModal({
         }
 
         await navigator.share(shareData);
+        onClose();
       } else {
-        handleCopyText();
+        await handleCopyText();
       }
     } catch (err) {
       if ((err as any).name !== 'AbortError') {
@@ -176,8 +180,9 @@ export function ShareBirdModal({
               title: `Bird Passport: ${bird.name}`,
               text: shareText
             });
+            onClose();
           } else {
-            handleCopyText();
+            await handleCopyText();
           }
         } catch (_) {
           toast.error('Share failed or was cancelled');
@@ -605,7 +610,10 @@ export function SharePairModal({
       await navigator.clipboard.writeText(shareText);
       setCopied(true);
       toast.success('Pair information copied to clipboard');
-      setTimeout(() => setCopied(false), 2000);
+      setTimeout(() => {
+        setCopied(false);
+        onClose();
+      }, 600);
     } catch (err) {
       toast.error('Failed to copy text');
     }
@@ -635,8 +643,9 @@ export function SharePairModal({
         }
 
         await navigator.share(shareData);
+        onClose();
       } else {
-        handleCopyText();
+        await handleCopyText();
       }
     } catch (err) {
       if ((err as any).name !== 'AbortError') {
@@ -647,8 +656,9 @@ export function SharePairModal({
               title: `Breeding Pair: ${male?.name || 'Sire'} x ${female?.name || 'Dam'}`,
               text: shareText,
             });
+            onClose();
           } else {
-            handleCopyText();
+            await handleCopyText();
           }
         } catch (_) {
           toast.error('Share failed or was cancelled');

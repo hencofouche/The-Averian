@@ -2292,26 +2292,123 @@ export default function App() {
 
             {sharedItemView.type === 'pair' && (
               <div className="space-y-4">
-                <div className="flex items-center gap-2">
-                  <Heart size={24} className="text-rose-500 fill-rose-500" />
-                  <h2 className="text-2xl font-black text-white">Breeding Pair</h2>
-                </div>
-                <div className="grid grid-cols-2 gap-4 border-t border-black-800 pt-4">
-                  <div className="space-y-1">
-                    <p className="text-gold-500 uppercase tracking-widest text-[10px] font-black">Male</p>
-                    <p className="text-white font-bold">{data.maleName || 'Unknown'}</p>
-                    {data.maleSpecies && <p className="text-black-200 text-xs">{data.maleSpecies}</p>}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Heart size={22} className="text-rose-500 fill-rose-500" />
+                    <h2 className="text-xl font-black text-white">Breeding Pair Passport</h2>
                   </div>
-                  <div className="space-y-1">
-                    <p className="text-rose-500 uppercase tracking-widest text-[10px] font-black">Female</p>
-                    <p className="text-white font-bold">{data.femaleName || 'Unknown'}</p>
-                    {data.femaleSpecies && <p className="text-black-200 text-xs">{data.femaleSpecies}</p>}
+                  {data.status && (
+                    <Badge variant={data.status === 'Active' ? 'success' : 'neutral'}>
+                      {data.status}
+                    </Badge>
+                  )}
+                </div>
+
+                {/* Male & Female Photos Grid */}
+                {(data.maleBird?.imageUrl || data.femaleBird?.imageUrl) && (
+                  <div className="grid grid-cols-2 gap-3 pt-2">
+                    {data.maleBird?.imageUrl ? (
+                      <div 
+                        className="aspect-square rounded-xl overflow-hidden bg-black-900 border border-gold-500/30 relative cursor-pointer group"
+                        onClick={() => {
+                          const urls = data.maleBird?.imageUrls || [data.maleBird.imageUrl];
+                          if (urls.length > 0) setGalleryData({ urls, index: 0 });
+                        }}
+                      >
+                        <img src={data.maleBird.imageUrl} alt={data.maleName || 'Cock'} className="w-full h-full object-cover group-hover:scale-105 transition-transform" referrerPolicy="no-referrer" />
+                        <div className="absolute bottom-1.5 left-1.5 bg-black/80 backdrop-blur-sm px-2 py-0.5 rounded text-[9px] font-black text-gold-400 border border-gold-500/30 uppercase">
+                          Cock
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="aspect-square rounded-xl bg-black-900 border border-black-800 flex flex-col items-center justify-center p-3 text-center">
+                        <span className="text-[10px] font-black uppercase text-gold-500">Cock</span>
+                        <span className="text-xs font-bold text-white mt-1">{data.maleName || 'Sire'}</span>
+                      </div>
+                    )}
+
+                    {data.femaleBird?.imageUrl ? (
+                      <div 
+                        className="aspect-square rounded-xl overflow-hidden bg-black-900 border border-rose-500/30 relative cursor-pointer group"
+                        onClick={() => {
+                          const urls = data.femaleBird?.imageUrls || [data.femaleBird.imageUrl];
+                          if (urls.length > 0) setGalleryData({ urls, index: 0 });
+                        }}
+                      >
+                        <img src={data.femaleBird.imageUrl} alt={data.femaleName || 'Hen'} className="w-full h-full object-cover group-hover:scale-105 transition-transform" referrerPolicy="no-referrer" />
+                        <div className="absolute bottom-1.5 left-1.5 bg-black/80 backdrop-blur-sm px-2 py-0.5 rounded text-[9px] font-black text-rose-400 border border-rose-500/30 uppercase">
+                          Hen
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="aspect-square rounded-xl bg-black-900 border border-black-800 flex flex-col items-center justify-center p-3 text-center">
+                        <span className="text-[10px] font-black uppercase text-rose-500">Hen</span>
+                        <span className="text-xs font-bold text-white mt-1">{data.femaleName || 'Dam'}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Male and Female Details */}
+                <div className="grid grid-cols-2 gap-3 border-t border-black-800 pt-4">
+                  <div className="space-y-1.5 bg-black-900/60 p-3 rounded-xl border border-gold-500/20">
+                    <div className="flex items-center justify-between">
+                      <p className="text-gold-500 uppercase tracking-widest text-[9px] font-black">Cock (Male)</p>
+                      <Badge variant="male" className="text-[9px] px-1 py-0">M</Badge>
+                    </div>
+                    <p className="text-white font-black text-sm">{data.maleName || 'Unknown'}</p>
+                    {data.maleSpecies && <p className="text-black-200 text-[11px] font-medium">{data.maleSpecies}</p>}
+                    {data.maleBird?.birthDate && <p className="text-zinc-400 text-[10px]">Born: {data.maleBird.birthDate}</p>}
+                    {data.maleBird?.mutations?.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {data.maleBird.mutations.map((m: string) => <Badge key={m} className="bg-zinc-800 text-[9px] px-1 py-0">{m}</Badge>)}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-1.5 bg-black-900/60 p-3 rounded-xl border border-rose-500/20">
+                    <div className="flex items-center justify-between">
+                      <p className="text-rose-500 uppercase tracking-widest text-[9px] font-black">Hen (Female)</p>
+                      <Badge variant="female" className="text-[9px] px-1 py-0">F</Badge>
+                    </div>
+                    <p className="text-white font-black text-sm">{data.femaleName || 'Unknown'}</p>
+                    {data.femaleSpecies && <p className="text-black-200 text-[11px] font-medium">{data.femaleSpecies}</p>}
+                    {data.femaleBird?.birthDate && <p className="text-zinc-400 text-[10px]">Born: {data.femaleBird.birthDate}</p>}
+                    {data.femaleBird?.mutations?.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {data.femaleBird.mutations.map((m: string) => <Badge key={m} className="bg-zinc-800 text-[9px] px-1 py-0">{m}</Badge>)}
+                      </div>
+                    )}
                   </div>
                 </div>
-                <div className="border-t border-black-800 pt-4">
-                  <p className="text-black-200 uppercase tracking-widest text-[10px] font-black">Started</p>
-                  <p className="text-white font-medium">{data.startDate || 'Unknown'}</p>
+
+                <div className="border-t border-black-800 pt-3 flex items-center justify-between text-xs">
+                  <span className="text-black-200 uppercase tracking-widest text-[10px] font-black">Pairing Started</span>
+                  <span className="text-white font-bold">{data.startDate || 'N/A'}</span>
                 </div>
+
+                {/* Breeding Records if available */}
+                {data.breedingRecords && data.breedingRecords.length > 0 && (
+                  <div className="space-y-2 border-t border-black-800 pt-3">
+                    <p className="text-black-200 uppercase tracking-widest text-[10px] font-black flex items-center gap-1.5">
+                      <ListPlus size={12} className="text-rose-500" />
+                      <span>Breeding History ({data.breedingRecords.length} Clutches)</span>
+                    </p>
+                    <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
+                      {data.breedingRecords.map((r: any, idx: number) => (
+                        <div key={idx} className="p-2 bg-black-900 border border-black-800 rounded-lg text-xs flex items-center justify-between gap-2">
+                          <div>
+                            <p className="font-bold text-white text-[11px]">Clutch #{idx + 1} ({r.clutchDate || 'Date N/A'})</p>
+                            <p className="text-[10px] text-zinc-400">
+                              Eggs: {r.clutchSize || 0} | Fertile: {r.fertileEggs || 0} | Hatched: {r.hatchedCount || 0}
+                            </p>
+                          </div>
+                          <Badge variant="neutral" className="text-[9px]">{r.status || 'Active'}</Badge>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -2341,8 +2438,8 @@ export default function App() {
           </Card>
 
           {!isTransfer && (
-            <Button onClick={handleImport} className="w-full py-4 text-lg">
-              Add Bird to My Aviary
+            <Button onClick={handleImport} className="w-full py-4 text-lg font-bold">
+              Add {sharedItemView.type === 'bird' ? 'Bird' : sharedItemView.type === 'pair' ? 'Pair' : 'Cage'} to My Aviary
             </Button>
           )}
 
