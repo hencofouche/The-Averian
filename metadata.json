@@ -1,6 +1,6 @@
 {
   "name": "The Averian",
-  "description": "A professional bird breeding tracker with offline support, diagnostics suite, and cost efficiency controls.",
+  "description": "The Averian is the premier aviculture management system, avian genetics calculator, and bird breeding tracker.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
