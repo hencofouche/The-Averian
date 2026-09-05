@@ -270,6 +270,17 @@ const generateGoogleCalendarUrl = (text: string, date: string, details: string =
 
 import { compressAndUploadImage, deleteStorageFileIfApplicable, ensurePassportPayloadFitsFirestore } from "./lib/image-utils";
 
+async function executeFirestoreWrite(writePromise: Promise<any>, timeoutMs: number = 200) {
+  try {
+    await Promise.race([
+      writePromise,
+      new Promise((resolve) => setTimeout(resolve, timeoutMs))
+    ]);
+  } catch (err) {
+    console.warn("Firestore write queued offline or failed:", err);
+  }
+}
+
 // --- UI Components ---
 
 
@@ -733,13 +744,13 @@ export default function App() {
   } | null>(null);
 
   // Pagination limits
-  const [birdsLimit, setBirdsLimit] = useState(100);
-  const [cagesLimit, setCagesLimit] = useState(50);
-  const [pairsLimit, setPairsLimit] = useState(50);
-  const [breedingLimit, setBreedingLimit] = useState(50);
-  const [transactionLimit, setTransactionLimit] = useState(50);
-  const [contactsLimit, setContactsLimit] = useState(100);
-  const [tasksLimit, setTasksLimit] = useState(50);
+  const [birdsLimit, setBirdsLimit] = useState(1000);
+  const [cagesLimit, setCagesLimit] = useState(1000);
+  const [pairsLimit, setPairsLimit] = useState(1000);
+  const [breedingLimit, setBreedingLimit] = useState(1000);
+  const [transactionLimit, setTransactionLimit] = useState(1000);
+  const [contactsLimit, setContactsLimit] = useState(1000);
+  const [tasksLimit, setTasksLimit] = useState(1000);
   
   const [searchQuery, setSearchQuery] = useState(``);
   const [navigationHistory, setNavigationHistory] = useState<{ tab: string, query: string, filter: any } | null>(null);
@@ -964,16 +975,18 @@ export default function App() {
       return;
     }
     setIsDeleting(true);
+    const confirmFn = deleteConfirmation.onConfirm;
+    // Dismiss delete dialog immediately so UI closes without delay offline or online
+    setDeleteConfirmation(null);
+    setIsDeleting(false);
+
     try {
-      const result = deleteConfirmation.onConfirm();
+      const result = confirmFn();
       if (result instanceof Promise) {
-        await result;
+        await executeFirestoreWrite(result, 200);
       }
-      setDeleteConfirmation(null);
     } catch (e: any) {
-      toast.error("Failed to delete: " + e.message);
-    } finally {
-      setIsDeleting(false);
+      toast.error("Failed to delete: " + (e?.message || e));
     }
   };
 
@@ -1137,19 +1150,34 @@ export default function App() {
     // Use limits to prevent "The Bleed" (excessive reads on large collections)
     const qBirds = query(collection(db, 'birds'), where('uid', '==', userUid), limit(birdsLimit));
     const unsubBirds = onSnapshot(qBirds, (snapshot) => {
-      setBirds(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Bird)));
+      const fetched = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Bird));
+      setBirds(prev => {
+        const fetchedIds = new Set(fetched.map(b => b.id));
+        const localOnly = prev.filter(b => !fetchedIds.has(b.id));
+        return [...fetched, ...localOnly];
+      });
       setIsSyncing(snapshot.metadata.hasPendingWrites);
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'birds'));
 
     const qCages = query(collection(db, 'cages'), where('uid', '==', userUid), limit(cagesLimit));
     const unsubCages = onSnapshot(qCages, (snapshot) => {
-      setCages(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Cage)));
+      const fetched = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Cage));
+      setCages(prev => {
+        const fetchedIds = new Set(fetched.map(c => c.id));
+        const localOnly = prev.filter(c => !fetchedIds.has(c.id));
+        return [...fetched, ...localOnly];
+      });
       setIsSyncing(snapshot.metadata.hasPendingWrites);
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'cages'));
 
     const qPairs = query(collection(db, 'pairs'), where('uid', '==', userUid), limit(pairsLimit));
     const unsubPairs = onSnapshot(qPairs, (snapshot) => {
-      setPairs(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Pair)));
+      const fetched = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Pair));
+      setPairs(prev => {
+        const fetchedIds = new Set(fetched.map(p => p.id));
+        const localOnly = prev.filter(p => !fetchedIds.has(p.id));
+        return [...fetched, ...localOnly];
+      });
       setIsSyncing(snapshot.metadata.hasPendingWrites);
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'pairs'));
 
@@ -1159,15 +1187,25 @@ export default function App() {
       limit(breedingLimit)
     );
     const unsubBreeding = onSnapshot(qBreeding, (snapshot) => {
-      const records = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as BreedingRecord));
-      records.sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime());
-      setBreedingRecords(records);
+      const fetched = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as BreedingRecord));
+      setBreedingRecords(prev => {
+        const fetchedIds = new Set(fetched.map(r => r.id));
+        const localOnly = prev.filter(r => !fetchedIds.has(r.id));
+        const combined = [...fetched, ...localOnly];
+        combined.sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime());
+        return combined;
+      });
       setIsSyncing(snapshot.metadata.hasPendingWrites);
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'breedingRecords'));
 
     const qTasks = query(collection(db, 'tasks'), where('uid', '==', userUid), limit(tasksLimit));
     const unsubTasks = onSnapshot(qTasks, (snapshot) => {
-      setTasks(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Task)));
+      const fetched = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Task));
+      setTasks(prev => {
+        const fetchedIds = new Set(fetched.map(t => t.id));
+        const localOnly = prev.filter(t => !fetchedIds.has(t.id));
+        return [...fetched, ...localOnly];
+      });
       setIsSyncing(snapshot.metadata.hasPendingWrites);
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'tasks'));
 
@@ -1177,17 +1215,27 @@ export default function App() {
       limit(transactionLimit)
     );
     const unsubTransactions = onSnapshot(qTransactions, (snapshot) => {
-      const records = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Transaction));
-      records.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-      setTransactions(records);
+      const fetched = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Transaction));
+      setTransactions(prev => {
+        const fetchedIds = new Set(fetched.map(tr => tr.id));
+        const localOnly = prev.filter(tr => !fetchedIds.has(tr.id));
+        const combined = [...fetched, ...localOnly];
+        combined.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        return combined;
+      });
       setIsSyncing(snapshot.metadata.hasPendingWrites);
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'transactions'));
 
     const qContacts = query(collection(db, 'contacts'), where('uid', '==', userUid), limit(contactsLimit));
     const unsubContacts = onSnapshot(qContacts, (snapshot) => {
-      const contactsList = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Contact));
-      contactsList.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-      setContacts(contactsList);
+      const fetched = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Contact));
+      setContacts(prev => {
+        const fetchedIds = new Set(fetched.map(c => c.id));
+        const localOnly = prev.filter(c => !fetchedIds.has(c.id));
+        const combined = [...fetched, ...localOnly];
+        combined.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+        return combined;
+      });
       setIsSyncing(snapshot.metadata.hasPendingWrites);
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'contacts'));
 
@@ -1784,7 +1832,7 @@ export default function App() {
       onConfirm: async () => {
         try { 
           setTransactions(prev => prev.filter(t => t.id !== id));
-          await deleteDoc(doc(db, 'transactions', id)); 
+          await executeFirestoreWrite(deleteDoc(doc(db, 'transactions', id))); 
           toast.success('Transaction deleted');
         }
         catch (e) { handleFirestoreError(e, OperationType.DELETE, 'transactions'); }
@@ -1804,7 +1852,7 @@ export default function App() {
       onConfirm: async () => {
         try { 
           setBreedingRecords(prev => prev.filter(r => r.id !== id));
-          await deleteDoc(doc(db, 'breedingRecords', id)); 
+          await executeFirestoreWrite(deleteDoc(doc(db, 'breedingRecords', id))); 
           toast.success('Breeding record deleted');
         }
         catch (e) { handleFirestoreError(e, OperationType.DELETE, 'breedingRecords'); }
@@ -2278,7 +2326,7 @@ export default function App() {
                         <Sliders size={12} className="text-gold-500" />
                         <span>Additional Information</span>
                       </p>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <div className="grid grid-cols-1 gap-2">
                         {Object.entries(data.customFields).map(([k, v]: [string, any]) => {
                           const def = data.customFieldDefinitions?.find((d: any) => d.id === k || d.name.toLowerCase() === k.toLowerCase());
                           const fieldName = def?.name || k;
@@ -3032,7 +3080,7 @@ export default function App() {
                                     batch.update(doc(db, 'birds', mateId), { mateId: '' });
                                   }
 
-                                  await batch.commit();
+                                  await executeFirestoreWrite(batch.commit());
                                   
                                   // Fire non-blocking storage cleanup in background
                                   const urlsToDelete = [
@@ -3093,7 +3141,7 @@ export default function App() {
                                 try { 
                                   setCages(prev => prev.filter(c => c.id !== cage.id));
                                   setBirds(prev => prev.map(b => b.cageId === cage.id ? { ...b, cageId: '' } : b));
-                                  await deleteDoc(doc(db, 'cages', cage.id)); 
+                                  await executeFirestoreWrite(deleteDoc(doc(db, 'cages', cage.id))); 
                                   const urlsToDelete = [
                                     ...(cage.imageUrls || []),
                                     ...(cage.imageUrl ? [cage.imageUrl] : [])
@@ -3148,7 +3196,7 @@ export default function App() {
                                   batch.delete(doc(db, 'pairs', pair.id));
                                   if (pair.maleId) batch.update(doc(db, 'birds', pair.maleId), { mateId: '' });
                                   if (pair.femaleId) batch.update(doc(db, 'birds', pair.femaleId), { mateId: '' });
-                                  await batch.commit();
+                                  await executeFirestoreWrite(batch.commit());
                                   
                                   (pair.imageUrls || []).forEach(url => deleteStorageFileIfApplicable(url).catch(() => {}));
                                   
@@ -3198,7 +3246,11 @@ export default function App() {
                               title: 'Delete Breeding Record', 
                               message: `Are you sure you want to delete this breeding record? This action cannot be undone.`,
                               onConfirm: async () => {
-                                try { await deleteDoc(doc(db, 'breedingRecords', record.id)); }
+                                try { 
+                                  setBreedingRecords(prev => prev.filter(r => r.id !== record.id));
+                                  await executeFirestoreWrite(deleteDoc(doc(db, 'breedingRecords', record.id))); 
+                                  toast.success('Breeding record deleted');
+                                }
                                 catch (e) { handleFirestoreError(e, OperationType.DELETE, 'breedingRecords'); }
                               }
                             })}
@@ -3362,10 +3414,12 @@ export default function App() {
                                   toast.error("Your subscription has expired! Please renew to add or edit entries.");
                                   return;
                                 }
+                                const newStatus = task.status === 'Completed' ? 'Pending' : 'Completed';
+                                setTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: newStatus } : t));
                                 try {
-                                  await updateDoc(doc(db, 'tasks', task.id), { 
-                                    status: task.status === 'Completed' ? 'Pending' : 'Completed' 
-                                  });
+                                  await executeFirestoreWrite(updateDoc(doc(db, 'tasks', task.id), { 
+                                    status: newStatus 
+                                  }));
                                 } catch (e) { handleFirestoreError(e, OperationType.UPDATE, 'tasks'); }
                               }}
                               onEdit={() => { setEditingItem(task); setIsModalOpen(true); }}
@@ -3375,7 +3429,7 @@ export default function App() {
                                 onConfirm: async () => {
                                   try { 
                                     setTasks(prev => prev.filter(t => t.id !== task.id));
-                                    await deleteDoc(doc(db, 'tasks', task.id)); 
+                                    await executeFirestoreWrite(deleteDoc(doc(db, 'tasks', task.id))); 
                                     toast.success('Task deleted');
                                   }
                                   catch (e) { handleFirestoreError(e, OperationType.DELETE, 'tasks'); }
@@ -3417,7 +3471,7 @@ export default function App() {
                         onConfirm: async () => {
                           try { 
                             setContacts(prev => prev.filter(c => c.id !== id));
-                            await deleteDoc(doc(db, 'contacts', id)); 
+                            await executeFirestoreWrite(deleteDoc(doc(db, 'contacts', id))); 
                             toast.success('Contact deleted');
                           }
                           catch (e) { handleFirestoreError(e, OperationType.DELETE, 'contacts'); }
@@ -4717,7 +4771,7 @@ function BirdCard({ bird, cage, birds, cages, viewMode = 'grid-large', currency,
                   exit={{ opacity: 0, height: 0 }}
                   className="overflow-hidden space-y-1.5 pt-1"
                 >
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                  <div className="grid grid-cols-1 gap-1.5">
                     {customFieldEntries.map(item => (
                       <div 
                         key={item.key} 
@@ -6444,16 +6498,19 @@ function BreedingRecordForm({ user, initialData, pairs, birds, cages, onClose, u
         
         if (initialData?.id) { 
           if (onSave) onSave({ ...data, id: initialData.id } as BreedingRecord);
-          await updateDoc(doc(db, 'breedingRecords', initialData.id), data); 
+          toast.success(`Breeding record updated!`);
+          setIsSaving(false);
+          onClose();
+          await executeFirestoreWrite(updateDoc(doc(db, 'breedingRecords', initialData.id), data)); 
         } 
         else { 
           const docRef = doc(collection(db, 'breedingRecords'));
           if (onSave) onSave({ ...data, id: docRef.id } as BreedingRecord);
-          await setDoc(docRef, data); 
+          toast.success(`Breeding record added!`);
+          setIsSaving(false);
+          onClose();
+          await executeFirestoreWrite(setDoc(docRef, data)); 
         }
-        toast.success(`Breeding record ${initialData ? 'updated' : 'added'}!`);
-        setIsSaving(false);
-        onClose();
       } catch (err) { 
         setIsSaving(false);
         handleFirestoreError(err, initialData ? OperationType.UPDATE : OperationType.CREATE, 'breedingRecords'); 
@@ -6784,16 +6841,19 @@ function TransactionForm({ user, initialData, birds, pairs, cages, contacts, cur
 
         if (initialData?.id) { 
           if (onSave) onSave({ ...data, id: initialData.id } as Transaction);
-          await updateDoc(doc(db, 'transactions', initialData.id), data); 
+          toast.success(`Transaction updated!`);
+          setIsSaving(false);
+          onClose();
+          await executeFirestoreWrite(updateDoc(doc(db, 'transactions', initialData.id), data)); 
         } 
         else { 
           const docRef = doc(collection(db, 'transactions'));
           if (onSave) onSave({ ...data, id: docRef.id } as Transaction);
-          await setDoc(docRef, data); 
+          toast.success(`Transaction added!`);
+          setIsSaving(false);
+          onClose();
+          await executeFirestoreWrite(setDoc(docRef, data)); 
         }
-        toast.success(`Transaction ${initialData ? 'updated' : 'added'}!`);
-        setIsSaving(false);
-        onClose();
       } catch (err) { 
         setIsSaving(false);
         handleFirestoreError(err, initialData ? OperationType.UPDATE : OperationType.CREATE, 'transactions'); 
@@ -6943,15 +7003,18 @@ function ContactForm({ user, initialData, onClose, userSettings, onSave }: { use
         const data = sanitizeData(rawData);
         if (initialData?.id) { 
           if (onSave) onSave({ ...data, id: initialData.id } as Contact);
-          await updateDoc(doc(db, 'contacts', initialData.id), data); 
+          toast.success(`Contact updated!`);
+          setIsSaving(false);
+          onClose();
+          await executeFirestoreWrite(updateDoc(doc(db, 'contacts', initialData.id), data)); 
         } else { 
           const docRef = doc(collection(db, 'contacts'));
           if (onSave) onSave({ ...data, id: docRef.id } as Contact);
-          await setDoc(docRef, data); 
+          toast.success(`Contact added!`);
+          setIsSaving(false);
+          onClose();
+          await executeFirestoreWrite(setDoc(docRef, data)); 
         }
-        toast.success(`Contact ${initialData ? 'updated' : 'added'}!`);
-        setIsSaving(false);
-        onClose();
       } catch (err) { 
         setIsSaving(false);
         handleFirestoreError(err, initialData ? OperationType.UPDATE : OperationType.CREATE, 'contacts'); 
@@ -8698,12 +8761,11 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
           onSave({ ...data, id: birdId } as Bird);
         }
 
-        // Await commit to ensure we catch errors before closing
-        await batch.commit();
-        
         toast.success(`Successfully ${initialData ? 'updated' : 'added'} bird!`);
         setIsSaving(false);
         onClose();
+
+        await executeFirestoreWrite(batch.commit());
       } catch (err) { 
          setIsSaving(false);
          console.error("Save error:", err);
@@ -9127,7 +9189,7 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
             </span>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3">
             {userSettings.customBirdFields.map(field => {
               const value = (formData.customFields as any)?.[field.id] ?? (formData.customFields as any)?.[field.name] ?? ``;
               return (
@@ -9333,7 +9395,18 @@ function CageForm({ user, initialData, cages, onClose, userSettings, onSave }: {
             throw new Error('All specified cages already exist');
           }
 
-          await batch.commit();
+          if (onSave) {
+            for (let i = start; i <= end; i++) {
+              const cageName = `${multiPrefix}${i}`;
+              if (!cages.some(c => c.name.toLowerCase() === cageName.toLowerCase())) {
+                onSave({ ...formData, name: cageName, id: Math.random().toString(36).substring(2, 9) } as Cage);
+              }
+            }
+          }
+          toast.success('Bulk cages created!');
+          setIsSaving(false);
+          onClose();
+          await executeFirestoreWrite(batch.commit());
         } else {
           if (cages.some(c => c.id !== initialData?.id && c.name.toLowerCase() === formData.name?.toLowerCase())) {
             throw new Error(`Cage "${formData.name}" already exists`);
@@ -9345,17 +9418,20 @@ function CageForm({ user, initialData, cages, onClose, userSettings, onSave }: {
           });
           if (initialData?.id) { 
             if (onSave) onSave({ ...data, id: initialData.id } as Cage);
-            await updateDoc(doc(db, 'cages', initialData.id), data); 
+            toast.success('Cage updated!');
+            setIsSaving(false);
+            onClose();
+            await executeFirestoreWrite(updateDoc(doc(db, 'cages', initialData.id), data)); 
           } 
           else { 
             const docRef = doc(collection(db, 'cages'));
             if (onSave) onSave({ ...data, id: docRef.id } as Cage);
-            await setDoc(docRef, data); 
+            toast.success('Cage added!');
+            setIsSaving(false);
+            onClose();
+            await executeFirestoreWrite(setDoc(docRef, data)); 
           }
         }
-        toast.success(isMultiMode && !initialData ? 'Bulk cages created!' : `Cage ${initialData ? 'updated' : 'added'}!`);
-        setIsSaving(false);
-        onClose();
       } catch (err) { 
         setError(err instanceof Error ? err.message : 'Action failed');
         setIsSaving(false);
@@ -9602,11 +9678,11 @@ function PairForm({ user, initialData, birds, cages, onClose, userSettings, onSa
           onSave({ ...data, id: pairId } as Pair);
         }
         
-        await batch.commit();
-
         toast.success(`Pair ${initialData ? 'updated' : 'added'}!`);
         setIsSaving(false);
         onClose();
+
+        await executeFirestoreWrite(batch.commit());
       } catch (err) { 
         setIsSaving(false);
         handleFirestoreError(err, initialData ? OperationType.UPDATE : OperationType.CREATE, 'pairs'); 
@@ -9794,16 +9870,18 @@ function TaskForm({ user, initialData, birds, cages, onClose, userSettings, onSa
         });
         if (initialData?.id) { 
           if (onSave) onSave({ ...data, id: initialData.id } as Task);
-          await updateDoc(doc(db, 'tasks', initialData.id), data);
           toast.success(t('Task updated'));
+          setIsSaving(false);
+          onClose();
+          await executeFirestoreWrite(updateDoc(doc(db, 'tasks', initialData.id), data));
         } else { 
           const docRef = doc(collection(db, 'tasks'));
           if (onSave) onSave({ ...data, id: docRef.id } as Task);
-          await setDoc(docRef, data);
           toast.success(t('Task created'));
+          setIsSaving(false);
+          onClose();
+          await executeFirestoreWrite(setDoc(docRef, data));
         }
-        setIsSaving(false);
-        onClose();
       } catch (err) { 
         setIsSaving(false);
         handleFirestoreError(err, initialData ? OperationType.UPDATE : OperationType.CREATE, 'tasks'); 
