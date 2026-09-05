@@ -3,10 +3,14 @@ import { storage } from '../firebase';
 
 export const deleteStorageFileIfApplicable = async (url: string) => {
   if (!url) return;
+  if (typeof navigator !== 'undefined' && !navigator.onLine) return;
   if (url.startsWith('https://firebasestorage.googleapis.com/') || url.includes('firebasestorage.app')) {
     try {
       const fileRef = ref(storage, url);
-      await deleteObject(fileRef);
+      await Promise.race([
+        deleteObject(fileRef),
+        new Promise((resolve) => setTimeout(resolve, 1000))
+      ]);
     } catch (e) {
       console.warn('Failed to delete storage file (or already removed):', e);
     }

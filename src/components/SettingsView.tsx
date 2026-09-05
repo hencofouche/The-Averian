@@ -205,13 +205,16 @@ export function SettingsView({
       return;
     }
 
+    const desc = newCustomFieldDescription.trim();
     const newField: CustomBirdFieldDefinition = {
       id: `cf_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
       name: cleanName,
       type: newCustomFieldType,
-      description: newCustomFieldDescription.trim() || undefined,
       createdAt: new Date().toISOString()
     };
+    if (desc) {
+      newField.description = desc;
+    }
 
     onUpdate({
       ...settings,
@@ -226,15 +229,24 @@ export function SettingsView({
 
   const handleEditCustomField = () => {
     if (!editingCustomField || !editingCustomField.name.trim()) return;
+    const desc = editingCustomField.description?.trim();
     onUpdate({
       ...settings,
-      customBirdFields: (settings.customBirdFields || []).map(f => 
-        f.id === editingCustomField.id ? { 
-          ...editingCustomField, 
-          name: editingCustomField.name.trim(),
-          description: editingCustomField.description?.trim() || undefined
-        } : f
-      )
+      customBirdFields: (settings.customBirdFields || []).map(f => {
+        if (f.id === editingCustomField.id) {
+          const updated: CustomBirdFieldDefinition = {
+            id: editingCustomField.id,
+            name: editingCustomField.name.trim(),
+            type: editingCustomField.type,
+            createdAt: editingCustomField.createdAt || new Date().toISOString()
+          };
+          if (desc) {
+            updated.description = desc;
+          }
+          return updated;
+        }
+        return f;
+      })
     });
     setEditingCustomField(null);
     toast.success('Custom field updated');
@@ -517,7 +529,7 @@ export function SettingsView({
                     <div key={m.id} className="p-3 bg-black border border-black-700 rounded-xl flex items-center justify-between group">
                       <span className="text-sm font-bold text-white">{m.name}</span>
                       <div className="flex items-center gap-1">
-                        <button onClick={() => setEditingItem({ type: 'mutation', id: m.id, name: m.name, inheritance: m.inheritance })} className="text-black-200 hover:text-secondary p-1.5 bg-zinc-800 rounded-lg transition-all"><Edit2 size={14} /></button>
+                        <button onClick={() => setEditingItem({ type: 'mutation', id: m.id, name: m.name, inheritance: m.inheritance as any })} className="text-black-200 hover:text-secondary p-1.5 bg-zinc-800 rounded-lg transition-all"><Edit2 size={14} /></button>
                         <button onClick={() => removeMutation(m.id, m.name)} className="p-1.5 rounded-lg text-red-400 hover:bg-red-500/10"><Trash2 size={14} /></button>
                       </div>
                     </div>

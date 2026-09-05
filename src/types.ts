@@ -12,7 +12,7 @@ export interface SubSpecies {
 export interface Mutation {
   id: string;
   name: string;
-  inheritance?: 'autosomal_recessive' | 'autosomal_dominant' | 'incomplete_dominant' | 'sex_linked_recessive';
+  inheritance?: 'autosomal_recessive' | 'autosomal_dominant' | 'incomplete_dominant' | 'sex_linked_recessive' | 'other' | '';
 }
 
 export interface CustomBirdFieldDefinition {
@@ -393,6 +393,7 @@ export interface Task {
   priority?: 'Low' | 'Medium' | 'High';
   category?: string;
   dueDate?: string;
+  dueTime?: string;
   reminderDate?: string;
   reminderLeadTime?: number;
   birdIds: string[];

@@ -1,5 +1,5 @@
 import { ShareBirdModal, SharePairModal } from './components/ShareModals';
-import { SettingsView } from `./components/SettingsView`;
+import { SettingsView } from './components/SettingsView';
 import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { format } from 'date-fns';
@@ -14,41 +14,41 @@ import {
   Mail, MessageCircle, Video, Shield, Wifi, WifiOff, Flame, ShoppingBag, Store, BookOpen, Sparkles, FileSpreadsheet,
   ListPlus, Type, Hash, Sliders
 } from 'lucide-react';
-import GeneticsCalculatorOriginal from `./components/GeneticsCalculator`;
+import GeneticsCalculatorOriginal from './components/GeneticsCalculator';
 const GeneticsCalculator = React.memo(GeneticsCalculatorOriginal);
-import { ContactsView as ContactsViewOriginal } from `./components/ContactsView`;
+import { ContactsView as ContactsViewOriginal } from './components/ContactsView';
 const ContactsView = React.memo(ContactsViewOriginal);
-import { AdminDiagnosticsView } from `./components/AdminDiagnosticsView`;
-import { AdminDashboardView } from `./components/AdminDashboardView`;
-import { MarketplaceView } from `./components/MarketplaceView`;
-import { WikiView } from `./components/WikiView`;
-import { SmartCandlingModal, computeEggTimeline, getSpeciesIncubation, SPECIES_INCUBATION_DATA } from `./components/SmartCandlingModal`;
+import { AdminDiagnosticsView } from './components/AdminDiagnosticsView';
+import { AdminDashboardView } from './components/AdminDashboardView';
+import { MarketplaceView } from './components/MarketplaceView';
+import { WikiView } from './components/WikiView';
+import { SmartCandlingModal, computeEggTimeline, getSpeciesIncubation, SPECIES_INCUBATION_DATA } from './components/SmartCandlingModal';
 import { calculatePairRoi, getPairOffspring } from './lib/pair-roi';
-import { DigitalTransferPassportModal } from `./components/DigitalTransferPassportModal`;
-import { ComingSoonView } from `./components/ComingSoonView`;
-import { AdminPageTestingBanner } from `./components/AdminPageTestingBanner`;
-import { AdminComingSoonModal } from `./components/AdminComingSoonModal`;
+import { DigitalTransferPassportModal } from './components/DigitalTransferPassportModal';
+import { ComingSoonView } from './components/ComingSoonView';
+import { AdminPageTestingBanner } from './components/AdminPageTestingBanner';
+import { AdminComingSoonModal } from './components/AdminComingSoonModal';
 // Google Workspace native integrations removed to prevent trust-violating security warnings
 import { 
   SellerProfile, MarketplaceListing, MarketplaceReview, 
   AppPageId, AppComingSoonSettings, ComingSoonPageConfig,
   CustomBirdFieldDefinition
-} from `./types`;
-import { QRCodeSVG } from `qrcode.react`;
+} from './types';
+import { QRCodeSVG } from 'qrcode.react';
 import { SubscriptionGate } from "./components/SubscriptionGate";
 import { Button, Input, Select, Card, Textarea, BirdCompactInfo, Badge } from "./components/ui";
-import { Scanner } from `@yudiel/react-qr-scanner`;
+import { Scanner } from '@yudiel/react-qr-scanner';
 import { motion, AnimatePresence } from 'motion/react';
-import { generateBirdListPDF, generateCageListPDF, generatePairListPDF, generateCertificatePDF, generateQRListPDF } from `./lib/pdf-engine`;
-import { defaultSpecies, defaultMutations } from `./lib/default-data`;
-import { getTranslatedLabel, LANGUAGE_NAMES, setActiveLanguage, t as tGlobal } from `./lib/translations`;
-import { InstallAppButton } from `./components/InstallAppButton`;
-import { InstallPromptBanner } from `./components/InstallPromptBanner`;
-import { BannedUserScreen } from `./components/BannedUserScreen`;
-import { PublicLanding } from `./components/PublicLanding`;
-import { useIncubationNotifications } from `./hooks/useIncubationNotifications`;
-import { IncubationAlertsModal } from `./components/IncubationAlertsModal`;
-import { CurrencyConverterRates } from `./components/CurrencyConverterRates`;
+import { generateBirdListPDF, generateCageListPDF, generatePairListPDF, generateCertificatePDF, generateQRListPDF } from './lib/pdf-engine';
+import { defaultSpecies, defaultMutations } from './lib/default-data';
+import { getTranslatedLabel, LANGUAGE_NAMES, setActiveLanguage, t as tGlobal } from './lib/translations';
+import { InstallAppButton } from './components/InstallAppButton';
+import { InstallPromptBanner } from './components/InstallPromptBanner';
+import { BannedUserScreen } from './components/BannedUserScreen';
+import { PublicLanding } from './components/PublicLanding';
+import { useIncubationNotifications } from './hooks/useIncubationNotifications';
+import { IncubationAlertsModal } from './components/IncubationAlertsModal';
+import { CurrencyConverterRates } from './components/CurrencyConverterRates';
 
 function ImageGallery({ imageUrls, initialIndex, onClose }: { imageUrls: string[], initialIndex: number, onClose: () => void }) {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
@@ -167,7 +167,7 @@ import {
 } from 'recharts';
 import { 
   auth, db, storage, loginWithGoogle, logout, handleFirestoreError, testConnection, setFirestoreNetworkState
-} from `./firebase`;
+} from './firebase';
 import { 
   onAuthStateChanged, User as FirebaseUser 
 } from 'firebase/auth';
@@ -178,10 +178,10 @@ import {
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { 
   Bird, Cage, Pair, Task, Transaction, OperationType, BreedingRecord, UserSettings, Species, SubSpecies, Mutation, SharedItem, Contact, BirdDocument, Egg as EggType
-} from `./types`;
-import { cn, generateColorPalette } from `./lib/utils`;
-import ColorWheel from `@uiw/react-color-wheel`;
-import { hexToHsva, hsvaToHex } from `@uiw/color-convert`;
+} from './types';
+import { cn, generateColorPalette } from './lib/utils';
+import ColorWheel from '@uiw/react-color-wheel';
+import { hexToHsva, hsvaToHex } from '@uiw/color-convert';
 import { startOfDay, startOfWeek, startOfMonth, startOfYear, endOfMonth, endOfWeek, addDays, addMonths, isSameMonth, subDays, subWeeks, subMonths, subYears, isWithinInterval, parseISO } from 'date-fns';
 
 // --- Helpers ---
@@ -211,24 +211,24 @@ const isSubscriptionExpired = (settings: UserSettings | null | undefined): boole
   return new Date() > expiryDate;
 };
 
-const sanitizeData = (data: any) => {
-  const sanitized: any = {};
-  Object.keys(data).forEach(key => {
-    if (key !== 'id' && data[key] !== undefined) {
-      if (key === 'customFields' && typeof data[key] === 'object' && data[key] !== null) {
-        const cleanCustom: Record<string, any> = {};
-        Object.entries(data[key]).forEach(([ck, cv]) => {
-          if (cv !== undefined && cv !== null && cv !== ``) {
-            cleanCustom[ck] = cv;
-          }
-        });
-        sanitized[key] = cleanCustom;
-      } else {
-        sanitized[key] = data[key];
+const sanitizeData = (data: any, isRoot = true): any => {
+  if (data === null || data === undefined) return null;
+  if (Array.isArray(data)) {
+    return data.map(item => sanitizeData(item, false)).filter(item => item !== undefined && item !== null);
+  }
+  if (typeof data === 'object' && !(data instanceof Date)) {
+    const sanitized: Record<string, any> = {};
+    Object.keys(data).forEach(key => {
+      if ((!isRoot || key !== 'id') && data[key] !== undefined) {
+        const cleaned = sanitizeData(data[key], false);
+        if (cleaned !== undefined) {
+          sanitized[key] = cleaned;
+        }
       }
-    }
-  });
-  return sanitized;
+    });
+    return sanitized;
+  }
+  return data;
 };
 
 const getCurrencySymbol = (currency?: string) => {
@@ -745,6 +745,40 @@ export default function App() {
   const [navigationHistory, setNavigationHistory] = useState<{ tab: string, query: string, filter: any } | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<any>(null);
+  const [modalFormTypeOverride, setModalFormTypeOverride] = useState<'birds' | 'cages' | 'pairs' | 'breeding' | 'tasks' | 'financials' | 'contacts' | null>(null);
+
+  const getModalTargetForm = (): 'birds' | 'cages' | 'pairs' | 'breeding' | 'tasks' | 'financials' | 'contacts' => {
+    if (modalFormTypeOverride) return modalFormTypeOverride;
+    if (editingItem && typeof editingItem === 'object') {
+      if ('species' in editingItem || 'sex' in editingItem || 'fatherId' in editingItem || 'motherId' in editingItem || 'splitMutations' in editingItem || 'ringNumber' in editingItem) {
+        return 'birds';
+      }
+      if ('maleId' in editingItem && 'femaleId' in editingItem) {
+        return 'pairs';
+      }
+      if ('pairId' in editingItem && ('eggs' in editingItem || 'eggsLaid' in editingItem || 'incubationDays' in editingItem || 'clutchSize' in editingItem)) {
+        return 'breeding';
+      }
+      if ('subTasks' in editingItem || 'priority' in editingItem || ('dueDate' in editingItem && !('amount' in editingItem))) {
+        return 'tasks';
+      }
+      if ('amount' in editingItem || editingItem.type === 'Income' || editingItem.type === 'Expense') {
+        return 'financials';
+      }
+      if (editingItem.type === 'Buyer' || editingItem.type === 'Seller' || editingItem.type === 'Both' || 'phone' in editingItem || 'email' in editingItem) {
+        return 'contacts';
+      }
+      if ('location' in editingItem || 'dimensionUnit' in editingItem || editingItem.type === 'Standard' || editingItem.type === 'Flight' || editingItem.type === 'Breeding' || editingItem.type === 'Aviary' || editingItem.type === 'Custom') {
+        return 'cages';
+      }
+    }
+
+    if (['birds', 'cages', 'pairs', 'breeding', 'tasks', 'financials', 'contacts'].includes(activeTab)) {
+      return activeTab as any;
+    }
+
+    return 'birds';
+  };
   const [deleteConfirmation, setDeleteConfirmation] = useState<{ title: string, message: string, onConfirm: () => Promise<void> | void } | null>(null);
 
   const [sharedItemView, setSharedItemView] = useState<SharedItem | null>(null);
@@ -1682,7 +1716,7 @@ export default function App() {
     setQuickAddDialog({
       type: 'mutation',
       name,
-      inheritance: ``,
+      inheritance: '' as any,
       onSuccess
     });
   };
@@ -1748,7 +1782,11 @@ export default function App() {
       title: 'Delete Transaction',
       message: `Are you sure you want to delete this transaction? This action cannot be undone.`,
       onConfirm: async () => {
-        try { await deleteDoc(doc(db, 'transactions', id)); }
+        try { 
+          setTransactions(prev => prev.filter(t => t.id !== id));
+          await deleteDoc(doc(db, 'transactions', id)); 
+          toast.success('Transaction deleted');
+        }
         catch (e) { handleFirestoreError(e, OperationType.DELETE, 'transactions'); }
       }
     });
@@ -1764,7 +1802,11 @@ export default function App() {
       title: 'Delete Breeding Record',
       message: `Are you sure you want to delete this breeding record? This action cannot be undone.`,
       onConfirm: async () => {
-        try { await deleteDoc(doc(db, 'breedingRecords', id)); }
+        try { 
+          setBreedingRecords(prev => prev.filter(r => r.id !== id));
+          await deleteDoc(doc(db, 'breedingRecords', id)); 
+          toast.success('Breeding record deleted');
+        }
         catch (e) { handleFirestoreError(e, OperationType.DELETE, 'breedingRecords'); }
       }
     });
@@ -1982,7 +2024,7 @@ export default function App() {
                 customBirdFields: [...(userSettings.customBirdFields || []), ...newFieldsToAdd]
               };
               try {
-                await setDoc(doc(db, 'users', user.uid, 'settings', 'general'), sanitizeData(updatedSettings), { merge: true });
+                await setDoc(doc(db, 'userSettings', user.uid), sanitizeData(updatedSettings), { merge: true });
                 setUserSettings(updatedSettings);
               } catch (err) {
                 console.error(`Failed to sync imported custom field definitions:`, err);
@@ -2971,6 +3013,10 @@ export default function App() {
                               message: `Are you sure you want to delete "${bird.name}"? This action cannot be undone.`,
                               onConfirm: async () => {
                                 try { 
+                                  // Optimistically update local state immediately
+                                  setBirds(prev => prev.filter(b => b.id !== bird.id).map(b => b.mateId === bird.id ? { ...b, mateId: '' } : b));
+                                  setPairs(prev => prev.filter(p => p.maleId !== bird.id && p.femaleId !== bird.id));
+
                                   const batch = writeBatch(db);
                                   batch.delete(doc(db, 'birds', bird.id));
                                   
@@ -2988,20 +3034,13 @@ export default function App() {
 
                                   await batch.commit();
                                   
-                                  // Clean up images from storage
-                                  if (bird.imageUrls && bird.imageUrls.length > 0) {
-                                    for (const url of bird.imageUrls) {
-                                      await deleteStorageFileIfApplicable(url);
-                                    }
-                                  } else if (bird.imageUrl) {
-                                    await deleteStorageFileIfApplicable(bird.imageUrl);
-                                  }
-                                  // Clean up documents
-                                  if (bird.documents && bird.documents.length > 0) {
-                                    for (const doc of bird.documents) {
-                                      await deleteStorageFileIfApplicable(doc.url);
-                                    }
-                                  }
+                                  // Fire non-blocking storage cleanup in background
+                                  const urlsToDelete = [
+                                    ...(bird.imageUrls || []),
+                                    ...(bird.imageUrl ? [bird.imageUrl] : []),
+                                    ...(bird.documents?.map(d => d.url) || [])
+                                  ];
+                                  urlsToDelete.forEach(url => deleteStorageFileIfApplicable(url).catch(() => {}));
                                   
                                   toast.success('Bird and associated pair data deleted');
                                 }
@@ -3052,14 +3091,15 @@ export default function App() {
                               message: `Are you sure you want to delete "${cage.name}"? This action cannot be undone.`,
                               onConfirm: async () => {
                                 try { 
+                                  setCages(prev => prev.filter(c => c.id !== cage.id));
+                                  setBirds(prev => prev.map(b => b.cageId === cage.id ? { ...b, cageId: '' } : b));
                                   await deleteDoc(doc(db, 'cages', cage.id)); 
-                                  if (cage.imageUrls && cage.imageUrls.length > 0) {
-                                    for (const url of cage.imageUrls) {
-                                      await deleteStorageFileIfApplicable(url);
-                                    }
-                                  } else if (cage.imageUrl) {
-                                    await deleteStorageFileIfApplicable(cage.imageUrl);
-                                  }
+                                  const urlsToDelete = [
+                                    ...(cage.imageUrls || []),
+                                    ...(cage.imageUrl ? [cage.imageUrl] : [])
+                                  ];
+                                  urlsToDelete.forEach(url => deleteStorageFileIfApplicable(url).catch(() => {}));
+                                  toast.success('Cage deleted');
                                 }
                                 catch (e) { handleFirestoreError(e, OperationType.DELETE, 'cages'); }
                               }
@@ -3101,17 +3141,16 @@ export default function App() {
                               message: `Are you sure you want to delete this breeding pair? This action cannot be undone.`,
                               onConfirm: async () => {
                                 try { 
+                                  setPairs(prev => prev.filter(p => p.id !== pair.id));
+                                  setBirds(prev => prev.map(b => (b.id === pair.maleId || b.id === pair.femaleId) ? { ...b, mateId: '' } : b));
+
                                   const batch = writeBatch(db);
                                   batch.delete(doc(db, 'pairs', pair.id));
                                   if (pair.maleId) batch.update(doc(db, 'birds', pair.maleId), { mateId: '' });
                                   if (pair.femaleId) batch.update(doc(db, 'birds', pair.femaleId), { mateId: '' });
                                   await batch.commit();
                                   
-                                  if (pair.imageUrls && pair.imageUrls.length > 0) {
-                                    for (const url of pair.imageUrls) {
-                                      await deleteStorageFileIfApplicable(url);
-                                    }
-                                  }
+                                  (pair.imageUrls || []).forEach(url => deleteStorageFileIfApplicable(url).catch(() => {}));
                                   
                                   toast.success('Pair deleted and mate links removed');
                                 }
@@ -3334,7 +3373,11 @@ export default function App() {
                                 title: 'Delete Task', 
                                 message: `Are you sure you want to delete "${task.title}"? This action cannot be undone.`,
                                 onConfirm: async () => {
-                                  try { await deleteDoc(doc(db, 'tasks', task.id)); }
+                                  try { 
+                                    setTasks(prev => prev.filter(t => t.id !== task.id));
+                                    await deleteDoc(doc(db, 'tasks', task.id)); 
+                                    toast.success('Task deleted');
+                                  }
                                   catch (e) { handleFirestoreError(e, OperationType.DELETE, 'tasks'); }
                                 }
                               })}
@@ -3372,7 +3415,11 @@ export default function App() {
                         title: 'Delete Contact',
                         message: `Are you sure you want to delete this contact? This action cannot be undone.`,
                         onConfirm: async () => {
-                          try { await deleteDoc(doc(db, 'contacts', id)); }
+                          try { 
+                            setContacts(prev => prev.filter(c => c.id !== id));
+                            await deleteDoc(doc(db, 'contacts', id)); 
+                            toast.success('Contact deleted');
+                          }
                           catch (e) { handleFirestoreError(e, OperationType.DELETE, 'contacts'); }
                         }
                       })}
@@ -3467,39 +3514,179 @@ export default function App() {
         </div>
       </main>
 
-      <Modal 
-        isOpen={isModalOpen} 
-        onClose={() => { setIsModalOpen(false); setEditingItem(null); }}
-        title={`${(editingItem && (editingItem as any).id) ? 'Edit' : 'Add'} ${
-          activeTab === 'breeding' ? 'Breeding Record' :
-          activeTab === 'financials' ? 'Transaction' :
-          activeTab === 'tasks' ? 'Task / Reminder' : 
-          activeTab.slice(0, -1)
-        }`}
-      >
-        {activeTab === 'birds' && (
-          <BirdForm 
-            user={user} 
-            initialData={editingItem} 
-            cages={cages} 
-            birds={birds} 
-            pairs={pairs}
-            contacts={contacts}
-            userSettings={effectiveSettings}
-            onAddSpecies={handleAddSpecies}
-            onAddSubSpecies={handleAddSubSpecies}
-            onAddMutation={handleAddMutation}
-            onAddStatus={handleAddStatus}
-            onClose={() => setIsModalOpen(false)} 
-          />
-        )}
-        {activeTab === 'cages' && <CageForm user={user} initialData={editingItem} cages={cages} onClose={() => setIsModalOpen(false)} userSettings={effectiveSettings ?? undefined} />}
-        {activeTab === 'pairs' && <PairForm user={user} initialData={editingItem} birds={birds} cages={cages} onClose={() => setIsModalOpen(false)} userSettings={effectiveSettings ?? undefined} />}
-        {activeTab === 'breeding' && <BreedingRecordForm user={user} initialData={editingItem} pairs={pairs} birds={birds} cages={cages} onClose={() => setIsModalOpen(false)} userSettings={effectiveSettings ?? undefined} />}
-        {activeTab === 'tasks' && <TaskForm user={user} initialData={editingItem} birds={birds} cages={cages} onClose={() => setIsModalOpen(false)} userSettings={effectiveSettings ?? undefined} />}
-        {activeTab === 'financials' && <TransactionForm user={user} initialData={editingItem} birds={birds} pairs={pairs} cages={cages} contacts={contacts} currency={userSettings?.currency} onClose={() => setIsModalOpen(false)} userSettings={effectiveSettings ?? undefined} />}
-        {activeTab === 'contacts' && <ContactForm user={user} initialData={editingItem} onClose={() => setIsModalOpen(false)} userSettings={effectiveSettings ?? undefined} />}
-      </Modal>
+      {(() => {
+        const currentModalFormType = getModalTargetForm();
+        const formNames: Record<string, string> = {
+          birds: 'Bird',
+          cages: 'Cage',
+          pairs: 'Pair',
+          breeding: 'Breeding Record',
+          tasks: 'Task / Reminder',
+          financials: 'Transaction',
+          contacts: 'Contact'
+        };
+        const handleCloseModal = () => {
+          setIsModalOpen(false);
+          setEditingItem(null);
+          setModalFormTypeOverride(null);
+        };
+
+        return (
+          <Modal 
+            isOpen={isModalOpen} 
+            onClose={handleCloseModal}
+            title={`${(editingItem && (editingItem as any).id) ? 'Edit' : 'Add'} ${formNames[currentModalFormType] || 'Item'}`}
+          >
+            {!editingItem?.id && !['birds', 'cages', 'pairs', 'breeding', 'tasks', 'financials', 'contacts'].includes(activeTab) && (
+              <div className="flex flex-wrap gap-2 pb-3 mb-4 border-b border-zinc-800">
+                {[
+                  { id: 'birds', label: 'Bird' },
+                  { id: 'cages', label: 'Cage' },
+                  { id: 'pairs', label: 'Pair' },
+                  { id: 'breeding', label: 'Breeding Record' },
+                  { id: 'tasks', label: 'Task' },
+                  { id: 'financials', label: 'Transaction' },
+                  { id: 'contacts', label: 'Contact' },
+                ].map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => setModalFormTypeOverride(item.id as any)}
+                    className={cn(
+                      "px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer",
+                      currentModalFormType === item.id
+                        ? "bg-gold-500 text-black shadow-md shadow-gold-500/20 font-black"
+                        : "bg-zinc-800 text-zinc-400 hover:text-white"
+                    )}
+                  >
+                    + {item.label}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {currentModalFormType === 'birds' && (
+              <BirdForm 
+                user={user} 
+                initialData={editingItem} 
+                cages={cages} 
+                birds={birds} 
+                pairs={pairs}
+                contacts={contacts}
+                userSettings={effectiveSettings}
+                onAddSpecies={handleAddSpecies}
+                onAddSubSpecies={handleAddSubSpecies}
+                onAddMutation={handleAddMutation}
+                onAddStatus={handleAddStatus}
+                onClose={handleCloseModal} 
+                onSave={(savedBird) => {
+                  setBirds(prev => {
+                    const idx = prev.findIndex(b => b.id === savedBird.id);
+                    return idx >= 0 ? prev.map((b, i) => i === idx ? savedBird : b) : [savedBird, ...prev];
+                  });
+                }}
+              />
+            )}
+            {currentModalFormType === 'cages' && (
+              <CageForm 
+                user={user} 
+                initialData={editingItem} 
+                cages={cages} 
+                onClose={handleCloseModal} 
+                userSettings={effectiveSettings ?? undefined} 
+                onSave={(savedCage) => {
+                  setCages(prev => {
+                    const idx = prev.findIndex(c => c.id === savedCage.id);
+                    return idx >= 0 ? prev.map((c, i) => i === idx ? savedCage : c) : [savedCage, ...prev];
+                  });
+                }}
+              />
+            )}
+            {currentModalFormType === 'pairs' && (
+              <PairForm 
+                user={user} 
+                initialData={editingItem} 
+                birds={birds} 
+                cages={cages} 
+                onClose={handleCloseModal} 
+                userSettings={effectiveSettings ?? undefined} 
+                onSave={(savedPair) => {
+                  setPairs(prev => {
+                    const idx = prev.findIndex(p => p.id === savedPair.id);
+                    return idx >= 0 ? prev.map((p, i) => i === idx ? savedPair : p) : [savedPair, ...prev];
+                  });
+                }}
+              />
+            )}
+            {currentModalFormType === 'breeding' && (
+              <BreedingRecordForm 
+                user={user} 
+                initialData={editingItem} 
+                pairs={pairs} 
+                birds={birds} 
+                cages={cages} 
+                onClose={handleCloseModal} 
+                userSettings={effectiveSettings ?? undefined} 
+                onSave={(savedRecord) => {
+                  setBreedingRecords(prev => {
+                    const idx = prev.findIndex(r => r.id === savedRecord.id);
+                    return idx >= 0 ? prev.map((r, i) => i === idx ? savedRecord : r) : [savedRecord, ...prev];
+                  });
+                }}
+              />
+            )}
+            {currentModalFormType === 'tasks' && (
+              <TaskForm 
+                user={user} 
+                initialData={editingItem} 
+                birds={birds} 
+                cages={cages} 
+                onClose={handleCloseModal} 
+                userSettings={effectiveSettings ?? undefined} 
+                onSave={(savedTask) => {
+                  setTasks(prev => {
+                    const idx = prev.findIndex(t => t.id === savedTask.id);
+                    return idx >= 0 ? prev.map((t, i) => i === idx ? savedTask : t) : [savedTask, ...prev];
+                  });
+                }}
+              />
+            )}
+            {currentModalFormType === 'financials' && (
+              <TransactionForm 
+                user={user} 
+                initialData={editingItem} 
+                birds={birds} 
+                pairs={pairs} 
+                cages={cages} 
+                contacts={contacts} 
+                currency={userSettings?.currency} 
+                onClose={handleCloseModal} 
+                userSettings={effectiveSettings ?? undefined} 
+                onSave={(savedTx) => {
+                  setTransactions(prev => {
+                    const idx = prev.findIndex(t => t.id === savedTx.id);
+                    return idx >= 0 ? prev.map((t, i) => i === idx ? savedTx : t) : [savedTx, ...prev];
+                  });
+                }}
+              />
+            )}
+            {currentModalFormType === 'contacts' && (
+              <ContactForm 
+                user={user} 
+                initialData={editingItem} 
+                onClose={handleCloseModal} 
+                userSettings={effectiveSettings ?? undefined} 
+                onSave={(savedContact) => {
+                  setContacts(prev => {
+                    const idx = prev.findIndex(c => c.id === savedContact.id);
+                    return idx >= 0 ? prev.map((c, i) => i === idx ? savedContact : c) : [savedContact, ...prev];
+                  });
+                }}
+              />
+            )}
+          </Modal>
+        );
+      })()}
 
       <ScannerModal 
         isOpen={isScanModalOpen}
@@ -6164,7 +6351,7 @@ function BreedingRecordCard({ record, pair, male, female, birds, onEdit, onDelet
   );
 }
 
-function BreedingRecordForm({ user, initialData, pairs, birds, cages, onClose, userSettings }: { user: FirebaseUser, initialData?: BreedingRecord, pairs: Pair[], birds: Bird[], cages: Cage[], onClose: () => void, userSettings?: UserSettings }) {
+function BreedingRecordForm({ user, initialData, pairs, birds, cages, onClose, userSettings, onSave }: { user: FirebaseUser, initialData?: BreedingRecord, pairs: Pair[], birds: Bird[], cages: Cage[], onClose: () => void, userSettings?: UserSettings, onSave?: (record: BreedingRecord) => void }) {
   const t = (text: string) => getTranslatedLabel(text, userSettings?.language || 'en');
   const [formData, setFormData] = useState<Partial<BreedingRecord>>(initialData || { 
     pairId: ``, 
@@ -6256,10 +6443,12 @@ function BreedingRecordForm({ user, initialData, pairs, birds, cages, onClose, u
         });
         
         if (initialData?.id) { 
+          if (onSave) onSave({ ...data, id: initialData.id } as BreedingRecord);
           await updateDoc(doc(db, 'breedingRecords', initialData.id), data); 
         } 
         else { 
           const docRef = doc(collection(db, 'breedingRecords'));
+          if (onSave) onSave({ ...data, id: docRef.id } as BreedingRecord);
           await setDoc(docRef, data); 
         }
         toast.success(`Breeding record ${initialData ? 'updated' : 'added'}!`);
@@ -6547,7 +6736,7 @@ function BreedingRecordForm({ user, initialData, pairs, birds, cages, onClose, u
   );
 }
 
-function TransactionForm({ user, initialData, birds, pairs, cages, contacts, currency, onClose, userSettings }: { user: FirebaseUser, initialData?: Transaction, birds: Bird[], pairs: Pair[], cages: Cage[], contacts: Contact[], currency?: string, onClose: () => void, userSettings?: UserSettings }) {
+function TransactionForm({ user, initialData, birds, pairs, cages, contacts, currency, onClose, userSettings, onSave }: { user: FirebaseUser, initialData?: Transaction, birds: Bird[], pairs: Pair[], cages: Cage[], contacts: Contact[], currency?: string, onClose: () => void, userSettings?: UserSettings, onSave?: (tx: Transaction) => void }) {
   const t = (text: string) => getTranslatedLabel(text, userSettings?.language || 'en');
   const symbol = getCurrencySymbol(currency);
   const [formData, setFormData] = useState<Partial<Transaction>>(initialData || {
@@ -6594,10 +6783,12 @@ function TransactionForm({ user, initialData, birds, pairs, cages, contacts, cur
         const data = sanitizeData(rawData);
 
         if (initialData?.id) { 
+          if (onSave) onSave({ ...data, id: initialData.id } as Transaction);
           await updateDoc(doc(db, 'transactions', initialData.id), data); 
         } 
         else { 
           const docRef = doc(collection(db, 'transactions'));
+          if (onSave) onSave({ ...data, id: docRef.id } as Transaction);
           await setDoc(docRef, data); 
         }
         toast.success(`Transaction ${initialData ? 'updated' : 'added'}!`);
@@ -6722,7 +6913,7 @@ function TransactionForm({ user, initialData, birds, pairs, cages, contacts, cur
   );
 }
 
-function ContactForm({ user, initialData, onClose, userSettings }: { user: FirebaseUser, initialData?: Contact, onClose: () => void, userSettings?: UserSettings }) {
+function ContactForm({ user, initialData, onClose, userSettings, onSave }: { user: FirebaseUser, initialData?: Contact, onClose: () => void, userSettings?: UserSettings, onSave?: (contact: Contact) => void }) {
   const t = (text: string) => getTranslatedLabel(text, userSettings?.language || 'en');
   const [formData, setFormData] = useState<Partial<Contact>>(initialData || {
     name: ``,
@@ -6751,9 +6942,11 @@ function ContactForm({ user, initialData, onClose, userSettings }: { user: Fireb
         };
         const data = sanitizeData(rawData);
         if (initialData?.id) { 
+          if (onSave) onSave({ ...data, id: initialData.id } as Contact);
           await updateDoc(doc(db, 'contacts', initialData.id), data); 
         } else { 
           const docRef = doc(collection(db, 'contacts'));
+          if (onSave) onSave({ ...data, id: docRef.id } as Contact);
           await setDoc(docRef, data); 
         }
         toast.success(`Contact ${initialData ? 'updated' : 'added'}!`);
@@ -8262,7 +8455,7 @@ function ConfirmModal({ isOpen, onClose, onConfirm, title, message, isDeleting }
 
 // --- Forms ---
 
-function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettings, onAddSpecies, onAddSubSpecies, onAddMutation, onAddStatus, onClose }: { user: FirebaseUser, initialData?: Bird | null, cages: Cage[], birds: Bird[], pairs: Pair[], contacts: Contact[], userSettings: UserSettings | null, onAddSpecies: (n: string, cb?: (name: string, id: string) => void) => void, onAddSubSpecies: (n: string, sid: string, cb?: (name: string, id: string) => void) => void, onAddMutation: (n: string, cb?: (name: string, id: string) => void) => void, onAddStatus: (n: string) => void, onClose: () => void }) {
+function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettings, onAddSpecies, onAddSubSpecies, onAddMutation, onAddStatus, onClose, onSave }: { user: FirebaseUser, initialData?: Bird | null, cages: Cage[], birds: Bird[], pairs: Pair[], contacts: Contact[], userSettings: UserSettings | null, onAddSpecies: (n: string, cb?: (name: string, id: string) => void) => void, onAddSubSpecies: (n: string, sid: string, cb?: (name: string, id: string) => void) => void, onAddMutation: (n: string, cb?: (name: string, id: string) => void) => void, onAddStatus: (n: string) => void, onClose: () => void, onSave?: (bird: Bird) => void }) {
   const t = (text: string) => tGlobal(text, userSettings?.language || 'en');
   const symbol = getCurrencySymbol(userSettings?.currency);
   const detectedMateId = (initialData && initialData.id) ? (initialData.mateId || birds.find(b => b.mateId === initialData.id)?.id || '') : '';
@@ -8500,6 +8693,11 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
           });
         }
         
+        // Optimistically update local parent state immediately
+        if (onSave) {
+          onSave({ ...data, id: birdId } as Bird);
+        }
+
         // Await commit to ensure we catch errors before closing
         await batch.commit();
         
@@ -9056,7 +9254,7 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
   );
 }
 
-function CageForm({ user, initialData, cages, onClose, userSettings }: { user: FirebaseUser, initialData?: Cage, cages: Cage[], onClose: () => void, userSettings?: UserSettings }) {
+function CageForm({ user, initialData, cages, onClose, userSettings, onSave }: { user: FirebaseUser, initialData?: Cage, cages: Cage[], onClose: () => void, userSettings?: UserSettings, onSave?: (cage: Cage) => void }) {
   const t = (text: string) => getTranslatedLabel(text, userSettings?.language || 'en');
   const [formData, setFormData] = useState<Partial<Cage>>(initialData || { name: '', location: '', type: 'Standard', imageUrl: '', imageUrls: [] });
   const [isUploading, setIsUploading] = useState(false);
@@ -9146,10 +9344,12 @@ function CageForm({ user, initialData, cages, onClose, userSettings }: { user: F
             ...(initialData?.id ? {} : { uid: user.uid })
           });
           if (initialData?.id) { 
+            if (onSave) onSave({ ...data, id: initialData.id } as Cage);
             await updateDoc(doc(db, 'cages', initialData.id), data); 
           } 
           else { 
             const docRef = doc(collection(db, 'cages'));
+            if (onSave) onSave({ ...data, id: docRef.id } as Cage);
             await setDoc(docRef, data); 
           }
         }
@@ -9316,7 +9516,7 @@ function CageForm({ user, initialData, cages, onClose, userSettings }: { user: F
   );
 }
 
-function PairForm({ user, initialData, birds, cages, onClose, userSettings }: { user: FirebaseUser, initialData?: Pair, birds: Bird[], cages: Cage[], onClose: () => void, userSettings?: UserSettings }) {
+function PairForm({ user, initialData, birds, cages, onClose, userSettings, onSave }: { user: FirebaseUser, initialData?: Pair, birds: Bird[], cages: Cage[], onClose: () => void, userSettings?: UserSettings, onSave?: (pair: Pair) => void }) {
   const t = (text: string) => getTranslatedLabel(text, userSettings?.language || 'en');
   const [formData, setFormData] = useState<Partial<Pair>>(initialData || { maleId: '', femaleId: '', status: 'Active', startDate: '', endDate: '' });
   const [isSaving, setIsSaving] = useState(false);
@@ -9373,6 +9573,7 @@ function PairForm({ user, initialData, birds, cages, onClose, userSettings }: { 
           ...(initialData?.id ? {} : { uid: user.uid })
         });
         
+        let pairId = initialData?.id;
         if (initialData?.id) { 
           batch.update(doc(db, 'pairs', initialData.id), data); 
           // If mate changed, clear old ones
@@ -9385,6 +9586,7 @@ function PairForm({ user, initialData, birds, cages, onClose, userSettings }: { 
         } 
         else { 
           const docRef = doc(collection(db, 'pairs'));
+          pairId = docRef.id;
           batch.set(docRef, data); 
         }
 
@@ -9394,6 +9596,10 @@ function PairForm({ user, initialData, birds, cages, onClose, userSettings }: { 
         }
         if (data.femaleId) {
           batch.update(doc(db, 'birds', data.femaleId), { mateId: data.maleId || '' });
+        }
+
+        if (onSave && pairId) {
+          onSave({ ...data, id: pairId } as Pair);
         }
         
         await batch.commit();
@@ -9542,7 +9748,7 @@ function PairForm({ user, initialData, birds, cages, onClose, userSettings }: { 
   );
 }
 
-function TaskForm({ user, initialData, birds, cages, onClose, userSettings }: { user: FirebaseUser, initialData?: Task, birds: Bird[], cages: Cage[], onClose: () => void, userSettings?: UserSettings }) {
+function TaskForm({ user, initialData, birds, cages, onClose, userSettings, onSave }: { user: FirebaseUser, initialData?: Task, birds: Bird[], cages: Cage[], onClose: () => void, userSettings?: UserSettings, onSave?: (task: Task) => void }) {
   const t = (text: string) => getTranslatedLabel(text, userSettings?.language || 'en');
   const [formData, setFormData] = useState<Partial<Task>>(initialData || { title: '', description: '', status: 'Pending', priority: 'Medium', category: 'General', dueDate: '', reminderDate: '', birdIds: [], subTasks: [] });
   const [newSubTask, setNewSubTask] = useState(``);
@@ -9587,10 +9793,12 @@ function TaskForm({ user, initialData, birds, cages, onClose, userSettings }: { 
           ...(initialData?.id ? {} : { uid: user.uid })
         });
         if (initialData?.id) { 
+          if (onSave) onSave({ ...data, id: initialData.id } as Task);
           await updateDoc(doc(db, 'tasks', initialData.id), data);
           toast.success(t('Task updated'));
         } else { 
           const docRef = doc(collection(db, 'tasks'));
+          if (onSave) onSave({ ...data, id: docRef.id } as Task);
           await setDoc(docRef, data);
           toast.success(t('Task created'));
         }
