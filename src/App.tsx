@@ -3347,6 +3347,11 @@ export default function App() {
                     onDeleteBreeding={handleDeleteBreeding}
                     onEditTransaction={handleEditTransaction}
                     onDeleteTransaction={handleDeleteTransaction}
+                    onAddBreedingRecord={(pairId) => {
+                      setModalFormTypeOverride('breeding');
+                      setEditingItem(pairId ? ({ pairId } as any) : null);
+                      setIsModalOpen(true);
+                    }}
                   />
                 )}
 
@@ -4679,23 +4684,6 @@ function BirdCard({ bird, cage, birds, pairs = [], cages, viewMode = 'grid-large
               >
                 <div className="flex flex-wrap items-center gap-2 pt-2">
                   <button 
-                    onClick={(e) => { 
-                      e.stopPropagation(); 
-                      const pair = pairs.find(p => p.maleId === bird.id || p.femaleId === bird.id);
-                      if (pair) {
-                        if (onAddBreedingRecord) onAddBreedingRecord(pair.id);
-                      } else {
-                        toast.info(`No active pair found for ${bird.name}. Opening Breeding Record form.`);
-                        if (onAddBreedingRecord) onAddBreedingRecord('');
-                      }
-                    }} 
-                    className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 rounded-lg transition-all border border-emerald-500/30 min-w-[90px] cursor-pointer"
-                    title="Add Breeding Record for this bird"
-                  >
-                    <Plus size={13} className="text-emerald-400" />
-                    <span className="text-[9px] font-black uppercase tracking-widest">+ Record</span>
-                  </button>
-                  <button 
                     onClick={(e) => { e.stopPropagation(); onNavigate('stats', '', { birdId: bird.id }); }} 
                     className="flex-1 p-2 bg-secondary/10 border border-secondary/20 rounded-lg text-[10px] text-secondary font-black uppercase tracking-widest hover:bg-secondary/20 transition-colors flex items-center justify-center gap-2 min-w-[90px]"
                   >
@@ -5089,19 +5077,9 @@ function PairCard({ pair, male, female, cages, birds, records, currency, onBirdR
             <Home size={10} />
             <span className="max-w-[80px] truncate">{cage?.name || 'Unassigned'}</span>
           </div>
-          <div className="flex items-center gap-1.5">
-            <Badge variant={pair.status === 'Active' ? 'success' : 'neutral'} className="text-[8px] px-2 py-0.5">
-              {pair.status}
-            </Badge>
-            <button
-              onClick={(e) => { e.stopPropagation(); if (onAddBreedingRecord) onAddBreedingRecord(pair.id); }}
-              className="flex items-center gap-1 px-2 py-0.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 rounded-lg border border-emerald-500/30 text-[8px] font-black uppercase tracking-wider transition-all active:scale-95 cursor-pointer"
-              title="Add Breeding Record for this pair"
-            >
-              <Plus size={9} />
-              <span>+ Record</span>
-            </button>
-          </div>
+          <Badge variant={pair.status === 'Active' ? 'success' : 'neutral'} className="text-[8px] px-2 py-0.5">
+            {pair.status}
+          </Badge>
         </div>
       </Card>
     );
@@ -5172,15 +5150,7 @@ function PairCard({ pair, male, female, cages, birds, records, currency, onBirdR
             )}
           </div>
 
-          <div className="grid grid-cols-6 gap-1.5">
-            <button 
-              onClick={(e) => { e.stopPropagation(); if (onAddBreedingRecord) onAddBreedingRecord(pair.id); }} 
-              className="flex flex-col items-center justify-center py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 rounded-xl border border-emerald-500/30 transition-all active:scale-95 cursor-pointer"
-              title="Add Breeding Record for this pair"
-            >
-              <Plus size={13} className="text-emerald-400" />
-              <span className="text-[7px] font-black uppercase mt-1">+ Record</span>
-            </button>
+          <div className="grid grid-cols-5 gap-1.5">
             <button 
               onClick={(e) => { e.stopPropagation(); onNavigate('stats', '', { pairId: pair.id }); }} 
               className="flex flex-col items-center justify-center py-2 bg-secondary/5 hover:bg-secondary/10 text-secondary rounded-xl border border-secondary/10 transition-all active:scale-95"
@@ -5533,7 +5503,8 @@ function EntityStatsView({
   onEditBreeding,
   onDeleteBreeding,
   onEditTransaction,
-  onDeleteTransaction
+  onDeleteTransaction,
+  onAddBreedingRecord
 }: {
   filter: { birdId?: string, pairId?: string },
   birds: Bird[],
@@ -5547,7 +5518,8 @@ function EntityStatsView({
   onEditBreeding: (r: BreedingRecord) => void,
   onDeleteBreeding: (id: string) => void,
   onEditTransaction: (t: Transaction) => void,
-  onDeleteTransaction: (id: string) => void
+  onDeleteTransaction: (id: string) => void,
+  onAddBreedingRecord?: (pairId?: string) => void
 }) {
   const [activeTab, setActiveTab] = useState<'roi' | 'breeding'>('roi');
   const [searchQuery, setSearchQuery] = useState(``);
@@ -5662,7 +5634,21 @@ function EntityStatsView({
             <p className="text-[10px] text-gold-500 font-bold uppercase tracking-widest">Showing breeding and financial ROI</p>
           </div>
         </div>
-        <Button variant="secondary" className="px-4 py-2 text-[10px]" onClick={() => onBirdRef(``)}>Close Stats</Button>
+        <div className="flex items-center gap-2">
+          {onAddBreedingRecord && (
+            <button
+              onClick={() => {
+                const targetPairId = filter.pairId || pairs.find(p => p.maleId === filter.birdId || p.femaleId === filter.birdId)?.id || '';
+                onAddBreedingRecord(targetPairId);
+              }}
+              className="px-3.5 py-2 bg-gold-500 hover:bg-gold-400 text-black font-black uppercase text-xs tracking-wider rounded-xl transition-all shadow-md flex items-center gap-1.5 cursor-pointer active:scale-95 shrink-0"
+            >
+              <Plus size={14} />
+              <span>+ Add Record</span>
+            </button>
+          )}
+          <Button variant="secondary" className="px-4 py-2 text-[10px]" onClick={() => onBirdRef(``)}>Close Stats</Button>
+        </div>
       </div>
 
       <div className="flex bg-zinc-900 p-1 rounded-2xl border border-black-700 w-fit mx-auto">
@@ -5858,8 +5844,22 @@ function EntityStatsView({
           </div>
 
           <div className="flex flex-col space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="font-black text-white uppercase tracking-widest text-sm">Breeding Records</h3>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <h3 className="font-black text-white uppercase tracking-widest text-sm">Breeding Records</h3>
+                {onAddBreedingRecord && (
+                  <button
+                    onClick={() => {
+                      const targetPairId = filter.pairId || pairs.find(p => p.maleId === filter.birdId || p.femaleId === filter.birdId)?.id || '';
+                      onAddBreedingRecord(targetPairId);
+                    }}
+                    className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-black font-black uppercase text-[10px] tracking-wider rounded-xl transition-all shadow-md flex items-center gap-1 cursor-pointer active:scale-95 shrink-0"
+                  >
+                    <Plus size={13} />
+                    <span>+ Add Record</span>
+                  </button>
+                )}
+              </div>
               <div className="relative w-full sm:w-64">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30" size={16} />
                 <Input 
