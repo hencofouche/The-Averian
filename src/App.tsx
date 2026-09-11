@@ -3624,7 +3624,7 @@ export default function App() {
             onClose={handleCloseModal}
             title={`${(editingItem && (editingItem as any).id) ? 'Edit' : 'Add'} ${formNames[currentModalFormType] || 'Item'}`}
           >
-            {!editingItem?.id && !['birds', 'cages', 'pairs', 'breeding', 'tasks', 'financials', 'contacts'].includes(activeTab) && (
+            {!editingItem?.id && !modalFormTypeOverride && !['birds', 'cages', 'pairs', 'breeding', 'tasks', 'financials', 'contacts'].includes(activeTab) && (
               <div className="flex flex-wrap gap-2 pb-3 mb-4 border-b border-zinc-800">
                 {[
                   { id: 'birds', label: 'Bird' },
@@ -3714,6 +3714,7 @@ export default function App() {
                 cages={cages} 
                 onClose={handleCloseModal} 
                 userSettings={effectiveSettings ?? undefined} 
+                setPairs={setPairs}
                 onSave={(savedRecord) => {
                   setBreedingRecords(prev => {
                     const idx = prev.findIndex(r => r.id === savedRecord.id);
@@ -6468,7 +6469,7 @@ function BreedingRecordCard({ record, pair, male, female, birds, onEdit, onDelet
   );
 }
 
-function BreedingRecordForm({ user, initialData, pairs, birds, cages, onClose, userSettings, onSave }: { user: FirebaseUser, initialData?: BreedingRecord, pairs: Pair[], birds: Bird[], cages: Cage[], onClose: () => void, userSettings?: UserSettings, onSave?: (record: BreedingRecord) => void }) {
+function BreedingRecordForm({ user, initialData, pairs, birds, cages, onClose, userSettings, onSave, setPairs }: { user: FirebaseUser, initialData?: any, pairs: Pair[], birds: Bird[], cages: Cage[], onClose: () => void, userSettings?: UserSettings, onSave?: (record: BreedingRecord) => void, setPairs?: React.Dispatch<React.SetStateAction<Pair[]>> }) {
   const t = (text: string) => getTranslatedLabel(text, userSettings?.language || 'en');
   const [formData, setFormData] = useState<Partial<BreedingRecord>>(initialData || { 
     pairId: ``, 
@@ -6484,21 +6485,39 @@ function BreedingRecordForm({ user, initialData, pairs, birds, cages, onClose, u
     ringingDays: 7
   });
 
+  const [isCustomPairMode, setIsCustomPairMode] = useState(false);
+  const [customMaleId, setCustomMaleId] = useState('');
+  const [customFemaleId, setCustomFemaleId] = useState('');
+
   // Ensure pairId, incubationDays and ringingDays are populated correctly from initialData
   useEffect(() => {
     if (initialData) {
       const pId = initialData.pairId || '';
+      const bId = initialData.birdId || '';
       let incubation = initialData.incubationDays ?? 21;
       let ringing = initialData.ringingDays ?? 7;
+
       if (pId) {
         const selectedPair = pairs.find(p => p.id === pId);
         const female = birds.find(b => b.id === selectedPair?.femaleId);
         const male = birds.find(b => b.id === selectedPair?.maleId);
+        if (male) setCustomMaleId(male.id);
+        if (female) setCustomFemaleId(female.id);
         const speciesName = female?.species || male?.species || '';
         const presets = getSpeciesIncubation(speciesName);
         if (!initialData.incubationDays) incubation = presets.incubation;
         if (!initialData.ringingDays) ringing = presets.ring;
+      } else if (bId) {
+        const focalBird = birds.find(b => b.id === bId);
+        if (focalBird) {
+          if (focalBird.sex === 'Female') {
+            setCustomFemaleId(focalBird.id);
+          } else {
+            setCustomMaleId(focalBird.id);
+          }
+        }
       }
+
       setFormData(prev => ({
         ...prev,
         ...initialData,
@@ -6508,6 +6527,7 @@ function BreedingRecordForm({ user, initialData, pairs, birds, cages, onClose, u
       }));
     }
   }, [initialData, pairs, birds]);
+
   const [isSaving, setIsSaving] = useState(false);
   
   const handleAddEgg = () => {
@@ -6535,16 +6555,9 @@ function BreedingRecordForm({ user, initialData, pairs, birds, cages, onClose, u
     const newEggs = [...(formData.eggs || [])];
     newEggs[index] = { ...newEggs[index], ...updates };
     
-    // Auto calculate eggs stats based on statuses if user modifies array
-    let laid = formData.eggsLaid || 0;
-    let hatched = formData.eggsHatched || 0;
-    let weaned = formData.chicksWeaned || 0;
-    
-    // Check if we want to auto-sync. It might be better to just let user manually override or compute it.
-    // For simplicity we will compute it if they add eggs.
-    laid = newEggs.length;
-    hatched = newEggs.filter(e => ['Hatched', 'Died', 'Weaned'].includes(e.status)).length;
-    weaned = newEggs.filter(e => e.status === 'Weaned').length;
+    let laid = newEggs.length;
+    let hatched = newEggs.filter(e => ['Hatched', 'Died', 'Weaned'].includes(e.status)).length;
+    let weaned = newEggs.filter(e => e.status === 'Weaned').length;
 
     setFormData({ ...formData, eggs: newEggs, eggsLaid: laid, eggsHatched: hatched, chicksWeaned: weaned });
   };
@@ -6555,18 +6568,62 @@ function BreedingRecordForm({ user, initialData, pairs, birds, cages, onClose, u
       toast.error("Your subscription has expired! Please renew to add or edit entries.");
       return;
     }
-    if (!formData.pairId) {
-      toast.error(`Please select a pair.`);
-      return;
-    }
+
     if (isSaving) return;
     setIsSaving(true);
     
     const processSave = async () => {
       try {
+        let pairIdToUse = formData.pairId;
+
+        if (isCustomPairMode) {
+          if (!customMaleId || !customFemaleId) {
+            toast.error("Please select both a male and female bird for the breeding record.");
+            setIsSaving(false);
+            return;
+          }
+          if (customMaleId === customFemaleId) {
+            toast.error("Male and female birds cannot be the same bird.");
+            setIsSaving(false);
+            return;
+          }
+          
+          let existingPair = pairs.find(p => 
+            (p.maleId === customMaleId && p.femaleId === customFemaleId) || 
+            (p.maleId === customFemaleId && p.femaleId === customMaleId)
+          );
+          
+          if (existingPair) {
+            pairIdToUse = existingPair.id;
+          } else {
+            const newPairRef = doc(collection(db, 'pairs'));
+            const male = birds.find(b => b.id === customMaleId);
+            const female = birds.find(b => b.id === customFemaleId);
+            const newPairData: Pair = {
+              id: newPairRef.id,
+              maleId: customMaleId,
+              femaleId: customFemaleId,
+              cageId: male?.cageId || female?.cageId || '',
+              startDate: formData.startDate || format(new Date(), 'yyyy-MM-dd'),
+              status: 'Inactive',
+              uid: user.uid
+            };
+            await executeFirestoreWrite(setDoc(newPairRef, newPairData));
+            if (setPairs) setPairs(prev => [newPairData, ...prev]);
+            pairIdToUse = newPairRef.id;
+          }
+        } else {
+          if (!pairIdToUse) {
+            toast.error("Please select a pair.");
+            setIsSaving(false);
+            return;
+          }
+        }
+
         const eggsArr = formData.eggs || [];
         const data = sanitizeData({ 
           ...formData, 
+          pairId: pairIdToUse,
           ...(initialData?.id ? {} : { uid: user.uid }),
           eggsLaid: eggsArr.length,
           eggsHatched: eggsArr.filter(e => ['Hatched', 'Died', 'Weaned'].includes(e.status)).length,
@@ -6607,44 +6664,130 @@ function BreedingRecordForm({ user, initialData, pairs, birds, cages, onClose, u
         </div>
       )}
       <fieldset disabled={isExpired} className="space-y-4">
-        <div className="space-y-1">
-          <SearchableSelect 
-            label={t('Pair')}
-          value={formData.pairId || ``}
-          onChange={(val) => {
-            const selectedPair = pairs.find(p => p.id === val);
-            const female = birds.find(b => b.id === selectedPair?.femaleId);
-            const male = birds.find(b => b.id === selectedPair?.maleId);
-            const speciesName = female?.species || male?.species || ``;
-            const presets = getSpeciesIncubation(speciesName);
-            setFormData({ 
-              ...formData, 
-              pairId: val,
-              incubationDays: formData.incubationDays || presets.incubation,
-              ringingDays: formData.ringingDays || presets.ring
-            });
-          }}
-          options={[
-            { id: '', name: t('Select Pair') },
-            ...pairs.filter(p => p.maleId || p.femaleId).map(p => {
-              const male = birds.find(b => b.id === p.maleId);
-              const female = birds.find(b => b.id === p.femaleId);
-              const cageId = p.cageId || male?.cageId || female?.cageId;
-              const cage = cages.find(c => c.id === cageId);
-              const cageLabel = cage ? ` [Cage: ${cage.name}]` : '';
-              return { 
-                id: p.id, 
-                name: `${male?.name || 'Empty'} x ${female?.name || 'Empty'}${cageLabel}`,
-                details: `${p.status}${cage ? ` • Cage: ${cage.name}` : ''}`,
-                subText: `${male?.species || ''}${male?.subSpecies ? ` (${male.subSpecies})` : ''}${cage ? ` • Cage: ${cage.name}` : ''}`,
-                pair: p
-              };
-            })
-          ]}
-          birds={birds}
-          cages={cages}
-        />
-      </div>
+        <div className="space-y-3 bg-zinc-900/60 p-3.5 rounded-2xl border border-zinc-800">
+          <div className="flex items-center justify-between border-b border-zinc-800 pb-2">
+            <label className="text-[10px] font-black text-gold-500 uppercase tracking-widest flex items-center gap-1.5">
+              <Egg size={14} />
+              <span>{t('Breeding Pair & Mate')}</span>
+            </label>
+            <button
+              type="button"
+              onClick={() => setIsCustomPairMode(!isCustomPairMode)}
+              className="text-[9px] font-black text-emerald-400 hover:text-emerald-300 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 px-2.5 py-1 rounded-lg transition-all cursor-pointer uppercase tracking-wider flex items-center gap-1"
+            >
+              {isCustomPairMode ? "<- Select Linked Pair" : "+ Custom / Historic Mate"}
+            </button>
+          </div>
+
+          {!isCustomPairMode ? (
+            <SearchableSelect 
+              label={t('Pair')}
+              value={formData.pairId || ``}
+              onChange={(val) => {
+                const selectedPair = pairs.find(p => p.id === val);
+                const female = birds.find(b => b.id === selectedPair?.femaleId);
+                const male = birds.find(b => b.id === selectedPair?.maleId);
+                const speciesName = female?.species || male?.species || ``;
+                const presets = getSpeciesIncubation(speciesName);
+                setFormData({ 
+                  ...formData, 
+                  pairId: val,
+                  incubationDays: formData.incubationDays || presets.incubation,
+                  ringingDays: formData.ringingDays || presets.ring
+                });
+              }}
+              options={[
+                { id: '', name: t('Select Pair') },
+                ...pairs.filter(p => p.maleId || p.femaleId).map(p => {
+                  const male = birds.find(b => b.id === p.maleId);
+                  const female = birds.find(b => b.id === p.femaleId);
+                  const cageId = p.cageId || male?.cageId || female?.cageId;
+                  const cage = cages.find(c => c.id === cageId);
+                  const cageLabel = cage ? ` [Cage: ${cage.name}]` : '';
+                  return { 
+                    id: p.id, 
+                    name: `${male?.name || 'Empty'} x ${female?.name || 'Empty'}${cageLabel}`,
+                    details: `${p.status}${cage ? ` • Cage: ${cage.name}` : ''}`,
+                    subText: `${male?.species || ''}${male?.subSpecies ? ` (${male.subSpecies})` : ''}${cage ? ` • Cage: ${cage.name}` : ''}`,
+                    pair: p
+                  };
+                })
+              ]}
+              birds={birds}
+              cages={cages}
+            />
+          ) : (
+            <div className="space-y-3 pt-1">
+              <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">
+                Select male and female birds directly for an unlinked or historic breeding record:
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <SearchableSelect 
+                  label={t('Male Bird')}
+                  value={customMaleId}
+                  onChange={(val) => {
+                    setCustomMaleId(val);
+                    const male = birds.find(b => b.id === val);
+                    const female = birds.find(b => b.id === customFemaleId);
+                    const presets = getSpeciesIncubation(male?.species || female?.species || '');
+                    const existingPair = pairs.find(p => (p.maleId === val && p.femaleId === customFemaleId) || (p.maleId === customFemaleId && p.femaleId === val));
+                    setFormData(prev => ({ 
+                      ...prev, 
+                      pairId: existingPair ? existingPair.id : '',
+                      incubationDays: prev.incubationDays || presets.incubation,
+                      ringingDays: prev.ringingDays || presets.ring
+                    }));
+                  }}
+                  options={[
+                    { id: '', name: t('Select Male Bird') },
+                    ...birds.filter(b => b.sex === 'Male' || b.sex === 'Unknown').map(b => {
+                      const cage = cages.find(c => c.id === b.cageId);
+                      return {
+                        id: b.id,
+                        name: `${b.name} (${b.species}${b.ringNumber ? ` - #${b.ringNumber}` : ''})${cage ? ` [Cage: ${cage.name}]` : ''}`,
+                        details: `${b.sex}${cage ? ` • Cage: ${cage.name}` : ''}`,
+                        subText: `${b.species}${b.ringNumber ? ` • Ring: ${b.ringNumber}` : ''}`
+                      };
+                    })
+                  ]}
+                  birds={birds}
+                  cages={cages}
+                />
+                <SearchableSelect 
+                  label={t('Female Bird')}
+                  value={customFemaleId}
+                  onChange={(val) => {
+                    setCustomFemaleId(val);
+                    const male = birds.find(b => b.id === customMaleId);
+                    const female = birds.find(b => b.id === val);
+                    const presets = getSpeciesIncubation(female?.species || male?.species || '');
+                    const existingPair = pairs.find(p => (p.maleId === customMaleId && p.femaleId === val) || (p.maleId === val && p.femaleId === customMaleId));
+                    setFormData(prev => ({ 
+                      ...prev, 
+                      pairId: existingPair ? existingPair.id : '',
+                      incubationDays: prev.incubationDays || presets.incubation,
+                      ringingDays: prev.ringingDays || presets.ring
+                    }));
+                  }}
+                  options={[
+                    { id: '', name: t('Select Female Bird') },
+                    ...birds.filter(b => b.sex === 'Female' || b.sex === 'Unknown').map(b => {
+                      const cage = cages.find(c => c.id === b.cageId);
+                      return {
+                        id: b.id,
+                        name: `${b.name} (${b.species}${b.ringNumber ? ` - #${b.ringNumber}` : ''})${cage ? ` [Cage: ${cage.name}]` : ''}`,
+                        details: `${b.sex}${cage ? ` • Cage: ${cage.name}` : ''}`,
+                        subText: `${b.species}${b.ringNumber ? ` • Ring: ${b.ringNumber}` : ''}`
+                      };
+                    })
+                  ]}
+                  birds={birds}
+                  cages={cages}
+                />
+              </div>
+            </div>
+          )}
+        </div>
       
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1">
