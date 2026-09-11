@@ -543,11 +543,28 @@ export const SearchableSelect = ({
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState(``);
   
-  const filteredOptions = options.filter(opt => 
-    opt.name.toLowerCase().includes(search.toLowerCase()) ||
-    (opt.details?.toLowerCase().includes(search.toLowerCase())) ||
-    (opt.subText?.toLowerCase().includes(search.toLowerCase()))
-  );
+  const filteredOptions = options.filter(opt => {
+    const searchLower = search.toLowerCase();
+    if (!searchLower) return true;
+
+    let extraText = '';
+    if (opt.pair) {
+      const male = birds?.find(b => b.id === opt.pair.maleId);
+      const female = birds?.find(b => b.id === opt.pair.femaleId);
+      const cageId = opt.pair.cageId || male?.cageId || female?.cageId;
+      const cage = cages?.find(c => c.id === cageId);
+      if (cage) extraText += ` ${cage.name} ${cage.type || ''} ${cage.location || ''}`;
+      if (male) extraText += ` ${male.name} ${male.species} ${male.ringNumber || ''}`;
+      if (female) extraText += ` ${female.name} ${female.species} ${female.ringNumber || ''}`;
+    }
+
+    return (
+      opt.name.toLowerCase().includes(searchLower) ||
+      (opt.details?.toLowerCase().includes(searchLower) ?? false) ||
+      (opt.subText?.toLowerCase().includes(searchLower) ?? false) ||
+      (extraText.toLowerCase().includes(searchLower))
+    );
+  });
 
   const showAdd = onAdd && search && !options.some(opt => opt.name.toLowerCase() === search.toLowerCase());
 
@@ -3048,6 +3065,7 @@ export default function App() {
                             bird={bird} 
                             cage={cages.find(c => c.id === bird.cageId)}
                             birds={birds}
+                            pairs={pairs}
                             cages={cages}
                             viewMode={viewMode}
                             currency={userSettings?.currency}
@@ -3056,6 +3074,11 @@ export default function App() {
                             onNavigate={handleNavigate}
                             onEdit={() => { setEditingItem(bird); setIsModalOpen(true); }}
                             user={user}
+                            onAddBreedingRecord={(pairId) => {
+                              setModalFormTypeOverride('breeding');
+                              setEditingItem(pairId ? ({ pairId } as any) : null);
+                              setIsModalOpen(true);
+                            }}
                             onDelete={() => setDeleteConfirmation({ 
                               title: 'Delete Bird', 
                               message: `Are you sure you want to delete "${bird.name}"? This action cannot be undone.`,
@@ -3183,6 +3206,11 @@ export default function App() {
                       {(filteredItems as Pair[]).length > 0 ? (
                         (filteredItems as Pair[]).map(pair => (
                           <PairCard key={pair.id} pair={pair} male={birds.find(b => b.id === pair.maleId)} female={birds.find(b => b.id === pair.femaleId)} cages={cages} birds={birds} records={breedingRecords} currency={userSettings?.currency} viewMode={viewMode} onBirdRef={handleBirdRef} onNavigate={handleNavigate} userSettings={effectiveSettings}
+                            onAddBreedingRecord={(pairId) => {
+                              setModalFormTypeOverride('breeding');
+                              setEditingItem({ pairId } as any);
+                              setIsModalOpen(true);
+                            }}
                             onEdit={() => { setEditingItem(pair); setIsModalOpen(true); }}
                             onDelete={() => setDeleteConfirmation({ 
                               title: 'Delete Pair', 
@@ -4418,7 +4446,7 @@ function PedigreeFullView({ birdId, birds, cages, onBirdRef, onBack, userSetting
   );
 }
 
-function BirdCard({ bird, cage, birds, cages, viewMode = 'grid-large', currency, onBirdRef, onNavigate, onEdit, onDelete, userSettings, user }: { bird: Bird, cage?: Cage, birds: Bird[], cages: Cage[], viewMode?: 'grid-large' | 'list', currency?: string, onBirdRef: (name: string) => void, onNavigate: (tab: string, query?: string, filter?: any) => void, onEdit: () => void, onDelete: () => void, userSettings?: UserSettings, user: FirebaseUser | null }) {
+function BirdCard({ bird, cage, birds, pairs = [], cages, viewMode = 'grid-large', currency, onBirdRef, onNavigate, onEdit, onDelete, userSettings, user, onAddBreedingRecord }: { bird: Bird, cage?: Cage, birds: Bird[], pairs?: Pair[], cages: Cage[], viewMode?: 'grid-large' | 'list', currency?: string, onBirdRef: (name: string) => void, onNavigate: (tab: string, query?: string, filter?: any) => void, onEdit: () => void, onDelete: () => void, userSettings?: UserSettings, user: FirebaseUser | null, onAddBreedingRecord?: (pairId?: string) => void }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [showGallery, setShowGallery] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
@@ -4650,6 +4678,23 @@ function BirdCard({ bird, cage, birds, cages, viewMode = 'grid-large', currency,
                 className="overflow-hidden"
               >
                 <div className="flex flex-wrap items-center gap-2 pt-2">
+                  <button 
+                    onClick={(e) => { 
+                      e.stopPropagation(); 
+                      const pair = pairs.find(p => p.maleId === bird.id || p.femaleId === bird.id);
+                      if (pair) {
+                        if (onAddBreedingRecord) onAddBreedingRecord(pair.id);
+                      } else {
+                        toast.info(`No active pair found for ${bird.name}. Opening Breeding Record form.`);
+                        if (onAddBreedingRecord) onAddBreedingRecord('');
+                      }
+                    }} 
+                    className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 rounded-lg transition-all border border-emerald-500/30 min-w-[90px] cursor-pointer"
+                    title="Add Breeding Record for this bird"
+                  >
+                    <Plus size={13} className="text-emerald-400" />
+                    <span className="text-[9px] font-black uppercase tracking-widest">+ Record</span>
+                  </button>
                   <button 
                     onClick={(e) => { e.stopPropagation(); onNavigate('stats', '', { birdId: bird.id }); }} 
                     className="flex-1 p-2 bg-secondary/10 border border-secondary/20 rounded-lg text-[10px] text-secondary font-black uppercase tracking-widest hover:bg-secondary/20 transition-colors flex items-center justify-center gap-2 min-w-[90px]"
@@ -4939,7 +4984,7 @@ function CageCard({ cage, birds, cages, viewMode = 'grid-large', onBirdRef, onNa
   );
 }
 
-function PairCard({ pair, male, female, cages, birds, records, currency, onBirdRef, onNavigate, onEdit, onDelete, userSettings, viewMode = 'grid-large' }: { pair: Pair, male?: Bird, female?: Bird, cages: Cage[], birds: Bird[], records?: BreedingRecord[], currency?: string, onBirdRef: (name: string) => void, onNavigate: (tab: string, query?: string, filter?: any) => void, onEdit: () => void, onDelete: () => void, userSettings?: UserSettings, viewMode?: 'grid-large' | 'list' }) {
+function PairCard({ pair, male, female, cages, birds, records, currency, onBirdRef, onNavigate, onEdit, onDelete, userSettings, viewMode = 'grid-large', onAddBreedingRecord }: { pair: Pair, male?: Bird, female?: Bird, cages: Cage[], birds: Bird[], records?: BreedingRecord[], currency?: string, onBirdRef: (name: string) => void, onNavigate: (tab: string, query?: string, filter?: any) => void, onEdit: () => void, onDelete: () => void, userSettings?: UserSettings, viewMode?: 'grid-large' | 'list', onAddBreedingRecord?: (pairId: string) => void }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [isPassportOpen, setIsPassportOpen] = useState(false);
@@ -5039,14 +5084,24 @@ function PairCard({ pair, male, female, cages, birds, records, currency, onBirdR
           </div>
         </div>
         
-        <div className="flex flex-col items-end gap-2 ml-3 shrink-0">
+        <div className="flex flex-col items-end gap-1.5 ml-3 shrink-0">
           <div className="flex items-center gap-1 text-[9px] font-black uppercase tracking-widest text-gold-500">
             <Home size={10} />
             <span className="max-w-[80px] truncate">{cage?.name || 'Unassigned'}</span>
           </div>
-          <Badge variant={pair.status === 'Active' ? 'success' : 'neutral'} className="text-[8px] px-2 py-0.5">
-            {pair.status}
-          </Badge>
+          <div className="flex items-center gap-1.5">
+            <Badge variant={pair.status === 'Active' ? 'success' : 'neutral'} className="text-[8px] px-2 py-0.5">
+              {pair.status}
+            </Badge>
+            <button
+              onClick={(e) => { e.stopPropagation(); if (onAddBreedingRecord) onAddBreedingRecord(pair.id); }}
+              className="flex items-center gap-1 px-2 py-0.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 rounded-lg border border-emerald-500/30 text-[8px] font-black uppercase tracking-wider transition-all active:scale-95 cursor-pointer"
+              title="Add Breeding Record for this pair"
+            >
+              <Plus size={9} />
+              <span>+ Record</span>
+            </button>
+          </div>
         </div>
       </Card>
     );
@@ -5117,7 +5172,15 @@ function PairCard({ pair, male, female, cages, birds, records, currency, onBirdR
             )}
           </div>
 
-          <div className="grid grid-cols-5 gap-1.5">
+          <div className="grid grid-cols-6 gap-1.5">
+            <button 
+              onClick={(e) => { e.stopPropagation(); if (onAddBreedingRecord) onAddBreedingRecord(pair.id); }} 
+              className="flex flex-col items-center justify-center py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 rounded-xl border border-emerald-500/30 transition-all active:scale-95 cursor-pointer"
+              title="Add Breeding Record for this pair"
+            >
+              <Plus size={13} className="text-emerald-400" />
+              <span className="text-[7px] font-black uppercase mt-1">+ Record</span>
+            </button>
             <button 
               onClick={(e) => { e.stopPropagation(); onNavigate('stats', '', { pairId: pair.id }); }} 
               className="flex flex-col items-center justify-center py-2 bg-secondary/5 hover:bg-secondary/10 text-secondary rounded-xl border border-secondary/10 transition-all active:scale-95"
@@ -6421,16 +6484,30 @@ function BreedingRecordForm({ user, initialData, pairs, birds, cages, onClose, u
     ringingDays: 7
   });
 
-  // Ensure incubationDays and ringingDays have defaults if not set in initialData
+  // Ensure pairId, incubationDays and ringingDays are populated correctly from initialData
   useEffect(() => {
     if (initialData) {
+      const pId = initialData.pairId || '';
+      let incubation = initialData.incubationDays ?? 21;
+      let ringing = initialData.ringingDays ?? 7;
+      if (pId) {
+        const selectedPair = pairs.find(p => p.id === pId);
+        const female = birds.find(b => b.id === selectedPair?.femaleId);
+        const male = birds.find(b => b.id === selectedPair?.maleId);
+        const speciesName = female?.species || male?.species || '';
+        const presets = getSpeciesIncubation(speciesName);
+        if (!initialData.incubationDays) incubation = presets.incubation;
+        if (!initialData.ringingDays) ringing = presets.ring;
+      }
       setFormData(prev => ({
         ...prev,
-        incubationDays: initialData.incubationDays ?? 21,
-        ringingDays: initialData.ringingDays ?? 7
+        ...initialData,
+        pairId: pId || prev.pairId || '',
+        incubationDays: incubation,
+        ringingDays: ringing
       }));
     }
-  }, [initialData]);
+  }, [initialData, pairs, birds]);
   const [isSaving, setIsSaving] = useState(false);
   
   const handleAddEgg = () => {
@@ -6552,11 +6629,14 @@ function BreedingRecordForm({ user, initialData, pairs, birds, cages, onClose, u
             ...pairs.filter(p => p.maleId || p.femaleId).map(p => {
               const male = birds.find(b => b.id === p.maleId);
               const female = birds.find(b => b.id === p.femaleId);
+              const cageId = p.cageId || male?.cageId || female?.cageId;
+              const cage = cages.find(c => c.id === cageId);
+              const cageLabel = cage ? ` [Cage: ${cage.name}]` : '';
               return { 
                 id: p.id, 
-                name: `${male?.name || 'Empty'} x ${female?.name || 'Empty'}`,
-                details: p.status,
-                subText: `${male?.species || ''}${male?.subSpecies ? ' (${male.subSpecies})' : ''}`,
+                name: `${male?.name || 'Empty'} x ${female?.name || 'Empty'}${cageLabel}`,
+                details: `${p.status}${cage ? ` • Cage: ${cage.name}` : ''}`,
+                subText: `${male?.species || ''}${male?.subSpecies ? ` (${male.subSpecies})` : ''}${cage ? ` • Cage: ${cage.name}` : ''}`,
                 pair: p
               };
             })
