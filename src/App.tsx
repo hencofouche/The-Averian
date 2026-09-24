@@ -1,8 +1,6 @@
-import { ShareBirdModal, SharePairModal } from './components/ShareModals';
-import { SettingsView } from './components/SettingsView';
 import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { format } from 'date-fns';
+import { format, startOfDay, startOfWeek, startOfMonth, startOfYear, endOfMonth, endOfWeek, addDays, addMonths, isSameMonth, subDays, subWeeks, subMonths, subYears, isWithinInterval, parseISO } from 'date-fns';
 import { Toaster, toast } from 'sonner';
 import { 
   Plus, Search, Bird as BirdIcon, Home, Heart, CheckSquare, 
@@ -14,26 +12,30 @@ import {
   Mail, MessageCircle, Video, Shield, Wifi, WifiOff, Flame, ShoppingBag, Store, BookOpen, Sparkles, FileSpreadsheet,
   ListPlus, Type, Hash, Sliders
 } from 'lucide-react';
-import GeneticsCalculatorOriginal from './components/GeneticsCalculator';
-const GeneticsCalculator = React.memo(GeneticsCalculatorOriginal);
-import { ContactsView as ContactsViewOriginal } from './components/ContactsView';
-const ContactsView = React.memo(ContactsViewOriginal);
-import { AdminDiagnosticsView } from './components/AdminDiagnosticsView';
-import { AdminDashboardView } from './components/AdminDashboardView';
-import { MarketplaceView } from './components/MarketplaceView';
-import { WikiView } from './components/WikiView';
-import { SmartCandlingModal, computeEggTimeline, getSpeciesIncubation, SPECIES_INCUBATION_DATA } from './components/SmartCandlingModal';
-import { calculatePairRoi, getPairOffspring } from './lib/pair-roi';
-import { DigitalTransferPassportModal } from './components/DigitalTransferPassportModal';
-import { ComingSoonView } from './components/ComingSoonView';
-import { AdminPageTestingBanner } from './components/AdminPageTestingBanner';
-import { AdminComingSoonModal } from './components/AdminComingSoonModal';
-// Google Workspace native integrations removed to prevent trust-violating security warnings
 import { 
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
+  BarChart, Bar, Cell, Legend, PieChart, Pie, AreaChart, Area
+} from 'recharts';
+import { 
+  auth, db, storage, loginWithGoogle, logout, handleFirestoreError, testConnection, setFirestoreNetworkState
+} from './firebase';
+import { 
+  onAuthStateChanged, User as FirebaseUser 
+} from 'firebase/auth';
+import { 
+  collection, onSnapshot, query, where, addDoc, 
+  updateDoc, deleteDoc, doc, getDocs, orderBy, setDoc, getDocFromServer, writeBatch, limit
+} from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
+import { 
+  Bird, Cage, Pair, Task, Transaction, OperationType, BreedingRecord, UserSettings, Species, SubSpecies, Mutation, SharedItem, Contact, BirdDocument, Egg as EggType,
   SellerProfile, MarketplaceListing, MarketplaceReview, 
   AppPageId, AppComingSoonSettings, ComingSoonPageConfig,
   CustomBirdFieldDefinition
 } from './types';
+import { cn, generateColorPalette } from './lib/utils';
+import ColorWheel from '@uiw/react-color-wheel';
+import { hexToHsva, hsvaToHex } from '@uiw/color-convert';
 import { QRCodeSVG } from 'qrcode.react';
 import { SubscriptionGate } from "./components/SubscriptionGate";
 import { Button, Input, Select, Card, Textarea, BirdCompactInfo, Badge } from "./components/ui";
@@ -49,6 +51,24 @@ import { PublicLanding } from './components/PublicLanding';
 import { useIncubationNotifications } from './hooks/useIncubationNotifications';
 import { IncubationAlertsModal } from './components/IncubationAlertsModal';
 import { CurrencyConverterRates } from './components/CurrencyConverterRates';
+import { ShareBirdModal, SharePairModal } from './components/ShareModals';
+import { SettingsView } from './components/SettingsView';
+import GeneticsCalculatorOriginal from './components/GeneticsCalculator';
+import { ContactsView as ContactsViewOriginal } from './components/ContactsView';
+import { AdminDiagnosticsView } from './components/AdminDiagnosticsView';
+import { AdminDashboardView } from './components/AdminDashboardView';
+import { MarketplaceView } from './components/MarketplaceView';
+import { WikiView } from './components/WikiView';
+import { SmartCandlingModal, computeEggTimeline, getSpeciesIncubation, SPECIES_INCUBATION_DATA } from './components/SmartCandlingModal';
+import { calculatePairRoi, getPairOffspring } from './lib/pair-roi';
+import { DigitalTransferPassportModal } from './components/DigitalTransferPassportModal';
+import { ComingSoonView } from './components/ComingSoonView';
+import { AdminPageTestingBanner } from './components/AdminPageTestingBanner';
+import { AdminComingSoonModal } from './components/AdminComingSoonModal';
+import { compressAndUploadImage, deleteStorageFileIfApplicable, ensurePassportPayloadFitsFirestore } from "./lib/image-utils";
+
+const GeneticsCalculator = React.memo(GeneticsCalculatorOriginal);
+const ContactsView = React.memo(ContactsViewOriginal);
 
 function ImageGallery({ imageUrls, initialIndex, onClose }: { imageUrls: string[], initialIndex: number, onClose: () => void }) {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
@@ -161,29 +181,6 @@ function ImageGallery({ imageUrls, initialIndex, onClose }: { imageUrls: string[
   );
 }
 
-import { 
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
-  BarChart, Bar, Cell, Legend, PieChart, Pie, AreaChart, Area
-} from 'recharts';
-import { 
-  auth, db, storage, loginWithGoogle, logout, handleFirestoreError, testConnection, setFirestoreNetworkState
-} from './firebase';
-import { 
-  onAuthStateChanged, User as FirebaseUser 
-} from 'firebase/auth';
-import { 
-  collection, onSnapshot, query, where, addDoc, 
-  updateDoc, deleteDoc, doc, getDocs, orderBy, setDoc, getDocFromServer, writeBatch, limit
-} from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
-import { 
-  Bird, Cage, Pair, Task, Transaction, OperationType, BreedingRecord, UserSettings, Species, SubSpecies, Mutation, SharedItem, Contact, BirdDocument, Egg as EggType
-} from './types';
-import { cn, generateColorPalette } from './lib/utils';
-import ColorWheel from '@uiw/react-color-wheel';
-import { hexToHsva, hsvaToHex } from '@uiw/color-convert';
-import { startOfDay, startOfWeek, startOfMonth, startOfYear, endOfMonth, endOfWeek, addDays, addMonths, isSameMonth, subDays, subWeeks, subMonths, subYears, isWithinInterval, parseISO } from 'date-fns';
-
 // --- Helpers ---
 const ADMIN_EMAILS_LIST = [
   `clashfouche@gmail.com`,
@@ -266,9 +263,6 @@ const generateGoogleCalendarUrl = (text: string, date: string, details: string =
   
   return `https://www.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(text)}&dates=${formatDate(startDate)}/${formatDate(endDate)}&details=${encodeURIComponent(details)}`;
 };
-
-
-import { compressAndUploadImage, deleteStorageFileIfApplicable, ensurePassportPayloadFitsFirestore } from "./lib/image-utils";
 
 async function executeFirestoreWrite(writePromise: Promise<any>, timeoutMs: number = 200) {
   try {
@@ -1547,9 +1541,9 @@ export default function App() {
           const cageLabel = cage ? cage.name : 'unassigned';
           const bornLabel = b.birthDate || 'unknown';
           
-          return b.name.toLowerCase().includes(query) || 
-                 b.id.toLowerCase().includes(query) ||
-                 b.species.toLowerCase().includes(query) ||
+          return (b.name || '').toLowerCase().includes(query) || 
+                 (b.id || '').toLowerCase().includes(query) ||
+                 (b.species || '').toLowerCase().includes(query) ||
                  b.subSpecies?.toLowerCase().includes(query) ||
                  (b.mutations || []).some(m => m.toLowerCase().includes(query)) ||
                  (b.splitMutations || []).some(m => m.toLowerCase().includes(query)) ||
@@ -1568,7 +1562,7 @@ export default function App() {
           const sexDiff = (sexOrder[a.sex] ?? 2) - (sexOrder[b.sex] ?? 2);
           if (sexDiff !== 0) return sexDiff;
           
-          return a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' });
+          return (a.name || '').localeCompare(b.name || '', undefined, { numeric: true, sensitivity: 'base' });
         });
       case 'cages':
         return cages
@@ -1590,9 +1584,9 @@ export default function App() {
             // Also check if any bird in this cage matches the query (only for 3+ chars)
             return birds.some(b => 
               b.cageId === c.id && (
-                b.name.toLowerCase().includes(query) ||
-                b.id.toLowerCase().includes(query) ||
-                b.species.toLowerCase().includes(query) ||
+                (b.name || '').toLowerCase().includes(query) ||
+                (b.id || '').toLowerCase().includes(query) ||
+                (b.species || '').toLowerCase().includes(query) ||
                 b.subSpecies?.toLowerCase().includes(query) ||
                 (b.mutations || []).some(m => m.toLowerCase().includes(query)) ||
                 (b.splitMutations || []).some(m => m.toLowerCase().includes(query))
@@ -1611,9 +1605,9 @@ export default function App() {
           const cageLabel = cage ? cage.name : 'unassigned';
 
           const birdMatches = (b: Bird) => 
-            b.name.toLowerCase().includes(query) ||
-            b.id.toLowerCase().includes(query) ||
-            b.species.toLowerCase().includes(query) ||
+            (b.name || '').toLowerCase().includes(query) ||
+            (b.id || '').toLowerCase().includes(query) ||
+            (b.species || '').toLowerCase().includes(query) ||
             b.subSpecies?.toLowerCase().includes(query) ||
             (b.mutations || []).some(m => m.toLowerCase().includes(query)) ||
             (b.splitMutations || []).some(m => m.toLowerCase().includes(query)) ||
@@ -1650,9 +1644,9 @@ export default function App() {
           const cage = cages.find(c => c.id === pair?.cageId) || cages.find(c => c.id === male?.cageId) || cages.find(c => c.id === female?.cageId);
           
           const birdMatches = (b: Bird) => 
-            b.name.toLowerCase().includes(query) ||
-            b.id.toLowerCase().includes(query) ||
-            b.species.toLowerCase().includes(query) ||
+            (b.name || '').toLowerCase().includes(query) ||
+            (b.id || '').toLowerCase().includes(query) ||
+            (b.species || '').toLowerCase().includes(query) ||
             b.subSpecies?.toLowerCase().includes(query) ||
             (b.mutations || []).some(m => m.toLowerCase().includes(query)) ||
             (b.splitMutations || []).some(m => m.toLowerCase().includes(query)) ||
@@ -4601,7 +4595,7 @@ function BirdCard({ bird, cage, birds, pairs = [], cages, viewMode = 'grid-large
         <div className={cn("flex items-start justify-between gap-2", effectiveViewMode === 'list' ? "w-full" : "relative")}>
           <div className="space-y-1 min-w-0 flex-1">
             <h3 className={cn("font-black text-white flex items-center gap-2 tracking-tight text-lg")}>
-              <span className="truncate">{bird.name}</span>
+              <span className="truncate">{bird.name || 'Unnamed Bird'}</span>
               <Badge 
                 variant={bird.sex === 'Male' ? 'male' : bird.sex === 'Female' ? 'female' : 'neutral'} 
                 className="shrink-0"
@@ -4612,7 +4606,7 @@ function BirdCard({ bird, cage, birds, pairs = [], cages, viewMode = 'grid-large
             
             {/* 2. Species & Sub-species */}
             <p className="text-[9px] sm:text-[10px] text-gold-500 font-black uppercase tracking-widest truncate">
-              {bird.species}
+              {bird.species || 'Unspecified Species'}
               {bird.subSpecies && <span className="text-white mx-1">*</span>}
               {bird.subSpecies && <span className="text-white">{bird.subSpecies}</span>}
             </p>
@@ -8856,17 +8850,25 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
       toast.error("Your subscription has expired! Please renew to add or edit entries.");
       return;
     }
-    if (!formData.name?.trim()) {
-      toast.error(`Please enter a name or ID for the bird.`);
-      return;
-    }
     if (isUploading || isSaving) return;
     setIsSaving(true);
     
     const processSave = async () => {
       try {
+        let birdName = formData.name?.trim();
+        if (!birdName) {
+          const baseName = formData.species?.trim() ? `Unnamed ${formData.species.trim()}` : 'Unnamed Bird';
+          const existingMatches = birds.filter(b => b.name === baseName || b.name.startsWith(`${baseName} #`));
+          birdName = existingMatches.length > 0 ? `${baseName} #${existingMatches.length + 1}` : baseName;
+        }
+
         // Sanitize data: remove undefined fields
-        const data = sanitizeData(formData);
+        const data = sanitizeData({
+          ...formData,
+          name: birdName,
+          species: formData.species || '',
+          sex: formData.sex || 'Unknown',
+        });
 
         if (!initialData?.id) {
           data.uid = user.uid;
@@ -8958,7 +8960,7 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
             category: 'Bird Purchase',
             amount: formData.purchasePrice,
             date: formData.purchaseDate || format(new Date(), 'yyyy-MM-dd'),
-            description: `Purchase of bird: ${formData.name}`,
+            description: `Purchase of bird: ${data.name}`,
             birdId: birdId,
             contactId: formData.boughtFromId || ``,
             uid: user.uid
@@ -8972,7 +8974,7 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
             category: 'Bird Sale',
             amount: salePrice,
             date: format(new Date(), 'yyyy-MM-dd'),
-            description: `Sale of bird: ${formData.name}`,
+            description: `Sale of bird: ${data.name}`,
             birdId: birdId,
             contactId: buyerId || ``,
             uid: user.uid
@@ -9013,7 +9015,6 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
         <div className="col-span-6 space-y-1">
           <label className="text-[10px] font-black text-white uppercase tracking-widest ml-1">{t('Ring / Name')}</label>
           <Input 
-            required
             value={formData.name}
             onChange={e => setFormData({ ...formData, name: e.target.value.toUpperCase() })}
             placeholder="E.G. RING-123"
