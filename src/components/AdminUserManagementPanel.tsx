@@ -5,8 +5,7 @@ import {
   Sliders, UserCheck, CheckCircle2, ChevronRight, Eye, 
   FileJson, Sparkles, Feather, Home, Heart, FileSpreadsheet, 
   DollarSign, CheckSquare, Layers, Lock, Unlock, Zap, X, Info,
-  ShieldAlert, Mail, AlertTriangle, UserX, Trash2, HelpCircle,
-  CreditCard
+  ShieldAlert, Mail, AlertTriangle, UserX, Trash2, HelpCircle
 } from 'lucide-react';
 import { 
   UserSettings, AppUserAccount, Bird, Cage, Pair, BreedingRecord, 
@@ -95,70 +94,6 @@ export function AdminUserManagementPanel({
   const [customDate, setCustomDate] = useState(format(addYears(new Date(), 1), 'yyyy-MM-dd'));
   const [customPlanName, setCustomPlanName] = useState('Annual Breeder Pro');
   const [isUpdatingSub, setIsUpdatingSub] = useState(false);
-
-  // Yoco Payments Recovery State
-  const [showYocoPanel, setShowYocoPanel] = useState(false);
-  const [recentYocoCheckouts, setRecentYocoCheckouts] = useState<any[]>([]);
-  const [isLoadingYocoCheckouts, setIsLoadingYocoCheckouts] = useState(false);
-  const [yocoLookupQuery, setYocoLookupQuery] = useState('');
-  const [isVerifyingYoco, setIsVerifyingYoco] = useState(false);
-
-  const fetchYocoCheckouts = async () => {
-    setIsLoadingYocoCheckouts(true);
-    try {
-      const res = await fetch('/api/yoco/recent-checkouts');
-      const data = await res.json();
-      if (data && Array.isArray(data.checkouts)) {
-        setRecentYocoCheckouts(data.checkouts);
-      }
-    } catch (err: any) {
-      console.warn("Failed to fetch Yoco checkouts:", err);
-    } finally {
-      setIsLoadingYocoCheckouts(false);
-    }
-  };
-
-  const handleVerifyAndActivateYoco = async (checkoutIdOrEmail: string, specificTargetUser?: UserWithDetails) => {
-    setIsVerifyingYoco(true);
-    const toastId = toast.loading(`Verifying payment on Yoco for ${checkoutIdOrEmail}...`);
-    try {
-      const isCheckoutRef = checkoutIdOrEmail.startsWith('ch_');
-      const res = await fetch('/api/verify-checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          checkoutId: isCheckoutRef ? checkoutIdOrEmail.trim() : undefined,
-          userEmail: !isCheckoutRef ? checkoutIdOrEmail.trim() : undefined,
-          userId: specificTargetUser?.uid
-        })
-      });
-      const data = await res.json();
-      if (!res.ok || !data.verified) {
-        toast.error(data.error || `Payment status is ${data.status || 'unverified'}. If charged, use manual +1 Year extension below.`, { id: toastId, duration: 6000 });
-        setIsVerifyingYoco(false);
-        return;
-      }
-
-      // Find user to update
-      const targetUid = data.userId || specificTargetUser?.uid;
-      const targetEmail = (data.userEmail || specificTargetUser?.email || '').toLowerCase().trim();
-      const matchedUser = specificTargetUser || usersList.find(u => (targetUid && u.uid === targetUid) || (targetEmail && (u.email || '').toLowerCase().trim() === targetEmail));
-
-      if (!matchedUser) {
-        toast.error(`Payment is verified on Yoco (${data.checkoutId}), but no user with email '${targetEmail || targetUid}' was found in database.`, { id: toastId, duration: 8000 });
-        setIsVerifyingYoco(false);
-        return;
-      }
-
-      await handleGrantSubscription(matchedUser, '1year', undefined, 'Annual Breeder Pro (Yoco Verified)');
-      toast.success(`Successfully activated 1-Year Pro subscription for ${matchedUser.email || matchedUser.displayName}!`, { id: toastId });
-      fetchYocoCheckouts();
-    } catch (e: any) {
-      toast.error("Verification error: " + e.message, { id: toastId });
-    } finally {
-      setIsVerifyingYoco(false);
-    }
-  };
 
   // Ban / Suspend Modal State
   const [showBanModal, setShowBanModal] = useState(false);
@@ -599,6 +534,40 @@ export function AdminUserManagementPanel({
     }
   };
 
+  // Yoco Payments & Recovery Modal State
+  const [showYocoModal, setShowYocoModal] = useState(false);
+  const [yocoQueryInput, setYocoQueryInput] = useState('');
+  const [isQueryingYoco, setIsQueryingYoco] = useState(false);
+  const [yocoQueryResult, setYocoQueryResult] = useState<any>(null);
+
+  const handleQueryYoco = async () => {
+    if (!yocoQueryInput.trim()) {
+      toast.error('Please enter a Yoco Checkout ID (ch_...) or user email');
+      return;
+    }
+    setIsQueryingYoco(true);
+    setYocoQueryResult(null);
+    try {
+      const isCheckoutId = yocoQueryInput.trim().toLowerCase().startsWith('ch_');
+      const response = await fetch('/api/verify-checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(isCheckoutId ? { checkoutId: yocoQueryInput.trim() } : { email: yocoQueryInput.trim() })
+      });
+      const data = await response.json();
+      setYocoQueryResult(data);
+      if (data.verified || data.success) {
+        toast.success('Yoco transaction found & verified!');
+      } else {
+        toast.error(data.error || 'Transaction not found or payment incomplete.');
+      }
+    } catch (err: any) {
+      toast.error('Error querying Yoco: ' + err.message);
+    } finally {
+      setIsQueryingYoco(false);
+    }
+  };
+
   // Handle Granting / Extending Subscription
   const handleGrantSubscription = async (
     targetUser: UserWithDetails,
@@ -613,28 +582,34 @@ export function AdminUserManagementPanel({
       let baseDate = isAfter(currentExpiry, now) ? currentExpiry : now;
       let newExpiry: Date;
       let planName = planTitle || 'Annual Breeder Subscription';
+      let resolvedPlan = 'yearly';
 
       if (type === '1year') {
         newExpiry = addYears(baseDate, 1);
         planName = 'Annual Breeder Pro (Yearly)';
+        resolvedPlan = 'yearly';
       } else if (type === '6months') {
         newExpiry = addMonths(baseDate, 6);
         planName = '6-Month Breeder Access';
+        resolvedPlan = 'trial';
       } else if (type === '1month') {
         newExpiry = addMonths(baseDate, 1);
         planName = 'Monthly Breeder Pass';
+        resolvedPlan = 'trial';
       } else if (type === 'lifetime') {
         newExpiry = new Date('2099-12-31T23:59:59.000Z');
         planName = 'Lifetime VIP Access';
+        resolvedPlan = 'lifetime';
       } else if (type === 'trial30') {
         newExpiry = addDays(now, 30);
         planName = '30-Day Free Trial';
+        resolvedPlan = 'trial';
       } else {
         newExpiry = customExpiry ? new Date(customExpiry) : addYears(now, 1);
+        resolvedPlan = 'yearly';
       }
 
       const isoExpiry = newExpiry.toISOString();
-      const planToSet = type === '1year' ? 'yearly' : (type === 'lifetime' ? 'lifetime' : (type === '6months' ? '6months' : (type === '1month' ? 'monthly' : 'trial')));
 
       // Update userSettings and users docs in parallel
       const settingsRef = doc(db, 'userSettings', targetUser.uid);
@@ -643,13 +618,13 @@ export function AdminUserManagementPanel({
       const subResults = await Promise.allSettled([
         setDoc(settingsRef, {
           account_expiry_date: isoExpiry,
-          subscriptionPlan: planToSet,
+          subscriptionPlan: resolvedPlan,
           subscribedAt: new Date().toISOString(),
           subscriptionGrantedBy: `Admin (${currentUser?.email || 'Admin'})`
         }, { merge: true }),
         setDoc(userRef, {
           account_expiry_date: isoExpiry,
-          subscriptionPlan: planToSet,
+          subscriptionPlan: resolvedPlan,
           subscriptionGrantedBy: `Admin (${currentUser?.email || 'Admin'})`,
           updatedAt: new Date().toISOString()
         }, { merge: true })
@@ -667,7 +642,7 @@ export function AdminUserManagementPanel({
           return {
             ...u,
             account_expiry_date: isoExpiry,
-            subscriptionPlan: planToSet,
+            subscriptionPlan: resolvedPlan,
             subscriptionGrantedBy: `Admin (${currentUser?.email || 'Admin'})`
           };
         }
@@ -1097,30 +1072,41 @@ export function AdminUserManagementPanel({
       </div>
 
       {/* Control Bar: Search, Filters, Refresh */}
-      <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between">
-        <div className="flex flex-1 items-center gap-2.5 bg-zinc-900/90 border border-zinc-800 rounded-2xl px-3.5 py-2.5 shadow-inner">
-          <Search size={18} className="text-gold-400 shrink-0" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search by user email, name, UID, or aviary name..."
-            className="w-full bg-transparent border-none text-sm text-white focus:outline-none placeholder:text-zinc-500"
-          />
-          {searchQuery && (
-            <button onClick={() => setSearchQuery('')} className="text-zinc-500 hover:text-white p-1">
-              <X size={16} />
-            </button>
-          )}
+      <div className="space-y-3">
+        <div className="flex items-center gap-2">
+          <div className="flex flex-1 items-center gap-2.5 bg-zinc-900/90 border border-zinc-800 rounded-2xl px-3.5 py-2.5 shadow-inner">
+            <Search size={18} className="text-gold-400 shrink-0" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search by user email, name, UID, or aviary name..."
+              className="w-full bg-transparent border-none text-sm text-white focus:outline-none placeholder:text-zinc-500"
+            />
+            {searchQuery && (
+              <button onClick={() => setSearchQuery('')} className="text-zinc-500 hover:text-white p-1">
+                <X size={16} />
+              </button>
+            )}
+          </div>
+          <Button
+            variant="secondary"
+            onClick={() => fetchAllUsers(true)}
+            disabled={isLoading}
+            className="p-3 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 rounded-2xl shrink-0 border border-zinc-800"
+            title="Refresh Users"
+          >
+            <RefreshCw size={18} className={cn(isLoading && "animate-spin text-gold-400")} />
+          </Button>
         </div>
 
-        {/* Filter Pills */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 max-w-full scrollbar-none">
+        {/* Filter Pills Horizontal Scroll Container */}
+        <div className="w-full flex items-center gap-2 overflow-x-auto pb-2 max-w-full scrollbar-none">
           <button
             onClick={() => setStatusFilter('all')}
             className={cn(
-              "px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all shrink-0",
-              statusFilter === 'all' ? "bg-gold-500 text-black shadow-md" : "bg-zinc-900 text-zinc-400 hover:text-white"
+              "px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all shrink-0",
+              statusFilter === 'all' ? "bg-gold-500 text-black shadow-md font-extrabold" : "bg-zinc-900 text-zinc-400 hover:text-white border border-zinc-800/80"
             )}
           >
             All ({usersList.length})
@@ -1128,18 +1114,18 @@ export function AdminUserManagementPanel({
           <button
             onClick={() => setStatusFilter('testers')}
             className={cn(
-              "px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all shrink-0 flex items-center gap-1",
-              statusFilter === 'testers' ? "bg-indigo-500 text-white shadow-md shadow-indigo-500/20" : "bg-zinc-900 text-zinc-400 hover:text-indigo-400"
+              "px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all shrink-0 flex items-center gap-1.5",
+              statusFilter === 'testers' ? "bg-indigo-500 text-white shadow-md shadow-indigo-500/20" : "bg-zinc-900 text-zinc-400 hover:text-indigo-400 border border-zinc-800/80"
             )}
           >
-            <Sparkles size={12} />
+            <Sparkles size={13} />
             Beta Testers ({stats.betaTesterCount})
           </button>
           <button
             onClick={() => setStatusFilter('registered')}
             className={cn(
-              "px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all shrink-0",
-              statusFilter === 'registered' ? "bg-emerald-500 text-black shadow-md" : "bg-zinc-900 text-zinc-400 hover:text-emerald-400"
+              "px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all shrink-0",
+              statusFilter === 'registered' ? "bg-emerald-500 text-black shadow-md" : "bg-zinc-900 text-zinc-400 hover:text-emerald-400 border border-zinc-800/80"
             )}
           >
             Google Accounts ({stats.registeredCount})
@@ -1147,8 +1133,8 @@ export function AdminUserManagementPanel({
           <button
             onClick={() => setStatusFilter('active')}
             className={cn(
-              "px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all shrink-0",
-              statusFilter === 'active' ? "bg-emerald-600 text-white shadow-md" : "bg-zinc-900 text-zinc-400 hover:text-emerald-400"
+              "px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all shrink-0",
+              statusFilter === 'active' ? "bg-emerald-600 text-white shadow-md" : "bg-zinc-900 text-zinc-400 hover:text-emerald-400 border border-zinc-800/80"
             )}
           >
             Active ({stats.activeSubCount})
@@ -1156,8 +1142,8 @@ export function AdminUserManagementPanel({
           <button
             onClick={() => setStatusFilter('yearly')}
             className={cn(
-              "px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all shrink-0",
-              statusFilter === 'yearly' ? "bg-amber-500 text-black shadow-md" : "bg-zinc-900 text-zinc-400 hover:text-amber-400"
+              "px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all shrink-0",
+              statusFilter === 'yearly' ? "bg-amber-500 text-black shadow-md" : "bg-zinc-900 text-zinc-400 hover:text-amber-400 border border-zinc-800/80"
             )}
           >
             Yearly
@@ -1165,8 +1151,8 @@ export function AdminUserManagementPanel({
           <button
             onClick={() => setStatusFilter('lifetime')}
             className={cn(
-              "px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all shrink-0",
-              statusFilter === 'lifetime' ? "bg-indigo-500 text-white shadow-md" : "bg-zinc-900 text-zinc-400 hover:text-indigo-400"
+              "px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all shrink-0",
+              statusFilter === 'lifetime' ? "bg-indigo-500 text-white shadow-md" : "bg-zinc-900 text-zinc-400 hover:text-indigo-400 border border-zinc-800/80"
             )}
           >
             Lifetime
@@ -1174,8 +1160,8 @@ export function AdminUserManagementPanel({
           <button
             onClick={() => setStatusFilter('expired')}
             className={cn(
-              "px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all shrink-0",
-              statusFilter === 'expired' ? "bg-zinc-700 text-white shadow-md" : "bg-zinc-900 text-zinc-400 hover:text-zinc-200"
+              "px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all shrink-0",
+              statusFilter === 'expired' ? "bg-zinc-700 text-white shadow-md" : "bg-zinc-900 text-zinc-400 hover:text-zinc-200 border border-zinc-800/80"
             )}
           >
             Expired ({stats.expiredCount})
@@ -1184,8 +1170,8 @@ export function AdminUserManagementPanel({
             <button
               onClick={() => setStatusFilter('unregistered')}
               className={cn(
-                "px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all shrink-0",
-                statusFilter === 'unregistered' ? "bg-amber-600 text-white shadow-md" : "bg-zinc-900 text-zinc-400 hover:text-amber-300"
+                "px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all shrink-0",
+                statusFilter === 'unregistered' ? "bg-amber-600 text-white shadow-md" : "bg-zinc-900 text-zinc-400 hover:text-amber-300 border border-zinc-800/80"
               )}
             >
               Legacy / Ghost Docs ({stats.unregisteredCount})
@@ -1194,42 +1180,28 @@ export function AdminUserManagementPanel({
           <button
             onClick={() => setStatusFilter('banned')}
             className={cn(
-              "px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all shrink-0",
-              statusFilter === 'banned' ? "bg-rose-600 text-white shadow-md" : "bg-zinc-900 text-zinc-400 hover:text-rose-400"
+              "px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all shrink-0",
+              statusFilter === 'banned' ? "bg-rose-600 text-white shadow-md" : "bg-zinc-900 text-zinc-400 hover:text-rose-400 border border-zinc-800/80"
             )}
           >
             Banned ({stats.bannedCount})
           </button>
           <button
+            onClick={() => setShowYocoModal(true)}
+            className="px-3.5 py-2 rounded-xl text-xs font-black whitespace-nowrap transition-all shrink-0 bg-gold-500/20 text-gold-300 hover:bg-gold-500/30 border border-gold-500/50 flex items-center gap-1.5 shadow-sm shadow-gold-500/10 cursor-pointer"
+          >
+            <DollarSign size={14} className="text-gold-400" />
+            Yoco Payments & Recovery
+          </button>
+          <button
             onClick={() => setStatusFilter('admins')}
             className={cn(
-              "px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all shrink-0",
-              statusFilter === 'admins' ? "bg-purple-500 text-white shadow-md" : "bg-zinc-900 text-zinc-400 hover:text-purple-400"
+              "px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all shrink-0",
+              statusFilter === 'admins' ? "bg-purple-500 text-white shadow-md" : "bg-zinc-900 text-zinc-400 hover:text-purple-400 border border-zinc-800/80"
             )}
           >
             Admins
           </button>
-          <Button
-            variant="secondary"
-            onClick={() => {
-              setShowYocoPanel(true);
-              fetchYocoCheckouts();
-            }}
-            className="px-3 py-1.5 bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 border border-amber-500/30 rounded-xl text-xs font-bold whitespace-nowrap shrink-0 flex items-center gap-1.5"
-            title="Yoco Payments & Checkout Recovery"
-          >
-            <CreditCard size={14} />
-            Yoco Payments & Recovery
-          </Button>
-          <Button
-            variant="secondary"
-            onClick={() => fetchAllUsers(true)}
-            disabled={isLoading}
-            className="p-2 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 rounded-xl shrink-0"
-            title="Refresh Users"
-          >
-            <RefreshCw size={16} className={cn(isLoading && "animate-spin text-gold-400")} />
-          </Button>
         </div>
       </div>
 
@@ -2044,130 +2016,133 @@ export function AdminUserManagementPanel({
           </div>
         </div>
       )}
-
       {/* ========================================================================= */}
-      {/* 4. YOCO PAYMENT RECOVERY & VERIFICATION MODAL */}
+      {/* 6. YOCO PAYMENTS & RECOVERY MODAL */}
       {/* ========================================================================= */}
-      {showYocoPanel && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md">
-          <div className="w-full max-w-2xl bg-zinc-950 border border-amber-500/30 rounded-3xl p-6 space-y-5 shadow-2xl max-h-[90vh] flex flex-col">
+      {showYocoModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm overflow-y-auto">
+          <div className="w-full max-w-xl bg-zinc-950 border border-zinc-800 rounded-3xl p-6 space-y-5 shadow-2xl my-8">
             <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
-              <div className="flex items-center gap-2.5 text-amber-400">
-                <div className="w-9 h-9 rounded-xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center">
-                  <CreditCard size={20} />
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-gold-500/20 text-gold-400 flex items-center justify-center">
+                  <DollarSign size={20} />
                 </div>
                 <div>
                   <h3 className="text-sm font-black uppercase text-white tracking-wider">
-                    Yoco Payments & Subscription Sync
+                    Yoco Payment Query & Subscription Recovery
                   </h3>
-                  <p className="text-xs text-zinc-400 font-medium">Verify payments directly against Yoco API & activate accounts</p>
+                  <p className="text-xs text-zinc-400">Search transactions by Yoco Checkout ID or Email address</p>
                 </div>
               </div>
               <button 
-                onClick={() => setShowYocoPanel(false)}
+                onClick={() => {
+                  setShowYocoModal(false);
+                  setYocoQueryResult(null);
+                  setYocoQueryInput('');
+                }} 
                 className="text-zinc-500 hover:text-white p-1"
               >
                 <X size={18} />
               </button>
             </div>
 
-            {/* Quick Lookup Form */}
-            <div className="p-4 bg-zinc-900/80 border border-zinc-800 rounded-2xl space-y-3 shrink-0">
-              <label className="text-xs font-bold uppercase text-zinc-300 tracking-wider">
-                Direct Verification (Enter Checkout ID or User Email)
+            <div className="space-y-3">
+              <label className="text-xs font-bold uppercase text-zinc-400 tracking-wider">
+                Search Yoco Transaction
               </label>
               <div className="flex gap-2">
-                <Input
+                <input
                   type="text"
-                  placeholder="e.g. ch_vx5YPDjN... or breeder@gmail.com"
-                  value={yocoLookupQuery}
-                  onChange={(e) => setYocoLookupQuery(e.target.value)}
-                  className="bg-black border-zinc-700 text-xs font-mono"
+                  value={yocoQueryInput}
+                  onChange={(e) => setYocoQueryInput(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleQueryYoco()}
+                  placeholder="Enter Yoco Checkout ID (e.g. ch_12345678) or user email..."
+                  className="flex-1 bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white placeholder:text-zinc-600 focus:outline-none focus:border-gold-500"
                 />
                 <Button
-                  onClick={() => handleVerifyAndActivateYoco(yocoLookupQuery)}
-                  disabled={isVerifyingYoco || !yocoLookupQuery.trim()}
-                  className="text-xs font-bold bg-gold-500 text-black hover:bg-gold-400 shrink-0"
+                  onClick={handleQueryYoco}
+                  disabled={isQueryingYoco}
+                  className="bg-gold-500 hover:bg-gold-400 text-black text-xs font-bold px-4"
                 >
-                  {isVerifyingYoco ? "Verifying..." : "Verify & Activate +1 Yr"}
+                  {isQueryingYoco ? 'Querying...' : 'Query Yoco'}
                 </Button>
               </div>
-              <p className="text-[10px] text-zinc-500">
-                Queries the official Yoco API. If status is completed or paid, extends the user's subscription for 1 Year immediately.
-              </p>
             </div>
 
-            {/* Recent Checkouts Log */}
-            <div className="flex-1 overflow-y-auto space-y-3 min-h-[150px]">
-              <div className="flex items-center justify-between">
-                <h4 className="text-xs font-bold uppercase text-zinc-400 tracking-wider">
-                  Recent Checkouts Recorded ({recentYocoCheckouts.length})
-                </h4>
-                <Button
-                  variant="secondary"
-                  onClick={fetchYocoCheckouts}
-                  disabled={isLoadingYocoCheckouts}
-                  className="p-1 px-2.5 text-[10px] bg-zinc-900 border border-zinc-800 hover:bg-zinc-800"
-                >
-                  <RefreshCw size={11} className={cn("mr-1", isLoadingYocoCheckouts && "animate-spin")} />
-                  Refresh
-                </Button>
-              </div>
+            {yocoQueryResult && (
+              <div className="p-4 bg-zinc-900/90 border border-zinc-800 rounded-2xl space-y-3 text-xs">
+                <div className="flex items-center justify-between border-b border-zinc-800 pb-2">
+                  <span className="font-bold uppercase text-zinc-400">Verification Status:</span>
+                  <Badge variant={yocoQueryResult.verified || yocoQueryResult.success ? 'success' : 'warning'}>
+                    {yocoQueryResult.verified ? 'VERIFIED PAID' : yocoQueryResult.status || 'UNVERIFIED'}
+                  </Badge>
+                </div>
 
-              {isLoadingYocoCheckouts ? (
-                <div className="p-8 text-center text-zinc-400 text-xs">
-                  <RefreshCw size={20} className="animate-spin text-gold-400 mx-auto mb-2" />
-                  Fetching checkouts from server...
-                </div>
-              ) : recentYocoCheckouts.length === 0 ? (
-                <div className="p-6 text-center text-zinc-500 text-xs bg-zinc-900/40 rounded-xl border border-zinc-800">
-                  No checkouts logged in local memory. You can still verify any checkout by typing its ID or email above!
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {recentYocoCheckouts.map((ch) => (
-                    <div 
-                      key={ch.id || Math.random()} 
-                      className="p-3 bg-zinc-900/60 border border-zinc-800 rounded-xl flex items-center justify-between gap-3 text-xs"
-                    >
-                      <div className="space-y-0.5 truncate">
-                        <div className="flex items-center gap-2">
-                          <span className="font-mono text-gold-400 font-semibold">{ch.id}</span>
-                          <Badge variant={ch.status === 'completed' || ch.status === 'paid' || ch.verified ? 'success' : 'default'} className="text-[9px] py-0 px-1.5 uppercase">
-                            {ch.status || 'created'}
-                          </Badge>
-                          <span className="text-[10px] text-zinc-400">R{(ch.amount ? ch.amount / 100 : 450).toFixed(0)}</span>
-                        </div>
-                        <p className="text-zinc-300 font-medium truncate">
-                          {ch.userEmail || ch.userName || ch.userId || 'Anonymous Checkout'}
-                        </p>
-                        {ch.createdAt && (
-                          <p className="text-[10px] text-zinc-500">
-                            {format(new Date(ch.createdAt), 'dd MMM yyyy, HH:mm')}
-                          </p>
-                        )}
+                {yocoQueryResult.checkoutId && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-zinc-400">Checkout ID:</span>
+                    <span className="font-mono text-gold-400">{yocoQueryResult.checkoutId}</span>
+                  </div>
+                )}
+
+                {yocoQueryResult.metadata?.userEmail && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-zinc-400">Payer Email:</span>
+                    <span className="font-bold text-white">{yocoQueryResult.metadata.userEmail}</span>
+                  </div>
+                )}
+
+                {yocoQueryResult.amount && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-zinc-400">Amount Paid:</span>
+                    <span className="font-bold text-emerald-400">R {(yocoQueryResult.amount / 100).toFixed(2)} {yocoQueryResult.currency || 'ZAR'}</span>
+                  </div>
+                )}
+
+                {/* Match account in usersList & provide 1-click activation */}
+                {(() => {
+                  const targetEmail = (yocoQueryResult.metadata?.userEmail || yocoQueryInput).toLowerCase().trim();
+                  const targetUid = yocoQueryResult.metadata?.userId;
+                  const matchingUser = usersList.find(u => 
+                    (targetUid && u.uid === targetUid) || 
+                    (targetEmail && u.email && u.email.toLowerCase().trim() === targetEmail)
+                  );
+
+                  if (matchingUser) {
+                    return (
+                      <div className="mt-3 p-3 bg-gold-500/10 border border-gold-500/30 rounded-xl space-y-2">
+                        <p className="font-bold text-gold-300">Matched User Account:</p>
+                        <p className="text-white font-medium">{matchingUser.displayName} ({matchingUser.email})</p>
+                        <p className="text-zinc-400 text-[11px]">Current Sub Plan: <span className="uppercase text-gold-400 font-bold">{matchingUser.subscriptionPlan || 'trial'}</span></p>
+                        
+                        <Button
+                          onClick={() => handleGrantSubscription(matchingUser, '1year', undefined, 'Yoco 1-Year Pro Plan')}
+                          disabled={isUpdatingSub}
+                          className="w-full bg-gold-500 hover:bg-gold-400 text-black font-black uppercase text-xs py-2 mt-1"
+                        >
+                          {isUpdatingSub ? 'Updating...' : 'Activate 1-Year Pro Plan for User'}
+                        </Button>
                       </div>
+                    );
+                  } else {
+                    return (
+                      <p className="text-amber-400 text-[11px] bg-amber-950/20 p-2 rounded border border-amber-900/30">
+                        No exact registered user account matched "{targetEmail}". You can search for the user in the main directory and click "Extend Sub" to apply.
+                      </p>
+                    );
+                  }
+                })()}
+              </div>
+            )}
 
-                      <Button
-                        onClick={() => handleVerifyAndActivateYoco(ch.id)}
-                        disabled={isVerifyingYoco}
-                        className="text-[11px] font-bold bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 border border-amber-500/30 shrink-0"
-                      >
-                        Verify & Grant
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div className="flex items-center justify-between pt-3 border-t border-zinc-800">
-              <p className="text-[10px] text-zinc-500">
-                You can also use the normal "Manage Subscription" button on any user card to grant +1 Year directly.
-              </p>
-              <Button
-                variant="secondary"
-                onClick={() => setShowYocoPanel(false)}
+            <div className="flex items-center justify-end pt-3 border-t border-zinc-800">
+              <Button 
+                variant="secondary" 
+                onClick={() => {
+                  setShowYocoModal(false);
+                  setYocoQueryResult(null);
+                  setYocoQueryInput('');
+                }} 
                 className="text-xs"
               >
                 Close

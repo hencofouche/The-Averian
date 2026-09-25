@@ -140,11 +140,15 @@ export function initGlobalErrorHandlers() {
       msg.includes('Failed to fetch dynamically imported module') ||
       msg.includes('Importing a module script failed') ||
       msg.includes('Loading chunk') ||
-      msg.includes('Unexpected token')
+      msg.includes('Unexpected token') ||
+      msg.includes('Invalid hook call') ||
+      msg.includes('reading \'useState\'')
     ) {
-      console.warn('[VersionManager] Detected stale module chunk error. Triggering auto-update reload...');
-      event.preventDefault();
-      checkAndApplyAppUpdate(true);
+      console.warn('[VersionManager] Detected stale module chunk or hook conflict error. Purging caches...');
+      try {
+        clearServiceWorkerCaches();
+        purgeStaleAppData();
+      } catch (_) {}
     }
   });
 

@@ -123,7 +123,6 @@
         window.dispatchEvent(new CustomEvent('pwa_prompt_ready', { detail: e }));
       });
     </script>
-    <script src="https://js.yoco.com/sdk/v1/yoco-sdk-web.js"></script>
   </head>
   <body>
     <!-- Search Engine Indexing Pre-rendered Fallback Content for Crawlers -->
@@ -147,49 +146,69 @@
     <script type="module" src="/src/main.tsx"></script>
     <script>
       if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js', { scope: '/' }).then(registration => {
-            // Check for updates immediately on load
-            registration.update();
-
-            // If an update is waiting, prompt skipWaiting immediately
-            if (registration.waiting) {
-              registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+        const isDev = window.location.hostname === 'localhost' || 
+                      window.location.hostname === '127.0.0.1' || 
+                      window.location.hostname.includes('ais-dev');
+        
+        if (isDev) {
+          // In development/preview environment, unregister any stale service workers and clear cache storage
+          navigator.serviceWorker.getRegistrations().then(registrations => {
+            for (const registration of registrations) {
+              registration.unregister();
             }
-
-            registration.addEventListener('updatefound', () => {
-              const newWorker = registration.installing;
-              if (newWorker) {
-                newWorker.addEventListener('statechange', () => {
-                  if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                    newWorker.postMessage({ type: 'SKIP_WAITING' });
-                  }
-                });
+          });
+          if ('caches' in window) {
+            caches.keys().then(names => {
+              for (const name of names) {
+                caches.delete(name);
               }
             });
-
-            // Check for updates periodically every 15 minutes
-            setInterval(() => {
-              registration.update();
-            }, 15 * 60 * 1000);
-          });
-        });
-
-        // Reload the page when a new service worker takes over
-        let refreshing = false;
-        navigator.serviceWorker.addEventListener('controllerchange', () => {
-          if (!refreshing) {
-            refreshing = true;
-            window.location.reload();
           }
-        });
+        } else {
+          window.addEventListener('load', () => {
+            navigator.serviceWorker.register('/sw.js', { scope: '/' }).then(registration => {
+              // Check for updates immediately on load
+              registration.update();
 
-        // Check for updates when the user returns to the app
-        window.addEventListener('focus', () => {
-          navigator.serviceWorker.ready.then(registration => {
-            registration.update();
+              // If an update is waiting, prompt skipWaiting immediately
+              if (registration.waiting) {
+                registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+              }
+
+              registration.addEventListener('updatefound', () => {
+                const newWorker = registration.installing;
+                if (newWorker) {
+                  newWorker.addEventListener('statechange', () => {
+                    if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                      newWorker.postMessage({ type: 'SKIP_WAITING' });
+                    }
+                  });
+                }
+              });
+
+              // Check for updates periodically every 15 minutes
+              setInterval(() => {
+                registration.update();
+              }, 15 * 60 * 1000);
+            });
           });
-        });
+
+          // Reload the page when a new service worker takes over
+          let refreshing = false;
+          navigator.serviceWorker.addEventListener('controllerchange', () => {
+            if (!refreshing) {
+              refreshing = true;
+              window.location.reload();
+            }
+          });
+
+          // Check for updates when the user returns to the app
+          window.addEventListener('focus', () => {
+            navigator.serviceWorker.ready.then(registration => {
+              registration.update();
+            });
+          });
+        }
       }
     </script>
   </body>

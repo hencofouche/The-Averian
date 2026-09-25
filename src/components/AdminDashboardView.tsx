@@ -224,11 +224,11 @@ export function AdminDashboardView({
       </div>
 
       {/* Navigation Tabs */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-1 border-b border-zinc-800">
+      <div className="flex items-center gap-2 overflow-x-auto pb-1.5 border-b border-zinc-800 scrollbar-none max-w-full">
         <button
           onClick={() => setActiveTab('overview')}
           className={cn(
-            "flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-black uppercase tracking-wider transition-all whitespace-nowrap",
+            "flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-black uppercase tracking-wider transition-all whitespace-nowrap shrink-0",
             activeTab === 'overview'
               ? "bg-gold-500 text-black shadow-lg shadow-gold-500/20"
               : "bg-zinc-900/60 text-zinc-400 hover:text-white border border-zinc-800"
@@ -241,7 +241,7 @@ export function AdminDashboardView({
         <button
           onClick={() => setActiveTab('users')}
           className={cn(
-            "flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-black uppercase tracking-wider transition-all whitespace-nowrap",
+            "flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-black uppercase tracking-wider transition-all whitespace-nowrap shrink-0",
             activeTab === 'users'
               ? "bg-gold-500 text-black shadow-lg shadow-gold-500/20"
               : "bg-zinc-900/60 text-zinc-400 hover:text-white border border-zinc-800"
@@ -254,7 +254,7 @@ export function AdminDashboardView({
         <button
           onClick={() => setActiveTab('sellers')}
           className={cn(
-            "flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-black uppercase tracking-wider transition-all whitespace-nowrap",
+            "flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-black uppercase tracking-wider transition-all whitespace-nowrap shrink-0",
             activeTab === 'sellers'
               ? "bg-gold-500 text-black shadow-lg shadow-gold-500/20"
               : "bg-zinc-900/60 text-zinc-400 hover:text-white border border-zinc-800"

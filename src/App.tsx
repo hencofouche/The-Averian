@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { format, startOfDay, startOfWeek, startOfMonth, startOfYear, endOfMonth, endOfWeek, addDays, addMonths, isSameMonth, subDays, subWeeks, subMonths, subYears, isWithinInterval, parseISO } from 'date-fns';
+import { format, startOfDay, startOfWeek, startOfMonth, startOfYear, endOfMonth, endOfWeek, addDays, addMonths, addYears, isSameMonth, subDays, subWeeks, subMonths, subYears, isWithinInterval, parseISO } from 'date-fns';
 import { Toaster, toast } from 'sonner';
 import { 
   Plus, Search, Bird as BirdIcon, Home, Heart, CheckSquare, 
@@ -10,7 +10,7 @@ import {
   Activity, ArrowUpRight, ArrowDownRight, BarChart3, PieChart as PieChartIcon,
   Menu, Egg, LayoutGrid, Grid3x3, List as ListIcon, AlertTriangle, CreditCard, CheckCircle2, Bell, Cloud, Maximize2, Share2, Send, Printer, MoreHorizontal, Dna, Users, Palette, QrCode, Scan, FileText, ExternalLink, ArrowLeft, ArrowRightLeft, History as HistoryIcon, RefreshCw, UploadCloud, Eye,
   Mail, MessageCircle, Video, Shield, Wifi, WifiOff, Flame, ShoppingBag, Store, BookOpen, Sparkles, FileSpreadsheet,
-  ListPlus, Type, Hash, Sliders
+  ListPlus, Type, Hash, Sliders, Crown
 } from 'lucide-react';
 import { 
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
@@ -905,6 +905,78 @@ export default function App() {
   useEffect(() => {
     setActiveLanguage(userSettings?.language || 'en');
   }, [userSettings?.language]);
+
+  // Automated Yoco Payment Verification Effect
+  useEffect(() => {
+    if (!user) return;
+
+    const checkYocoPayment = async () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const paymentStatus = urlParams.get('payment');
+      const checkoutId = urlParams.get('checkoutId') || urlParams.get('checkout_id');
+      const pendingRaw = localStorage.getItem('pending_yoco_checkout');
+      let pendingCheckout = null;
+
+      try {
+        if (pendingRaw) pendingCheckout = JSON.parse(pendingRaw);
+      } catch (e) {
+        console.warn("Invalid pending_yoco_checkout JSON", e);
+      }
+
+      const activeCheckoutId = checkoutId || pendingCheckout?.checkoutId;
+
+      if (paymentStatus === 'success' || activeCheckoutId || pendingCheckout) {
+        toast.loading("Verifying Yoco subscription...", { id: "yoco-verify" });
+        try {
+          const res = await fetch('/api/verify-checkout', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              checkoutId: activeCheckoutId,
+              email: user.email,
+              userId: user.uid
+            })
+          });
+          const data = await res.json();
+
+          if (data.verified || data.success) {
+            const newExpiry = addYears(new Date(), 1).toISOString();
+            const subPayload = {
+              account_expiry_date: newExpiry,
+              subscriptionPlan: 'yearly' as const,
+              subscribedAt: new Date().toISOString(),
+              paymentMethod: 'yoco',
+              lastYocoCheckoutId: data.checkoutId || activeCheckoutId || null
+            };
+
+            // Update Firestore userSettings & users documents
+            await Promise.allSettled([
+              setDoc(doc(db, 'userSettings', user.uid), subPayload, { merge: true }),
+              setDoc(doc(db, 'users', user.uid), subPayload, { merge: true })
+            ]);
+
+            // Update local state
+            setUserSettings(prev => prev ? { ...prev, ...subPayload } : null);
+
+            // Clean up localStorage and URL query params
+            localStorage.removeItem('pending_yoco_checkout');
+            if (window.location.search) {
+              window.history.replaceState({}, document.title, window.location.pathname);
+            }
+
+            toast.success(`🎉 Subscription Activated! Your 1-Year Pro Plan is active until ${format(new Date(newExpiry), 'dd MMM yyyy')}`, { id: "yoco-verify" });
+          } else {
+            toast.error("Payment verification pending or unsuccessful: " + (data.error || "Please check Yoco status."), { id: "yoco-verify" });
+          }
+        } catch (err: any) {
+          console.error("Yoco auto-verify error:", err);
+          toast.error("Yoco payment verification failed: " + err.message, { id: "yoco-verify" });
+        }
+      }
+    };
+
+    checkYocoPayment();
+  }, [user]);
   
   const effectiveSettings = useMemo(() => {
     if (!userSettings) return null;
@@ -1135,95 +1207,25 @@ export default function App() {
 
   const userUid = user?.uid;
 
-  const [pendingPaymentInfo, setPendingPaymentInfo] = useState<{ checkoutId?: string, uid?: string, email?: string } | null>(() => {
-    if (typeof window === 'undefined') return null;
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('payment') === 'success' || params.get('checkoutId')) {
-      return {
-        checkoutId: params.get('checkoutId') || undefined,
-        uid: params.get('uid') || undefined,
-        email: params.get('email') || undefined
-      };
-    }
-    // Also check localStorage for any pending checkout created in this browser
-    try {
-      const stored = localStorage.getItem('averian_pending_yoco_payment');
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (parsed && (parsed.checkoutId || parsed.userId)) {
-          // If within the last 48 hours
-          if (Date.now() - (parsed.createdAt || 0) < 48 * 60 * 60 * 1000) {
-            return {
-              checkoutId: parsed.checkoutId,
-              uid: parsed.userId,
-              email: parsed.userEmail
-            };
-          } else {
-            localStorage.removeItem('averian_pending_yoco_payment');
-          }
-        }
-      }
-    } catch (_) {}
-    return null;
-  });
-
   useEffect(() => {
-    if (!pendingPaymentInfo || !userUid) return;
+    if (!userUid) return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('payment') === 'success') {
+      // 1. Remove the parameter from the URL immediately to prevent re-triggers
+      const newUrl = window.location.pathname;
+      window.history.replaceState({}, document.title, newUrl);
 
-    let isCancelled = false;
-
-    // Clean up URL parameters cleanly
-    try {
-      const url = new URL(window.location.href);
-      url.searchParams.delete('payment');
-      url.searchParams.delete('checkoutId');
-      url.searchParams.delete('uid');
-      url.searchParams.delete('email');
-      window.history.replaceState({}, document.title, url.pathname + (url.search ? url.search : ''));
-    } catch (_) {}
-
-    const runActivation = async () => {
-      try {
-        // Attempt verification with the server if checkoutId or user details exist
-        try {
-          await fetch('/api/verify-checkout', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              checkoutId: pendingPaymentInfo.checkoutId,
-              userId: userUid,
-              userEmail: user?.email || pendingPaymentInfo.email || ''
-            })
-          });
-        } catch (vErr) {
-          console.warn("Backend verification attempt:", vErr);
-        }
-
-        // Apply renewal
-        await handleRenew(1);
-
-        try { localStorage.removeItem('averian_pending_yoco_payment'); } catch (_) {}
-        if (!isCancelled) {
-          setPendingPaymentInfo(null);
-          toast.success("Payment confirmed! Your 1-Year Subscription has been successfully activated.", {
-            duration: 8000
-          });
-        }
-      } catch (e) {
-        console.error("Renewal failed:", e);
-        if (!isCancelled) {
-          setPendingPaymentInfo(null);
-          toast.error("Failed to automatically activate subscription. Please use 'Verify Payment' in Subscription Center or contact support.");
-        }
+      // 2. Use a session storage flag to ensure it only happens once per session/load
+      const hasRenewed = sessionStorage.getItem('has_renewed_payment');
+      if (!hasRenewed) {
+        sessionStorage.setItem('has_renewed_payment', 'true');
+        handleRenew().catch(e => {
+          console.error("Renewal failed:", e);
+          toast.error("Failed to activate subscription. Please contact support.");
+        });
       }
-    };
-
-    runActivation();
-
-    return () => {
-      isCancelled = true;
-    };
-  }, [pendingPaymentInfo, userUid]);
+    }
+  }, [userUid, !!userSettings]); // Stabilized on userUid
 
   useEffect(() => {
     if (!userUid) return;
@@ -1859,8 +1861,8 @@ export default function App() {
     });
   };
 
-  const handleRenew = async (customYears: number = 1) => {
-    if (!user) return;
+  const handleRenew = async () => {
+    if (!user || !userSettings) return;
     
     try {
       // Fetch latest from server with graceful local state fallback
@@ -1874,49 +1876,30 @@ export default function App() {
         console.warn("Server fetch failed, using local settings state:", networkErr);
       }
       
-      const currentExpiry = currentData?.account_expiry_date ? new Date(currentData.account_expiry_date) : null;
+      const currentExpiry = currentData.account_expiry_date ? new Date(currentData.account_expiry_date) : new Date();
       const now = new Date();
       
-      // Calculate base date: if current expiration is in the future, extend from that date; otherwise extend from now
-      const baseDate = (currentExpiry && !isNaN(currentExpiry.getTime()) && currentExpiry > now) 
-        ? new Date(currentExpiry.getTime()) 
-        : new Date(now.getTime());
-        
-      baseDate.setFullYear(baseDate.getFullYear() + customYears);
+      // Prevent topping up if they already have more than 45 days left
+      const diffTime = currentExpiry.getTime() - now.getTime();
+      const daysLeft = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      
+      if (daysLeft > 45) {
+        console.log("Subscription already active for more than 45 days, skipping auto-renewal.");
+        return;
+      }
+
+      const baseDate = currentExpiry > now ? currentExpiry : now;
+      baseDate.setFullYear(baseDate.getFullYear() + 1);
+      
       const updatedExpiry = baseDate.toISOString();
+      await setDoc(doc(db, 'userSettings', user.uid), {
+        account_expiry_date: updatedExpiry
+      }, { merge: true });
       
-      // Update both userSettings and users collections for rock-solid sync
-      await Promise.allSettled([
-        setDoc(doc(db, 'userSettings', user.uid), {
-          account_expiry_date: updatedExpiry,
-          subscriptionPlan: 'yearly',
-          lastPaymentDate: new Date().toISOString(),
-          lastPaymentType: 'yoco_yearly'
-        }, { merge: true }),
-        setDoc(doc(db, 'users', user.uid), {
-          account_expiry_date: updatedExpiry,
-          subscriptionPlan: 'yearly',
-          updatedAt: new Date().toISOString()
-        }, { merge: true })
-      ]);
-      
-      setUserSettings(prev => ({
-        ...(prev || ({} as UserSettings)),
-        id: user.uid,
-        uid: user.uid,
-        email: user.email || prev?.email || '',
-        account_expiry_date: updatedExpiry,
-        subscriptionPlan: 'yearly',
-        lastPaymentDate: new Date().toISOString(),
-        lastPaymentType: 'yoco_yearly'
-      }));
-      toast.success(`Subscription successfully activated for ${customYears} year${customYears > 1 ? 's' : ''}! Valid until ${format(baseDate, 'PPP')}.`, {
-        duration: 8000
-      });
-      return true;
+      setUserSettings(prev => prev ? ({ ...prev, account_expiry_date: updatedExpiry }) : null);
+      toast.success("Subscription activated for 1 year!");
     } catch (e) {
       handleFirestoreError(e, OperationType.UPDATE, 'userSettings');
-      throw e;
     }
   };
 
@@ -2826,7 +2809,7 @@ export default function App() {
               onClick={() => setWalkthroughStep(1)}
               className="w-full flex items-center justify-center gap-2 py-1.5 rounded-lg border border-gold-500/10 bg-gold-500/5 hover:bg-gold-500/10 hover:border-gold-500/20 text-[8px] text-zinc-400 hover:text-gold-500 transition-all uppercase tracking-wider font-extrabold cursor-pointer"
             >
-              [Crown] <span className="tracking-widest">Help & Guide Tour</span>
+              <Crown size={12} className="text-gold-400 shrink-0" /> <span className="tracking-widest">Help & Guide Tour</span>
             </button>
           </div>
 
@@ -3619,6 +3602,7 @@ export default function App() {
                     setDeleteConfirmation={setDeleteConfirmation}
                     allSharedItems={allSharedItems}
                     setAllSharedItems={setAllSharedItems}
+                    onNavigateToTab={(tab) => handleNavigate(tab as any, '', null, true)}
                   />
                 )}
 
@@ -4059,7 +4043,7 @@ export default function App() {
                 <div className="absolute -bottom-12 -right-12 w-48 h-48 bg-gold-500/5 rounded-full blur-3xl pointer-events-none" />
 
                 <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-gold-500/20 to-gold-500/5 border border-gold-500/30 flex items-center justify-center text-gold-500 shadow-lg shadow-gold-500/10">
-                  <span className="text-3xl animate-bounce">[Crown]</span>
+                  <Crown size={32} className="text-gold-400 animate-bounce" />
                 </div>
 
                 <div className="space-y-2">
@@ -4162,7 +4146,7 @@ export default function App() {
                   >
                     <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300" />
                     <span className="relative z-10 flex items-center justify-center gap-2">
-                      [Crown] HIGHLIGHTED MEMBERSHIP PLAN [Crown]
+                      <Crown size={18} className="text-black shrink-0" /> HIGHLIGHTED MEMBERSHIP PLAN <Crown size={18} className="text-black shrink-0" />
                     </span>
                   </button>
                   <p className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest mt-1.5 animate-pulse">Click directly to explore secure payment & subscription setups</p>
@@ -7669,15 +7653,15 @@ function SubscriptionView({ settings, onRenew, onBack }: { settings: UserSetting
   const diffTime = isValidDate ? expiryDate.getTime() - now.getTime() : 0;
   const daysLeft = Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
 
-  const [isVerifying, setIsVerifying] = useState(false);
+  const [showVerifyModal, setShowVerifyModal] = useState(false);
   const [manualCheckoutId, setManualCheckoutId] = useState('');
-  const [showRestoreBox, setShowRestoreBox] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
 
   const statusText = isExpired 
     ? `Your access has expired. Renew to regain full access.` 
     : daysLeft === 0 
       ? `Today is your last day of access. Renew now to avoid interruption.`
-      : `You have ${daysLeft} days remaining.`;
+      : `You have ${daysLeft} days remaining on your membership.`;
 
   const handlePay = async () => {
     try {
@@ -7686,21 +7670,21 @@ function SubscriptionView({ settings, onRenew, onBack }: { settings: UserSetting
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           origin: window.location.origin,
-          userId: settings.uid || settings.id,
+          userId: settings.uid || '',
           userEmail: settings.email || '',
-          userName: settings.displayName || ''
+          userName: settings.displayName || settings.aviaryName || '',
+          plan: 'yearly'
         })
       });
       const data = await response.json();
-      if (data.id) {
-        try {
-          localStorage.setItem('averian_pending_yoco_payment', JSON.stringify({
-            checkoutId: data.id,
-            userId: settings.uid || settings.id,
-            userEmail: settings.email || '',
-            createdAt: Date.now()
-          }));
-        } catch (_) {}
+      if (data.id || data.checkoutId) {
+        const checkoutId = data.id || data.checkoutId;
+        localStorage.setItem('pending_yoco_checkout', JSON.stringify({
+          checkoutId,
+          userId: settings.uid,
+          userEmail: settings.email,
+          createdAt: Date.now()
+        }));
       }
       if (data.redirectUrl) {
         window.location.href = data.redirectUrl;
@@ -7712,35 +7696,33 @@ function SubscriptionView({ settings, onRenew, onBack }: { settings: UserSetting
     }
   };
 
-  const handleVerifyPayment = async (overrideId?: string) => {
+  const handleManualVerify = async () => {
+    if (!manualCheckoutId.trim() && !settings.email) {
+      toast.error("Please enter a Checkout ID or ensure your email is linked.");
+      return;
+    }
     setIsVerifying(true);
-    const toastId = toast.loading("Checking Yoco API for completed payment...");
     try {
-      const idToSearch = overrideId || manualCheckoutId.trim();
-      const res = await fetch('/api/verify-checkout', {
+      const response = await fetch('/api/verify-checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          checkoutId: idToSearch || undefined,
-          userId: settings.uid || settings.id,
-          userEmail: settings.email || ''
+          checkoutId: manualCheckoutId.trim() || undefined,
+          email: settings.email,
+          userId: settings.uid
         })
       });
-      const data = await res.json();
-      if (data.verified) {
-        try { localStorage.removeItem('averian_pending_yoco_payment'); } catch (_) {}
-        toast.success(`Yoco payment verified (${data.checkoutId || 'Success'})! Extending subscription...`, { id: toastId });
-        await onRenew();
-        setShowRestoreBox(false);
-        setManualCheckoutId('');
+      const data = await response.json();
+      if (data.verified || data.success) {
+        toast.success("🎉 Payment verified! Updating subscription...");
+        setShowVerifyModal(false);
+        if (onRenew) onRenew();
+        else window.location.reload();
       } else {
-        toast.error(
-          data.error || `Payment status is '${data.status || 'not found'}'. If you were charged, please paste your Yoco checkout reference or contact support.`,
-          { id: toastId, duration: 8000 }
-        );
+        toast.error(data.error || "Could not verify payment with Yoco. Please check your Checkout ID.");
       }
     } catch (err: any) {
-      toast.error("Verification failed: " + err.message, { id: toastId });
+      toast.error("Verification error: " + err.message);
     } finally {
       setIsVerifying(false);
     }
@@ -7754,7 +7736,7 @@ function SubscriptionView({ settings, onRenew, onBack }: { settings: UserSetting
         </button>
         <div>
           <h2 className="text-2xl font-black uppercase tracking-widest text-gold-500">Subscription Center</h2>
-          <p className="text-xs text-zinc-400 font-medium">Manage your annual membership, renewals, and international currency rates</p>
+          <p className="text-xs text-zinc-400 font-medium">Manage your annual membership, Yoco payment renewals, and status</p>
         </div>
       </div>
       
@@ -7765,100 +7747,95 @@ function SubscriptionView({ settings, onRenew, onBack }: { settings: UserSetting
             {isExpired ? <AlertTriangle size={32} /> : <CheckCircle2 size={32} />}
           </div>
           <div>
-            <div className="flex items-center gap-2.5">
+            <div className="flex items-center gap-2.5 flex-wrap">
               <h3 className="text-xl font-black text-white uppercase tracking-widest">
-                {isExpired ? 'Expired' : daysLeft <= 30 ? 'Trial Active' : 'Active Subscription'}
+                {isExpired ? 'Expired' : settings.subscriptionPlan === 'lifetime' ? 'Lifetime VIP Access' : 'Active Subscription'}
               </h3>
               <span className="text-xs font-black uppercase px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40">
                 R450 / Year
               </span>
             </div>
-            <p className="text-black-50 font-medium mt-1">
+            <p className="text-zinc-300 font-medium mt-1">
               {statusText}
             </p>
             {expiryDate && (
-              <p className="text-[10px] text-black-100 font-bold uppercase tracking-widest mt-2">
+              <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-widest mt-2">
                 Valid until: {format(expiryDate, 'PPP')}
               </p>
             )}
           </div>
         </div>
         
-        <div className="w-full md:w-auto flex flex-col gap-2">
+        <div className="w-full md:w-auto flex flex-col gap-2.5 shrink-0">
           <Button 
             onClick={handlePay} 
-            className="w-full md:w-56 py-4 text-sm font-black uppercase tracking-wider bg-gold-500 hover:bg-gold-400 text-black shadow-lg shadow-gold-500/10"
+            className="w-full md:w-64 py-4 text-xs font-black uppercase tracking-wider bg-gold-500 hover:bg-gold-400 text-black shadow-lg shadow-gold-500/10 flex items-center justify-center gap-2"
           >
-            {isExpired ? 'Renew Now (R450 / yr)' : 'Extend 1 Year (R450 / yr)'}
+            <CreditCard size={16} />
+            {isExpired ? 'Renew Now (R450 / yr)' : 'Renew / Extend 1 Year (R450)'}
           </Button>
-          <button 
-            type="button"
-            onClick={() => setShowRestoreBox(!showRestoreBox)}
-            className="text-[10px] text-center text-gold-400 hover:text-gold-300 font-bold uppercase tracking-wider underline mt-1"
+
+          <button
+            onClick={() => setShowVerifyModal(true)}
+            className="w-full md:w-64 py-2.5 px-3 bg-zinc-800/80 hover:bg-zinc-700 text-zinc-200 rounded-xl text-xs font-bold uppercase tracking-wider border border-zinc-700 flex items-center justify-center gap-1.5 transition-colors"
           >
-            Already paid on Yoco? Verify / Restore
+            <RefreshCw size={14} className="text-gold-400" />
+            Already Paid? Verify Payment
           </button>
-          <p className="text-[9px] text-center text-zinc-400 font-bold uppercase tracking-widest">
+
+          <p className="text-[9px] text-center text-zinc-400 font-bold uppercase tracking-widest mt-1">
             Billed in ZAR (R450) * Powered by Yoco
           </p>
         </div>
       </Card>
 
-      {/* Payment Recovery / Verification Card */}
-      {showRestoreBox && (
-        <Card className="p-5 bg-zinc-950 border border-amber-500/40 rounded-2xl space-y-4 animate-in fade-in">
-          <div className="flex items-start justify-between">
-            <div className="space-y-1">
-              <h4 className="text-xs font-black uppercase tracking-wider text-amber-400 flex items-center gap-2">
-                <CreditCard size={15} />
-                Sync / Restore Yoco Payment
-              </h4>
-              <p className="text-xs text-zinc-300">
-                If you already completed payment on Yoco but your subscription did not automatically refresh, you can sync it instantly below.
-              </p>
+      {/* Manual Verification Modal */}
+      {showVerifyModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+          <div className="w-full max-w-md bg-zinc-950 border border-zinc-800 rounded-3xl p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+              <h3 className="text-sm font-black uppercase text-gold-400 tracking-wider flex items-center gap-2">
+                <CreditCard size={18} />
+                Verify / Restore Yoco Payment
+              </h3>
+              <button onClick={() => setShowVerifyModal(false)} className="text-zinc-400 hover:text-white text-xs font-bold">✕</button>
             </div>
-            <button onClick={() => setShowRestoreBox(false)} className="text-zinc-500 hover:text-white p-1 text-xs">Close</button>
-          </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-            <div className="p-3 bg-zinc-900/80 border border-zinc-800 rounded-xl space-y-2">
-              <p className="text-[11px] font-bold text-white">Option 1: Auto-Detect by Account Email</p>
-              <p className="text-[10px] text-zinc-400">
-                Checks for any recent completed payment on Yoco for <span className="text-gold-300 font-mono">{settings.email}</span>.
-              </p>
-              <Button
-                onClick={() => handleVerifyPayment()}
-                disabled={isVerifying}
-                className="w-full text-xs font-bold bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 border border-amber-500/30"
+            <p className="text-xs text-zinc-300">
+              If you recently paid on Yoco for the 1-Year Pro plan and your account hasn't updated automatically, enter your Yoco Checkout ID or verify with your account email.
+            </p>
+
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Yoco Checkout ID (Optional if using account email)</label>
+              <input
+                type="text"
+                value={manualCheckoutId}
+                onChange={(e) => setManualCheckoutId(e.target.value)}
+                placeholder="e.g. ch_1234567890..."
+                className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white placeholder:text-zinc-600 focus:outline-none focus:border-gold-500"
+              />
+              <p className="text-[10px] text-zinc-500">Checking for email: <span className="text-gold-400 font-mono">{settings.email || 'No email linked'}</span></p>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-zinc-800">
+              <button
+                type="button"
+                onClick={() => setShowVerifyModal(false)}
+                className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-xl text-xs font-bold"
               >
-                {isVerifying ? "Verifying..." : "Check Automatic Payment"}
-              </Button>
-            </div>
-
-            <div className="p-3 bg-zinc-900/80 border border-zinc-800 rounded-xl space-y-2">
-              <p className="text-[11px] font-bold text-white">Option 2: Enter Checkout ID / Reference</p>
-              <p className="text-[10px] text-zinc-400">
-                Paste the reference from your Yoco email receipt (e.g. <span className="font-mono text-zinc-300">ch_...</span>).
-              </p>
-              <div className="flex gap-2">
-                <Input
-                  type="text"
-                  placeholder="e.g. ch_vx5YPDjN..."
-                  value={manualCheckoutId}
-                  onChange={(e) => setManualCheckoutId(e.target.value)}
-                  className="bg-black border-zinc-700 text-xs font-mono"
-                />
-                <Button
-                  onClick={() => handleVerifyPayment(manualCheckoutId)}
-                  disabled={isVerifying || !manualCheckoutId.trim()}
-                  className="text-xs font-bold bg-gold-500 text-black hover:bg-gold-400 shrink-0"
-                >
-                  Verify
-                </Button>
-              </div>
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleManualVerify}
+                disabled={isVerifying}
+                className="px-4 py-2 bg-gold-500 hover:bg-gold-400 text-black rounded-xl text-xs font-black uppercase"
+              >
+                {isVerifying ? 'Verifying...' : 'Check Payment & Activate'}
+              </button>
             </div>
           </div>
-        </Card>
+        </div>
       )}
 
       {/* Currency Conversion Rate Estimator */}

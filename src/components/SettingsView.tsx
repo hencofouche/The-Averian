@@ -3,7 +3,8 @@ import {
   User, Bird as BirdIcon, GitBranch, Tag, Activity, 
   ChevronRight, Edit2, Trash2, Plus, Sliders, Type, Hash, 
   Image as ImageIcon, Cloud, History as HistoryIcon, 
-  ArrowRightLeft, Send, CheckCircle2, Shield, Flame
+  ArrowRightLeft, Send, CheckCircle2, Shield, Flame,
+  CreditCard, Crown, RefreshCw, AlertTriangle, Sparkles
 } from 'lucide-react';
 import { 
   UserSettings, CustomBirdFieldDefinition, SharedItem 
@@ -25,7 +26,8 @@ export function SettingsView({
   isSyncing, 
   setDeleteConfirmation, 
   allSharedItems, 
-  setAllSharedItems 
+  setAllSharedItems,
+  onNavigateToTab
 }: { 
   settings: UserSettings; 
   onUpdate: (s: UserSettings) => void; 
@@ -35,8 +37,12 @@ export function SettingsView({
   setDeleteConfirmation: (data: any) => void; 
   allSharedItems: SharedItem[]; 
   setAllSharedItems: React.Dispatch<React.SetStateAction<SharedItem[]>>; 
+  onNavigateToTab?: (tab: string) => void;
 }) {
-  const [activeSection, setActiveSection] = useState<'general' | 'species' | 'subspecies' | 'mutations' | 'statuses' | 'customFields' | 'data' | null>('general');
+  const [activeSection, setActiveSection] = useState<'general' | 'subscription' | 'species' | 'subspecies' | 'mutations' | 'statuses' | 'customFields' | 'data' | null>('general');
+  const [showVerifyModal, setShowVerifyModal] = useState(false);
+  const [manualCheckoutId, setManualCheckoutId] = useState('');
+  const [isVerifying, setIsVerifying] = useState(false);
   const [newSpecies, setNewSpecies] = useState('');
   const [newMutation, setNewMutation] = useState('');
   const [newMutationInheritance, setNewMutationInheritance] = useState<'autosomal_recessive' | 'autosomal_dominant' | 'incomplete_dominant' | 'sex_linked_recessive' | ''>('');
@@ -300,6 +306,13 @@ export function SettingsView({
           onClick={() => setActiveSection('general')} 
         />
         <SettingRow 
+          icon={Crown} 
+          title="Membership & Sub" 
+          description="Yoco Payment & Membership" 
+          active={activeSection === 'subscription'} 
+          onClick={() => setActiveSection('subscription')} 
+        />
+        <SettingRow 
           icon={BirdIcon} 
           title="Species" 
           description="Manage Bird Species" 
@@ -346,6 +359,197 @@ export function SettingsView({
       {/* Main Content Pane */}
       <div className="flex-1 min-w-0 bg-zinc-950/40 border border-black-800 rounded-3xl p-6 sm:p-8">
         <AnimatePresence mode="wait">
+          {activeSection === 'subscription' && (
+            <motion.div 
+              key="subscription"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              className="space-y-6"
+            >
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-black uppercase tracking-widest text-gold-500 flex items-center gap-2">
+                    <Crown size={20} />
+                    Membership & Subscription Status
+                  </h3>
+                  <span className="text-xs font-black uppercase px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                    R450 / Year
+                  </span>
+                </div>
+
+                <div className="p-5 sm:p-6 bg-black/60 border border-zinc-800 rounded-2xl space-y-4">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-zinc-800 pb-4">
+                    <div>
+                      <p className="text-xs text-zinc-400 font-bold uppercase tracking-wider">Current Account Plan</p>
+                      <h4 className="text-xl font-black text-white uppercase tracking-wider mt-0.5">
+                        {settings.subscriptionPlan === 'lifetime' ? 'Lifetime VIP Access' : settings.subscriptionPlan === 'yearly' ? '1-Year Pro Breeder Plan' : 'Standard Access'}
+                      </h4>
+                      {settings.account_expiry_date && (
+                        <p className="text-xs text-gold-400 font-semibold mt-1">
+                          Valid Until: {format(new Date(settings.account_expiry_date), 'dd MMMM yyyy')}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="flex flex-col gap-2 w-full sm:w-auto">
+                      <Button
+                        onClick={async () => {
+                          try {
+                            const res = await fetch('/api/create-checkout', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({
+                                origin: window.location.origin,
+                                userId: settings.uid || '',
+                                userEmail: settings.email || '',
+                                userName: settings.displayName || settings.aviaryName || '',
+                                plan: 'yearly'
+                              })
+                            });
+                            const data = await res.json();
+                            if (data.id || data.checkoutId) {
+                              localStorage.setItem('pending_yoco_checkout', JSON.stringify({
+                                checkoutId: data.id || data.checkoutId,
+                                userId: settings.uid,
+                                userEmail: settings.email,
+                                createdAt: Date.now()
+                              }));
+                            }
+                            if (data.redirectUrl) {
+                              window.location.href = data.redirectUrl;
+                            } else {
+                              toast.error('Payment failed: ' + (data.error || 'Unknown error'));
+                            }
+                          } catch (err: any) {
+                            toast.error('Checkout error: ' + err.message);
+                          }
+                        }}
+                        className="bg-gold-500 hover:bg-gold-400 text-black font-black uppercase text-xs py-3 px-5 flex items-center justify-center gap-2"
+                      >
+                        <CreditCard size={16} />
+                        Renew / Extend 1 Year (R450)
+                      </Button>
+
+                      <button
+                        type="button"
+                        onClick={() => setShowVerifyModal(true)}
+                        className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 rounded-xl text-xs font-bold uppercase tracking-wider border border-zinc-700 flex items-center justify-center gap-1.5 transition-colors"
+                      >
+                        <RefreshCw size={14} className="text-gold-400" />
+                        Already Paid? Verify Payment
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-zinc-300 pt-2">
+                    <div className="p-3 bg-zinc-900/60 border border-zinc-800 rounded-xl">
+                      <p className="font-bold text-white flex items-center gap-1.5">
+                        <CheckCircle2 size={14} className="text-emerald-400" />
+                        Yoco Payment Gateways
+                      </p>
+                      <p className="text-[11px] text-zinc-400 mt-1">Instant, secure card processing. Auto-activation upon callback.</p>
+                    </div>
+                    <div className="p-3 bg-zinc-900/60 border border-zinc-800 rounded-xl">
+                      <p className="font-bold text-white flex items-center gap-1.5">
+                        <Shield size={14} className="text-indigo-400" />
+                        Full Aviary Data Access
+                      </p>
+                      <p className="text-[11px] text-zinc-400 mt-1">Includes unlimited birds, egg candling alerts, pedigree generation, and backups.</p>
+                    </div>
+                  </div>
+                </div>
+
+                {onNavigateToTab && (
+                  <button
+                    onClick={() => onNavigateToTab('subscription')}
+                    className="text-xs font-bold text-gold-400 hover:underline uppercase tracking-wider flex items-center gap-1"
+                  >
+                    Open Full Subscription Center <ChevronRight size={14} />
+                  </button>
+                )}
+              </div>
+
+              {/* Verify Payment Modal inside Settings */}
+              {showVerifyModal && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+                  <div className="w-full max-w-md bg-zinc-950 border border-zinc-800 rounded-3xl p-6 space-y-4 shadow-2xl">
+                    <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+                      <h3 className="text-sm font-black uppercase text-gold-400 tracking-wider flex items-center gap-2">
+                        <CreditCard size={18} />
+                        Verify / Restore Yoco Payment
+                      </h3>
+                      <button onClick={() => setShowVerifyModal(false)} className="text-zinc-400 hover:text-white text-xs font-bold">✕</button>
+                    </div>
+
+                    <p className="text-xs text-zinc-300">
+                      If you recently paid on Yoco for the 1-Year Pro plan and your account hasn't updated automatically, enter your Yoco Checkout ID or verify with your account email.
+                    </p>
+
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Yoco Checkout ID (Optional if using account email)</label>
+                      <input
+                        type="text"
+                        value={manualCheckoutId}
+                        onChange={(e) => setManualCheckoutId(e.target.value)}
+                        placeholder="e.g. ch_1234567890..."
+                        className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white placeholder:text-zinc-600 focus:outline-none focus:border-gold-500"
+                      />
+                      <p className="text-[10px] text-zinc-500">Checking for email: <span className="text-gold-400 font-mono">{settings.email || 'No email linked'}</span></p>
+                    </div>
+
+                    <div className="flex justify-end gap-2 pt-2 border-t border-zinc-800">
+                      <button
+                        type="button"
+                        onClick={() => setShowVerifyModal(false)}
+                        className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-xl text-xs font-bold"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (!manualCheckoutId.trim() && !settings.email) {
+                            toast.error("Please enter a Checkout ID or ensure your email is linked.");
+                            return;
+                          }
+                          setIsVerifying(true);
+                          try {
+                            const response = await fetch('/api/verify-checkout', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({
+                                checkoutId: manualCheckoutId.trim() || undefined,
+                                email: settings.email,
+                                userId: settings.uid
+                              })
+                            });
+                            const data = await response.json();
+                            if (data.verified || data.success) {
+                              toast.success("🎉 Payment verified! Updating subscription...");
+                              setShowVerifyModal(false);
+                              window.location.reload();
+                            } else {
+                              toast.error(data.error || "Could not verify payment with Yoco. Please check your Checkout ID.");
+                            }
+                          } catch (err: any) {
+                            toast.error("Verification error: " + err.message);
+                          } finally {
+                            setIsVerifying(false);
+                          }
+                        }}
+                        disabled={isVerifying}
+                        className="px-4 py-2 bg-gold-500 hover:bg-gold-400 text-black rounded-xl text-xs font-black uppercase"
+                      >
+                        {isVerifying ? 'Verifying...' : 'Check Payment & Activate'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </motion.div>
+          )}
+
           {activeSection === 'general' && (
             <motion.div 
               key="general"
