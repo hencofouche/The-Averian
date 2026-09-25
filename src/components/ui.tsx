@@ -2,7 +2,7 @@ import React from 'react';
 import { cn } from '../lib/utils';
 import { Bird, Cage } from '../types';
 
-export const Button = ({ children, className, variant = 'primary', ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'primary' | 'secondary' | 'danger' | 'ghost' }) => {
+export const Button = ({ children, className, variant = 'primary', type = 'button', ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'primary' | 'secondary' | 'danger' | 'ghost' }) => {
   const variants = {
     primary: 'bg-gold-500 text-black-950 hover:bg-gold-600 shadow-lg shadow-gold-500/20',
     secondary: 'bg-zinc-800 text-gold-500 hover:bg-zinc-700 border border-gold-500/30',
@@ -19,6 +19,7 @@ export const Button = ({ children, className, variant = 'primary', ...props }: R
 
   return (
     <button 
+      type={type}
       className={cn('px-4 py-2 rounded-lg font-bold transition-all flex items-center justify-center gap-2 disabled:opacity-50 active:scale-95 text-[clamp(10px,1.2vw,14px)] uppercase tracking-widest', variants[variant], className)} 
       style={customDangerStyle}
       {...props}

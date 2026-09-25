@@ -1005,69 +1005,69 @@ export function AdminUserManagementPanel({
   return (
     <div className="space-y-6">
       {/* Top Header & Stats Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2.5">
-        <Card className="p-3.5 bg-zinc-950/80 border-zinc-800">
-          <div className="flex items-center gap-1.5 text-zinc-400 mb-1">
-            <Users size={14} className="text-gold-400" />
-            <span className="text-[10px] font-bold uppercase tracking-wider">Total</span>
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-8 gap-2 sm:gap-2.5 w-full min-w-0">
+        <Card className="p-3 sm:p-3.5 bg-zinc-950/80 border-zinc-800 min-w-0">
+          <div className="flex items-center gap-1.5 text-zinc-400 mb-1 min-w-0">
+            <Users size={14} className="text-gold-400 shrink-0" />
+            <span className="text-[10px] font-bold uppercase tracking-wider truncate">Total</span>
           </div>
-          <p className="text-xl sm:text-2xl font-black text-white">{stats.total}</p>
+          <p className="text-lg sm:text-xl md:text-2xl font-black text-white">{stats.total}</p>
         </Card>
 
-        <Card className="p-3.5 bg-zinc-950/80 border-zinc-800">
-          <div className="flex items-center gap-1.5 text-zinc-400 mb-1">
-            <CheckCircle2 size={14} className="text-emerald-400" />
-            <span className="text-[10px] font-bold uppercase tracking-wider">Active Subs</span>
+        <Card className="p-3 sm:p-3.5 bg-zinc-950/80 border-zinc-800 min-w-0">
+          <div className="flex items-center gap-1.5 text-zinc-400 mb-1 min-w-0">
+            <CheckCircle2 size={14} className="text-emerald-400 shrink-0" />
+            <span className="text-[10px] font-bold uppercase tracking-wider truncate">Active Subs</span>
           </div>
-          <p className="text-xl sm:text-2xl font-black text-emerald-400">{stats.activeSubCount}</p>
+          <p className="text-lg sm:text-xl md:text-2xl font-black text-emerald-400">{stats.activeSubCount}</p>
         </Card>
 
-        <Card className="p-3.5 bg-zinc-950/80 border-indigo-500/30 bg-indigo-950/10">
-          <div className="flex items-center gap-1.5 text-indigo-300 mb-1">
-            <Sparkles size={14} className="text-indigo-400" />
-            <span className="text-[10px] font-bold uppercase tracking-wider">Testers</span>
+        <Card className="p-3 sm:p-3.5 bg-zinc-950/80 border-indigo-500/30 bg-indigo-950/10 min-w-0">
+          <div className="flex items-center gap-1.5 text-indigo-300 mb-1 min-w-0">
+            <Sparkles size={14} className="text-indigo-400 shrink-0" />
+            <span className="text-[10px] font-bold uppercase tracking-wider truncate">Testers</span>
           </div>
-          <p className="text-xl sm:text-2xl font-black text-indigo-400">{stats.betaTesterCount}</p>
+          <p className="text-lg sm:text-xl md:text-2xl font-black text-indigo-400">{stats.betaTesterCount}</p>
         </Card>
 
-        <Card className="p-3.5 bg-zinc-950/80 border-zinc-800">
-          <div className="flex items-center gap-1.5 text-zinc-400 mb-1">
-            <Award size={14} className="text-amber-400" />
-            <span className="text-[10px] font-bold uppercase tracking-wider">Yearly</span>
+        <Card className="p-3 sm:p-3.5 bg-zinc-950/80 border-zinc-800 min-w-0">
+          <div className="flex items-center gap-1.5 text-zinc-400 mb-1 min-w-0">
+            <Award size={14} className="text-amber-400 shrink-0" />
+            <span className="text-[10px] font-bold uppercase tracking-wider truncate">Yearly</span>
           </div>
-          <p className="text-xl sm:text-2xl font-black text-amber-400">{stats.yearlyCount}</p>
+          <p className="text-lg sm:text-xl md:text-2xl font-black text-amber-400">{stats.yearlyCount}</p>
         </Card>
 
-        <Card className="p-3.5 bg-zinc-950/80 border-zinc-800">
-          <div className="flex items-center gap-1.5 text-zinc-400 mb-1">
-            <Sparkles size={14} className="text-indigo-400" />
-            <span className="text-[10px] font-bold uppercase tracking-wider">Lifetime</span>
+        <Card className="p-3 sm:p-3.5 bg-zinc-950/80 border-zinc-800 min-w-0">
+          <div className="flex items-center gap-1.5 text-zinc-400 mb-1 min-w-0">
+            <Sparkles size={14} className="text-indigo-400 shrink-0" />
+            <span className="text-[10px] font-bold uppercase tracking-wider truncate">Lifetime</span>
           </div>
-          <p className="text-xl sm:text-2xl font-black text-indigo-400">{stats.lifetimeCount}</p>
+          <p className="text-lg sm:text-xl md:text-2xl font-black text-indigo-400">{stats.lifetimeCount}</p>
         </Card>
 
-        <Card className="p-3.5 bg-zinc-950/80 border-zinc-800">
-          <div className="flex items-center gap-1.5 text-zinc-400 mb-1">
-            <Clock size={14} className="text-zinc-400" />
-            <span className="text-[10px] font-bold uppercase tracking-wider">Expired</span>
+        <Card className="p-3 sm:p-3.5 bg-zinc-950/80 border-zinc-800 min-w-0">
+          <div className="flex items-center gap-1.5 text-zinc-400 mb-1 min-w-0">
+            <Clock size={14} className="text-zinc-400 shrink-0" />
+            <span className="text-[10px] font-bold uppercase tracking-wider truncate">Expired</span>
           </div>
-          <p className="text-xl sm:text-2xl font-black text-zinc-400">{stats.expiredCount}</p>
+          <p className="text-lg sm:text-xl md:text-2xl font-black text-zinc-400">{stats.expiredCount}</p>
         </Card>
 
-        <Card className="p-3.5 bg-zinc-950/80 border-rose-900/30">
-          <div className="flex items-center gap-1.5 text-rose-400 mb-1">
-            <ShieldAlert size={14} className="text-rose-500" />
-            <span className="text-[10px] font-bold uppercase tracking-wider">Banned</span>
+        <Card className="p-3 sm:p-3.5 bg-zinc-950/80 border-rose-900/30 min-w-0">
+          <div className="flex items-center gap-1.5 text-rose-400 mb-1 min-w-0">
+            <ShieldAlert size={14} className="text-rose-500 shrink-0" />
+            <span className="text-[10px] font-bold uppercase tracking-wider truncate">Banned</span>
           </div>
-          <p className="text-xl sm:text-2xl font-black text-rose-500">{stats.bannedCount}</p>
+          <p className="text-lg sm:text-xl md:text-2xl font-black text-rose-500">{stats.bannedCount}</p>
         </Card>
 
-        <Card className="p-3.5 bg-zinc-950/80 border-zinc-800">
-          <div className="flex items-center gap-1.5 text-zinc-400 mb-1">
-            <Shield size={14} className="text-purple-400" />
-            <span className="text-[10px] font-bold uppercase tracking-wider">Admins</span>
+        <Card className="p-3 sm:p-3.5 bg-zinc-950/80 border-zinc-800 min-w-0">
+          <div className="flex items-center gap-1.5 text-zinc-400 mb-1 min-w-0">
+            <Shield size={14} className="text-purple-400 shrink-0" />
+            <span className="text-[10px] font-bold uppercase tracking-wider truncate">Admins</span>
           </div>
-          <p className="text-xl sm:text-2xl font-black text-purple-400">{stats.adminCount}</p>
+          <p className="text-lg sm:text-xl md:text-2xl font-black text-purple-400">{stats.adminCount}</p>
         </Card>
       </div>
 
@@ -1292,17 +1292,17 @@ export function AdminUserManagementPanel({
                       </div>
 
                       {/* Prominent Real Email Address & UID */}
-                      <div className="flex items-center gap-2.5 text-xs flex-wrap">
+                      <div className="flex items-center gap-2.5 text-xs flex-wrap min-w-0 max-w-full">
                         {u.email ? (
-                          <div className="flex items-center gap-1.5 bg-zinc-900 border border-zinc-800 px-2.5 py-0.5 rounded-lg text-gold-300 font-semibold">
-                            <Mail size={12} className="text-gold-400" />
-                            <span>{u.email}</span>
+                          <div className="flex items-center gap-1.5 bg-zinc-900 border border-zinc-800 px-2.5 py-0.5 rounded-lg text-gold-300 font-semibold min-w-0 max-w-full">
+                            <Mail size={12} className="text-gold-400 shrink-0" />
+                            <span className="truncate max-w-[180px] sm:max-w-[260px] md:max-w-none">{u.email}</span>
                             <button
                               onClick={() => {
                                 navigator.clipboard.writeText(u.email);
                                 toast.success('Email copied to clipboard!');
                               }}
-                              className="ml-1 text-zinc-500 hover:text-white inline-block"
+                              className="ml-1 text-zinc-500 hover:text-white inline-block shrink-0"
                               title="Copy user email"
                             >
                               <Copy size={11} />
@@ -1383,9 +1383,9 @@ export function AdminUserManagementPanel({
                 </div>
 
                 {/* Quick Action Toolbar */}
-                <div className="pt-2.5 border-t border-zinc-900 flex items-center justify-between gap-2 flex-wrap">
+                <div className="pt-2.5 border-t border-zinc-900 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-2.5 min-w-0 max-w-full">
                   {/* Left: Quick Subscription Grants & Beta Tester Toggle */}
-                  <div className="flex items-center gap-1.5 flex-wrap">
+                  <div className="flex items-center gap-1.5 flex-wrap min-w-0 max-w-full">
                     {/* Beta Tester Toggle Button */}
                     <Button
                       onClick={() => handleToggleBetaTester(u, !isTester)}
@@ -1432,7 +1432,7 @@ export function AdminUserManagementPanel({
                   </div>
 
                   {/* Right: Ban/Unban, Data Migration & Inspection */}
-                  <div className="flex items-center gap-1.5 flex-wrap">
+                  <div className="flex items-center gap-1.5 flex-wrap min-w-0 max-w-full">
                     {/* Ban / Unban Button */}
                     {u.isBanned ? (
                       <Button

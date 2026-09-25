@@ -747,7 +747,7 @@ export default function App() {
   const [walkthroughStep, setWalkthroughStep] = useState<number | null>(null);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [quickAddDialog, setQuickAddDialog] = useState<{
-    type: 'mutation' | 'species' | 'subspecies';
+    type: 'mutation' | 'species' | 'subspecies' | 'status';
     name: string;
     speciesId?: string;
     inheritance?: 'autosomal_recessive' | 'autosomal_dominant' | 'incomplete_dominant' | 'sex_linked_recessive' | 'other';
@@ -1852,12 +1852,11 @@ export default function App() {
     });
   };
 
-  const handleAddStatus = (name: string) => {
-    if (!userSettings) return;
-    const newStatus = { id: crypto.randomUUID(), name };
-    handleUpdateSettings({
-      ...userSettings,
-      statuses: [...(userSettings.statuses || []), newStatus]
+  const handleAddStatus = (name: string, onSuccess?: (name: string, id: string) => void) => {
+    setQuickAddDialog({
+      type: 'status',
+      name,
+      onSuccess
     });
   };
 
@@ -3072,7 +3071,7 @@ export default function App() {
           </div>
         )}
 
-        <div className={cn("custom-scrollbar", (activeTab === 'genetics' || activeTab === 'print' || activeTab === 'pedigree' || activeTab === 'marketplace' || showComingSoonSplash) ? "p-0" : "p-4 md:p-8")}>
+        <div className={cn("custom-scrollbar", (activeTab === 'genetics' || activeTab === 'print' || activeTab === 'pedigree' || activeTab === 'marketplace' || activeTab === 'admin' || showComingSoonSplash) ? "p-0" : "p-4 md:p-8")}>
           {isCurrentTabComingSoon && isAdmin && !isAdminPreviewMode && (
             <AdminPageTestingBanner
               pageId={activeTab as AppPageId}
@@ -3860,7 +3859,12 @@ export default function App() {
 
       <AnimatePresence>
         {quickAddDialog && (
-          <div className="fixed inset-0 z-[130] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div 
+            className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) setQuickAddDialog(null);
+            }}
+          >
             <motion.div 
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
@@ -3871,7 +3875,7 @@ export default function App() {
               <div className="absolute -top-12 -left-12 w-32 h-32 bg-gold-500/5 rounded-full blur-2xl pointer-events-none" />
               
               <h4 className="text-sm font-black uppercase tracking-widest text-gold-500 mb-4 flex items-center gap-2">
-                <span>[Sparkle] Quick Add {quickAddDialog.type === 'subspecies' ? 'Sub-Species' : quickAddDialog.type === 'species' ? 'Species' : 'Mutation'}</span>
+                <span>[Sparkle] Quick Add {quickAddDialog.type === 'subspecies' ? 'Sub-Species' : quickAddDialog.type === 'species' ? 'Species' : quickAddDialog.type === 'status' ? 'Status' : 'Mutation'}</span>
               </h4>
 
               <div className="space-y-4">
@@ -3989,6 +3993,12 @@ export default function App() {
                           speciesId: quickAddDialog.speciesId!
                         };
                         updatedSettings.subspecies = [...(current.subspecies || []), newSub];
+                      } else if (quickAddDialog.type === 'status') {
+                        const newStat = {
+                          id: addedId,
+                          name: trimmedName
+                        };
+                        updatedSettings.statuses = [...(current.statuses || []), newStat];
                       }
 
                       try {
@@ -8912,7 +8922,7 @@ function ConfirmModal({ isOpen, onClose, onConfirm, title, message, isDeleting }
 
 // --- Forms ---
 
-function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettings, onAddSpecies, onAddSubSpecies, onAddMutation, onAddStatus, onClose, onSave }: { user: FirebaseUser, initialData?: Bird | null, cages: Cage[], birds: Bird[], pairs: Pair[], contacts: Contact[], userSettings: UserSettings | null, onAddSpecies: (n: string, cb?: (name: string, id: string) => void) => void, onAddSubSpecies: (n: string, sid: string, cb?: (name: string, id: string) => void) => void, onAddMutation: (n: string, cb?: (name: string, id: string) => void) => void, onAddStatus: (n: string) => void, onClose: () => void, onSave?: (bird: Bird) => void }) {
+function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettings, onAddSpecies, onAddSubSpecies, onAddMutation, onAddStatus, onClose, onSave }: { user: FirebaseUser, initialData?: Bird | null, cages: Cage[], birds: Bird[], pairs: Pair[], contacts: Contact[], userSettings: UserSettings | null, onAddSpecies: (n: string, cb?: (name: string, id: string) => void) => void, onAddSubSpecies: (n: string, sid: string, cb?: (name: string, id: string) => void) => void, onAddMutation: (n: string, cb?: (name: string, id: string) => void) => void, onAddStatus: (n: string, cb?: (name: string, id: string) => void) => void, onClose: () => void, onSave?: (bird: Bird) => void }) {
   const t = (text: string) => tGlobal(text, userSettings?.language || 'en');
   const symbol = getCurrencySymbol(userSettings?.currency);
   const detectedMateId = (initialData && initialData.id) ? (initialData.mateId || birds.find(b => b.mateId === initialData.id)?.id || '') : '';
@@ -9309,7 +9319,9 @@ function BirdForm({ user, initialData, cages, birds, pairs, contacts, userSettin
               statuses: current.includes(name) ? current.filter(s => s !== name) : [...current, name]
             });
           }}
-          onAdd={onAddStatus}
+          onAdd={(n) => onAddStatus(n, (createdName) => {
+            setFormData(prev => ({ ...prev, statuses: [...(prev.statuses || []), createdName] }));
+          })}
           placeholder={t('Select or add statuses')}
         />
       </div>
