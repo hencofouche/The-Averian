@@ -1135,25 +1135,95 @@ export default function App() {
 
   const userUid = user?.uid;
 
-  useEffect(() => {
-    if (!userUid) return;
+  const [pendingPaymentInfo, setPendingPaymentInfo] = useState<{ checkoutId?: string, uid?: string, email?: string } | null>(() => {
+    if (typeof window === 'undefined') return null;
     const params = new URLSearchParams(window.location.search);
-    if (params.get('payment') === 'success') {
-      // 1. Remove the parameter from the URL immediately to prevent re-triggers
-      const newUrl = window.location.pathname;
-      window.history.replaceState({}, document.title, newUrl);
-
-      // 2. Use a session storage flag to ensure it only happens once per session/load
-      const hasRenewed = sessionStorage.getItem('has_renewed_payment');
-      if (!hasRenewed) {
-        sessionStorage.setItem('has_renewed_payment', 'true');
-        handleRenew().catch(e => {
-          console.error("Renewal failed:", e);
-          toast.error("Failed to activate subscription. Please contact support.");
-        });
-      }
+    if (params.get('payment') === 'success' || params.get('checkoutId')) {
+      return {
+        checkoutId: params.get('checkoutId') || undefined,
+        uid: params.get('uid') || undefined,
+        email: params.get('email') || undefined
+      };
     }
-  }, [userUid, !!userSettings]); // Stabilized on userUid
+    // Also check localStorage for any pending checkout created in this browser
+    try {
+      const stored = localStorage.getItem('averian_pending_yoco_payment');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed && (parsed.checkoutId || parsed.userId)) {
+          // If within the last 48 hours
+          if (Date.now() - (parsed.createdAt || 0) < 48 * 60 * 60 * 1000) {
+            return {
+              checkoutId: parsed.checkoutId,
+              uid: parsed.userId,
+              email: parsed.userEmail
+            };
+          } else {
+            localStorage.removeItem('averian_pending_yoco_payment');
+          }
+        }
+      }
+    } catch (_) {}
+    return null;
+  });
+
+  useEffect(() => {
+    if (!pendingPaymentInfo || !userUid) return;
+
+    let isCancelled = false;
+
+    // Clean up URL parameters cleanly
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('payment');
+      url.searchParams.delete('checkoutId');
+      url.searchParams.delete('uid');
+      url.searchParams.delete('email');
+      window.history.replaceState({}, document.title, url.pathname + (url.search ? url.search : ''));
+    } catch (_) {}
+
+    const runActivation = async () => {
+      try {
+        // Attempt verification with the server if checkoutId or user details exist
+        try {
+          await fetch('/api/verify-checkout', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              checkoutId: pendingPaymentInfo.checkoutId,
+              userId: userUid,
+              userEmail: user?.email || pendingPaymentInfo.email || ''
+            })
+          });
+        } catch (vErr) {
+          console.warn("Backend verification attempt:", vErr);
+        }
+
+        // Apply renewal
+        await handleRenew(1);
+
+        try { localStorage.removeItem('averian_pending_yoco_payment'); } catch (_) {}
+        if (!isCancelled) {
+          setPendingPaymentInfo(null);
+          toast.success("Payment confirmed! Your 1-Year Subscription has been successfully activated.", {
+            duration: 8000
+          });
+        }
+      } catch (e) {
+        console.error("Renewal failed:", e);
+        if (!isCancelled) {
+          setPendingPaymentInfo(null);
+          toast.error("Failed to automatically activate subscription. Please use 'Verify Payment' in Subscription Center or contact support.");
+        }
+      }
+    };
+
+    runActivation();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [pendingPaymentInfo, userUid]);
 
   useEffect(() => {
     if (!userUid) return;
@@ -1789,8 +1859,8 @@ export default function App() {
     });
   };
 
-  const handleRenew = async () => {
-    if (!user || !userSettings) return;
+  const handleRenew = async (customYears: number = 1) => {
+    if (!user) return;
     
     try {
       // Fetch latest from server with graceful local state fallback
@@ -1804,30 +1874,49 @@ export default function App() {
         console.warn("Server fetch failed, using local settings state:", networkErr);
       }
       
-      const currentExpiry = currentData.account_expiry_date ? new Date(currentData.account_expiry_date) : new Date();
+      const currentExpiry = currentData?.account_expiry_date ? new Date(currentData.account_expiry_date) : null;
       const now = new Date();
       
-      // Prevent topping up if they already have more than 45 days left
-      const diffTime = currentExpiry.getTime() - now.getTime();
-      const daysLeft = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      
-      if (daysLeft > 45) {
-        console.log("Subscription already active for more than 45 days, skipping auto-renewal.");
-        return;
-      }
-
-      const baseDate = currentExpiry > now ? currentExpiry : now;
-      baseDate.setFullYear(baseDate.getFullYear() + 1);
-      
+      // Calculate base date: if current expiration is in the future, extend from that date; otherwise extend from now
+      const baseDate = (currentExpiry && !isNaN(currentExpiry.getTime()) && currentExpiry > now) 
+        ? new Date(currentExpiry.getTime()) 
+        : new Date(now.getTime());
+        
+      baseDate.setFullYear(baseDate.getFullYear() + customYears);
       const updatedExpiry = baseDate.toISOString();
-      await setDoc(doc(db, 'userSettings', user.uid), {
-        account_expiry_date: updatedExpiry
-      }, { merge: true });
       
-      setUserSettings(prev => prev ? ({ ...prev, account_expiry_date: updatedExpiry }) : null);
-      toast.success("Subscription activated for 1 year!");
+      // Update both userSettings and users collections for rock-solid sync
+      await Promise.allSettled([
+        setDoc(doc(db, 'userSettings', user.uid), {
+          account_expiry_date: updatedExpiry,
+          subscriptionPlan: 'yearly',
+          lastPaymentDate: new Date().toISOString(),
+          lastPaymentType: 'yoco_yearly'
+        }, { merge: true }),
+        setDoc(doc(db, 'users', user.uid), {
+          account_expiry_date: updatedExpiry,
+          subscriptionPlan: 'yearly',
+          updatedAt: new Date().toISOString()
+        }, { merge: true })
+      ]);
+      
+      setUserSettings(prev => ({
+        ...(prev || ({} as UserSettings)),
+        id: user.uid,
+        uid: user.uid,
+        email: user.email || prev?.email || '',
+        account_expiry_date: updatedExpiry,
+        subscriptionPlan: 'yearly',
+        lastPaymentDate: new Date().toISOString(),
+        lastPaymentType: 'yoco_yearly'
+      }));
+      toast.success(`Subscription successfully activated for ${customYears} year${customYears > 1 ? 's' : ''}! Valid until ${format(baseDate, 'PPP')}.`, {
+        duration: 8000
+      });
+      return true;
     } catch (e) {
       handleFirestoreError(e, OperationType.UPDATE, 'userSettings');
+      throw e;
     }
   };
 
@@ -7580,6 +7669,10 @@ function SubscriptionView({ settings, onRenew, onBack }: { settings: UserSetting
   const diffTime = isValidDate ? expiryDate.getTime() - now.getTime() : 0;
   const daysLeft = Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
 
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [manualCheckoutId, setManualCheckoutId] = useState('');
+  const [showRestoreBox, setShowRestoreBox] = useState(false);
+
   const statusText = isExpired 
     ? `Your access has expired. Renew to regain full access.` 
     : daysLeft === 0 
@@ -7591,9 +7684,24 @@ function SubscriptionView({ settings, onRenew, onBack }: { settings: UserSetting
       const response = await fetch('/api/create-checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ origin: window.location.origin })
+        body: JSON.stringify({ 
+          origin: window.location.origin,
+          userId: settings.uid || settings.id,
+          userEmail: settings.email || '',
+          userName: settings.displayName || ''
+        })
       });
       const data = await response.json();
+      if (data.id) {
+        try {
+          localStorage.setItem('averian_pending_yoco_payment', JSON.stringify({
+            checkoutId: data.id,
+            userId: settings.uid || settings.id,
+            userEmail: settings.email || '',
+            createdAt: Date.now()
+          }));
+        } catch (_) {}
+      }
       if (data.redirectUrl) {
         window.location.href = data.redirectUrl;
       } else {
@@ -7601,6 +7709,40 @@ function SubscriptionView({ settings, onRenew, onBack }: { settings: UserSetting
       }
     } catch (error: any) {
       toast.error("Payment failed: " + error.message);
+    }
+  };
+
+  const handleVerifyPayment = async (overrideId?: string) => {
+    setIsVerifying(true);
+    const toastId = toast.loading("Checking Yoco API for completed payment...");
+    try {
+      const idToSearch = overrideId || manualCheckoutId.trim();
+      const res = await fetch('/api/verify-checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          checkoutId: idToSearch || undefined,
+          userId: settings.uid || settings.id,
+          userEmail: settings.email || ''
+        })
+      });
+      const data = await res.json();
+      if (data.verified) {
+        try { localStorage.removeItem('averian_pending_yoco_payment'); } catch (_) {}
+        toast.success(`Yoco payment verified (${data.checkoutId || 'Success'})! Extending subscription...`, { id: toastId });
+        await onRenew();
+        setShowRestoreBox(false);
+        setManualCheckoutId('');
+      } else {
+        toast.error(
+          data.error || `Payment status is '${data.status || 'not found'}'. If you were charged, please paste your Yoco checkout reference or contact support.`,
+          { id: toastId, duration: 8000 }
+        );
+      }
+    } catch (err: any) {
+      toast.error("Verification failed: " + err.message, { id: toastId });
+    } finally {
+      setIsVerifying(false);
     }
   };
 
@@ -7645,21 +7787,79 @@ function SubscriptionView({ settings, onRenew, onBack }: { settings: UserSetting
         <div className="w-full md:w-auto flex flex-col gap-2">
           <Button 
             onClick={handlePay} 
-            disabled={!isExpired && daysLeft > 30}
             className="w-full md:w-56 py-4 text-sm font-black uppercase tracking-wider bg-gold-500 hover:bg-gold-400 text-black shadow-lg shadow-gold-500/10"
           >
             {isExpired ? 'Renew Now (R450 / yr)' : 'Extend 1 Year (R450 / yr)'}
           </Button>
-          {!isExpired && daysLeft > 30 && (
-            <p className="text-[9px] text-center text-gold-500/70 font-bold uppercase tracking-widest">
-              Renewal opens when &lt; 30 days left
-            </p>
-          )}
+          <button 
+            type="button"
+            onClick={() => setShowRestoreBox(!showRestoreBox)}
+            className="text-[10px] text-center text-gold-400 hover:text-gold-300 font-bold uppercase tracking-wider underline mt-1"
+          >
+            Already paid on Yoco? Verify / Restore
+          </button>
           <p className="text-[9px] text-center text-zinc-400 font-bold uppercase tracking-widest">
             Billed in ZAR (R450) * Powered by Yoco
           </p>
         </div>
       </Card>
+
+      {/* Payment Recovery / Verification Card */}
+      {showRestoreBox && (
+        <Card className="p-5 bg-zinc-950 border border-amber-500/40 rounded-2xl space-y-4 animate-in fade-in">
+          <div className="flex items-start justify-between">
+            <div className="space-y-1">
+              <h4 className="text-xs font-black uppercase tracking-wider text-amber-400 flex items-center gap-2">
+                <CreditCard size={15} />
+                Sync / Restore Yoco Payment
+              </h4>
+              <p className="text-xs text-zinc-300">
+                If you already completed payment on Yoco but your subscription did not automatically refresh, you can sync it instantly below.
+              </p>
+            </div>
+            <button onClick={() => setShowRestoreBox(false)} className="text-zinc-500 hover:text-white p-1 text-xs">Close</button>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+            <div className="p-3 bg-zinc-900/80 border border-zinc-800 rounded-xl space-y-2">
+              <p className="text-[11px] font-bold text-white">Option 1: Auto-Detect by Account Email</p>
+              <p className="text-[10px] text-zinc-400">
+                Checks for any recent completed payment on Yoco for <span className="text-gold-300 font-mono">{settings.email}</span>.
+              </p>
+              <Button
+                onClick={() => handleVerifyPayment()}
+                disabled={isVerifying}
+                className="w-full text-xs font-bold bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 border border-amber-500/30"
+              >
+                {isVerifying ? "Verifying..." : "Check Automatic Payment"}
+              </Button>
+            </div>
+
+            <div className="p-3 bg-zinc-900/80 border border-zinc-800 rounded-xl space-y-2">
+              <p className="text-[11px] font-bold text-white">Option 2: Enter Checkout ID / Reference</p>
+              <p className="text-[10px] text-zinc-400">
+                Paste the reference from your Yoco email receipt (e.g. <span className="font-mono text-zinc-300">ch_...</span>).
+              </p>
+              <div className="flex gap-2">
+                <Input
+                  type="text"
+                  placeholder="e.g. ch_vx5YPDjN..."
+                  value={manualCheckoutId}
+                  onChange={(e) => setManualCheckoutId(e.target.value)}
+                  className="bg-black border-zinc-700 text-xs font-mono"
+                />
+                <Button
+                  onClick={() => handleVerifyPayment(manualCheckoutId)}
+                  disabled={isVerifying || !manualCheckoutId.trim()}
+                  className="text-xs font-bold bg-gold-500 text-black hover:bg-gold-400 shrink-0"
+                >
+                  Verify
+                </Button>
+              </div>
+            </div>
+          </div>
+        </Card>
+      )}
 
       {/* Currency Conversion Rate Estimator */}
       <CurrencyConverterRates basePriceZar={450} />

@@ -43,9 +43,24 @@ export function SubscriptionGate({ settings, onRenew, children }: { settings: Us
       const response = await fetch('/api/create-checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ origin: window.location.origin })
+        body: JSON.stringify({ 
+          origin: window.location.origin,
+          userId: settings.uid || settings.id,
+          userEmail: settings.email || '',
+          userName: settings.displayName || ''
+        })
       });
       const data = await response.json();
+      if (data.id) {
+        try {
+          localStorage.setItem('averian_pending_yoco_payment', JSON.stringify({
+            checkoutId: data.id,
+            userId: settings.uid || settings.id,
+            userEmail: settings.email || '',
+            createdAt: Date.now()
+          }));
+        } catch (_) {}
+      }
       if (data.redirectUrl) {
          window.location.href = data.redirectUrl;
       } else {
@@ -56,22 +71,52 @@ export function SubscriptionGate({ settings, onRenew, children }: { settings: Us
     }
   };
 
+  const handleRestorePayment = async () => {
+    const toastId = toast.loading("Checking Yoco for recent payment...");
+    try {
+      const res = await fetch('/api/verify-checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: settings.uid || settings.id,
+          userEmail: settings.email || ''
+        })
+      });
+      const data = await res.json();
+      if (data.verified) {
+        toast.success("Payment verified! Updating your annual subscription...", { id: toastId });
+        try { localStorage.removeItem('averian_pending_yoco_payment'); } catch (_) {}
+        onRenew();
+      } else {
+        toast.error("No recent completed Yoco payment found for this account. If you paid with a different email, please contact support or enter your checkout ID in Subscription Center.", { id: toastId, duration: 6000 });
+      }
+    } catch (err: any) {
+      toast.error("Could not verify payment: " + err.message, { id: toastId });
+    }
+  };
+
   return (
     <div className="min-h-[100dvh] flex flex-col">
       {isExpired ? (
-        <div className="bg-rose-600 text-white px-4 py-2.5 text-center text-[11px] font-black uppercase tracking-wider flex items-center justify-center gap-2 flex-shrink-0 sticky top-0 z-30 shadow-md">
+        <div className="bg-rose-600 text-white px-4 py-2.5 text-center text-[11px] font-black uppercase tracking-wider flex flex-wrap items-center justify-center gap-2 flex-shrink-0 sticky top-0 z-30 shadow-md">
           <AlertTriangle size={15} className="shrink-0" />
           <span>Subscription Expired (Read-Only Mode) — You can view your entries, but adding/editing is disabled.</span>
-          <button onClick={handlePay} className="ml-4 px-3 py-1 bg-white text-rose-700 font-bold rounded-full hover:bg-zinc-100 transition-colors uppercase text-[9px] tracking-widest flex items-center gap-1 shrink-0">
-            <CreditCard size={12} />
-            Renew Now
-          </button>
+          <div className="flex items-center gap-1.5 shrink-0 ml-2">
+            <button onClick={handlePay} className="px-3 py-1 bg-white text-rose-700 font-bold rounded-full hover:bg-zinc-100 transition-colors uppercase text-[9px] tracking-widest flex items-center gap-1">
+              <CreditCard size={12} />
+              Renew Now
+            </button>
+            <button onClick={handleRestorePayment} className="px-2.5 py-1 bg-rose-800 text-rose-100 font-bold rounded-full hover:bg-rose-900 transition-colors uppercase text-[9px] tracking-widest">
+              Already Paid?
+            </button>
+          </div>
         </div>
       ) : (daysLeft <= 30) && (
         <div className="bg-gold-500 text-black-950 px-4 py-1.5 text-center text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 flex-shrink-0 sticky top-0 z-30">
           <AlertTriangle size={14} />
           {daysLeft === 0 ? "Last day" : `${daysLeft} days left`} in your {daysLeft <= 30 ? 'trial' : 'subscription'}
           <button onClick={handlePay} className="ml-2 underline font-black hover:text-black transition-colors">Renew</button>
+          <button onClick={handleRestorePayment} className="ml-2 opacity-80 hover:opacity-100 underline text-[9px]">Check payment</button>
         </div>
       )}
       <div className="flex-grow">
