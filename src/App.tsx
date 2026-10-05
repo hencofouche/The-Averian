@@ -3348,6 +3348,9 @@ export default function App() {
                               }
                             })}
                             onBirdRef={handleBirdRef}
+                            onUpdateRecord={(updated) => {
+                              setBreedingRecords(prev => prev.map(r => r.id === updated.id ? updated : r));
+                            }}
                           />
                         ))
                       ) : (
@@ -3410,6 +3413,9 @@ export default function App() {
                     onBirdRef={handleBirdRef}
                     onEditBreeding={handleEditBreeding}
                     onDeleteBreeding={handleDeleteBreeding}
+                    onUpdateBreedingRecord={(updated) => {
+                      setBreedingRecords(prev => prev.map(rec => rec.id === updated.id ? updated : rec));
+                    }}
                     onEditTransaction={handleEditTransaction}
                     onDeleteTransaction={handleDeleteTransaction}
                     onAddBreedingRecord={(pairId) => {
@@ -5580,6 +5586,7 @@ function EntityStatsView({
   onBirdRef,
   onEditBreeding,
   onDeleteBreeding,
+  onUpdateBreedingRecord,
   onEditTransaction,
   onDeleteTransaction,
   onAddBreedingRecord
@@ -5595,6 +5602,7 @@ function EntityStatsView({
   onBirdRef: (name: string) => void,
   onEditBreeding: (r: BreedingRecord) => void,
   onDeleteBreeding: (id: string) => void,
+  onUpdateBreedingRecord?: (r: BreedingRecord) => void,
   onEditTransaction: (t: Transaction) => void,
   onDeleteTransaction: (id: string) => void,
   onAddBreedingRecord?: (pairId?: string) => void
@@ -5962,6 +5970,7 @@ function EntityStatsView({
                   onDelete={() => onDeleteBreeding(r.id)}
                   onBirdRef={onBirdRef}
                   viewMode="list"
+                  onUpdateRecord={onUpdateBreedingRecord}
                 />
               ))}
               {filteredBreedingRecords.length === 0 && (
@@ -6260,7 +6269,7 @@ function TransactionCard({ transaction, bird, pair, contact, cages, birds, curre
   );
 }
 
-function BreedingRecordCard({ record, pair, male, female, birds, onEdit, onDelete, onBirdRef, viewMode = 'grid-large', currency = 'USD' }: { record: BreedingRecord, pair?: Pair, male?: Bird, female?: Bird, birds: Bird[], onEdit: () => void, onDelete: () => void, onBirdRef: (name: string) => void, viewMode?: 'grid-large' | 'list', currency?: string }) {
+function BreedingRecordCard({ record, pair, male, female, birds, onEdit, onDelete, onBirdRef, onUpdateRecord, viewMode = 'grid-large', currency = 'USD' }: { record: BreedingRecord, pair?: Pair, male?: Bird, female?: Bird, birds: Bird[], onEdit: () => void, onDelete: () => void, onBirdRef: (name: string) => void, onUpdateRecord?: (updatedRecord: BreedingRecord) => void, viewMode?: 'grid-large' | 'list', currency?: string }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [activeCandlingEgg, setActiveCandlingEgg] = useState<{ egg: EggType; index: number } | null>(null);
   const effectiveViewMode = (viewMode === 'list' && isExpanded) ? 'grid-large' : viewMode;
@@ -6274,21 +6283,51 @@ function BreedingRecordCard({ record, pair, male, female, birds, onEdit, onDelet
     if (!activeCandlingEgg) return;
     const currentEggs = record.eggs || [];
     const newEggs = [...currentEggs];
-    newEggs[activeCandlingEgg.index] = { ...newEggs[activeCandlingEgg.index], ...updates };
+    const prevEgg = newEggs[activeCandlingEgg.index] || activeCandlingEgg.egg;
+    const mergedEgg: EggType = { ...prevEgg, ...updates };
 
-    const laid = newEggs.length;
-    const hatched = newEggs.filter(e => ['Hatched', 'Died', 'Weaned'].includes(e.status)).length;
-    const weaned = newEggs.filter(e => e.status === 'Weaned').length;
+    if (updates.status && updates.status !== 'Sold') {
+      delete mergedEgg.salePrice;
+      delete mergedEgg.saleDate;
+      delete mergedEgg.buyerName;
+      delete mergedEgg.transactionId;
+    }
+    if (updates.status && !['Hatched', 'Weaned', 'Died'].includes(updates.status) && !updates.actualHatchDate) {
+      delete mergedEgg.actualHatchDate;
+    }
+
+    newEggs[activeCandlingEgg.index] = mergedEgg;
+
+    const sanitizedEggs = sanitizeData(newEggs, false);
+    const laid = sanitizedEggs.length;
+    const hatched = sanitizedEggs.filter((e: EggType) => ['Hatched', 'Died', 'Weaned'].includes(e.status)).length;
+    const weaned = sanitizedEggs.filter((e: EggType) => e.status === 'Weaned').length;
+
+    const updatedRecord: BreedingRecord = {
+      ...record,
+      eggs: sanitizedEggs,
+      eggsLaid: laid,
+      eggsHatched: hatched,
+      chicksWeaned: weaned
+    };
+
+    // Immediate optimistic update to local state
+    if (onUpdateRecord) {
+      onUpdateRecord(updatedRecord);
+    }
 
     try {
-      await updateDoc(doc(db, 'breedingRecords', record.id), {
-        eggs: newEggs,
+      const dataToSave = sanitizeData({
+        eggs: sanitizedEggs,
         eggsLaid: laid,
         eggsHatched: hatched,
         chicksWeaned: weaned
       });
+      await executeFirestoreWrite(updateDoc(doc(db, 'breedingRecords', record.id), dataToSave));
     } catch (err) {
       console.error(`Failed to update candled egg:`, err);
+      handleFirestoreError(err, OperationType.UPDATE, 'breedingRecords');
+      throw err;
     }
   };
 

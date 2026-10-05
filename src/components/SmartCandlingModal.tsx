@@ -154,7 +154,7 @@ interface SmartCandlingModalProps {
   pair?: Pair;
   male?: Bird;
   female?: Bird;
-  onUpdateEgg: (updates: Partial<Egg>) => void;
+  onUpdateEgg: (updates: Partial<Egg>) => void | Promise<void>;
   onClose: () => void;
   onAddLocalTask?: (title: string, date: string, description?: string) => void;
 }
@@ -217,15 +217,21 @@ export function SmartCandlingModal({
         }
       }
 
-      onUpdateEgg({
+      const cleanUpdates: Partial<Egg> = {
         status: selectedStatus,
-        notes: candlingNotes,
-        actualHatchDate: actualHatch || undefined,
-        salePrice: selectedStatus === 'Sold' ? numSalePrice : undefined,
-        saleDate: selectedStatus === 'Sold' ? saleDate : undefined,
-        buyerName: selectedStatus === 'Sold' ? buyerName : undefined,
-        transactionId: selectedStatus === 'Sold' ? transactionId : undefined
-      });
+        notes: candlingNotes || ''
+      };
+      if ((selectedStatus === 'Hatched' || selectedStatus === 'Weaned') && actualHatch && actualHatch.trim()) {
+        cleanUpdates.actualHatchDate = actualHatch.trim();
+      }
+      if (selectedStatus === 'Sold') {
+        if (numSalePrice > 0) cleanUpdates.salePrice = numSalePrice;
+        if (saleDate) cleanUpdates.saleDate = saleDate;
+        if (buyerName) cleanUpdates.buyerName = buyerName;
+        if (transactionId) cleanUpdates.transactionId = transactionId;
+      }
+
+      await onUpdateEgg(cleanUpdates);
 
       if (selectedStatus === 'Sold') {
         toast.success(`Egg #${eggIndex + 1} marked as Sold! Added to Pair ROI & Accounting.`);
